@@ -1,82 +1,197 @@
-import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { LoadingPage } from "./components/LoadingSpinner";
+import { Header } from "./components/Header";
+import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
+import { Home } from "./pages/Home";
+import { BoardList } from "./pages/BoardList";
+import { BoardDetail } from "./pages/BoardDetail";
+import { BoardForm } from "./pages/BoardForm";
 
-//페이지들(실제 파일이 저장된 경로)
-import Login from "./pages/Login";
-import MemberCreate from "./pages/MemberCreate";
-import TopNav from "./components/TopNav";
+// 보호된 라우트 컴포넌트
+const ProtectedRoute = ({ children }) => {
+    const { isAuthenticated, loading } = useAuth();
 
-import BoardsList from "./pages/BoardsList";
-import BoardDetail from "./pages/BoardDetail";  // ⭐ 추가!
-import Ranks from "./pages/Ranks";
-import News from "./pages/News";
-import Calculators from "./pages/Calculators";
-import Mypage from "./pages/Mypage";
-import ApiConsole from "./pages/ApiConsole";
+    if (loading) {
+        return <LoadingPage />;
+    }
 
-function RequireAuth({ children }) {
-    const token = localStorage.getItem("accessToken");
-    return token ? children : <Navigate to="/login" replace />;
-}
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
 
-function AppLayout() {
+    return children;
+};
+
+// 앱 레이아웃
+const AppLayout = ({ children }) => {
     return (
         <div className="min-h-screen bg-slate-50">
-            <TopNav />
-            <main className="mx-auto max-w-6xl px-4 py-8">
-                <Outlet />
+            <Header />
+            <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+                {children}
             </main>
         </div>
     );
-}
+};
 
-
-// 각각의 라우팅 주소를 정의하는 공간인듯?
-export default function App() {
+function App() {
     return (
-        <Routes>
-            {/* 첫 진입은 로그인 */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+        <BrowserRouter>
+            <AuthProvider>
+                <Routes>
+                    {/* 공개 라우트 */}
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
 
-            {/* 로그인/회원가입은 공개 */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/members/create" element={<MemberCreate />} />
+                    {/* 보호된 라우트 */}
+                    <Route
+                        path="/app"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <Home />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
 
-            {/* 로그인 후 영역: /app/* */}
-            <Route
-                path="/app"
-                element={
-                    <RequireAuth>
-                        <AppLayout />
-                    </RequireAuth>
-                }
-            >
-                {/* /app 진입 시 기본 페이지 */}
-                <Route index element={<Navigate to="boards/main" replace />} />
+                    {/* 게시판 목록 */}
+                    <Route
+                        path="/app/boards/:kind"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <BoardList />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
 
-                {/* ⭐ 게시글 상세 - 목록보다 먼저 와야 함! */}
-                <Route path="boards/:kind/:boardId" element={<BoardDetail />} />
+                    {/* 게시글 작성 */}
+                    <Route
+                        path="/app/boards/:kind/new"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <BoardForm />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
 
-                {/* 게시판(목록/검색) */}
-                <Route path="boards/:kind" element={<BoardsList />} />
+                    {/* 게시글 수정 */}
+                    <Route
+                        path="/app/boards/:kind/:boardId/edit"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <BoardForm />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
 
-                {/* 랭킹: boards 랭킹 + members 랭킹 묶기 */}
-                <Route path="ranks" element={<Ranks />} />
+                    {/* 게시글 상세 */}
+                    <Route
+                        path="/app/boards/:kind/:boardId"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <BoardDetail />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
 
-                {/* 뉴스: GET /news */}
-                <Route path="news" element={<News />} />
+                    {/* 기타 페이지들 (플레이스홀더) */}
+                    <Route
+                        path="/app/ranks"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <PlaceholderPage title="랭킹" />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/news"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <PlaceholderPage title="뉴스" />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/calculators"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <PlaceholderPage title="전기요금 계산기" />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/mypage"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <PlaceholderPage title="마이페이지" />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
 
-                {/* 전기요금: POST /calculators */}
-                <Route path="calculators" element={<Calculators />} />
+                    {/* 기본 리다이렉트 */}
+                    <Route path="/" element={<Navigate to="/app" replace />} />
+                    <Route path="*" element={<Navigate to="/app" replace />} />
+                </Routes>
 
-                {/* 내정보: GET /members/{id}, PATCH /members/{id}, 프로필 업로드 등 */}
-                <Route path="mypage" element={<Mypage />} />
-
-                {/* api 콘솔로 이동 */}
-                <Route path="console" element={<ApiConsole />} />
-
-            </Route>
-            {/* 기타 모든동작 라우팅 페이지는 로그인화면으로 이동 */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+                {/* Toast 알림 */}
+                <Toaster
+                    position="top-right"
+                    toastOptions={{
+                        duration: 3000,
+                        style: {
+                            background: "#ffffff",
+                            color: "#0f172a",
+                            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                            borderRadius: "12px",
+                            padding: "12px 16px",
+                        },
+                        success: {
+                            iconTheme: {
+                                primary: "#16a34a",
+                                secondary: "#ffffff",
+                            },
+                        },
+                        error: {
+                            iconTheme: {
+                                primary: "#dc2626",
+                                secondary: "#ffffff",
+                            },
+                        },
+                    }}
+                />
+            </AuthProvider>
+        </BrowserRouter>
     );
 }
+
+// 플레이스홀더 페이지
+const PlaceholderPage = ({ title }) => {
+    return (
+        <div className="card p-8 text-center">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">{title}</h1>
+            <p className="text-slate-600">이 페이지는 개발 예정입니다.</p>
+        </div>
+    );
+};
+
+export default App;

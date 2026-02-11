@@ -18,4 +18,15 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+          utils: ["axios", "date-fns"],
+        },
+      },
+    },
+  },
 });

@@ -1,230 +1,285 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import http from "../api/http";
+import {
+    ArrowLeft,
+    Eye,
+    Heart,
+    MessageCircle,
+    Download,
+    FileText,
+    Image as ImageIcon,
+    Trash2,
+    Edit,
+    Send,
+} from "lucide-react";
+import { useBoardDetail } from "../hooks/useBoards";
+import { LoadingSpinner } from "../components/LoadingSpinner";
+import { ErrorMessage } from "../components/ErrorMessage";
+import {
+    formatDate,
+    formatNumber,
+    isImageFile,
+    getBoardKindLabel,
+    getBoardKindColor,
+} from "../utils/helpers";
+import api from "../utils/api";
+import toast from "react-hot-toast";
 
-export default function BoardDetail() {
-    const params = useParams();
-    const { boardId, kind } = params;
+export const BoardDetail = () => {
+    const { kind, boardId } = useParams();
     const navigate = useNavigate();
-    const [board, setBoard] = useState(null);
-    const [error, setError] = useState(null);
+    const { board, loading, error, refetch } = useBoardDetail(boardId);
+    const [commentText, setCommentText] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
-    useEffect(() => {
-        let mounted = true;
-
-        const fetchBoard = async () => {
-            if (!boardId) {
-                setError("게시글 ID가 없습니다.");
-                return;
-            }
-
-            try {
-                console.log(`Fetching board: /boards/${boardId}`);
-                const res = await http.get(`/boards/${boardId}`);
-                if (mounted) setBoard(res.data);
-            } catch (err) {
-                console.error("Board fetch error:", err);
-
-                if (err.status === 401 || err.status === 403) {
-                    setError("게시글을 조회할 권한이 없습니다.");
-                    return;
-                }
-
-                if (err.status === 404) {
-                    setError("게시글을 찾을 수 없습니다.");
-                    setTimeout(() => {
-                        navigate(`/app/boards/${kind || 'main'}`, { replace: true });
-                    }, 2000);
-                    return;
-                }
-
-                if (err.status === 500) {
-                    setError("서버에서 오류가 발생했습니다.");
-                    return;
-                }
-
-                setError(`오류 발생: ${err.message}`);
-            }
-        };
-
-        fetchBoard();
-        return () => {
-            mounted = false;
-        };
-    }, [boardId, kind, navigate]);
-
-    // 파일 확장자로 이미지 여부 판단
-    const isImageFile = (filename) => {
-        if (!filename) return false;
-        const ext = filename.toLowerCase().split('.').pop();
-        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
-    };
-
-    // 파일명 추출 (URL에서)
-    const getFileName = (url) => {
-        if (!url) return '파일';
+    const handleLike = async () => {
         try {
-            return decodeURIComponent(url.split('/').pop().split('?')[0]);
-        } catch {
-            return url.split('/').pop();
+            await api.post(`/boards/${boardId}/like`);
+            toast.success("좋아요!");
+            refetch();
+        } catch (error) {
+            toast.error("좋아요 실패");
         }
     };
 
+    const handleDelete = async () => {
+        if (!window.confirm("정말 삭제하시겠습니까?")) return;
+
+        try {
+            await api.delete(`/boards/${boardId}`);
+            toast.success("게시글이 삭제되었습니다");
+            navigate(`/app/boards/${kind}`);
+        } catch (error) {
+            toast.error("삭제 실패");
+        }
+    };
+
+    const handleCommentSubmit = async (e) => {
+        e.preventDefault();
+        if (!commentText.trim()) return;
+
+        setSubmitting(true);
+        try {
+            await api.post(`/boards/${boardId}/comments`, {
+                content: commentText,
+            });
+            setCommentText("");
+            toast.success("댓글이 등록되었습니다");
+            refetch();
+        } catch (error) {
+            toast.error("댓글 등록 실패");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    if (loading) {
+        return <LoadingSpinner text="게시글을 불러오는 중..." />;
+    }
+
     if (error) {
         return (
-            <div className="p-6">
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-                    <div className="font-semibold mb-2">⚠️ 오류 발생</div>
-                    <div className="mb-4">{error}</div>
-                </div>
-
+            <div className="space-y-4">
                 <button
-                    onClick={() => navigate(`/app/boards/${kind || 'main'}`)}
-                    className="mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+                    onClick={() => navigate(`/app/boards/${kind}`)}
+                    className="btn-secondary"
                 >
-                    ← 목록으로 돌아가기
+                    <ArrowLeft className="h-4 w-4 inline mr-2" />
+                    목록으로
                 </button>
+                <ErrorMessage message={error} />
             </div>
         );
     }
 
     if (!board) {
-        return (
-            <div className="p-6">
-                <div className="text-lg mb-2">로딩중...</div>
-                <div className="text-sm text-slate-500">
-                    게시글 #{boardId}를 불러오는 중입니다.
-                </div>
-            </div>
-        );
+        return <ErrorMessage message="게시글을 찾을 수 없습니다" />;
     }
 
-    // uploadFiles 배열 가져오기
     const uploadFiles = board.upload_files || board.uploadFiles || [];
 
     return (
-        <div className="p-6 max-w-4xl mx-auto">
-            {/* 상단 버튼 */}
-            <button
-                onClick={() => navigate(`/app/boards/${kind || 'main'}`)}
-                className="mb-4 text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1"
-            >
-                ← 목록으로
-            </button>
+        <div className="space-y-6">
+            {/* 상단 액션 */}
+            <div className="flex items-center justify-between">
+                <button
+                    onClick={() => navigate(`/app/boards/${kind}`)}
+                    className="btn-secondary"
+                >
+                    <ArrowLeft className="h-4 w-4 inline mr-2" />
+                    목록으로
+                </button>
 
-            {/* 제목 & 메타 정보 */}
-            <div className="border-b pb-4 mb-6">
-                <h1 className="text-2xl font-bold mb-3">{board.title}</h1>
-                <div className="flex items-center gap-4 text-sm text-slate-600">
-                    <span className="font-medium">
-                        {board.board_creator || board.boardCreator || '익명'}
-                    </span>
-                    <span>•</span>
-                    <span>조회 {board.view_count || board.viewCount || 0}</span>
-                    <span>•</span>
-                    <span>좋아요 {board.like_count || board.likeCount || 0}</span>
-                    {board.created_at && (
-                        <>
-                            <span>•</span>
-                            <span>{new Date(board.created_at).toLocaleDateString()}</span>
-                        </>
+                <div className="flex items-center gap-2">
+                    <button onClick={handleLike} className="btn-secondary">
+                        <Heart className="h-4 w-4 inline mr-2" />
+                        좋아요 {formatNumber(board.like_count || board.likeCount || 0)}
+                    </button>
+                    <button
+                        onClick={() => navigate(`/app/boards/${kind}/${boardId}/edit`)}
+                        className="btn-secondary"
+                    >
+                        <Edit className="h-4 w-4" />
+                    </button>
+                    <button onClick={handleDelete} className="btn-secondary text-red-600">
+                        <Trash2 className="h-4 w-4" />
+                    </button>
+                </div>
+            </div>
+
+            {/* 게시글 내용 */}
+            <div className="card p-8">
+                {/* 헤더 */}
+                <div className="border-b pb-6 mb-6">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                        <h1 className="text-3xl font-bold text-slate-900 flex-1">
+                            {board.title}
+                        </h1>
+                        <span
+                            className={`badge ${getBoardKindColor(
+                                board.board_kind || board.boardKind
+                            )} flex-shrink-0`}
+                        >
+              {getBoardKindLabel(board.board_kind || board.boardKind)}
+            </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm">
+            <span className="font-semibold text-slate-900">
+              {board.board_creator || board.boardCreator || "익명"}
+            </span>
+                        <span className="text-slate-500">
+              {formatDate(board.created_at)}
+            </span>
+                        <div className="flex items-center gap-4 text-slate-500">
+              <span className="flex items-center gap-1">
+                <Eye className="h-4 w-4" />
+                  {formatNumber(board.view_count || board.viewCount || 0)}
+              </span>
+                            <span className="flex items-center gap-1">
+                <MessageCircle className="h-4 w-4" />
+                                {formatNumber(board.comment_count || board.commentCount || 0)}
+              </span>
+                            <span className="flex items-center gap-1">
+                <Heart className="h-4 w-4" />
+                                {formatNumber(board.like_count || board.likeCount || 0)}
+              </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 본문 */}
+                <div className="prose max-w-none mb-8">
+                    <div className="whitespace-pre-wrap leading-relaxed text-slate-800">
+                        {board.contents || board.content || ""}
+                    </div>
+                </div>
+
+                {/* 첨부 파일 */}
+                {uploadFiles.length > 0 && (
+                    <div className="border-t pt-6">
+                        <h3 className="text-sm font-semibold text-slate-900 mb-4">
+                            첨부파일 ({uploadFiles.length})
+                        </h3>
+                        <div className="space-y-2">
+                            {uploadFiles.map((file, index) => (
+                                <FileItem key={index} file={file} />
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* 댓글 섹션 */}
+            <div className="card p-6">
+                <h2 className="text-lg font-bold text-slate-900 mb-6">
+                    댓글 ({formatNumber(board.comment_count || board.commentCount || 0)})
+                </h2>
+
+                {/* 댓글 작성 */}
+                <form onSubmit={handleCommentSubmit} className="mb-8">
+                    <div className="flex gap-3">
+            <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="댓글을 입력하세요..."
+                className="input-base resize-none"
+                rows="3"
+            />
+                        <button
+                            type="submit"
+                            disabled={!commentText.trim() || submitting}
+                            className="btn-primary h-fit"
+                        >
+                            <Send className="h-4 w-4" />
+                        </button>
+                    </div>
+                </form>
+
+                {/* 댓글 목록 */}
+                <div className="space-y-4">
+                    {(board.comments || []).map((comment) => (
+                        <CommentItem key={comment.id} comment={comment} />
+                    ))}
+                    {(!board.comments || board.comments.length === 0) && (
+                        <p className="text-center text-sm text-slate-500 py-8">
+                            첫 댓글을 작성해보세요!
+                        </p>
                     )}
                 </div>
             </div>
+        </div>
+    );
+};
 
-            {/* 본문 */}
-            <div className="prose max-w-none mb-8">
-                <div className="whitespace-pre-wrap leading-relaxed text-slate-800">
-                    {board.contents || board.content || '내용이 없습니다.'}
+const FileItem = ({ file }) => {
+    const fileName = file.original_name || file.originalName || file.name || "";
+    const fileUrl = file.file_url || file.fileUrl || file.url || "";
+
+    return (
+        <a
+            href={fileUrl}
+            download
+            className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
+        >
+            {isImageFile(fileName) ? (
+                <div className="h-10 w-10 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <ImageIcon className="h-5 w-5 text-blue-600" />
                 </div>
-            </div>
-
-            {/* 첨부 이미지들 미리보기 */}
-            {uploadFiles.length > 0 && (
-                <div className="border-t pt-6 mb-6">
-                    <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                        📎 첨부파일 ({uploadFiles.length})
-                    </h3>
-
-                    <div className="space-y-4">
-                        {uploadFiles.map((file, idx) => {
-                            const filename = file.file_name || file.fileName || getFileName(file.image_path || file.imagePath);
-                            const filepath = file.image_path || file.imagePath;
-                            const isImage = isImageFile(filename) || isImageFile(filepath);
-
-                            return (
-                                <div key={idx} className="border rounded-lg p-4 bg-slate-50">
-                                    {isImage ? (
-                                        // 이미지 파일 - 미리보기
-                                        <div>
-                                            <div className="mb-2 text-sm text-slate-600">
-                                                🖼️ {filename}
-                                            </div>
-                                            <a
-                                                href={filepath}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="block"
-                                            >
-                                                <img
-                                                    src={filepath}
-                                                    alt={filename}
-                                                    className="max-w-full h-auto rounded border hover:opacity-90 transition-opacity cursor-pointer"
-                                                    onError={(e) => {
-                                                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23f1f5f9" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8"%3E이미지를 불러올 수 없습니다%3C/text%3E%3C/svg%3E';
-                                                    }}
-                                                />
-                                            </a>
-                                            <div className="mt-2">
-                                                <a
-                                                    href={filepath}
-                                                    download={filename}
-                                                    className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
-                                                >
-                                                    ⬇️ 다운로드
-                                                </a>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        // 일반 파일 - 다운로드 링크만
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 text-sm text-slate-700">
-                                                <span>📄</span>
-                                                <span className="font-medium">{filename}</span>
-                                            </div>
-                                            <a
-                                                href={filepath}
-                                                download={filename}
-                                                className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                                            >
-                                                ⬇️ 다운로드
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+            ) : (
+                <div className="h-10 w-10 rounded bg-slate-100 flex items-center justify-center flex-shrink-0">
+                    <FileText className="h-5 w-5 text-slate-600" />
                 </div>
             )}
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900 truncate">
+                    {fileName}
+                </p>
+                <p className="text-xs text-slate-500">
+                    {file.file_size || file.fileSize || ""}
+                </p>
+            </div>
+            <Download className="h-5 w-5 text-slate-400 group-hover:text-primary-600 flex-shrink-0" />
+        </a>
+    );
+};
 
-            {/* 하단 액션 버튼들 */}
-            <div className="border-t pt-6 flex gap-3">
-                <button
-                    onClick={() => navigate(`/app/boards/${kind || 'main'}`)}
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                    목록
-                </button>
-
-                {/* 추가 기능 버튼들 (나중에 구현) */}
-                {/* <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-                    수정
-                </button>
-                <button className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
-                    삭제
-                </button> */}
+const CommentItem = ({ comment }) => {
+    return (
+        <div className="flex gap-4 p-4 rounded-lg bg-slate-50">
+            <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+          <span className="text-sm font-semibold text-slate-900">
+            {comment.author || comment.creator || "익명"}
+          </span>
+                    <span className="text-xs text-slate-500">
+            {formatDate(comment.created_at || comment.createdAt)}
+          </span>
+                </div>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                    {comment.content}
+                </p>
             </div>
         </div>
     );
-}
+};
