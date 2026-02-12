@@ -85,7 +85,7 @@ export const Register = () => {
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900 mb-2">회원가입</h1>
                     <p className="text-slate-600">
-                        탄소저감 커뮤니티에 오신 것을 환영합니다
+                        벌꿀오소리 커뮤니티에 오신 것을 환영합니다
                     </p>
                 </div>
 

@@ -69,7 +69,7 @@ export const Home = () => {
                     </h1>
                 </div>
                 <p className="text-primary-100 text-lg">
-                    탄소저감 커뮤니티에서 친환경 활동을 공유하고 소통하세요.
+                    벌꿀오소리 커뮤니티에서 일상을 공유하고 소통하세요.
                 </p>
             </div>
 

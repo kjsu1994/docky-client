@@ -9,6 +9,10 @@ import { Home } from "./pages/Home";
 import { BoardList } from "./pages/BoardList";
 import { BoardDetail } from "./pages/BoardDetail";
 import { BoardForm } from "./pages/BoardForm";
+import {Mypage} from "./pages/Mypage.jsx";
+import {Ranks} from "./pages/Ranks.jsx";
+import {News} from "./pages/News.jsx";
+import {Calculators} from "./pages/Calculators.jsx";
 
 // 보호된 라우트 컴포넌트
 const ProtectedRoute = ({ children }) => {
@@ -112,7 +116,7 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <AppLayout>
-                                    <PlaceholderPage title="랭킹" />
+                                    <Ranks title="랭킹" />
                                 </AppLayout>
                             </ProtectedRoute>
                         }
@@ -122,7 +126,7 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <AppLayout>
-                                    <PlaceholderPage title="뉴스" />
+                                    <News title="뉴스" />
                                 </AppLayout>
                             </ProtectedRoute>
                         }
@@ -132,7 +136,7 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <AppLayout>
-                                    <PlaceholderPage title="전기요금 계산기" />
+                                    <Calculators title="전기요금 계산기" />
                                 </AppLayout>
                             </ProtectedRoute>
                         }
@@ -142,7 +146,7 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <AppLayout>
-                                    <PlaceholderPage title="마이페이지" />
+                                    <Mypage title="마이페이지" />
                                 </AppLayout>
                             </ProtectedRoute>
                         }

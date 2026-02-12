@@ -48,7 +48,7 @@ export const Header = () => {
                         </div>
                         <div>
                             <div className="text-base font-bold text-slate-900">
-                                탄소저감 커뮤니티
+                                벌꿀오소리 커뮤니티
                             </div>
                             <div className="text-xs text-slate-500 hidden sm:block">
                                 Community Platform
