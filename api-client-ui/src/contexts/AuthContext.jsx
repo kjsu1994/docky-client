@@ -38,20 +38,29 @@ export const AuthProvider = ({ children }) => {
         initAuth();
     }, []);
 
+    //2026.02.12 수정
     const login = async (email, password) => {
         try {
             const response = await api.post("/members/login", { email, password });
 
-            const { accessToken, refreshToken } = response.data;
+            // 헤더에서 토큰 추출 (대소문자 및 Bearer 접두어 대응)
+            const authHeader = response.headers?.authorization || response.headers?.Authorization;
+            const refreshHeader = response.headers?.refresh || response.headers?.Refresh;
+
+            const accessToken = authHeader?.replace(/^Bearer\s+/i, "");
+            const refreshToken = refreshHeader?.replace(/^Bearer\s+/i, "");
+
+            if (!accessToken) throw new Error("토큰을 찾을 수 없습니다.");
+
             localStorage.setItem("accessToken", accessToken);
             localStorage.setItem("refreshToken", refreshToken);
 
-            // 사용자 정보 가져오기
+            // 유저 정보를 가져올 때 토큰이 바로 적용되도록 설정 확인 필요
             const userResponse = await api.get("/members");
             setUser(userResponse.data.data || userResponse.data);
 
             toast.success("로그인 성공!");
-            navigate("/app");
+            navigate("/app"); // 이제 정상 실행될 겁니다!
         } catch (error) {
             toast.error(error.response?.data?.message || "로그인 실패");
             throw error;

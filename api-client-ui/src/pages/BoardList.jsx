@@ -26,11 +26,18 @@ import {
 export const BoardList = () => {
     const { kind = "FREE_BOARD" } = useParams();
     const navigate = useNavigate();
-    const [page, setPage] = useState(1);
+
+    // 백엔드 API가 0-based index이므로 0으로 시작합니다.
+    const [page, setPage] = useState(0);
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("latest");
 
     const { boards, loading, error, pageInfo } = useBoards(kind, page, 10);
+
+    // 게시판 종류(kind)가 바뀌면 페이지를 다시 0으로 초기화합니다.
+    useEffect(() => {
+        setPage(0);
+    }, [kind]);
 
     // 검색 처리
     const filteredBoards = boards.filter((board) => {
@@ -57,6 +64,12 @@ export const BoardList = () => {
         }
     });
 
+    const handlePageChange = (newPage) => {
+        setPage(newPage);
+        // 페이지 이동 시 사용자가 흐름을 놓치지 않게 화면 상단으로 부드럽게 스크롤합니다.
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     if (loading) {
         return <LoadingSpinner text="게시글을 불러오는 중..." />;
     }
@@ -74,7 +87,7 @@ export const BoardList = () => {
                         {getBoardKindLabel(kind)}
                     </h1>
                     <p className="text-sm text-slate-600 mt-1">
-                        총 {formatNumber(pageInfo.totalElements)}개의 게시글
+                        총 {formatNumber(pageInfo?.totalElements || 0)}개의 게시글
                     </p>
                 </div>
                 <button
@@ -132,24 +145,28 @@ export const BoardList = () => {
                     }
                 />
             ) : (
-                <div className="space-y-3">
-                    {sortedBoards.map((board) => (
-                        <BoardCard
-                            key={board.board_id || board.boardId}
-                            board={board}
-                            kind={kind}
-                        />
-                    ))}
-                </div>
-            )}
+                <>
+                    <div className="space-y-3">
+                        {sortedBoards.map((board) => (
+                            <BoardCard
+                                key={board.board_id || board.boardId}
+                                board={board}
+                                kind={kind}
+                            />
+                        ))}
+                    </div>
 
-            {/* 페이지네이션 */}
-            {!searchTerm && sortedBoards.length > 0 && (
-                <Pagination
-                    currentPage={page}
-                    totalPages={pageInfo.totalPages}
-                    onPageChange={setPage}
-                />
+                    {/* 페이지네이션: 검색 중이 아닐 때만 노출하거나 전체 데이터 기준으로 노출 */}
+                    {!searchTerm && pageInfo?.totalPages > 1 && (
+                        <div className="py-4">
+                            <Pagination
+                                currentPage={page}
+                                totalPages={pageInfo.totalPages}
+                                onPageChange={handlePageChange}
+                            />
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
@@ -166,51 +183,47 @@ const BoardCard = ({ board, kind }) => {
         >
             <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                    {/* 제목 */}
                     <h3 className="font-semibold text-slate-900 mb-2 group-hover:text-primary-600 transition-colors line-clamp-1">
                         {board.title}
                         {hasFiles && (
-                            <span className="ml-2 text-xs text-slate-400">[파일]</span>
+                            <span className="ml-2 text-xs text-slate-400 font-normal">[파일]</span>
                         )}
                     </h3>
 
-                    {/* 내용 미리보기 */}
                     <p className="text-sm text-slate-600 mb-3 line-clamp-2">
                         {truncateText(board.contents || board.content || "", 150)}
                     </p>
 
-                    {/* 메타 정보 */}
                     <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-            <span className="font-medium text-slate-700">
-              {board.board_creator || board.boardCreator || "익명"}
-            </span>
+                        <span className="font-medium text-slate-700">
+                          {board.board_creator || board.boardCreator || "익명"}
+                        </span>
                         <span className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
+                            <Calendar className="h-3 w-3" />
                             {formatRelativeTime(board.created_at)}
-            </span>
+                        </span>
                         <span className="flex items-center gap-1">
-              <Eye className="h-3 w-3" />
+                            <Eye className="h-3 w-3" />
                             {formatNumber(board.view_count || board.viewCount || 0)}
-            </span>
+                        </span>
                         <span className="flex items-center gap-1">
-              <MessageCircle className="h-3 w-3" />
+                            <MessageCircle className="h-3 w-3" />
                             {formatNumber(board.comment_count || board.commentCount || 0)}
-            </span>
+                        </span>
                         <span className="flex items-center gap-1">
-              <Heart className="h-3 w-3" />
+                            <Heart className="h-3 w-3" />
                             {formatNumber(board.like_count || board.likeCount || 0)}
-            </span>
+                        </span>
                     </div>
                 </div>
 
-                {/* 카테고리 뱃지 */}
                 <span
                     className={`badge ${getBoardKindColor(
                         board.board_kind || board.boardKind
                     )} flex-shrink-0`}
                 >
-          {getBoardKindLabel(board.board_kind || board.boardKind)}
-        </span>
+                    {getBoardKindLabel(board.board_kind || board.boardKind)}
+                </span>
             </div>
         </Link>
     );

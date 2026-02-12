@@ -14,7 +14,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         // /api/members/login -> /members/login 으로 바꿔서 백엔드에 전달
-        rewrite: (path) => path.replace(/^\/api/, ""),
+         rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },
