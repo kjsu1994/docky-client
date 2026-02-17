@@ -6,6 +6,51 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { formatNumber } from "../utils/helpers";
 
+const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
+
+const normalizeList = (response) => {
+    const data = unwrapData(response);
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.content)) return data.content;
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.ranks)) return data.ranks;
+    return [];
+};
+
+const getErrorMessage = (error, fallbackMessage) => {
+    const status = error?.response?.status;
+    const message = error?.response?.data?.message;
+    if (status) {
+        return `${fallbackMessage} (HTTP ${status}${message ? `: ${message}` : ""})`;
+    }
+    return fallbackMessage;
+};
+
+const fetchWithFallbackEndpoints = async (endpoints) => {
+    let lastError = null;
+    for (const endpoint of endpoints) {
+        try {
+            const response = await api.get(endpoint);
+            return normalizeList(response);
+        } catch (error) {
+            lastError = error;
+            const status = error?.response?.status;
+            // 404는 다음 후보 엔드포인트로 폴백
+            if (status === 404) {
+                continue;
+            }
+            // 500 등 서버 오류도 후보가 남아있으면 폴백 시도
+            if (endpoints[endpoints.length - 1] !== endpoint) {
+                continue;
+            }
+            throw error;
+        }
+    }
+    if (lastError) throw lastError;
+    return [];
+};
+
 export const Ranks = () => {
     const [activeTab, setActiveTab] = useState("boards"); // boards, level, donation
     const [boardRankType, setBoardRankType] = useState("FREE_BOARD");
@@ -14,6 +59,7 @@ export const Ranks = () => {
     const [donationRanks, setDonationRanks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [retryKey, setRetryKey] = useState(0);
 
     // 게시판 랭킹 불러오기
     useEffect(() => {
@@ -23,30 +69,47 @@ export const Ranks = () => {
             setLoading(true);
             setError("");
             try {
-                let endpoint = "";
-                switch (boardRankType) {
-                    case "FREE_BOARD":
-                        endpoint = "/boards/rankFreeBoards";
-                        break;
-                    case "ECO_REVIEW":
-                        endpoint = "/boards/rankEcoBoards";
-                        break;
-                    case "GREEN_ACTIVE":
-                        endpoint = "/boards/rankGreenBoards";
-                        break;
+                // 최신 명세 반영: 단일 랭킹 API에 kind 쿼리를 전달한다.
+                try {
+                    const response = await api.get("/boards/rankBoards", {
+                        params: { kind: boardRankType },
+                    });
+                    setBoardRanks(normalizeList(response));
+                } catch (primaryError) {
+                    // 구버전 서버 호환: 404일 때만 기존 분리 엔드포인트로 재시도한다.
+                    if (primaryError?.response?.status !== 404) {
+                        throw primaryError;
+                    }
+
+                    let fallbackEndpoint = "";
+                    switch (boardRankType) {
+                        case "FREE_BOARD":
+                            fallbackEndpoint = "/boards/rankFreeBoards";
+                            break;
+                        case "ECO_REVIEW":
+                            fallbackEndpoint = "/boards/rankEcoBoards";
+                            break;
+                        case "GREEN_ACTIVE":
+                            fallbackEndpoint = "/boards/rankGreenBoards";
+                            break;
+                        default:
+                            fallbackEndpoint = "/boards/rankFreeBoards";
+                            break;
+                    }
+
+                    const fallbackResponse = await api.get(fallbackEndpoint);
+                    setBoardRanks(normalizeList(fallbackResponse));
                 }
-                const response = await api.get(endpoint);
-                setBoardRanks(response.data?.data || response.data || []);
             } catch (err) {
                 console.error("Failed to fetch board ranks:", err);
-                setError("게시판 랭킹을 불러오는데 실패했습니다.");
+                setError(getErrorMessage(err, "게시판 랭킹을 불러오는데 실패했습니다."));
             } finally {
                 setLoading(false);
             }
         };
 
         fetchBoardRanks();
-    }, [activeTab, boardRankType]);
+    }, [activeTab, boardRankType, retryKey]);
 
     // 레벨 랭킹 불러오기
     useEffect(() => {
@@ -56,18 +119,22 @@ export const Ranks = () => {
             setLoading(true);
             setError("");
             try {
-                const response = await api.get("/members/levelRanks");
-                setLevelRanks(response.data?.data || response.data || []);
+                const ranks = await fetchWithFallbackEndpoints([
+                    "/members/levelRanks",
+                    "/members/level-ranks",
+                    "/members/ranks/level",
+                ]);
+                setLevelRanks(ranks);
             } catch (err) {
                 console.error("Failed to fetch level ranks:", err);
-                setError("레벨 랭킹을 불러오는데 실패했습니다.");
+                setError(getErrorMessage(err, "레벨 랭킹을 불러오는데 실패했습니다."));
             } finally {
                 setLoading(false);
             }
         };
 
         fetchLevelRanks();
-    }, [activeTab]);
+    }, [activeTab, retryKey]);
 
     // 기부 랭킹 불러오기
     useEffect(() => {
@@ -78,17 +145,17 @@ export const Ranks = () => {
             setError("");
             try {
                 const response = await api.get("/members/donationRanks");
-                setDonationRanks(response.data?.data || response.data || []);
+                setDonationRanks(normalizeList(response));
             } catch (err) {
                 console.error("Failed to fetch donation ranks:", err);
-                setError("기부 랭킹을 불러오는데 실패했습니다.");
+                setError(getErrorMessage(err, "기부 랭킹을 불러오는데 실패했습니다."));
             } finally {
                 setLoading(false);
             }
         };
 
         fetchDonationRanks();
-    }, [activeTab]);
+    }, [activeTab, retryKey]);
 
     const getRankIcon = (rank) => {
         if (rank === 1) return <Crown className="h-6 w-6 text-yellow-500" />;
@@ -170,7 +237,15 @@ export const Ranks = () => {
 
             {/* 로딩 및 에러 처리 */}
             {loading && <LoadingSpinner text="랭킹 데이터 로딩 중..." />}
-            {error && <ErrorMessage message={error} />}
+            {error && (
+                <ErrorMessage
+                    message={error}
+                    onRetry={() => {
+                        setError("");
+                        setRetryKey((prev) => prev + 1);
+                    }}
+                />
+            )}
 
             {/* 랭킹 리스트 */}
             {!loading && !error && (
@@ -221,7 +296,8 @@ const BoardTypeButton = ({ active, onClick, children }) => (
 
 // 게시판 랭킹 리스트
 const BoardRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    if (ranks.length === 0) {
+    const safeRanks = Array.isArray(ranks) ? ranks : [];
+    if (safeRanks.length === 0) {
         return (
             <div className="p-12 text-center text-slate-500">
                 아직 랭킹 데이터가 없습니다.
@@ -231,7 +307,7 @@ const BoardRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
 
     return (
         <div className="divide-y">
-            {ranks.map((board, index) => {
+            {safeRanks.map((board, index) => {
                 const rank = index + 1;
                 return (
                     <Link
@@ -273,7 +349,8 @@ const BoardRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
 
 // 레벨 랭킹 리스트
 const LevelRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    if (ranks.length === 0) {
+    const safeRanks = Array.isArray(ranks) ? ranks : [];
+    if (safeRanks.length === 0) {
         return (
             <div className="p-12 text-center text-slate-500">
                 아직 랭킹 데이터가 없습니다.
@@ -283,7 +360,7 @@ const LevelRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
 
     return (
         <div className="divide-y">
-            {ranks.map((item, index) => {
+            {safeRanks.map((item, index) => {
                 const rank = index + 1;
                 return (
                     <div
@@ -338,7 +415,8 @@ const LevelRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
 
 // 기부 랭킹 리스트
 const DonationRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    if (ranks.length === 0) {
+    const safeRanks = Array.isArray(ranks) ? ranks : [];
+    if (safeRanks.length === 0) {
         return (
             <div className="p-12 text-center text-slate-500">
                 아직 랭킹 데이터가 없습니다.
@@ -348,7 +426,7 @@ const DonationRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
 
     return (
         <div className="divide-y">
-            {ranks.map((member, index) => {
+            {safeRanks.map((member, index) => {
                 const rank = index + 1;
                 return (
                     <div

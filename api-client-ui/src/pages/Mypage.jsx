@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     User,
@@ -11,13 +11,49 @@ import {
     Edit,
     Calendar,
     BarChart3,
-    TreePine
+    TreePine,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../utils/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { formatNumber, formatRelativeTime } from "../utils/helpers";
+import { formatNumber, formatRelativeTime, stripHtmlTags } from "../utils/helpers";
+
+const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
+
+const normalizeBoardKind = (board) =>
+    board?.kind_of_board || board?.kindOfBoard || board?.kind || "FREE_BOARD";
+
+const normalizeMyBoards = (response) => {
+    const data = unwrapData(response);
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.content)) return data.content;
+    if (Array.isArray(data.boards)) return data.boards;
+    return [];
+};
+
+const getRawMemberStatus = (member) => member?.member_status || member?.memberStatus || "MEMBER_ACTIVE";
+const normalizeMemberStatus = (member) => String(getRawMemberStatus(member)).toUpperCase();
+const isActiveMember = (member) => {
+    const status = normalizeMemberStatus(member);
+    return status === "ACTIVE" || status === "MEMBER_ACTIVE";
+};
+const getMemberStatusLabel = (member) => (isActiveMember(member) ? "활성" : "비활성");
+
+const getProgress = (levelData) => {
+    const current = Number(levelData?.current_exp ?? levelData?.currentExp ?? 0);
+    const next = Number(levelData?.next_level_exp ?? levelData?.nextLevelExp ?? 100);
+    if (next <= 0) return 0;
+    return Math.max(0, Math.min(100, (current / next) * 100));
+};
+
+const toDisplayDate = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return formatRelativeTime(date);
+};
 
 export const Mypage = () => {
     const { user, logout } = useAuth();
@@ -28,6 +64,28 @@ export const Mypage = () => {
     const [boardsLoading, setBoardsLoading] = useState(false);
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState("profile"); // profile, posts, stats
+
+    const levelData = useMemo(
+        () => memberData?.level_dto || memberData?.levelDto || {},
+        [memberData]
+    );
+    const profileImageUrl = memberData?.profile_url || memberData?.profileUrl || "";
+    const memberActive = isActiveMember(memberData);
+
+    const fetchMemberData = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const response = await api.get("/members");
+            const data = unwrapData(response);
+            setMemberData(data || null);
+        } catch (err) {
+            console.error("Failed to fetch member data:", err);
+            setError(err.response?.data?.message || "회원 정보를 불러오는데 실패했습니다.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleDeleteAccount = async () => {
         const confirmed = window.confirm("정말 회원 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.");
@@ -42,27 +100,10 @@ export const Mypage = () => {
         }
     };
 
-    // 회원 정보 불러오기
     useEffect(() => {
-        const fetchMemberData = async () => {
-            setLoading(true);
-            setError("");
-            try {
-                const response = await api.get("/members");
-                const data = response.data?.data || response.data;
-                setMemberData(data);
-            } catch (err) {
-                console.error("Failed to fetch member data:", err);
-                setError("회원 정보를 불러오는데 실패했습니다.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchMemberData();
     }, []);
 
-    // 내가 작성한 게시글 불러오기
     useEffect(() => {
         if (activeTab !== "posts") return;
 
@@ -70,12 +111,12 @@ export const Mypage = () => {
             setBoardsLoading(true);
             try {
                 const response = await api.get("/boards/myBoards", {
-                    params: { page: 1, size: 10 }
+                    params: { page: 0, size: 10 },
                 });
-                const boards = response.data?.data?.content || response.data?.content || [];
-                setMyBoards(boards);
+                setMyBoards(normalizeMyBoards(response));
             } catch (err) {
                 console.error("Failed to fetch my boards:", err);
+                setMyBoards([]);
             } finally {
                 setBoardsLoading(false);
             }
@@ -89,7 +130,7 @@ export const Mypage = () => {
     }
 
     if (error) {
-        return <ErrorMessage message={error} />;
+        return <ErrorMessage message={error} onRetry={fetchMemberData} />;
     }
 
     if (!memberData) {
@@ -100,23 +141,18 @@ export const Mypage = () => {
         );
     }
 
-    const levelData = memberData.level_dto || memberData.levelDto || {};
-
     return (
         <div className="space-y-6">
-            {/* 프로필 헤더 */}
             <div className="card overflow-hidden">
-                {/* 배경 그라데이션 */}
                 <div className="h-32 bg-gradient-to-r from-purple-500 to-purple-600" />
 
                 <div className="px-6 pb-6">
                     <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-16">
-                        {/* 프로필 이미지 */}
                         <div className="flex-shrink-0">
-                            {memberData.profile_url || memberData.profileUrl ? (
+                            {profileImageUrl ? (
                                 <img
-                                    src={memberData.profile_url || memberData.profileUrl}
-                                    alt={memberData.name}
+                                    src={profileImageUrl}
+                                    alt={memberData.name || "프로필"}
                                     className="w-32 h-32 rounded-2xl border-4 border-white shadow-xl object-cover"
                                 />
                             ) : (
@@ -128,16 +164,15 @@ export const Mypage = () => {
                             )}
                         </div>
 
-                        {/* 프로필 정보 */}
                         <div className="flex-1 pt-4">
                             <div className="flex flex-wrap items-center gap-3 mb-2">
                                 <h1 className="text-2xl font-bold text-slate-900">
-                                    {memberData.name || "익명"}
+                                    {memberData.name || user?.name || "익명"}
                                 </h1>
                                 <div className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm font-semibold">
                                     Lv. {levelData.level || 1}
                                 </div>
-                                {memberData.member_status === "ACTIVE" && (
+                                {memberActive && (
                                     <div className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold">
                                         활성
                                     </div>
@@ -146,7 +181,7 @@ export const Mypage = () => {
                             <div className="text-sm text-slate-600 space-y-1">
                                 <div className="flex items-center gap-2">
                                     <Mail className="h-4 w-4" />
-                                    <span>{memberData.email}</span>
+                                    <span>{memberData.email || user?.email || "-"}</span>
                                 </div>
                                 {memberData.phone && (
                                     <div className="flex items-center gap-2">
@@ -157,7 +192,6 @@ export const Mypage = () => {
                             </div>
                         </div>
 
-                        {/* 수정 버튼 */}
                         <button
                             onClick={() => navigate("/app/mypage/edit")}
                             className="btn-secondary flex items-center gap-2"
@@ -167,7 +201,6 @@ export const Mypage = () => {
                         </button>
                     </div>
 
-                    {/* 통계 카드 */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
                         <StatCard
                             icon={Award}
@@ -197,7 +230,6 @@ export const Mypage = () => {
                 </div>
             </div>
 
-            {/* 탭 메뉴 */}
             <div className="card p-2">
                 <div className="flex gap-2">
                     <TabButton
@@ -221,7 +253,6 @@ export const Mypage = () => {
                 </div>
             </div>
 
-            {/* 탭 컨텐츠 */}
             {activeTab === "profile" && (
                 <ProfileTab
                     memberData={memberData}
@@ -239,7 +270,6 @@ export const Mypage = () => {
     );
 };
 
-// 통계 카드
 const StatCard = ({ icon: Icon, label, value, color }) => {
     const colorClasses = {
         purple: "from-purple-500 to-purple-600",
@@ -259,7 +289,6 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
     );
 };
 
-// 탭 버튼
 const TabButton = ({ active, onClick, children }) => (
     <button
         onClick={onClick}
@@ -273,11 +302,13 @@ const TabButton = ({ active, onClick, children }) => (
     </button>
 );
 
-// 프로필 탭
 const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
+    const progress = getProgress(levelData);
+    const currentExp = Number(levelData.current_exp ?? levelData.currentExp ?? 0);
+    const nextExp = Number(levelData.next_level_exp ?? levelData.nextLevelExp ?? 100);
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 기본 정보 */}
             <div className="card p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                     <User className="h-5 w-5 text-purple-600" />
@@ -289,12 +320,11 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
                     <InfoRow label="전화번호" value={memberData.phone || "-"} />
                     <InfoRow
                         label="회원 상태"
-                        value={memberData.member_status === "ACTIVE" ? "활성" : "비활성"}
+                        value={getMemberStatusLabel(memberData)}
                     />
                 </div>
             </div>
 
-            {/* 레벨 정보 */}
             <div className="card p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                     <Award className="h-5 w-5 text-purple-600" />
@@ -318,15 +348,13 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
                         <div className="flex items-center justify-between mb-2 text-sm">
                             <span className="text-slate-600">다음 레벨까지</span>
                             <span className="font-semibold text-purple-600">
-                                {levelData.current_exp || levelData.currentExp || 0} / {levelData.next_level_exp || levelData.nextLevelExp || 100}
+                                {currentExp} / {nextExp}
                             </span>
                         </div>
                         <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all"
-                                style={{
-                                    width: `${((levelData.current_exp || levelData.currentExp || 0) / (levelData.next_level_exp || levelData.nextLevelExp || 100)) * 100}%`
-                                }}
+                                style={{ width: `${progress}%` }}
                             />
                         </div>
                     </div>
@@ -337,7 +365,6 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
                 </div>
             </div>
 
-            {/* 환경 활동 */}
             <div className="card p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                     <TreePine className="h-5 w-5 text-green-600" />
@@ -359,13 +386,9 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
                 </div>
             </div>
 
-            {/* 계정 관리 */}
             <div className="card p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">계정 관리</h3>
                 <div className="space-y-3">
-                    <button className="w-full btn-secondary text-left">
-                        비밀번호 변경
-                    </button>
                     <button
                         onClick={onDeleteAccount}
                         className="w-full px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-left font-semibold"
@@ -378,7 +401,6 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
     );
 };
 
-// 작성한 글 탭
 const PostsTab = ({ boards, loading, navigate }) => {
     if (loading) {
         return <LoadingSpinner text="게시글 로딩 중..." />;
@@ -412,7 +434,7 @@ const PostsTab = ({ boards, loading, navigate }) => {
                     className="card p-6 hover:shadow-lg transition-all cursor-pointer"
                     onClick={() =>
                         navigate(
-                            `/app/boards/${board.kind_of_board || board.kindOfBoard || "FREE_BOARD"}/${board.board_id || board.boardId}`
+                            `/app/boards/${normalizeBoardKind(board)}/${board.board_id || board.boardId}`
                         )
                     }
                 >
@@ -420,7 +442,7 @@ const PostsTab = ({ boards, loading, navigate }) => {
                         {board.title}
                     </h3>
                     <p className="text-slate-600 text-sm mb-3 line-clamp-2">
-                        {board.contents}
+                        {stripHtmlTags(board.contents || board.content || "")}
                     </p>
                     <div className="flex items-center gap-4 text-sm text-slate-500">
                         <div className="flex items-center gap-1">
@@ -433,7 +455,7 @@ const PostsTab = ({ boards, loading, navigate }) => {
                         </div>
                         <div className="flex items-center gap-1 ml-auto">
                             <Calendar className="h-4 w-4" />
-                            <span>{formatRelativeTime(new Date(board.created_at || board.createdAt))}</span>
+                            <span>{toDisplayDate(board.created_at || board.createdAt) || "-"}</span>
                         </div>
                     </div>
                 </div>
@@ -442,8 +464,12 @@ const PostsTab = ({ boards, loading, navigate }) => {
     );
 };
 
-// 활동 통계 탭
 const StatsTab = ({ memberData, levelData }) => {
+    const progress = getProgress(levelData);
+    const currentExp = Number(levelData.current_exp ?? levelData.currentExp ?? 0);
+    const nextExp = Number(levelData.next_level_exp ?? levelData.nextLevelExp ?? 100);
+    const neededExp = Math.max(nextExp - currentExp, 0);
+
     return (
         <div className="space-y-6">
             <div className="card p-6">
@@ -486,7 +512,6 @@ const StatsTab = ({ memberData, levelData }) => {
                 </div>
             </div>
 
-            {/* 레벨 진행도 */}
             <div className="card p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">레벨 진행도</h3>
                 <div className="space-y-4">
@@ -496,19 +521,17 @@ const StatsTab = ({ memberData, levelData }) => {
                                 Lv. {levelData.level || 1} → Lv. {(levelData.level || 1) + 1}
                             </span>
                             <span className="text-sm text-slate-600">
-                                {levelData.current_exp || levelData.currentExp || 0} / {levelData.next_level_exp || levelData.nextLevelExp || 100}
+                                {currentExp} / {nextExp}
                             </span>
                         </div>
                         <div className="h-4 bg-slate-200 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all"
-                                style={{
-                                    width: `${((levelData.current_exp || levelData.currentExp || 0) / (levelData.next_level_exp || levelData.nextLevelExp || 100)) * 100}%`
-                                }}
+                                style={{ width: `${progress}%` }}
                             />
                         </div>
                         <p className="text-sm text-slate-500 mt-2">
-                            다음 레벨까지 {(levelData.next_level_exp || levelData.nextLevelExp || 100) - (levelData.current_exp || levelData.currentExp || 0)} 경험치 필요
+                            다음 레벨까지 {neededExp} 경험치 필요
                         </p>
                     </div>
                 </div>
@@ -517,7 +540,6 @@ const StatsTab = ({ memberData, levelData }) => {
     );
 };
 
-// 정보 행
 const InfoRow = ({ label, value }) => (
     <div className="flex items-center justify-between py-2 border-b border-slate-200 last:border-0">
         <span className="text-sm text-slate-600">{label}</span>
@@ -525,7 +547,6 @@ const InfoRow = ({ label, value }) => (
     </div>
 );
 
-// 통계 카드
 const StatsCard = ({ label, value, color, icon: Icon }) => {
     const colorClasses = {
         purple: "from-purple-500 to-purple-600",

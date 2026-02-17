@@ -184,3 +184,93 @@ Frontend 권장 처리:
   - `currentUser.memberId === resource.member.member_id`
   - 또는 `roles`에 `ROLE_ADMIN` 포함
 - 서버가 `403`을 반환하면 "수정/삭제 권한이 없습니다." 메시지 표시
+
+## 10-1) Rank API Stabilization (2026-02-17)
+- Board rank API는 단일 엔드포인트로 통합:
+  - `GET /boards/rankBoards?kind={FREE_BOARD|ECO_REVIEW|GREEN_ACTIVE}`
+- Board rank 정렬 기본값:
+  - `likeCount DESC`, `viewCount DESC`, `createdAt DESC`
+
+- Member rank 정렬 안정성 개선:
+  - 기부 랭킹(`GET /members/donationRanks`): `treeCount DESC`, `memberId DESC`
+  - 레벨 랭킹(`GET /members/levelRanks`): `totalExp DESC`, `level DESC`, `levelId DESC`
+    - 구현 안정화: DB 정렬 의존 대신 서비스 레이어에서 정렬+페이징 수행
+- 목적:
+  - 동점자 발생 시 순서가 매 요청마다 바뀌는 문제 방지
+  - 게시판 랭킹 컨트롤러를 단일 API로 유지해 관리 복잡도 감소
+
+## 11) Stats API Update (2026-02-17)
+- 통계 요약 조회: `GET /stats/summary`
+- 방문자 비교 조회: `GET /stats/visitors/compare`
+- 기간 추이 조회: `GET /stats/trend?days={1..365}`
+- 인증: 불필요 (`permitAll`)
+- 요약 응답 예시:
+```json
+{
+  "data": {
+    "total_members": 120,
+    "total_boards": 430,
+    "total_comments": 980,
+    "today_visitors": 56,
+    "active_members": 115,
+    "quit_members": 5
+  }
+}
+```
+
+방문자 비교 응답 예시:
+```json
+{
+  "data": {
+    "today_visitors": 56,
+    "yesterday_visitors": 42,
+    "day_over_day_change_rate": 33.33
+  }
+}
+```
+
+기간 추이 응답 예시:
+```json
+{
+  "data": {
+    "days": 7,
+    "items": [
+      {
+        "date": "2026-02-11",
+        "new_boards": 12,
+        "new_comments": 41,
+        "visitors": 73
+      }
+    ]
+  }
+}
+```
+
+집계 기준(기본 통계 기능 포함):
+- `total_members`: 회원 전체 건수
+- `total_boards`: 게시글 전체 건수
+- `total_comments`: 댓글 전체 건수
+- `today_visitors`: Redis 일자별 Set 기반 고유 방문자 수
+- `active_members`: `MEMBER_ACTIVE` 상태 회원 수
+- `quit_members`: `MEMBER_QUIT` 상태 회원 수
+- `day_over_day_change_rate`: 오늘 방문자 대비 어제 방문자 증감률(%)
+- `trend.items[].new_boards`: 날짜별 신규 게시글 수
+- `trend.items[].new_comments`: 날짜별 신규 댓글 수
+- `trend.items[].visitors`: 날짜별 고유 방문자 수
+
+방문자 식별 규칙:
+- 로그인 사용자: `MEMBER:{username}`
+- 비로그인 사용자: `ANON:{clientIp}`
+- 프록시/도메인 배포 환경 고려: `X-Forwarded-For` 헤더 우선, 없으면 `remoteAddr` 사용
+
+운영 참고:
+- 현재 `.docker compose` 환경에서 Redis(`redis:6379`)를 사용
+- 일자별 방문자 키(`stats:visitors:yyyyMMdd`)는 TTL 2일로 관리
+- 기간 추이 API는 차트 렌더링을 고려해 `오래된 날짜 -> 최신 날짜` 순으로 반환
+- 빌드 검증: `server`에서 `./gradlew compileJava` 성공(2026-02-17)
+- 쿼리 정책: `BoardRepository`의 기간별 게시글 수 집계 메서드(`countByCreatedAtBetween`)를 자동 파생 쿼리에서 명시적 JPQL(`@Query`)로 변경(2026-02-17)
+- 가독성 개선: `BoardRepository`의 명시적 JPQL을 DB 쿼리 스타일의 줄바꿈 형태로 정리(2026-02-17)
+- 쿼리 정책 확장: 통계 관련 나머지 자동 파생 쿼리도 명시적 JPQL(`@Query`)로 변경
+  - `MemberRepository.countByMemberStatus`
+  - `CommentRepository.countByCreatedAtBetween`
+- 주의사항: `CommentRepository`는 UTF-8 BOM 이슈를 제거한 뒤 재컴파일하여 정상 동작 확인(2026-02-17)

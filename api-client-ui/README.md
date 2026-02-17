@@ -1,6 +1,6 @@
 ﻿# 탄소저감 커뮤니티 클라이언트
 
-최종 업데이트: 2026-02-17
+최종 업데이트: 2026-02-18
 
 이 프로젝트는 `API 기능명세.md` 기준으로 프론트 기능을 연결한 React + Vite 클라이언트입니다.
 
@@ -69,12 +69,70 @@
 - GPT 질문: `POST /gpt/question`
 
 ## 주요 UI/UX 개선
+- 랭킹 페이지 안정성 개선:
+  - `/boards/rank*`, `/members/levelRanks`, `/members/donationRanks` 응답 정규화 추가
+  - 배열 직접 반환, `content/items/ranks` 래핑 구조 모두 대응
+  - 비정형 응답으로 인한 `map is not a function` 런타임 오류 방지
+  - 리스트 컴포넌트에서 `Array.isArray` 방어 처리로 렌더링 안정성 추가
+  - 레벨 랭킹 `500` 대응 개선:
+    - 에러 메시지에 HTTP 상태/서버 메시지 노출
+    - 레벨 랭킹 엔드포인트 폴백 시도
+      (`/members/levelRanks` -> `/members/level-ranks` -> `/members/ranks/level`)
+    - 에러 카드 `다시 시도` 버튼으로 실제 재요청 수행(`retryKey` 기반)
+- 마이페이지 회원상태 표시 보정:
+  - `ACTIVE` 뿐 아니라 `MEMBER_ACTIVE`도 활성으로 인식하도록 수정
+  - 프로필 헤더 배지/프로필 탭의 상태 텍스트 규칙을 동일 로직으로 통일
+- 홈 통계 대시보드 API 연동:
+  - `GET /stats/summary`로 회원/게시글/댓글/방문자 요약 카드 표시
+  - `GET /stats/visitors/compare`로 전일 대비 방문자 증감률 표시
+  - `GET /stats/trend?days={n}`로 기간 추이(7/14/30일) 렌더링
+  - 기존 하드코딩 통계값 제거, 응답 파싱(`data.data`/`data`) 다중 대응
 - 마이페이지에 회원탈퇴 동작 연결
 - 마이페이지 편집 페이지 추가 (프로필 업로드 + 회원정보 수정)
+- 마이페이지 동작 안정화:
+  - 회원 정보 조회 실패 시 재시도 버튼 제공
+  - `GET /boards/myBoards` 응답 파싱 다중 대응 및 페이지 인덱스 `0` 기준 적용
+  - 게시글 본문 미리보기 HTML 제거, 날짜 파싱 실패 방어 처리
+  - 레벨 진행도 계산식(0~100%) 안전화 및 음수 경험치 표시 방지
+  - 프로필 수정 시 변경사항 없으면 PATCH 요청 생략
+  - 프로필 업로드 시 파일 형식/크기(5MB) 사전 검증
+  - 회원 수정 실패 시 `fieldErrors`/`violationErrors` 메시지 노출
+- 마이페이지에 `내 댓글` 탭 추가:
+  - 명세 API `GET /comments?boardId={id}&page={n}&size={n}`를 사용해
+    내 게시글 목록(`GET /boards/myBoards`) 기준으로 댓글을 수집/필터링
+  - 댓글 작성자 `member_id/memberId` 우선 비교, 없으면 이름/이메일 fallback
+  - 최신순 정렬 및 댓글 클릭 시 원문 게시글 상세로 이동
+  - 댓글 조회 페이지 인덱스를 `page=1`로 조정 (일부 서버에서 `page=0` 요청 시 500 발생 대응)
+- 요청 반영: 마이페이지 `내 댓글` 탭 기능 제거
 - GPT 질문 페이지 추가
 - 홈 대시보드에서 상세 라우팅/빠른링크 정합성 개선
 - 랭킹/뉴스/댓글 응답 파싱 안정화
 - 글로벌 스타일 개선(배경 레이어, 카드/버튼 인터랙션, 타이포그래피)
+
+## 최근 작업 로그 (2026-02-18)
+- 확인 명령:
+  - `Get-ChildItem -Force`
+  - `Get-Content 'API 기능명세.md'`
+  - `Get-Content 'src/pages/Mypage.jsx'` / `Get-Content 'src/pages/MypageEdit.jsx'`
+  - `Get-Content 'src/utils/api.js'` / `Get-Content 'src/contexts/AuthContext.jsx'`
+  - `Select-String -Path 'src/pages/Mypage.jsx' -Pattern 'CommentsTab|/comments'`
+  - `Get-Content 'src/pages/Home.jsx'` / `Get-Content 'src/pages/Mypage.jsx'`
+  - `Get-Content 'API 기능명세.md'`
+  - `rg -n "member_status|memberStatus|ACTIVE|비활성" src`
+  - `Get-Content 'src/pages/Ranks.jsx'`
+  - `Get-Content 'src/pages/Ranks.jsx' -Encoding UTF8`
+- 검증 시도:
+  - `npm run lint -- src/pages/Mypage.jsx src/pages/MypageEdit.jsx` (실패: lint 스크립트 없음)
+  - `npx eslint src/pages/Mypage.jsx src/pages/MypageEdit.jsx` (실패: 네트워크/권한 제약으로 eslint 다운로드 불가)
+- 변경 파일:
+  - `src/pages/Home.jsx` (통계 API 3종 연동 대시보드 구현)
+  - `src/pages/Ranks.jsx` (랭킹 응답 정규화/렌더링 안정화)
+  - `src/pages/Ranks.jsx` (레벨 랭킹 500 대응: 폴백/재시도/상태코드 메시지)
+  - `src/pages/Mypage.jsx`
+  - `src/pages/MypageEdit.jsx`
+  - `src/pages/Mypage.jsx` (`내 댓글` 탭 추가 반영)
+  - `src/pages/Mypage.jsx` (`GET /comments` 요청 page 파라미터를 `1`로 조정)
+  - `src/pages/Mypage.jsx` (`내 댓글` 탭/조회 로직 제거)
 
 ## 코드 정리
 - 미사용 코드/파일 정리 완료:
