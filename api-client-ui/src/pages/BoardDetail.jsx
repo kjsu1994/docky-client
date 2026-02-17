@@ -102,11 +102,29 @@ export const BoardDetail = () => {
     if (error) return <div className="p-6"><ErrorMessage message={error} /></div>;
     if (!board) return <div className="p-6 text-center">게시글이 없습니다.</div>;
 
-    const isAuthor = user && (
-        board.member?.member_id === user.member_id ||
-        board.member?.memberId === user.memberId ||
-        board.board_creator === user.name
+    const hasRole = (roles, roleName) => {
+        if (!roles) return false;
+        if (Array.isArray(roles)) return roles.includes(roleName);
+        return String(roles).includes(roleName);
+    };
+
+    const isAdmin = !!user && (
+        hasRole(user.roles, "ROLE_ADMIN") ||
+        hasRole(user.role, "ROLE_ADMIN") ||
+        hasRole(user.member?.roles, "ROLE_ADMIN")
     );
+
+    const boardMemberId = board.member?.member_id ?? board.member?.memberId ?? null;
+    const currentMemberId = user?.member_id ?? user?.memberId ?? null;
+    const boardCreatorName = board.board_creator || board.boardCreator || "";
+    const currentUserName = user?.name || "";
+
+    const isAuthor = !!user && (
+        (boardMemberId !== null && currentMemberId !== null && String(boardMemberId) === String(currentMemberId)) ||
+        (boardCreatorName && currentUserName && boardCreatorName === currentUserName)
+    );
+
+    const canManageBoard = isAuthor || isAdmin;
 
     const files = board.uploadDto || board.upload_dto || [];
     // 서버 응답 필드명 대응
@@ -120,7 +138,7 @@ export const BoardDetail = () => {
                     <ArrowLeft className="h-4 w-4" /> 목록으로
                 </button>
 
-                {isAuthor && (
+                {canManageBoard && (
                     <div className="flex items-center gap-2">
                         <button onClick={() => navigate(`/app/boards/${kind}/${boardId}/edit`)} className="btn-secondary flex items-center gap-2">
                             <Edit className="h-4 w-4" /> 수정

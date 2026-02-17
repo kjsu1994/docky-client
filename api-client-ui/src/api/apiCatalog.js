@@ -84,6 +84,7 @@ export const apiCatalog = [
                 multipartDefaults: { title: "", contents: "" },
                 fileKey: "files",
             },
+            { name: "Delete Board File", method: "DELETE", path: "/boards/{board-id}/files/{file-id}", auth: true },
             { name: "Delete Board", method: "DELETE", path: "/boards/{board-id}", auth: true },
             { name: "Like Board", method: "POST", path: "/boards/{board-id}/Like", auth: true },
             { name: "My Boards", method: "GET", path: "/boards/myBoards", auth: true, sampleParams: { page: 1, size: 10 } },

@@ -42,6 +42,14 @@ const hasRole = (roles, roleName) => {
     return String(roles).includes(roleName);
 };
 
+const getFileIdValue = (file) =>
+    file?.file_id ??
+    file?.fileId ??
+    file?.upload_id ??
+    file?.uploadId ??
+    file?.id ??
+    null;
+
 export const BoardForm = () => {
     const { kind, boardId } = useParams();
     const navigate = useNavigate();
@@ -191,15 +199,34 @@ export const BoardForm = () => {
     };
 
     const removeExistingFile = (file) => {
-        const fileId = file.file_id || file.fileId;
+        const fileId = getFileIdValue(file);
         if (!fileId) return;
 
         setExistingFiles((prev) =>
-            prev.filter((it) => (it.file_id || it.fileId) !== fileId)
+            prev.filter((it) => getFileIdValue(it) !== fileId)
         );
         setDeletedExistingFileIds((prev) =>
             prev.includes(fileId) ? prev : [...prev, fileId]
         );
+    };
+
+    const buildSubmitFormData = ({ includeNewFiles = true } = {}) => {
+        const formDataToSend = new FormData();
+        const quill = quillRef.current;
+        const htmlContents = quill?.root?.innerHTML || "";
+
+        formDataToSend.append("title", title);
+        formDataToSend.append("contents", htmlContents);
+
+        if (includeNewFiles) {
+            attachFiles.forEach((file) => formDataToSend.append("files", file));
+        }
+        if (isAdmin) {
+            formDataToSend.append("isNotice", "true");
+            formDataToSend.append("notice", "true");
+            formDataToSend.append("adminPost", "true");
+        }
+        return formDataToSend;
     };
 
     // ── 제출 ────────────────────────────────────────────────────
@@ -211,28 +238,25 @@ export const BoardForm = () => {
         const quill = quillRef.current;
         if (!quill) return;
 
-        const htmlContents = quill.root.innerHTML;
         if (!quill.getText().trim()) { toast.error("내용을 입력해주세요"); return; }
 
         setLoading(true);
         try {
-            const formDataToSend = new FormData();
-            formDataToSend.append("title", title);
-            formDataToSend.append("contents", htmlContents);
-            attachFiles.forEach((file) => formDataToSend.append("files", file));
-            deletedExistingFileIds.forEach((fileId) => {
-                formDataToSend.append("deleteFileIds", fileId);
-            });
-            if (isAdmin) {
-                formDataToSend.append("isNotice", "true");
-                formDataToSend.append("notice", "true");
-                formDataToSend.append("adminPost", "true");
-            }
-
             if (isEdit) {
+                if (deletedExistingFileIds.length > 0) {
+                    // API 명세: DELETE /boards/{board-id}/files/{file-id}
+                    await Promise.all(
+                        deletedExistingFileIds.map((fileId) =>
+                            api.delete(`/boards/${boardId}/files/${fileId}`)
+                        )
+                    );
+                }
+
+                const formDataToSend = buildSubmitFormData({ includeNewFiles: true });
                 await uploadFiles(`/boards/${boardId}`, formDataToSend, "patch");
                 toast.success("게시글이 수정되었습니다");
             } else {
+                const formDataToSend = buildSubmitFormData({ includeNewFiles: true });
                 const createEndpoints = [
                     `/boards/${boardCategoryPath}`,
                     `/boards/${kind}`,
@@ -330,7 +354,7 @@ export const BoardForm = () => {
                                 <div className="space-y-2">
                                     <div className="text-sm font-semibold text-slate-700">기존 첨부파일</div>
                                     {existingFiles.map((file, index) => (
-                                        <div key={`existing-${file.file_id || file.fileId || index}`} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                        <div key={`existing-${getFileIdValue(file) || index}`} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 {isImageFile(file.file_name || file.fileName)
                                                     ? <ImageIcon className="h-4 w-4 text-amber-600 flex-shrink-0" />

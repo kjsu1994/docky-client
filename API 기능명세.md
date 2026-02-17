@@ -47,6 +47,7 @@ Frontend rule:
 - 게시글 상세: `GET /boards/{board-id}`
 - 게시글 작성: `POST /boards/{free|eco|green}`
 - 게시글 수정/삭제: `PATCH`, `DELETE /boards/{board-id}`
+- 게시글 첨부파일 삭제: `DELETE /boards/{board-id}/files/{file-id}`
 - 게시글 좋아요: `POST /boards/{board-id}/Like`
 - 내 게시글 목록: `GET /boards/myBoards`
 
@@ -163,6 +164,7 @@ Frontend 처리 기준:
 - 보호 API 호출 시 인증 헤더 포함 확인
 - 게시글/댓글 CRUD 후 목록 캐시 갱신 확인
 - 파일 업로드/다운로드 동작 확인
+- 첨부파일 삭제 후 게시글 상세의 `uploadDto` 목록/대표 이미지 반영 확인
 
 ## 9) Notes
 - CORS는 현재 전체 허용 설정(`*`) 상태
@@ -171,6 +173,8 @@ Frontend 처리 기준:
 
 ## 10) Authorization Policy Update (2026-02-17)
 - 게시글 수정/삭제(`PATCH /boards/{board-id}`, `DELETE /boards/{board-id}`):
+  - 작성자 본인 또는 `ROLE_ADMIN`만 가능
+- 게시글 첨부파일 삭제(`DELETE /boards/{board-id}/files/{file-id}`):
   - 작성자 본인 또는 `ROLE_ADMIN`만 가능
 - 댓글 수정/삭제(`PATCH /comments/{comment-id}`, `DELETE /comments/{comment-id}`):
   - 작성자 본인 또는 `ROLE_ADMIN`만 가능
