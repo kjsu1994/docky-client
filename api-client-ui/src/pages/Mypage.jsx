@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     User,
@@ -41,11 +41,88 @@ const isActiveMember = (member) => {
 };
 const getMemberStatusLabel = (member) => (isActiveMember(member) ? "활성" : "비활성");
 
-const getProgress = (levelData) => {
-    const current = Number(levelData?.current_exp ?? levelData?.currentExp ?? 0);
-    const next = Number(levelData?.next_level_exp ?? levelData?.nextLevelExp ?? 100);
-    if (next <= 0) return 0;
-    return Math.max(0, Math.min(100, (current / next) * 100));
+const toSafeNumber = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+
+const pickNumber = (source, keys) => {
+    for (const key of keys) {
+        const value = toSafeNumber(source?.[key]);
+        if (value !== null) return value;
+    }
+    return null;
+};
+
+const resolveLevelProgressInfo = (levelData) => {
+    // 백엔드 DTO 필드명이 환경별로 다를 수 있어 후보 키를 순차적으로 확인한다.
+    const current = pickNumber(levelData, [
+        "current_exp",
+        "currentExp",
+        "exp",
+        "level_exp",
+        "levelExp",
+        "now_exp",
+        "nowExp",
+    ]);
+    let next = pickNumber(levelData, [
+        "next_level_exp",
+        "nextLevelExp",
+        "next_exp",
+        "nextExp",
+        "required_exp",
+        "requiredExp",
+        "target_exp",
+        "targetExp",
+        "max_exp",
+        "maxExp",
+    ]);
+    const remaining = pickNumber(levelData, [
+        "remaining_exp",
+        "remainingExp",
+        "need_exp",
+        "needExp",
+        "to_next_exp",
+        "toNextExp",
+    ]);
+    const progressRaw = pickNumber(levelData, [
+        "progress",
+        "progress_rate",
+        "progressRate",
+        "progress_percent",
+        "progressPercent",
+        "exp_progress",
+        "expProgress",
+    ]);
+
+    const safeCurrent = Math.max(0, current ?? 0);
+    if ((next === null || next <= 0) && remaining !== null) {
+        next = safeCurrent + Math.max(0, remaining);
+    }
+    if (next !== null && next > 0 && safeCurrent > next) {
+        // 일부 응답은 next 값을 남은 경험치로 내려줄 수 있어 현재값보다 작으면 보정한다.
+        next = safeCurrent + next;
+    }
+
+    const safeNext = Math.max(1, Math.round((next ?? safeCurrent) || 1));
+    const neededExp = Math.max(safeNext - safeCurrent, 0);
+
+    let progress = 0;
+    if (progressRaw !== null) {
+        progress = progressRaw <= 1 ? progressRaw * 100 : progressRaw;
+    } else if (safeNext > 0) {
+        progress = (safeCurrent / safeNext) * 100;
+    }
+    if (neededExp === 0 && safeCurrent > 0) {
+        progress = 100;
+    }
+
+    return {
+        currentExp: Math.round(safeCurrent),
+        nextExp: safeNext,
+        neededExp: Math.round(neededExp),
+        progress: Math.max(0, Math.min(100, progress)),
+    };
 };
 
 const toDisplayDate = (value) => {
@@ -63,7 +140,7 @@ export const Mypage = () => {
     const [loading, setLoading] = useState(true);
     const [boardsLoading, setBoardsLoading] = useState(false);
     const [error, setError] = useState("");
-    const [activeTab, setActiveTab] = useState("profile"); // profile, posts, stats
+    const [activeTab, setActiveTab] = useState("profile");
 
     const levelData = useMemo(
         () => memberData?.level_dto || memberData?.levelDto || {},
@@ -126,7 +203,7 @@ export const Mypage = () => {
     }, [activeTab]);
 
     if (loading) {
-        return <LoadingSpinner text="회원 정보 로딩 중..." />;
+        return <LoadingSpinner text="회원 정보 로딩 중.." />;
     }
 
     if (error) {
@@ -232,22 +309,13 @@ export const Mypage = () => {
 
             <div className="card p-2">
                 <div className="flex gap-2">
-                    <TabButton
-                        active={activeTab === "profile"}
-                        onClick={() => setActiveTab("profile")}
-                    >
+                    <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>
                         프로필 정보
                     </TabButton>
-                    <TabButton
-                        active={activeTab === "posts"}
-                        onClick={() => setActiveTab("posts")}
-                    >
+                    <TabButton active={activeTab === "posts"} onClick={() => setActiveTab("posts")}>
                         작성한 글
                     </TabButton>
-                    <TabButton
-                        active={activeTab === "stats"}
-                        onClick={() => setActiveTab("stats")}
-                    >
+                    <TabButton active={activeTab === "stats"} onClick={() => setActiveTab("stats")}>
                         활동 통계
                     </TabButton>
                 </div>
@@ -263,9 +331,7 @@ export const Mypage = () => {
             {activeTab === "posts" && (
                 <PostsTab boards={myBoards} loading={boardsLoading} navigate={navigate} />
             )}
-            {activeTab === "stats" && (
-                <StatsTab memberData={memberData} levelData={levelData} />
-            )}
+            {activeTab === "stats" && <StatsTab memberData={memberData} levelData={levelData} />}
         </div>
     );
 };
@@ -275,7 +341,7 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
         purple: "from-purple-500 to-purple-600",
         blue: "from-blue-500 to-blue-600",
         green: "from-green-500 to-green-600",
-        orange: "from-orange-500 to-orange-600"
+        orange: "from-orange-500 to-orange-600",
     };
 
     return (
@@ -303,9 +369,10 @@ const TabButton = ({ active, onClick, children }) => (
 );
 
 const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
-    const progress = getProgress(levelData);
-    const currentExp = Number(levelData.current_exp ?? levelData.currentExp ?? 0);
-    const nextExp = Number(levelData.next_level_exp ?? levelData.nextLevelExp ?? 100);
+    const levelProgress = resolveLevelProgressInfo(levelData);
+    const progress = levelProgress.progress;
+    const currentExp = levelProgress.currentExp;
+    const nextExp = levelProgress.nextExp;
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -318,10 +385,7 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
                     <InfoRow label="이름" value={memberData.name || "-"} />
                     <InfoRow label="이메일" value={memberData.email || "-"} />
                     <InfoRow label="전화번호" value={memberData.phone || "-"} />
-                    <InfoRow
-                        label="회원 상태"
-                        value={getMemberStatusLabel(memberData)}
-                    />
+                    <InfoRow label="회원 상태" value={getMemberStatusLabel(memberData)} />
                 </div>
             </div>
 
@@ -339,16 +403,15 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
                             </span>
                         </div>
                         <div className="text-sm text-slate-600">
-                            총 경험치: <span className="font-semibold">{formatNumber(levelData.total_exp || levelData.totalExp || 0)}</span>
+                            총 경험치 <span className="font-semibold">{formatNumber(levelData.total_exp || levelData.totalExp || 0)}</span>
                         </div>
                     </div>
 
-                    {/* 경험치 바 */}
                     <div>
                         <div className="flex items-center justify-between mb-2 text-sm">
                             <span className="text-slate-600">다음 레벨까지</span>
                             <span className="font-semibold text-purple-600">
-                                {currentExp} / {nextExp}
+                                {formatNumber(currentExp)} / {formatNumber(nextExp)}
                             </span>
                         </div>
                         <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
@@ -371,18 +434,9 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
                     환경 활동
                 </h3>
                 <div className="space-y-3">
-                    <InfoRow
-                        label="포인트"
-                        value={`${formatNumber(memberData.point || 0)}P`}
-                    />
-                    <InfoRow
-                        label="기부한 나무"
-                        value={`${formatNumber(memberData.tree_count || memberData.treeCount || 0)}그루`}
-                    />
-                    <InfoRow
-                        label="작성 게시글"
-                        value={`${formatNumber(memberData.board_count || memberData.boardCount || 0)}개`}
-                    />
+                    <InfoRow label="포인트" value={`${formatNumber(memberData.point || 0)}P`} />
+                    <InfoRow label="기부한 나무" value={`${formatNumber(memberData.tree_count || memberData.treeCount || 0)}그루`} />
+                    <InfoRow label="작성 게시글" value={`${formatNumber(memberData.board_count || memberData.boardCount || 0)}개`} />
                 </div>
             </div>
 
@@ -403,23 +457,16 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
 
 const PostsTab = ({ boards, loading, navigate }) => {
     if (loading) {
-        return <LoadingSpinner text="게시글 로딩 중..." />;
+        return <LoadingSpinner text="게시글 로딩 중.." />;
     }
 
     if (boards.length === 0) {
         return (
             <div className="card p-12 text-center">
                 <MessageSquare className="h-16 w-16 mx-auto text-slate-300 mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                    작성한 게시글이 없습니다
-                </h3>
-                <p className="text-slate-600 mb-4">
-                    첫 번째 게시글을 작성해보세요!
-                </p>
-                <button
-                    onClick={() => navigate("/app/boards/FREE_BOARD")}
-                    className="btn-primary"
-                >
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">작성한 게시글이 없습니다</h3>
+                <p className="text-slate-600 mb-4">첫 번째 게시글을 작성해보세요!</p>
+                <button onClick={() => navigate("/app/boards/FREE_BOARD")} className="btn-primary">
                     게시글 작성하기
                 </button>
             </div>
@@ -433,14 +480,10 @@ const PostsTab = ({ boards, loading, navigate }) => {
                     key={board.board_id || board.boardId}
                     className="card p-6 hover:shadow-lg transition-all cursor-pointer"
                     onClick={() =>
-                        navigate(
-                            `/app/boards/${normalizeBoardKind(board)}/${board.board_id || board.boardId}`
-                        )
+                        navigate(`/app/boards/${normalizeBoardKind(board)}/${board.board_id || board.boardId}`)
                     }
                 >
-                    <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-1">
-                        {board.title}
-                    </h3>
+                    <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-1">{board.title}</h3>
                     <p className="text-slate-600 text-sm mb-3 line-clamp-2">
                         {stripHtmlTags(board.contents || board.content || "")}
                     </p>
@@ -465,10 +508,11 @@ const PostsTab = ({ boards, loading, navigate }) => {
 };
 
 const StatsTab = ({ memberData, levelData }) => {
-    const progress = getProgress(levelData);
-    const currentExp = Number(levelData.current_exp ?? levelData.currentExp ?? 0);
-    const nextExp = Number(levelData.next_level_exp ?? levelData.nextLevelExp ?? 100);
-    const neededExp = Math.max(nextExp - currentExp, 0);
+    const levelProgress = resolveLevelProgressInfo(levelData);
+    const progress = levelProgress.progress;
+    const currentExp = levelProgress.currentExp;
+    const nextExp = levelProgress.nextExp;
+    const neededExp = levelProgress.neededExp;
 
     return (
         <div className="space-y-6">
@@ -479,24 +523,14 @@ const StatsTab = ({ memberData, levelData }) => {
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <StatsCard
-                        label="레벨"
-                        value={levelData.level || 1}
-                        color="purple"
-                        icon={Award}
-                    />
+                    <StatsCard label="레벨" value={levelData.level || 1} color="purple" icon={Award} />
                     <StatsCard
                         label="총 경험치"
                         value={formatNumber(levelData.total_exp || levelData.totalExp || 0)}
                         color="blue"
                         icon={TrendingUp}
                     />
-                    <StatsCard
-                        label="포인트"
-                        value={formatNumber(memberData.point || 0)}
-                        color="green"
-                        icon={TrendingUp}
-                    />
+                    <StatsCard label="포인트" value={formatNumber(memberData.point || 0)} color="green" icon={TrendingUp} />
                     <StatsCard
                         label="작성 게시글"
                         value={formatNumber(memberData.board_count || memberData.boardCount || 0)}
@@ -518,10 +552,10 @@ const StatsTab = ({ memberData, levelData }) => {
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <span className="font-semibold text-slate-900">
-                                Lv. {levelData.level || 1} → Lv. {(levelData.level || 1) + 1}
+                                Lv. {levelData.level || 1} -> Lv. {(levelData.level || 1) + 1}
                             </span>
                             <span className="text-sm text-slate-600">
-                                {currentExp} / {nextExp}
+                                {formatNumber(currentExp)} / {formatNumber(nextExp)}
                             </span>
                         </div>
                         <div className="h-4 bg-slate-200 rounded-full overflow-hidden">
@@ -531,7 +565,7 @@ const StatsTab = ({ memberData, levelData }) => {
                             />
                         </div>
                         <p className="text-sm text-slate-500 mt-2">
-                            다음 레벨까지 {neededExp} 경험치 필요
+                            다음 레벨까지 {formatNumber(neededExp)} 경험치 필요
                         </p>
                     </div>
                 </div>
@@ -552,7 +586,7 @@ const StatsCard = ({ label, value, color, icon: Icon }) => {
         purple: "from-purple-500 to-purple-600",
         blue: "from-blue-500 to-blue-600",
         green: "from-green-500 to-green-600",
-        orange: "from-orange-500 to-orange-600"
+        orange: "from-orange-500 to-orange-600",
     };
 
     return (
