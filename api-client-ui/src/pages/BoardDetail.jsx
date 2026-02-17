@@ -20,6 +20,7 @@ import {
     formatRelativeTime,
     formatNumber
 } from "../utils/helpers";
+import { canManageByOwnerOrAdmin } from "../utils/authorization";
 
 export const BoardDetail = () => {
     const { kind, boardId } = useParams();
@@ -102,29 +103,12 @@ export const BoardDetail = () => {
     if (error) return <div className="p-6"><ErrorMessage message={error} /></div>;
     if (!board) return <div className="p-6 text-center">게시글이 없습니다.</div>;
 
-    const hasRole = (roles, roleName) => {
-        if (!roles) return false;
-        if (Array.isArray(roles)) return roles.includes(roleName);
-        return String(roles).includes(roleName);
-    };
-
-    const isAdmin = !!user && (
-        hasRole(user.roles, "ROLE_ADMIN") ||
-        hasRole(user.role, "ROLE_ADMIN") ||
-        hasRole(user.member?.roles, "ROLE_ADMIN")
-    );
-
-    const boardMemberId = board.member?.member_id ?? board.member?.memberId ?? null;
-    const currentMemberId = user?.member_id ?? user?.memberId ?? null;
     const boardCreatorName = board.board_creator || board.boardCreator || "";
     const currentUserName = user?.name || "";
-
-    const isAuthor = !!user && (
-        (boardMemberId !== null && currentMemberId !== null && String(boardMemberId) === String(currentMemberId)) ||
-        (boardCreatorName && currentUserName && boardCreatorName === currentUserName)
-    );
-
-    const canManageBoard = isAuthor || isAdmin;
+    const canManageBoard = canManageByOwnerOrAdmin(user, board.member, {
+        ownerName: boardCreatorName,
+        userName: currentUserName,
+    });
 
     const files = board.uploadDto || board.upload_dto || [];
     // 서버 응답 필드명 대응

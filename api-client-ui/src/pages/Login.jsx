@@ -1,13 +1,51 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Lock, Leaf } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 export const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const { login, loginWithTokens } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const accessToken = params.get("accessToken");
+        const refreshToken = params.get("refreshToken");
+        const oauthError = params.get("error");
+
+        if (oauthError) {
+            toast.error("구글 로그인에 실패했습니다.");
+            return;
+        }
+
+        if (!accessToken) return;
+
+        const run = async () => {
+            setGoogleLoading(true);
+            try {
+                await loginWithTokens({ accessToken, refreshToken });
+                toast.success("구글 로그인 성공!");
+                navigate("/app", { replace: true });
+            } catch (error) {
+                toast.error(error.response?.data?.message || "구글 로그인 처리에 실패했습니다.");
+            } finally {
+                setGoogleLoading(false);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        };
+
+        run();
+    }, [loginWithTokens, navigate]);
+
+    const handleGoogleLogin = () => {
+        window.location.href = "/api/oauth2/authorization/google";
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -87,6 +125,18 @@ export const Login = () => {
                             ) : (
                                 "로그인"
                             )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleGoogleLogin}
+                            disabled={googleLoading}
+                            className="btn-secondary w-full flex items-center justify-center gap-2"
+                        >
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700">
+                                G
+                            </span>
+                            {googleLoading ? "구글 로그인 처리 중..." : "Google로 로그인"}
                         </button>
                     </form>
 

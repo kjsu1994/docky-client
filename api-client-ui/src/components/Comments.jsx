@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import api from "../utils/api.js";
 import toast from "react-hot-toast";
 import { formatRelativeTime } from "../utils/helpers.js";
+import { canManageByOwnerOrAdmin } from "../utils/authorization.js";
 
 export const Comments = ({ boardId, onUpdate }) => {
     const { user } = useAuth();
@@ -186,12 +187,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                         const commentId = comment.comment_id || comment.commentId;
                         const isEditing = editingId === commentId;
 
-                        // 작성자 본인 확인 (다양한 필드 대응)
-                        const isAuthor = user && (
-                            comment.member?.member_id === user.member_id ||
-                            comment.member?.memberId === user.memberId ||
-                            comment.member?.email === user.email
-                        );
+                        const canManageComment = canManageByOwnerOrAdmin(user, comment.member);
 
                         return (
                             <div key={commentId} className="card p-6 hover:shadow-md transition-shadow">
@@ -255,7 +251,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                             <span>{comment.like_count ?? comment.likeCount ?? 0}</span>
                                         </button>
 
-                                        {isAuthor && (
+                                        {canManageComment && (
                                             <div className="flex gap-3 border-l pl-4">
                                                 <button onClick={() => startEdit(comment)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-blue-600">
                                                     <Edit2 className="h-3.5 w-3.5" /> 수정

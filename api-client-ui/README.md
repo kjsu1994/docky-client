@@ -8,6 +8,7 @@
 
 ### 인증/회원
 - 로그인: `POST /members/login`
+- OAuth2 구글 로그인: `/oauth2/authorization/google` 리다이렉트 방식
 - 로그아웃: `POST /members/logout`
 - 회원가입: `POST /members`
 - 내 정보 조회: `GET /members`
@@ -15,6 +16,7 @@
 - 회원 탈퇴: `DELETE /members`
 - 프로필 업로드: `POST /members/uploadProfile`
 - 토큰 자동 첨부 + 401 시 `/auth/reissue` 재발급 시도
+- OAuth2 콜백에서 `accessToken`, `refreshToken` 쿼리 수신 시 자동 로그인 처리
 
 ### 게시글
 - 목록: `GET /boards`
@@ -29,10 +31,16 @@
 - 한 화면 표시 개수 선택 지원: `10 / 20 / 50`
 - 페이지 인덱스 보정 적용 (UI 1페이지 ↔ API 0페이지)으로 조회 누락 방지
 - 게시글 상세에서 수정/삭제 버튼은 작성자 또는 `ROLE_ADMIN`에게만 노출
+- 댓글의 수정/삭제 버튼도 작성자 또는 `ROLE_ADMIN`에게만 노출
+- 게시글 목록에서 작성자/`ROLE_ADMIN`은 즉시 삭제 버튼 사용 가능
+- 게시글 목록에서 작성자/`ROLE_ADMIN`은 즉시 수정 버튼 사용 가능
+- `ROLE_ADMIN`은 게시글 목록에서 `전체/공지/일반` 관리자 필터 사용 가능
+- 권한 파싱은 문자열/배열/객체(`role`, `name`, `authority`) 형식을 모두 지원
 - 관리자 작성 글은 목록 최상단에 공지 카드(절반 크기)로 우선 노출
 - 게시글 등록 시 서버별 엔드포인트 차이 대응 폴백 적용
   - 순차 시도: `/boards/free|eco|green` -> `/boards/{KIND}` -> `/boards?kind={KIND}` -> `/boards`
 - `ROLE_ADMIN` 사용자가 작성한 게시글은 등록 시 공지 플래그를 함께 전송 (`isNotice`, `notice`, `adminPost`)
+- 게시글 수정 페이지 직접 접근 시에도 작성자/`ROLE_ADMIN` 권한 검사 후 미권한자는 상세로 리다이렉트
 - `ECO_REVIEW` 게시판의 UI 명칭을 `Q&A 게시판`으로 변경
 - 게시글 수정 화면에서 기존 첨부파일 목록 표시
 - 게시글 수정 시 기존 첨부파일 삭제 + 새 첨부파일 추가 동시 지원
@@ -64,10 +72,17 @@
 - 마이페이지에 회원탈퇴 동작 연결
 - 마이페이지 편집 페이지 추가 (프로필 업로드 + 회원정보 수정)
 - GPT 질문 페이지 추가
-- API 콘솔 페이지를 앱 라우트에 연결
 - 홈 대시보드에서 상세 라우팅/빠른링크 정합성 개선
 - 랭킹/뉴스/댓글 응답 파싱 안정화
 - 글로벌 스타일 개선(배경 레이어, 카드/버튼 인터랙션, 타이포그래피)
+
+## 코드 정리
+- 미사용 코드/파일 정리 완료:
+  - `src/components/TopNav.jsx` 삭제
+  - `src/pages/MemberCreate.jsx` 삭제
+  - `src/api/*` 레거시 파일 삭제 및 빈 디렉터리 제거
+  - `App.jsx`의 미사용 `PlaceholderPage` 제거
+  - `hooks/useBoards.js`의 미사용 `useBoardDetail` 제거
 
 ## 라우트
 - `/login`
@@ -83,7 +98,6 @@
 - `/app/news`
 - `/app/calculators`
 - `/app/gpt`
-- `/app/api-console`
 
 ## 실행
 ```bash
@@ -96,6 +110,5 @@ npm run dev
 프론트 기본 URL: `http://localhost:5173`
 
 ## 참고
-- API 콘솔 카탈로그 파일: `src/api/apiCatalog.js`
 - 공통 API 클라이언트: `src/utils/api.js`
 - 명세 문서: `../API 기능명세.md`

@@ -15,7 +15,6 @@ import {Ranks} from "./pages/Ranks.jsx";
 import {News} from "./pages/News.jsx";
 import {Calculators} from "./pages/Calculators.jsx";
 import { GptQuestion } from "./pages/GptQuestion.jsx";
-import ApiConsole from "./pages/ApiConsole.jsx";
 
 // 보호된 라우트 컴포넌트
 const ProtectedRoute = ({ children }) => {
@@ -113,13 +112,13 @@ function App() {
                         }
                     />
 
-                    {/* 기타 페이지들 (플레이스홀더) */}
+                    {/* 기능 페이지 */}
                     <Route
                         path="/app/ranks"
                         element={
                             <ProtectedRoute>
                                 <AppLayout>
-                                    <Ranks title="랭킹" />
+                                    <Ranks />
                                 </AppLayout>
                             </ProtectedRoute>
                         }
@@ -129,7 +128,7 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <AppLayout>
-                                    <News title="뉴스" />
+                                    <News />
                                 </AppLayout>
                             </ProtectedRoute>
                         }
@@ -139,7 +138,7 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <AppLayout>
-                                    <Calculators title="전기요금 계산기" />
+                                    <Calculators />
                                 </AppLayout>
                             </ProtectedRoute>
                         }
@@ -149,7 +148,7 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <AppLayout>
-                                    <Mypage title="마이페이지" />
+                                    <Mypage />
                                 </AppLayout>
                             </ProtectedRoute>
                         }
@@ -174,17 +173,6 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
-                    <Route
-                        path="/app/api-console"
-                        element={
-                            <ProtectedRoute>
-                                <AppLayout>
-                                    <ApiConsole />
-                                </AppLayout>
-                            </ProtectedRoute>
-                        }
-                    />
-
                     {/* 기본 리다이렉트 */}
                     <Route path="/" element={<Navigate to="/app" replace />} />
                     <Route path="*" element={<Navigate to="/app" replace />} />
@@ -220,15 +208,5 @@ function App() {
         </BrowserRouter>
     );
 }
-
-// 플레이스홀더 페이지
-const PlaceholderPage = ({ title }) => {
-    return (
-        <div className="card p-8 text-center">
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">{title}</h1>
-            <p className="text-slate-600">이 페이지는 개발 예정입니다.</p>
-        </div>
-    );
-};
 
 export default App;

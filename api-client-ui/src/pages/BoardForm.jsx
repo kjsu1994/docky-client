@@ -5,6 +5,7 @@ import api, { uploadFiles } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import { isImageFile } from "../utils/helpers";
+import { canManageByOwnerOrAdmin } from "../utils/authorization";
 
 // ── Quill CDN 로드 ──────────────────────────────────────────────
 const loadQuill = () =>
@@ -178,6 +179,15 @@ export const BoardForm = () => {
         api.get(`/boards/${boardId}`)
             .then((res) => {
                 const board = res.data.data || res.data;
+                const canManage = canManageByOwnerOrAdmin(user, board.member, {
+                    ownerName: board.board_creator || board.boardCreator || "",
+                    userName: user?.name || "",
+                });
+                if (!canManage) {
+                    toast.error("수정 권한이 없습니다.");
+                    navigate(`/app/boards/${kind}/${boardId}`, { replace: true });
+                    return;
+                }
                 setTitle(board.title || "");
                 const files = board.uploadDto || board.upload_dto || [];
                 setExistingFiles(Array.isArray(files) ? files : []);
@@ -187,7 +197,7 @@ export const BoardForm = () => {
                 }
             })
             .catch(() => toast.error("게시글 로딩 실패"));
-    }, [isEdit, boardId, editorReady]);
+    }, [isEdit, boardId, editorReady, user, kind, navigate]);
 
     // ── 첨부파일 처리 ───────────────────────────────────────────
     const handleFileChange = (e) => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     Search,
     PlusCircle,
@@ -11,6 +11,9 @@ import {
     Megaphone,
 } from "lucide-react";
 import { useBoards } from "../hooks/useBoards";
+import { useAuth } from "../contexts/AuthContext";
+import api from "../utils/api";
+import toast from "react-hot-toast";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { EmptyState } from "../components/EmptyState";
@@ -22,6 +25,7 @@ import {
     formatNumber,
     stripHtmlTags,
 } from "../utils/helpers";
+import { canManageByOwnerOrAdmin, isAdminUser } from "../utils/authorization";
 
 // MinIO Docker 내부 URL → 브라우저 접근 가능 URL로 변환
 const toPublicUrl = (url) => {
@@ -59,6 +63,7 @@ const isAdminPost = (board) => {
 export const BoardList = () => {
     const { kind = "FREE_BOARD" } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [pagingByKind, setPagingByKind] = useState({
         FREE_BOARD: { page: 1, size: 10 },
         ECO_REVIEW: { page: 1, size: 10 },
@@ -66,12 +71,15 @@ export const BoardList = () => {
     });
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("latest");
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [adminFilter, setAdminFilter] = useState("all");
+    const isAdmin = isAdminUser(user);
 
     const currentPaging = pagingByKind[kind] || { page: 1, size: 10 };
     const page = currentPaging.page;
     const size = currentPaging.size;
 
-    const { boards, loading, error, pageInfo } = useBoards(kind, page, size);
+    const { boards, loading, error, pageInfo } = useBoards(kind, page, size, refreshKey);
 
     const filteredBoards = boards.filter((board) => {
         if (!searchTerm) return true;
@@ -97,8 +105,16 @@ export const BoardList = () => {
         }
     });
 
-    const noticeBoards = sortedBoards.filter(isAdminPost);
-    const regularBoards = sortedBoards.filter((board) => !isAdminPost(board));
+    const adminFilteredBoards = !isAdmin
+        ? sortedBoards
+        : adminFilter === "notice"
+            ? sortedBoards.filter(isAdminPost)
+            : adminFilter === "normal"
+                ? sortedBoards.filter((board) => !isAdminPost(board))
+                : sortedBoards;
+
+    const noticeBoards = adminFilteredBoards.filter(isAdminPost);
+    const regularBoards = adminFilteredBoards.filter((board) => !isAdminPost(board));
 
     const handlePageChange = (newPage) => {
         setPagingByKind((prev) => ({
@@ -119,6 +135,17 @@ export const BoardList = () => {
                 size: newSize,
             },
         }));
+    };
+
+    const handleDeleteBoard = async (boardId) => {
+        if (!window.confirm("정말 이 게시글을 삭제하시겠습니까?")) return;
+        try {
+            await api.delete(`/boards/${boardId}`);
+            toast.success("게시글이 삭제되었습니다.");
+            setRefreshKey((prev) => prev + 1);
+        } catch (error) {
+            toast.error(error.response?.data?.message || "게시글 삭제에 실패했습니다.");
+        }
     };
 
     return (
@@ -182,12 +209,50 @@ export const BoardList = () => {
                 </div>
             </div>
 
+            {isAdmin && (
+                <div className="card p-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">관리자 필터</span>
+                        <button
+                            onClick={() => setAdminFilter("all")}
+                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                                adminFilter === "all"
+                                    ? "bg-amber-100 text-amber-800 border-amber-300"
+                                    : "bg-white border-slate-200 text-slate-600"
+                            }`}
+                        >
+                            전체
+                        </button>
+                        <button
+                            onClick={() => setAdminFilter("notice")}
+                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                                adminFilter === "notice"
+                                    ? "bg-amber-100 text-amber-800 border-amber-300"
+                                    : "bg-white border-slate-200 text-slate-600"
+                            }`}
+                        >
+                            공지
+                        </button>
+                        <button
+                            onClick={() => setAdminFilter("normal")}
+                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                                adminFilter === "normal"
+                                    ? "bg-amber-100 text-amber-800 border-amber-300"
+                                    : "bg-white border-slate-200 text-slate-600"
+                            }`}
+                        >
+                            일반
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* 게시글 목록 */}
             {loading ? (
                 <LoadingSpinner text="게시글 불러오는 중..." />
             ) : error ? (
                 <ErrorMessage message={error} />
-            ) : sortedBoards.length === 0 ? (
+            ) : adminFilteredBoards.length === 0 ? (
                 <EmptyState
                     title="게시글이 없습니다"
                     description={
@@ -214,6 +279,9 @@ export const BoardList = () => {
                                         key={`notice-${board.board_id || board.boardId}`}
                                         board={board}
                                         kind={kind}
+                                        user={user}
+                                        onDelete={handleDeleteBoard}
+                                        onOpen={(boardKind, id) => navigate(`/app/boards/${boardKind}/${id}`)}
                                     />
                                 ))}
                             </div>
@@ -225,6 +293,10 @@ export const BoardList = () => {
                                 key={board.board_id || board.boardId}
                                 board={board}
                                 kind={kind}
+                                user={user}
+                                onDelete={handleDeleteBoard}
+                                onOpen={(boardKind, id) => navigate(`/app/boards/${boardKind}/${id}`)}
+                                onEdit={(boardKind, id) => navigate(`/app/boards/${boardKind}/${id}/edit`)}
                             />
                         ))}
                     </div>
@@ -244,9 +316,13 @@ export const BoardList = () => {
     );
 };
 
-const BoardCard = ({ board, kind }) => {
+const BoardCard = ({ board, kind, user, onDelete, onOpen, onEdit }) => {
     const boardId = board.board_id || board.boardId;
     const plainContents = stripHtmlTags(board.contents || board.content || "");
+    const canManageBoard = canManageByOwnerOrAdmin(user, board.member, {
+        ownerName: board.board_creator || board.boardCreator || "",
+        userName: user?.name || "",
+    });
 
     // delegateImagePath: 게시글 대표 이미지 URL (백엔드가 업로드 파일 중 마지막 이미지를 저장)
     const rawThumbnail = board.delegate_image_path || board.delegateImagePath || null;
@@ -257,10 +333,36 @@ const BoardCard = ({ board, kind }) => {
     const showThumbnail = thumbnailUrl && !imgError;
 
     return (
-        <Link
-            to={`/app/boards/${kind}/${boardId}`}
-            className="card hover:shadow-lg transition-all block group overflow-hidden"
+        <div
+            onClick={() => onOpen(kind, boardId)}
+            className="card hover:shadow-lg transition-all block group overflow-hidden cursor-pointer"
         >
+            <div className="flex justify-end p-2 pb-0">
+                {canManageBoard && (
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(kind, boardId);
+                            }}
+                            className="text-xs px-2 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50"
+                        >
+                            수정
+                        </button>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(boardId);
+                            }}
+                            className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                        >
+                            삭제
+                        </button>
+                    </div>
+                )}
+            </div>
             <div className="flex items-stretch">
 
                 {/* ── 썸네일 영역 ── */}
@@ -327,17 +429,21 @@ const BoardCard = ({ board, kind }) => {
                 </div>
 
             </div>
-        </Link>
+        </div>
     );
 };
 
-const NoticeBoardCard = ({ board, kind }) => {
+const NoticeBoardCard = ({ board, kind, user, onDelete, onOpen }) => {
     const boardId = board.board_id || board.boardId;
     const plainContents = stripHtmlTags(board.contents || board.content || "");
+    const canManageBoard = canManageByOwnerOrAdmin(user, board.member, {
+        ownerName: board.board_creator || board.boardCreator || "",
+        userName: user?.name || "",
+    });
     return (
-        <Link
-            to={`/app/boards/${kind}/${boardId}`}
-            className="block rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 hover:shadow-sm transition-all"
+        <div
+            onClick={() => onOpen(kind, boardId)}
+            className="block rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 hover:shadow-sm transition-all cursor-pointer"
         >
             <div className="flex items-center justify-between gap-2 text-[11px] text-amber-700 mb-1">
                 <span className="font-bold">공지</span>
@@ -349,6 +455,31 @@ const NoticeBoardCard = ({ board, kind }) => {
             <div className="mt-1 text-xs text-slate-600 line-clamp-1">
                 {truncateText(plainContents, 80)}
             </div>
-        </Link>
+            {canManageBoard && (
+                <div className="mt-2 flex items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpen(kind, boardId);
+                            window.location.href = `/app/boards/${kind}/${boardId}/edit`;
+                        }}
+                        className="text-[11px] px-2 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50"
+                    >
+                        공지 수정
+                    </button>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(boardId);
+                        }}
+                        className="text-[11px] px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                    >
+                        공지 삭제
+                    </button>
+                </div>
+            )}
+        </div>
     );
 };

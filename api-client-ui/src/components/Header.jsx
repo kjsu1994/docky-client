@@ -8,7 +8,6 @@ import {
     Newspaper,
     Calculator,
     Bot,
-    TerminalSquare,
     User,
     LogOut,
     Menu,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useState } from "react";
+import { isAdminUser } from "../utils/authorization";
 
 const NavItem = ({ to, icon: Icon, children, mobile = false }) => {
     return (
@@ -38,6 +38,7 @@ const NavItem = ({ to, icon: Icon, children, mobile = false }) => {
 export const Header = () => {
     const { user, logout } = useAuth();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const isAdmin = isAdminUser(user);
 
     return (
         <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur-sm shadow-sm">
@@ -84,9 +85,6 @@ export const Header = () => {
                         <NavItem to="/app/gpt" icon={Bot}>
                             GPT 질문
                         </NavItem>
-                        <NavItem to="/app/api-console" icon={TerminalSquare}>
-                            API 콘솔
-                        </NavItem>
                     </nav>
 
                     {/* 우측 액션 */}
@@ -101,6 +99,11 @@ export const Header = () => {
                                 <span className="hidden md:inline">
                   {user?.name || user?.email || "내정보"}
                 </span>
+                                {isAdmin && (
+                                    <span className="hidden md:inline-block text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">
+                                        ADMIN
+                                    </span>
+                                )}
                             </NavLink>
                             <button
                                 onClick={logout}
@@ -151,9 +154,6 @@ export const Header = () => {
                         </NavItem>
                         <NavItem to="/app/gpt" icon={Bot} mobile>
                             GPT 질문
-                        </NavItem>
-                        <NavItem to="/app/api-console" icon={TerminalSquare} mobile>
-                            API 콘솔
                         </NavItem>
                         <NavItem to="/app/mypage" icon={User} mobile>
                             내정보
