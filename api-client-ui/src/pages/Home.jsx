@@ -108,7 +108,7 @@ export const Home = () => {
                 <h2 className="text-xl font-bold text-slate-900 mb-4">
                     바로가기
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <QuickLink
                         to="/app/boards/FREE_BOARD"
                         title="자유게시판"
@@ -117,8 +117,8 @@ export const Home = () => {
                     />
                     <QuickLink
                         to="/app/boards/ECO_REVIEW"
-                        title="친환경 리뷰"
-                        description="친환경 제품 후기를 공유해요"
+                        title="Q&A 게시판"
+                        description="질문과 답변을 자유롭게 나눠요"
                         color="green"
                     />
                     <QuickLink
@@ -126,6 +126,12 @@ export const Home = () => {
                         title="녹색활동"
                         description="환경 보호 활동을 기록해요"
                         color="emerald"
+                    />
+                    <QuickLink
+                        to="/app/gpt"
+                        title="GPT 질문"
+                        description="AI 기반 환경 실천 팁 받기"
+                        color="teal"
                     />
                 </div>
             </div>
@@ -147,7 +153,7 @@ export const Home = () => {
                         {recentBoards.map((board) => (
                             <Link
                                 key={board.board_id || board.boardId}
-                                to={`/app/boards/${board.board_kind || board.boardKind}/${
+                                to={`/app/boards/${board.kind_of_board || board.kindOfBoard || "FREE_BOARD"}/${
                                     board.board_id || board.boardId
                                 }`}
                                 className="card p-5 hover:shadow-lg transition-all"
@@ -203,6 +209,7 @@ const QuickLink = ({ to, title, description, color }) => {
         blue: "from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700",
         green: "from-green-500 to-green-600 hover:from-green-600 hover:to-green-700",
         emerald: "from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700",
+        teal: "from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700",
     };
 
     return (

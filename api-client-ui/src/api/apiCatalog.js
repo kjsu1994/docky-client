@@ -1,17 +1,21 @@
-// api 콘솔에서 화면에대한 구역별 기능을 정의
-
+// API 콘솔용 엔드포인트 카탈로그 (API 기능명세 기준)
 export const apiCatalog = [
     {
-        group: "Members",
+        group: "Auth",
         items: [
             {
                 name: "Login",
                 method: "POST",
                 path: "/members/login",
                 auth: false,
-                sampleBody: { email: "codestates1@gmail.com", password: "abcd1234" },
+                sampleBody: { email: "user@gmail.com", password: "qwer1234" },
             },
-            { name: "Mypage", method: "GET", path: "/members", auth: true },
+            { name: "Logout", method: "POST", path: "/members/logout", auth: true },
+        ],
+    },
+    {
+        group: "Members",
+        items: [
             {
                 name: "Create Member",
                 method: "POST",
@@ -19,27 +23,108 @@ export const apiCatalog = [
                 auth: false,
                 sampleBody: { email: "", password: "", name: "", phone: "" },
             },
+            { name: "Get My Info", method: "GET", path: "/members", auth: true },
+            {
+                name: "Update My Info",
+                method: "PATCH",
+                path: "/members/{member-id}",
+                auth: true,
+                sampleBody: { name: "", phone: "", password: "" },
+            },
+            { name: "Delete Member", method: "DELETE", path: "/members", auth: true },
+            {
+                name: "Upload Profile",
+                method: "POST",
+                path: "/members/uploadProfile",
+                auth: true,
+                bodyType: "multipart",
+                multipartDefaults: {},
+                fileKey: "file",
+            },
         ],
     },
-
     {
         group: "Boards",
         items: [
-            // ====== GET (목록) 예시 ======
-            { name: "자유게시판 조회", method: "GET", path: "/boards", auth: true, sampleParams: {kind: "FREE_BOARD", page: 1, size: 10 } },
-            { name: "에코게시판 조회", method: "GET", path: "/boards", auth: true, sampleParams: {kind: "ECO_REVIEW", page: 1, size: 10 } },
-            { name: "그린게시판 조회", method: "GET", path: "/boards", auth: true, sampleParams: {kind: "GREEN_ACTIVE", page: 1, size: 10 } },
-
-            // ====== POST (작성) : 모두 multipart 기본 ======
+            { name: "List Boards", method: "GET", path: "/boards", auth: true, sampleParams: { kind: "FREE_BOARD", page: 1, size: 10 } },
+            { name: "Get Board Detail", method: "GET", path: "/boards/{board-id}", auth: true },
             {
-                name: "게시글 생성하기",
+                name: "Create Free Board",
                 method: "POST",
-                path: "/boards",
+                path: "/boards/free",
                 auth: true,
                 bodyType: "multipart",
-                sampleParams: {kind: "FREE_BOARD"},
-                multipartDefaults: { title: "", contents: ""}, // ✅ 기본 키
-                fileKey: "files", // ✅ 파일 키
+                multipartDefaults: { title: "", contents: "" },
+                fileKey: "files",
+            },
+            {
+                name: "Create Eco Board",
+                method: "POST",
+                path: "/boards/eco",
+                auth: true,
+                bodyType: "multipart",
+                multipartDefaults: { title: "", contents: "" },
+                fileKey: "files",
+            },
+            {
+                name: "Create Green Board",
+                method: "POST",
+                path: "/boards/green",
+                auth: true,
+                bodyType: "multipart",
+                multipartDefaults: { title: "", contents: "" },
+                fileKey: "files",
+            },
+            {
+                name: "Update Board",
+                method: "PATCH",
+                path: "/boards/{board-id}",
+                auth: true,
+                bodyType: "multipart",
+                multipartDefaults: { title: "", contents: "" },
+                fileKey: "files",
+            },
+            { name: "Delete Board", method: "DELETE", path: "/boards/{board-id}", auth: true },
+            { name: "Like Board", method: "POST", path: "/boards/{board-id}/Like", auth: true },
+            { name: "My Boards", method: "GET", path: "/boards/myBoards", auth: true, sampleParams: { page: 1, size: 10 } },
+        ],
+    },
+    {
+        group: "Comments",
+        items: [
+            { name: "Create Comment", method: "POST", path: "/comments", auth: true, sampleBody: { boardId: 1, contents: "좋은 글이네요." } },
+            { name: "Get Comment", method: "GET", path: "/comments/{comment-id}", auth: true },
+            { name: "List Comments", method: "GET", path: "/comments", auth: true, sampleParams: { boardId: 1, page: 1, size: 20 } },
+            { name: "Update Comment", method: "PATCH", path: "/comments/{comment-id}", auth: true, sampleBody: { contents: "수정된 댓글입니다." } },
+            { name: "Delete Comment", method: "DELETE", path: "/comments/{comment-id}", auth: true },
+            { name: "Like Comment", method: "POST", path: "/comments/{comment-id}/Like", auth: true },
+        ],
+    },
+    {
+        group: "Ranking",
+        items: [
+            { name: "Free Board Ranks", method: "GET", path: "/boards/rankFreeBoards", auth: true },
+            { name: "Eco Board Ranks", method: "GET", path: "/boards/rankEcoBoards", auth: true },
+            { name: "Green Board Ranks", method: "GET", path: "/boards/rankGreenBoards", auth: true },
+            { name: "Level Ranks", method: "GET", path: "/members/levelRanks", auth: true },
+            { name: "Donation Ranks", method: "GET", path: "/members/donationRanks", auth: true },
+        ],
+    },
+    {
+        group: "Etc",
+        items: [
+            { name: "Download File", method: "GET", path: "/file/{file-id}", auth: true },
+            { name: "News Search", method: "GET", path: "/news", auth: true, sampleParams: { query: "탄소중립", sort: "date", display: 10, start: 1 } },
+            { name: "Electric Calculator", method: "POST", path: "/calculators", auth: true, sampleBody: { powerConsumption: "1000", hour: "8" } },
+            { name: "GPT Question", method: "POST", path: "/gpt/question", auth: true, sampleBody: { question: "탄소 배출을 줄이는 방법을 알려줘." } },
+            {
+                name: "Board Inline Image Upload",
+                method: "POST",
+                path: "/image/upload",
+                auth: true,
+                bodyType: "multipart",
+                multipartDefaults: {},
+                fileKey: "file",
             },
         ],
     },

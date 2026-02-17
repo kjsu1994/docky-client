@@ -1,0 +1,182 @@
+﻿# Community Server - Frontend Implementation Guide
+
+Last updated: 2026-02-17
+Backend base URL: `http://localhost:8080`
+
+## 1) Goal
+이 문서는 프론트엔드 구현 시 필요한 화면, API, 인증/권한 흐름을 빠르게 연결하기 위한 개발 문서다.
+
+## 2) Auth and Token Rules
+- Login endpoint: `POST /members/login`
+- Access token: response header `Authorization: Bearer {token}`
+- Refresh token: response header `Refresh: {token}`
+- Logout endpoint: `POST /members/logout`
+
+Frontend rule:
+- 요청 인터셉터에서 `Authorization` 헤더 자동 부착
+- `401` 발생 시 refresh 재발급 로직(또는 재로그인) 처리
+- 로그인 성공 후 사용자 정보와 `roles`를 상태 저장
+
+## 3) Role Rules (USER / ADMIN)
+- 일반 회원가입: `POST /members`
+- 역할은 서버에서 이메일 기준으로 자동 부여
+- `application.yml`의 `mail.address.admin`와 동일한 이메일이면 `ROLE_ADMIN`
+- 그 외는 `ROLE_USER`
+
+확인 방법:
+- 로그인 응답 JSON의 `roles` 필드
+
+권한 UI 분기:
+- `ROLE_ADMIN` 포함 시 관리자 전용 버튼/메뉴 노출
+- 예: 전체 게시글 삭제 기능
+
+## 4) Page-by-Page API Mapping
+### 4.1 Auth
+- 로그인: `POST /members/login`
+- 로그아웃: `POST /members/logout`
+
+### 4.2 Member
+- 회원가입: `POST /members`
+- 내 정보 조회: `GET /members`
+- 내 정보 수정: `PATCH /members/{member-id}`
+- 회원 탈퇴: `DELETE /members`
+- 프로필 업로드: `POST /members/uploadProfile` (multipart/form-data)
+
+### 4.3 Board
+- 게시글 목록: `GET /boards`
+- 게시글 상세: `GET /boards/{board-id}`
+- 게시글 작성: `POST /boards/{free|eco|green}`
+- 게시글 수정/삭제: `PATCH`, `DELETE /boards/{board-id}`
+- 게시글 좋아요: `POST /boards/{board-id}/Like`
+- 내 게시글 목록: `GET /boards/myBoards`
+
+### 4.4 Comment
+- 댓글 작성: `POST /comments`
+- 댓글 단건: `GET /comments/{comment-id}`
+- 댓글 목록: `GET /comments?boardId={id}&page={n}&size={n}`
+- 댓글 수정/삭제: `PATCH`, `DELETE /comments/{comment-id}`
+- 댓글 좋아요: `POST /comments/{comment-id}/Like`
+
+### 4.5 Ranking
+- 자유 게시판 랭킹: `GET /boards/rankFreeBoards`
+- 에코 게시판 랭킹: `GET /boards/rankEcoBoards`
+- 그린 게시판 랭킹: `GET /boards/rankGreenBoards`
+- 레벨 랭킹: `GET /members/levelRanks`
+- 기부 랭킹: `GET /members/donationRanks`
+
+### 4.6 Other Features
+- 파일 다운로드: `GET /file/{file-id}`
+- 뉴스 검색: `GET /news`
+- 전기요금 계산기: `POST /calculators`
+- GPT 질문: `POST /gpt/question`
+
+## 5) Recommended Frontend Structure
+- `src/api/client.ts`: axios/fetch 공통 클라이언트
+- `src/api/endpoints.ts`: endpoint 상수
+- `src/features/auth/*`: login/logout, token store
+- `src/features/member/*`
+- `src/features/board/*`
+- `src/features/comment/*`
+- `src/features/ranking/*`
+
+상태 관리 권장:
+- auth 상태: 로그인 여부, access token, roles, member summary
+- 서버 상태: React Query 또는 SWR 권장
+
+## 6) Implementation Order (Suggested)
+1. 공통 API 클라이언트 + 인증 인터셉터
+2. 로그인/로그아웃 + 보호 라우트
+3. 회원가입/내 정보
+4. 게시글 목록/상세
+5. 게시글 작성/수정/삭제 + 파일 업로드
+6. 댓글 CRUD + 좋아요
+7. 랭킹/뉴스/계산기/GPT 기능
+8. admin 전용 UI 분기
+
+## 7) Error Handling Contract
+기본 에러 응답 스키마:
+```json
+{
+  "status": 400,
+  "code": "INVALID_INPUT_VALUE",
+  "message": "Invalid input value"
+}
+```
+
+Validation 에러 응답 예 (`@Valid`, `BindingResult`):
+```json
+{
+  "status": 400,
+  "code": "INVALID_INPUT_VALUE",
+  "message": "Invalid input value",
+  "fieldErrors": [
+    {
+      "field": "email",
+      "rejectedValue": "",
+      "reason": "must not be blank"
+    }
+  ]
+}
+```
+
+ConstraintViolation 에러 응답 예 (`@RequestParam`, `@PathVariable`):
+```json
+{
+  "status": 400,
+  "code": "INVALID_INPUT_VALUE",
+  "message": "Invalid input value",
+  "violationErrors": [
+    {
+      "propertyPath": "getBoard.boardId",
+      "rejectedValue": -1,
+      "reason": "must be greater than 0"
+    }
+  ]
+}
+```
+
+Frontend 처리 기준:
+- `400`: 폼 필드 에러 표시
+- `401`: 로그인 만료 처리
+- `403`: 권한 없음 안내
+- `404`: 존재하지 않는 리소스 안내
+- `500`: 공통 에러 토스트/페이지
+
+주요 에러 코드 예시:
+- `INVALID_INPUT_VALUE`
+- `MISSING_REQUEST_PARAMETER`
+- `MESSAGE_NOT_READABLE`
+- `METHOD_ARGUMENT_TYPE_MISMATCH`
+- `METHOD_NOT_ALLOWED`
+- `UNSUPPORTED_MEDIA_TYPE`
+- `NOT_ACCEPTABLE`
+- `UNAUTHORIZED`
+- `BAD_CREDENTIALS`
+- `ACCESS_DENIED`
+- `MEMBER_NOT_FOUND`, `BOARD_NOT_FOUND`, `COMMENT_NOT_FOUND`
+- `MEMBER_EXISTS`, `DATA_INTEGRITY_VIOLATION`
+- `INTERNAL_SERVER_ERROR`
+
+## 8) Quick Test Checklist
+- 로그인 시 토큰 헤더 저장 확인
+- `ROLE_ADMIN` 계정 로그인 시 관리자 UI 노출 확인
+- 보호 API 호출 시 인증 헤더 포함 확인
+- 게시글/댓글 CRUD 후 목록 캐시 갱신 확인
+- 파일 업로드/다운로드 동작 확인
+
+## 9) Notes
+- CORS는 현재 전체 허용 설정(`*`) 상태
+- 실제 운영 전에는 origin 제한 필요
+- OAuth 로그인 사용 시에도 roles 값을 기준으로 UI 분기
+
+## 10) Authorization Policy Update (2026-02-17)
+- 게시글 수정/삭제(`PATCH /boards/{board-id}`, `DELETE /boards/{board-id}`):
+  - 작성자 본인 또는 `ROLE_ADMIN`만 가능
+- 댓글 수정/삭제(`PATCH /comments/{comment-id}`, `DELETE /comments/{comment-id}`):
+  - 작성자 본인 또는 `ROLE_ADMIN`만 가능
+
+Frontend 권장 처리:
+- 수정/삭제 버튼은 아래 조건에서만 노출
+  - `currentUser.memberId === resource.member.member_id`
+  - 또는 `roles`에 `ROLE_ADMIN` 포함
+- 서버가 `403`을 반환하면 "수정/삭제 권한이 없습니다." 메시지 표시

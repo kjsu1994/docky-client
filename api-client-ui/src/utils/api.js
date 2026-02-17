@@ -36,14 +36,26 @@ api.interceptors.response.use(
             if (refreshToken) {
                 try {
                     // 리프레시 토큰으로 새 액세스 토큰 발급
-                    const response = await axios.post("/api/auth/refresh", {
-                        refreshToken,
+                    const response = await axios.get("/api/auth/reissue", {
+                        headers: {
+                            Authorization: `Bearer ${refreshToken}`,
+                        },
                     });
 
-                    const { accessToken } = response.data;
+                    const authHeader = response.headers?.authorization || response.headers?.Authorization;
+                    const accessToken =
+                        typeof authHeader === "string"
+                            ? authHeader.replace(/^Bearer\s+/i, "")
+                            : null;
+
+                    if (!accessToken) {
+                        throw new Error("재발급 토큰을 찾을 수 없습니다.");
+                    }
+
                     localStorage.setItem("accessToken", accessToken);
 
                     // 실패한 요청 재시도
+                    originalRequest.headers = originalRequest.headers || {};
                     originalRequest.headers.Authorization = `Bearer ${accessToken}`;
                     return api(originalRequest);
                 } catch (refreshError) {
@@ -68,9 +80,12 @@ api.interceptors.response.use(
 export default api;
 
 // Multipart 요청용 별도 함수
-export const uploadFiles = async (endpoint, formData) => {
+export const uploadFiles = async (endpoint, formData, method = "post") => {
     const token = localStorage.getItem("accessToken");
-    return axios.post(`/api${endpoint}`, formData, {
+    return axios({
+        method,
+        url: `/api${endpoint}`,
+        data: formData,
         headers: {
             "Content-Type": "multipart/form-data",
             Authorization: token ? `Bearer ${token}` : "",

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Trophy, TrendingUp, Heart, Award, Crown, Medal, Star } from "lucide-react";
 import api from "../utils/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
@@ -35,7 +36,7 @@ export const Ranks = () => {
                         break;
                 }
                 const response = await api.get(endpoint);
-                setBoardRanks(response.data || []);
+                setBoardRanks(response.data?.data || response.data || []);
             } catch (err) {
                 console.error("Failed to fetch board ranks:", err);
                 setError("게시판 랭킹을 불러오는데 실패했습니다.");
@@ -56,7 +57,7 @@ export const Ranks = () => {
             setError("");
             try {
                 const response = await api.get("/members/levelRanks");
-                setLevelRanks(response.data || []);
+                setLevelRanks(response.data?.data || response.data || []);
             } catch (err) {
                 console.error("Failed to fetch level ranks:", err);
                 setError("레벨 랭킹을 불러오는데 실패했습니다.");
@@ -77,7 +78,7 @@ export const Ranks = () => {
             setError("");
             try {
                 const response = await api.get("/members/donationRanks");
-                setDonationRanks(response.data || []);
+                setDonationRanks(response.data?.data || response.data || []);
             } catch (err) {
                 console.error("Failed to fetch donation ranks:", err);
                 setError("기부 랭킹을 불러오는데 실패했습니다.");
@@ -155,7 +156,7 @@ export const Ranks = () => {
                             active={boardRankType === "ECO_REVIEW"}
                             onClick={() => setBoardRankType("ECO_REVIEW")}
                         >
-                            친환경 리뷰
+                            Q&A 게시판
                         </BoardTypeButton>
                         <BoardTypeButton
                             active={boardRankType === "GREEN_ACTIVE"}
@@ -233,11 +234,12 @@ const BoardRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
             {ranks.map((board, index) => {
                 const rank = index + 1;
                 return (
-                    <div
+                    <Link
                         key={board.board_id || board.boardId}
+                        to={`/app/boards/${board.kind_of_board || board.kindOfBoard || "FREE_BOARD"}/${board.board_id || board.boardId}`}
                         className={`p-6 transition-colors ${
                             rank <= 3 ? "bg-gradient-to-r from-slate-50 to-transparent" : "hover:bg-slate-50"
-                        }`}
+                        } block`}
                     >
                         <div className="flex items-start gap-4">
                             {/* 순위 */}
@@ -262,7 +264,7 @@ const BoardRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </Link>
                 );
             })}
         </div>

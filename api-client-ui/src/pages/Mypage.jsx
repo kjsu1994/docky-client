@@ -29,6 +29,19 @@ export const Mypage = () => {
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState("profile"); // profile, posts, stats
 
+    const handleDeleteAccount = async () => {
+        const confirmed = window.confirm("정말 회원 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.");
+        if (!confirmed) return;
+
+        try {
+            await api.delete("/members");
+            await logout({ skipApi: true, silent: true });
+        } catch (err) {
+            console.error("Failed to delete member:", err);
+            setError(err.response?.data?.message || "회원 탈퇴에 실패했습니다.");
+        }
+    };
+
     // 회원 정보 불러오기
     useEffect(() => {
         const fetchMemberData = async () => {
@@ -210,7 +223,11 @@ export const Mypage = () => {
 
             {/* 탭 컨텐츠 */}
             {activeTab === "profile" && (
-                <ProfileTab memberData={memberData} levelData={levelData} />
+                <ProfileTab
+                    memberData={memberData}
+                    levelData={levelData}
+                    onDeleteAccount={handleDeleteAccount}
+                />
             )}
             {activeTab === "posts" && (
                 <PostsTab boards={myBoards} loading={boardsLoading} navigate={navigate} />
@@ -257,7 +274,7 @@ const TabButton = ({ active, onClick, children }) => (
 );
 
 // 프로필 탭
-const ProfileTab = ({ memberData, levelData }) => {
+const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 기본 정보 */}
@@ -349,7 +366,10 @@ const ProfileTab = ({ memberData, levelData }) => {
                     <button className="w-full btn-secondary text-left">
                         비밀번호 변경
                     </button>
-                    <button className="w-full px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-left font-semibold">
+                    <button
+                        onClick={onDeleteAccount}
+                        className="w-full px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-left font-semibold"
+                    >
                         회원 탈퇴
                     </button>
                 </div>
@@ -390,7 +410,11 @@ const PostsTab = ({ boards, loading, navigate }) => {
                 <div
                     key={board.board_id || board.boardId}
                     className="card p-6 hover:shadow-lg transition-all cursor-pointer"
-                    onClick={() => navigate(`/app/boards/detail/${board.board_id || board.boardId}`)}
+                    onClick={() =>
+                        navigate(
+                            `/app/boards/${board.kind_of_board || board.kindOfBoard || "FREE_BOARD"}/${board.board_id || board.boardId}`
+                        )
+                    }
                 >
                     <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-1">
                         {board.title}

@@ -51,7 +51,7 @@ export default function TopNav() {
                     <Item to="/app">홈</Item>
                     {/* 게시판 (kind 명시) */}
                     <Item to="/app/boards/FREE_BOARD">자유</Item>
-                    <Item to="/app/boards/ECO_REVIEW">친환경</Item>
+                    <Item to="/app/boards/ECO_REVIEW">Q&A</Item>
                     <Item to="/app/boards/GREEN_ACTIVE">녹색활동</Item>
 
                     <Item to="/app/ranks">랭킹</Item>

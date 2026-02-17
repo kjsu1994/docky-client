@@ -17,16 +17,18 @@ export const useBoards = (kind, page = 1, size = 10) => {
             setError(null);
 
             try {
+                const apiPage = Math.max((page || 1) - 1, 0);
                 const response = await api.get("/boards", {
-                    params: { kind, page, size },
+                    params: { kind, page: apiPage, size },
                 });
 
                 const data = response.data.data || response.data;
                 setBoards(data.content || data);
+                const serverPage = typeof data.number === "number" ? data.number + 1 : page;
                 setPageInfo({
                     totalPages: data.totalPages || 1,
                     totalElements: data.totalElements || 0,
-                    currentPage: data.number || page,
+                    currentPage: serverPage,
                 });
             } catch (err) {
                 setError(err.response?.data?.message || "게시글 로딩 실패");

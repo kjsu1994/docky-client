@@ -10,9 +10,12 @@ import { BoardList } from "./pages/BoardList";
 import { BoardDetail } from "./pages/BoardDetail";
 import { BoardForm } from "./pages/BoardForm";
 import {Mypage} from "./pages/Mypage.jsx";
+import { MypageEdit } from "./pages/MypageEdit.jsx";
 import {Ranks} from "./pages/Ranks.jsx";
 import {News} from "./pages/News.jsx";
 import {Calculators} from "./pages/Calculators.jsx";
+import { GptQuestion } from "./pages/GptQuestion.jsx";
+import ApiConsole from "./pages/ApiConsole.jsx";
 
 // 보호된 라우트 컴포넌트
 const ProtectedRoute = ({ children }) => {
@@ -147,6 +150,36 @@ function App() {
                             <ProtectedRoute>
                                 <AppLayout>
                                     <Mypage title="마이페이지" />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/mypage/edit"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <MypageEdit />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/gpt"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <GptQuestion />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/api-console"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <ApiConsole />
                                 </AppLayout>
                             </ProtectedRoute>
                         }

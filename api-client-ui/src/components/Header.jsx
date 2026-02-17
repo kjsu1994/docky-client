@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import {
     Home,
     MessageSquare,
@@ -7,6 +7,8 @@ import {
     Trophy,
     Newspaper,
     Calculator,
+    Bot,
+    TerminalSquare,
     User,
     LogOut,
     Menu,
@@ -42,7 +44,7 @@ export const Header = () => {
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
                     {/* 로고 */}
-                    <div className="flex items-center gap-3">
+                    <Link to="/app" className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-white font-bold text-lg shadow-md">
                             C
                         </div>
@@ -54,7 +56,7 @@ export const Header = () => {
                                 Community Platform
                             </div>
                         </div>
-                    </div>
+                    </Link>
 
                     {/* 데스크톱 네비게이션 */}
                     <nav className="hidden lg:flex items-center gap-2">
@@ -65,7 +67,7 @@ export const Header = () => {
                             자유게시판
                         </NavItem>
                         <NavItem to="/app/boards/ECO_REVIEW" icon={Leaf}>
-                            친환경리뷰
+                            Q&A 게시판
                         </NavItem>
                         <NavItem to="/app/boards/GREEN_ACTIVE" icon={Sprout}>
                             녹색활동
@@ -78,6 +80,12 @@ export const Header = () => {
                         </NavItem>
                         <NavItem to="/app/calculators" icon={Calculator}>
                             전기요금
+                        </NavItem>
+                        <NavItem to="/app/gpt" icon={Bot}>
+                            GPT 질문
+                        </NavItem>
+                        <NavItem to="/app/api-console" icon={TerminalSquare}>
+                            API 콘솔
                         </NavItem>
                     </nav>
 
@@ -127,7 +135,7 @@ export const Header = () => {
                             자유게시판
                         </NavItem>
                         <NavItem to="/app/boards/ECO_REVIEW" icon={Leaf} mobile>
-                            친환경리뷰
+                            Q&A 게시판
                         </NavItem>
                         <NavItem to="/app/boards/GREEN_ACTIVE" icon={Sprout} mobile>
                             녹색활동
@@ -140,6 +148,12 @@ export const Header = () => {
                         </NavItem>
                         <NavItem to="/app/calculators" icon={Calculator} mobile>
                             전기요금
+                        </NavItem>
+                        <NavItem to="/app/gpt" icon={Bot} mobile>
+                            GPT 질문
+                        </NavItem>
+                        <NavItem to="/app/api-console" icon={TerminalSquare} mobile>
+                            API 콘솔
                         </NavItem>
                         <NavItem to="/app/mypage" icon={User} mobile>
                             내정보

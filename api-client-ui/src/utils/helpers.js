@@ -20,7 +20,7 @@ export const formatRelativeTime = (date) => {
 export const getBoardKindLabel = (kind) => {
     const labels = {
         FREE_BOARD: "자유게시판",
-        ECO_REVIEW: "친환경 리뷰",
+        ECO_REVIEW: "Q&A 게시판",
         GREEN_ACTIVE: "녹색활동",
     };
     return labels[kind] || kind;
@@ -57,6 +57,21 @@ export const truncateText = (text, maxLength = 100) => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + "...";
+};
+
+// HTML 문자열을 목록/검색용 일반 텍스트로 정제
+export const stripHtmlTags = (html) => {
+    if (!html) return "";
+    return String(html)
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, " ")
+        .trim();
 };
 
 // 숫자 포맷팅 (천 단위 콤마)

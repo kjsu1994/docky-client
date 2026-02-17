@@ -27,7 +27,12 @@ export const Comments = ({ boardId, onUpdate }) => {
             });
             // MultiResponseDto 구조 대응: response.data.data 또는 response.data
             const data = response.data?.data || response.data;
-            setComments(Array.isArray(data) ? data : []);
+            const content = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.content)
+                    ? data.content
+                    : [];
+            setComments(content);
         } catch (error) {
             console.error("Failed to fetch comments:", error);
             // toast.error("댓글을 불러오는데 실패했습니다.");

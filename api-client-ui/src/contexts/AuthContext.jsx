@@ -67,11 +67,28 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
+    const logout = async (options = {}) => {
+        if (options && typeof options.preventDefault === "function") {
+            options = {};
+        }
+        const { skipApi = false, silent = false } = options;
+
+        if (!skipApi) {
+            try {
+                await api.post("/members/logout");
+            } catch (error) {
+                // 서버 로그아웃 실패여도 클라이언트 세션은 정리
+                console.error("Failed to logout from server:", error);
+            }
+        }
+
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         setUser(null);
-        toast.success("로그아웃되었습니다");
+
+        if (!silent) {
+            toast.success("로그아웃되었습니다");
+        }
         navigate("/login");
     };
 

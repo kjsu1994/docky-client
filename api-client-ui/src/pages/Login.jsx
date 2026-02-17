@@ -108,8 +108,8 @@ export const Login = () => {
                             테스트 계정
                         </p>
                         <div className="space-y-1 text-xs text-slate-600">
-                            <p>• 이메일: codestates1@gmail.com</p>
-                            <p>• 비밀번호: abcd1234</p>
+                            <p>• 이메일: user@gmail.com</p>
+                            <p>• 비밀번호: qwer1234</p>
                         </div>
                     </div>
                 </div>

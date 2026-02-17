@@ -1,83 +1,265 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload, X, FileText, Image as ImageIcon } from "lucide-react";
 import api, { uploadFiles } from "../utils/api";
+import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import { isImageFile } from "../utils/helpers";
+
+// ── Quill CDN 로드 ──────────────────────────────────────────────
+const loadQuill = () =>
+    new Promise((resolve) => {
+        if (window.Quill) return resolve(window.Quill);
+
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css";
+        document.head.appendChild(link);
+
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js";
+        script.onload = () => resolve(window.Quill);
+        document.head.appendChild(script);
+    });
+
+const BOARD_CATEGORY_PATH = {
+    FREE_BOARD: "free",
+    ECO_REVIEW: "eco",
+    GREEN_ACTIVE: "green",
+};
+
+const cloneFormData = (source) => {
+    const copied = new FormData();
+    for (const [key, value] of source.entries()) {
+        copied.append(key, value);
+    }
+    return copied;
+};
+
+const hasRole = (roles, roleName) => {
+    if (!roles) return false;
+    if (Array.isArray(roles)) return roles.includes(roleName);
+    return String(roles).includes(roleName);
+};
 
 export const BoardForm = () => {
     const { kind, boardId } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const isEdit = !!boardId;
+    const boardCategoryPath = BOARD_CATEGORY_PATH[kind] || "free";
+    const isAdmin =
+        hasRole(user?.roles, "ROLE_ADMIN") ||
+        hasRole(user?.role, "ROLE_ADMIN") ||
+        hasRole(user?.member?.roles, "ROLE_ADMIN");
 
-    const [formData, setFormData] = useState({
-        title: "",
-        contents: "",
-    });
-    const [files, setFiles] = useState([]);
+    const [title, setTitle] = useState("");
+    const [attachFiles, setAttachFiles] = useState([]);
+    const [existingFiles, setExistingFiles] = useState([]);
+    const [deletedExistingFileIds, setDeletedExistingFileIds] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [editorReady, setEditorReady] = useState(false);
 
+    const editorRef = useRef(null);
+    const quillRef = useRef(null);
+
+    // ── Quill 초기화 ────────────────────────────────────────────
     useEffect(() => {
-        if (isEdit) {
-            const fetchBoard = async () => {
-                try {
-                    const response = await api.get(`/boards/${boardId}`);
-                    const board = response.data.data || response.data;
-                    setFormData({
-                        title: board.title,
-                        contents: board.contents || board.content,
-                    });
-                } catch (error) {
-                    toast.error("게시글 로딩 실패");
-                }
-            };
-            fetchBoard();
-        }
-    }, [isEdit, boardId]);
+        loadQuill().then((Quill) => {
+            if (!editorRef.current || quillRef.current) return;
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+            const quill = new Quill(editorRef.current, {
+                theme: "snow",
+                placeholder: "내용을 입력하세요. 이미지는 복사-붙여넣기 또는 드래그앤드롭으로 바로 삽입 가능합니다.",
+                modules: {
+                    toolbar: [
+                        [{ header: [1, 2, 3, false] }],
+                        ["bold", "italic", "underline", "strike"],
+                        [{ color: [] }, { background: [] }],
+                        [{ list: "ordered" }, { list: "bullet" }],
+                        [{ align: [] }],
+                        ["link", "image"],
+                        ["blockquote", "code-block"],
+                        ["clean"],
+                    ],
+                },
+            });
+
+            quillRef.current = quill;
+            setEditorReady(true);
+
+            // ── 툴바 이미지 버튼 → 파일 선택 ──────────────────
+            quill.getModule("toolbar").addHandler("image", () => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "image/*";
+                input.multiple = true;
+                input.onchange = async (e) => {
+                    for (const file of Array.from(e.target.files)) {
+                        await uploadImageToServer(quill, file);
+                    }
+                };
+                input.click();
+            });
+
+            // ── 붙여넣기 이미지 처리 ───────────────────────────
+            quill.root.addEventListener("paste", async (e) => {
+                const items = Array.from(e.clipboardData?.items || []);
+                const imageItems = items.filter((i) => i.type.startsWith("image/"));
+                if (imageItems.length === 0) return;
+
+                e.preventDefault();
+                for (const item of imageItems) {
+                    const file = item.getAsFile();
+                    if (file) await uploadImageToServer(quill, file);
+                }
+            });
+
+            // ── 드래그앤드롭 이미지 처리 ──────────────────────
+            quill.root.addEventListener("drop", async (e) => {
+                e.preventDefault();
+                const files = Array.from(e.dataTransfer?.files || []).filter((f) =>
+                    f.type.startsWith("image/")
+                );
+                for (const file of files) {
+                    await uploadImageToServer(quill, file);
+                }
+            });
+            quill.root.addEventListener("dragover", (e) => e.preventDefault());
+        });
+
+        return () => { quillRef.current = null; };
+    }, []);
+
+    // ── 이미지 → /image/upload → MinIO URL → 에디터 삽입 ───────
+    const uploadImageToServer = async (quill, file) => {
+        // 5MB 프론트 사전 검증
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("이미지 크기는 5MB 이하여야 합니다.");
+            return;
+        }
+
+        const toastId = toast.loading("이미지 업로드 중...");
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const response = await api.post("/image/upload", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+
+            const imageUrl = response.data?.url || response.data;
+            if (!imageUrl) throw new Error("URL 없음");
+
+            // 현재 커서 위치에 이미지 삽입
+            const range = quill.getSelection(true);
+            quill.insertEmbed(range.index, "image", imageUrl);
+            quill.setSelection(range.index + 1);
+
+            toast.success("이미지 삽입 완료", { id: toastId });
+        } catch (err) {
+            console.error("이미지 업로드 실패:", err);
+            toast.error(err.response?.data?.message || "이미지 업로드 실패", { id: toastId });
+        }
     };
 
+    // ── 수정 모드: 기존 내용 로드 ───────────────────────────────
+    useEffect(() => {
+        if (!isEdit || !editorReady) return;
+
+        api.get(`/boards/${boardId}`)
+            .then((res) => {
+                const board = res.data.data || res.data;
+                setTitle(board.title || "");
+                const files = board.uploadDto || board.upload_dto || [];
+                setExistingFiles(Array.isArray(files) ? files : []);
+                setDeletedExistingFileIds([]);
+                if (quillRef.current) {
+                    quillRef.current.root.innerHTML = board.contents || board.content || "";
+                }
+            })
+            .catch(() => toast.error("게시글 로딩 실패"));
+    }, [isEdit, boardId, editorReady]);
+
+    // ── 첨부파일 처리 ───────────────────────────────────────────
     const handleFileChange = (e) => {
-        const selectedFiles = Array.from(e.target.files);
-        setFiles((prev) => [...prev, ...selectedFiles]);
+        setAttachFiles((prev) => [...prev, ...Array.from(e.target.files)]);
     };
 
     const removeFile = (index) => {
-        setFiles((prev) => prev.filter((_, i) => i !== index));
+        setAttachFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
+    const removeExistingFile = (file) => {
+        const fileId = file.file_id || file.fileId;
+        if (!fileId) return;
+
+        setExistingFiles((prev) =>
+            prev.filter((it) => (it.file_id || it.fileId) !== fileId)
+        );
+        setDeletedExistingFileIds((prev) =>
+            prev.includes(fileId) ? prev : [...prev, fileId]
+        );
+    };
+
+    // ── 제출 ────────────────────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!formData.title.trim()) {
-            toast.error("제목을 입력해주세요");
-            return;
-        }
+        if (!title.trim()) { toast.error("제목을 입력해주세요"); return; }
 
-        if (!formData.contents.trim()) {
-            toast.error("내용을 입력해주세요");
-            return;
-        }
+        const quill = quillRef.current;
+        if (!quill) return;
+
+        const htmlContents = quill.root.innerHTML;
+        if (!quill.getText().trim()) { toast.error("내용을 입력해주세요"); return; }
 
         setLoading(true);
-
         try {
             const formDataToSend = new FormData();
-            formDataToSend.append("title", formData.title);
-            formDataToSend.append("contents", formData.contents);
-
-            files.forEach((file) => {
-                formDataToSend.append("files", file);
+            formDataToSend.append("title", title);
+            formDataToSend.append("contents", htmlContents);
+            attachFiles.forEach((file) => formDataToSend.append("files", file));
+            deletedExistingFileIds.forEach((fileId) => {
+                formDataToSend.append("deleteFileIds", fileId);
             });
+            if (isAdmin) {
+                formDataToSend.append("isNotice", "true");
+                formDataToSend.append("notice", "true");
+                formDataToSend.append("adminPost", "true");
+            }
 
             if (isEdit) {
-                await uploadFiles(`/boards/${boardId}?kind=${kind}`, formDataToSend);
+                await uploadFiles(`/boards/${boardId}`, formDataToSend, "patch");
                 toast.success("게시글이 수정되었습니다");
             } else {
-                await uploadFiles(`/boards?kind=${kind}`, formDataToSend);
+                const createEndpoints = [
+                    `/boards/${boardCategoryPath}`,
+                    `/boards/${kind}`,
+                    `/boards?kind=${kind}`,
+                    "/boards",
+                ];
+
+                let createSuccess = false;
+                let lastError = null;
+
+                for (const endpoint of createEndpoints) {
+                    try {
+                        const formDataForTry = cloneFormData(formDataToSend);
+                        if (endpoint === "/boards") {
+                            formDataForTry.append("kind", kind);
+                        }
+                        await uploadFiles(endpoint, formDataForTry, "post");
+                        createSuccess = true;
+                        break;
+                    } catch (err) {
+                        lastError = err;
+                    }
+                }
+
+                if (!createSuccess && lastError) {
+                    throw lastError;
+                }
                 toast.success("게시글이 등록되었습니다");
             }
 
@@ -96,137 +278,157 @@ export const BoardForm = () => {
                 <h1 className="text-2xl font-bold text-slate-900">
                     {isEdit ? "게시글 수정" : "게시글 작성"}
                 </h1>
-                <button
-                    onClick={() => navigate(`/app/boards/${kind}`)}
-                    className="btn-secondary"
-                >
-                    <ArrowLeft className="h-4 w-4 inline mr-2" />
-                    목록으로
+                <button type="button" onClick={() => navigate(`/app/boards/${kind}`)} className="btn-secondary">
+                    <ArrowLeft className="h-4 w-4 inline mr-2" />목록으로
                 </button>
             </div>
 
-            {/* 폼 */}
-            <form onSubmit={handleSubmit} className="card p-8 space-y-6">
-                {/* 제목 */}
-                <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        제목
-                    </label>
-                    <input
-                        type="text"
-                        name="title"
-                        value={formData.title}
-                        onChange={handleChange}
-                        className="input-base"
-                        placeholder="제목을 입력하세요"
-                        required
-                    />
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="card p-8 space-y-6">
 
-                {/* 내용 */}
-                <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        내용
-                    </label>
-                    <textarea
-                        name="contents"
-                        value={formData.contents}
-                        onChange={handleChange}
-                        className="input-base resize-none"
-                        rows="12"
-                        placeholder="내용을 입력하세요"
-                        required
-                    />
-                </div>
+                    {/* 제목 */}
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">제목</label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            className="input-base"
+                            placeholder="제목을 입력하세요"
+                            required
+                        />
+                    </div>
 
-                {/* 파일 업로드 */}
-                <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        첨부파일
-                    </label>
-                    <div className="space-y-3">
-                        {/* 업로드 버튼 */}
-                        <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-xl hover:border-primary-500 hover:bg-primary-50 cursor-pointer transition-all">
-                            <Upload className="h-5 w-5 text-slate-400" />
-                            <span className="text-sm font-medium text-slate-600">
-                파일 선택 (이미지, 문서 등)
-              </span>
-                            <input
-                                type="file"
-                                multiple
-                                onChange={handleFileChange}
-                                className="hidden"
-                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-                            />
+                    {/* 에디터 */}
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            내용
+                            <span className="ml-2 text-xs font-normal text-slate-400">
+                                이미지 복사-붙여넣기 / 드래그앤드롭 지원 (최대 5MB)
+                            </span>
                         </label>
 
-                        {/* 선택된 파일 목록 */}
-                        {files.length > 0 && (
-                            <div className="space-y-2">
-                                {files.map((file, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-slate-50"
-                                    >
-                                        {isImageFile(file.name) ? (
-                                            <div className="h-10 w-10 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                                <ImageIcon className="h-5 w-5 text-blue-600" />
-                                            </div>
-                                        ) : (
-                                            <div className="h-10 w-10 rounded bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                                <FileText className="h-5 w-5 text-slate-600" />
-                                            </div>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-slate-900 truncate">
-                                                {file.name}
-                                            </p>
-                                            <p className="text-xs text-slate-500">
-                                                {(file.size / 1024).toFixed(2)} KB
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeFile(index)}
-                                            className="p-2 rounded-lg hover:bg-red-100 text-red-600 transition-colors"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                ))}
+                        {!editorReady && (
+                            <div className="border border-slate-200 rounded-xl h-64 flex items-center justify-center bg-slate-50 text-slate-400 text-sm">
+                                에디터 로딩 중...
                             </div>
                         )}
+
+                        <div className={`quill-wrapper ${editorReady ? "" : "hidden"}`}>
+                            <div ref={editorRef} />
+                        </div>
+                    </div>
+
+                    {/* 첨부파일 */}
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            첨부파일
+                            <span className="ml-2 text-xs font-normal text-slate-400">(본문 외 추가 첨부)</span>
+                        </label>
+                        <div className="space-y-3">
+                            {isEdit && existingFiles.length > 0 && (
+                                <div className="space-y-2">
+                                    <div className="text-sm font-semibold text-slate-700">기존 첨부파일</div>
+                                    {existingFiles.map((file, index) => (
+                                        <div key={`existing-${file.file_id || file.fileId || index}`} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {isImageFile(file.file_name || file.fileName)
+                                                    ? <ImageIcon className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                                                    : <FileText className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                                                }
+                                                <span className="text-sm truncate">{file.file_name || file.fileName}</span>
+                                                <span className="text-xs text-amber-700 flex-shrink-0">기존 파일</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeExistingFile(file)}
+                                                className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-xl hover:border-primary-500 hover:bg-primary-50 cursor-pointer transition-all">
+                                <Upload className="h-5 w-5 text-slate-400" />
+                                <span className="text-sm text-slate-500">클릭하여 파일 선택</span>
+                                <input type="file" multiple onChange={handleFileChange} className="hidden" />
+                            </label>
+
+                            {attachFiles.length > 0 && (
+                                <div className="space-y-2">
+                                    {attachFiles.map((file, index) => (
+                                        <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {isImageFile(file.name)
+                                                    ? <ImageIcon className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                                    : <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                                                }
+                                                <span className="text-sm truncate">{file.name}</span>
+                                                <span className="text-xs text-slate-400 flex-shrink-0">
+                                                    ({(file.size / 1024).toFixed(0)}KB)
+                                                </span>
+                                            </div>
+                                            <button type="button" onClick={() => removeFile(index)}
+                                                    className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors flex-shrink-0">
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* 제출 버튼 */}
-                <div className="flex items-center gap-3 pt-6 border-t">
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="btn-primary flex-1"
-                    >
-                        {loading ? (
-                            <span className="flex items-center justify-center gap-2">
-                <div className="loading-spinner" />
-                                {isEdit ? "수정 중..." : "등록 중..."}
-              </span>
-                        ) : isEdit ? (
-                            "수정하기"
-                        ) : (
-                            "등록하기"
-                        )}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => navigate(`/app/boards/${kind}`)}
-                        className="btn-secondary"
-                        disabled={loading}
-                    >
-                        취소
+                {/* 버튼 */}
+                <div className="flex justify-end gap-3">
+                    <button type="button" onClick={() => navigate(`/app/boards/${kind}`)}
+                            className="btn-secondary" disabled={loading}>취소</button>
+                    <button type="submit" className="btn-primary min-w-[100px]"
+                            disabled={loading || !editorReady}>
+                        {loading ? "저장 중..." : isEdit ? "수정 완료" : "등록하기"}
                     </button>
                 </div>
             </form>
+
+            {/* Quill 스타일 */}
+            <style>{`
+                .quill-wrapper .ql-toolbar {
+                    border-top-left-radius: 0.75rem;
+                    border-top-right-radius: 0.75rem;
+                    background: #f8fafc;
+                    border-color: #e2e8f0;
+                }
+                .quill-wrapper .ql-container {
+                    font-size: 15px;
+                    font-family: inherit;
+                    border-bottom-left-radius: 0.75rem;
+                    border-bottom-right-radius: 0.75rem;
+                    border-color: #e2e8f0;
+                    min-height: 280px;
+                }
+                .quill-wrapper .ql-editor {
+                    min-height: 280px;
+                    line-height: 1.7;
+                }
+                .quill-wrapper .ql-editor img {
+                    max-width: 320px;
+                    max-height: 240px;
+                    width: auto;
+                    height: auto;
+                    object-fit: contain;
+                    border-radius: 0.5rem;
+                    margin: 8px 0;
+                    cursor: pointer;
+                }
+                .quill-wrapper .ql-editor.ql-blank::before {
+                    color: #94a3b8;
+                    font-style: normal;
+                }
+            `}</style>
         </div>
     );
 };

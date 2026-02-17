@@ -157,9 +157,12 @@ export const BoardDetail = () => {
                 </div>
 
                 <div className="p-6">
-                    <div className="prose max-w-none text-slate-800 whitespace-pre-wrap min-h-[200px]">
-                        {board.contents || board.content}
-                    </div>
+                    <div
+                        className="prose prose-slate max-w-none min-h-[200px] board-contents"
+                        dangerouslySetInnerHTML={{
+                            __html: board.contents || board.content || ""
+                        }}
+                    />
 
                     {files.length > 0 && (
                         <div className="mt-8 pt-6 border-t">

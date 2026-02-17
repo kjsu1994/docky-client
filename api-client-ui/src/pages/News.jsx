@@ -6,8 +6,8 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { formatRelativeTime } from "../utils/helpers";
 
 export const News = () => {
-    const [query, setQuery] = useState("AI");
-    const [searchInput, setSearchInput] = useState("AI");
+    const [query, setQuery] = useState("탄소중립");
+    const [searchInput, setSearchInput] = useState("탄소중립");
     const [news, setNews] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -29,7 +29,8 @@ export const News = () => {
             });
 
             // API 응답 구조에 따라 처리
-            const newsData = response.data?.items || response.data || [];
+            const payload = response.data?.data || response.data || {};
+            const newsData = payload?.items || (Array.isArray(payload) ? payload : []);
             setNews(newsData);
 
             if (newsData.length === 0) {
@@ -164,7 +165,7 @@ export const News = () => {
                 <div>
                     <div className="text-sm font-semibold text-slate-700 mb-2">인기 검색어:</div>
                     <div className="flex flex-wrap gap-2">
-                        {["AI", "바이브코딩", "자동화", "딥러닝", "AI 에이전트", "AI 모델"].map((keyword) => (
+                        {["탄소중립", "재생에너지", "기후위기", "친환경", "전기차", "자원순환"].map((keyword) => (
                             <button
                                 key={keyword}
                                 onClick={() => {

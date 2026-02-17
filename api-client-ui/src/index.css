@@ -2,13 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-soft: #f4f7f2;
+  --bg-accent: #e6f8ef;
+  --ink-main: #0f172a;
+}
+
 @layer base {
   * {
     @apply box-border;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    font-family: "Pretendard Variable", "SUIT Variable", "Space Grotesk", "Noto Sans KR", sans-serif;
+    color: var(--ink-main);
+    background:
+      radial-gradient(circle at 8% 8%, var(--bg-accent) 0%, transparent 36%),
+      radial-gradient(circle at 92% 0%, #d9f3ff 0%, transparent 30%),
+      linear-gradient(180deg, #f9fbf8 0%, var(--bg-soft) 100%);
+    @apply antialiased;
   }
 
   input,
@@ -20,11 +32,11 @@
 
 @layer components {
   .btn-primary {
-    @apply rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all;
+    @apply rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:-translate-y-0.5 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200;
   }
 
   .btn-secondary {
-    @apply rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 border border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all;
+    @apply rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 border border-slate-300 hover:-translate-y-0.5 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200;
   }
 
   .input-base {
@@ -32,7 +44,7 @@
   }
 
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow;
+    @apply rounded-2xl border border-slate-200/80 bg-white/95 shadow-sm hover:shadow-md transition-all;
   }
 
   .badge {
