@@ -39,7 +39,7 @@ const isActiveMember = (member) => {
     const status = normalizeMemberStatus(member);
     return status === "ACTIVE" || status === "MEMBER_ACTIVE";
 };
-const getMemberStatusLabel = (member) => (isActiveMember(member) ? "활성" : "비활성");
+const getMemberStatusLabel = (member) => (isActiveMember(member) ? "비활성" : "활성");
 
 const toSafeNumber = (value) => {
     const num = Number(value);
