@@ -8,22 +8,19 @@ import toast from "react-hot-toast";
 import { formatNumber } from "../utils/helpers";
 import { useAuth } from "../contexts/AuthContext";
 
+// ── 사운드 효과 ────────────────────────────────────────────
+const ROLL_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3";
+const TINKLE_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/1074/1074-preview.mp3";
+
 // ── 주사위 눈 컴포넌트 ──────────────────────────────────────────
 const DiceFace = ({ value }) => {
-    const dots = {
-        1: [4],
-        2: [0, 8],
-        3: [0, 4, 8],
-        4: [0, 2, 6, 8],
-        5: [0, 2, 4, 6, 8],
-        6: [0, 2, 3, 5, 6, 8]
-    };
+    const dots = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
     return (
-        <div className="relative w-full h-full bg-white rounded-xl shadow-inner grid grid-cols-3 grid-rows-3 p-2 gap-1 border-2 border-slate-200">
+        <div className="relative w-full h-full bg-white rounded-2xl shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] grid grid-cols-3 grid-rows-3 p-3 gap-1 border-2 border-slate-200">
             {[...Array(9)].map((_, i) => (
                 <div key={i} className="flex items-center justify-center">
                     {dots[value]?.includes(i) && (
-                        <div className="w-full h-full max-w-[12px] max-h-[12px] bg-slate-800 rounded-full shadow-sm" />
+                        <div className="w-full h-full max-w-[14px] max-h-[14px] bg-slate-900 rounded-full shadow-inner" />
                     )}
                 </div>
             ))}
@@ -31,55 +28,54 @@ const DiceFace = ({ value }) => {
     );
 };
 
-// ── 3D 주사위 ──────────────────────────────────────────
+// ── 역동적 & 최적화된 3D 주사위 ──────────────────────────
 const ThreeDDice = ({ value, rolling, isHeld, onClick, index }) => {
-    const [rotation, setRotation] = useState({ x: 0, y: 0 });
+    const [rotation, setRotation] = useState({ x: 0, y: 0, z: 0 });
+    
+    const animConfig = useRef({
+        duration: "3.00s", // 요청하신 3.0초 주기로 변경
+        delay: (index * 0.15).toFixed(2) + "s",
+    }).current;
+
     useEffect(() => {
         if (rolling) {
             const interval = setInterval(() => {
-                setRotation({ x: Math.floor(Math.random() * 360), y: Math.floor(Math.random() * 360) });
-            }, 100);
+                setRotation({
+                    x: Math.random() * 1440 - 720,
+                    y: Math.random() * 1440 - 720,
+                    z: Math.random() * 360
+                });
+            }, 500); 
             return () => clearInterval(interval);
         } else {
-            const angles = { 1: { x: 0, y: 0 }, 2: { x: 0, y: 180 }, 3: { x: 0, y: -90 }, 4: { x: 0, y: 90 }, 5: { x: -90, y: 0 }, 6: { x: 90, y: 0 } };
-            setRotation(angles[value] || { x: 0, y: 0 });
+            const angles = {
+                1: { x: 0, y: 0, z: 0 }, 2: { x: 0, y: 180, z: 0 }, 3: { x: 0, y: -90, z: 0 },
+                4: { x: 0, y: 90, z: 0 }, 5: { x: -90, y: 0, z: 0 }, 6: { x: 90, y: 0, z: 0 }
+            };
+            setRotation(angles[value] || { x: 0, y: 0, z: 0 });
         }
     }, [rolling, value]);
 
     return (
-        <div onClick={() => onClick(index)} className={`dice-scene w-20 h-20 sm:w-24 sm:h-24 perspective-1000 transition-all duration-500 ${!rolling && !isHeld ? 'hover:-translate-y-2' : ''} ${isHeld ? 'scale-110' : ''}`}>
-            <div className="dice-cube relative w-full h-full preserve-3d transition-transform duration-500" style={{ transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)` }}>
-                <div className="dice-side front absolute w-full h-full translate-z-12"><DiceFace value={1} /></div>
-                <div className="dice-side back absolute w-full h-full rotate-y-180 translate-z-12"><DiceFace value={2} /></div>
-                <div className="dice-side left absolute w-full h-full rotate-y--90 translate-z-12"><DiceFace value={3} /></div>
-                <div className="dice-side right absolute w-full h-full rotate-y-90 translate-z-12"><DiceFace value={4} /></div>
-                <div className="dice-side top absolute w-full h-full rotate-x-90 translate-z-12"><DiceFace value={5} /></div>
-                <div className="dice-side bottom absolute w-full h-full rotate-x--90 translate-z-12"><DiceFace value={6} /></div>
+        <div onClick={() => onClick(index)} 
+             className={`dice-scene w-24 h-24 sm:w-28 sm:h-28 perspective-1000 transition-all duration-700 ${!rolling && !isHeld ? 'hover:scale-110 cursor-pointer' : ''} ${isHeld ? 'scale-105 brightness-75' : ''}`}>
+            <div className={`dice-cube relative w-full h-full preserve-3d will-change-transform ${rolling ? 'dice-rolling-slow' : 'dice-stopping-smooth'}`}
+                 style={{ 
+                    transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) rotateZ(${rotation.z}deg)`,
+                    animationDuration: rolling ? animConfig.duration : undefined,
+                    animationDelay: rolling ? animConfig.delay : undefined
+                 }}>
+                <div className="dice-side front absolute w-full h-full translate-z-14"><DiceFace value={1} /></div>
+                <div className="dice-side back absolute w-full h-full rotate-y-180 translate-z-14"><DiceFace value={2} /></div>
+                <div className="dice-side left absolute w-full h-full rotate-y--90 translate-z-14"><DiceFace value={3} /></div>
+                <div className="dice-side right absolute w-full h-full rotate-y-90 translate-z-14"><DiceFace value={4} /></div>
+                <div className="dice-side top absolute w-full h-full rotate-x-90 translate-z-14"><DiceFace value={5} /></div>
+                <div className="dice-side bottom absolute w-full h-full rotate-x--90 translate-z-14"><DiceFace value={6} /></div>
             </div>
-            {isHeld && <div className="absolute -top-3 -right-3 z-50 bg-amber-500 text-white p-1.5 rounded-full shadow-lg border-2 border-white animate-bounce"><Lock className="h-4 w-4" /></div>}
+            {isHeld && <div className="absolute -top-4 -right-4 z-50 bg-amber-500 text-white p-2 rounded-full shadow-2xl border-2 border-white animate-bounce"><Lock className="h-5 w-5" /></div>}
         </div>
     );
 };
-
-// ── 플링코 구슬 단품 컴포넌트 ────────────────────────────────────────
-const PlinkoMarble = ({ targetSlot, onFinish }) => {
-    const path = useRef([...Array(9)].map((_, i) => {
-        if (i === 0) return 0;
-        if (i === 8) return (targetSlot - 3.5) * 60;
-        const progress = i / 8;
-        const targetX = (targetSlot - 3.5) * 60;
-        return (targetX * progress) + (Math.random() * 40 - 20);
-    })).current;
-
-    return (
-        <div className="marble-container absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none">
-            <div className="marble-ball" style={{ '--path-0': `${path[0]}px`, '--path-1': `${path[1]}px`, '--path-2': `${path[2]}px`, '--path-3': `${path[3]}px`, '--path-4': `${path[4]}px`, '--path-5': `${path[5]}px`, '--path-6': `${path[6]}px`, '--path-7': `${path[7]}px`, '--path-8': `${path[8]}px` }} onAnimationEnd={onFinish} />
-        </div>
-    );
-};
-
-// ── 메인 게임 페이지 ────────────────────────────────────────────
-const ROLL_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3";
 
 export const LuckyPlinko = () => {
     const { user } = useAuth();
@@ -90,52 +86,111 @@ export const LuckyPlinko = () => {
     const [gameResult, setGameResult] = useState(null);
     const [plinkoResult, setPlinkoResult] = useState(null);
     const [marbles, setMarbles] = useState(0);
-    const [animatingMarbles, setAnimatingMarbles] = useState([]);
     const [activeSlot, setActiveSlot] = useState(null);
     
-    const audioRef = useRef(new Audio(ROLL_SOUND_URL));
+    const canvasRef = useRef(null);
+    const particlesRef = useRef([]);
+    const animationFrameRef = useRef();
+    const rollAudio = useRef(new Audio(ROLL_SOUND_URL));
+    const tinkleAudio = useRef(new Audio(TINKLE_SOUND_URL));
+
+    // 물리 엔진 로직 (상동)
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        const rows = 8;
+        const pinSpacingX = width / 10;
+        const pinSpacingY = (height - 150) / rows;
+        const pins = [];
+        for (let r = 0; r < rows; r++) {
+            const dotsInRow = r + 3;
+            const rowWidth = (dotsInRow - 1) * pinSpacingX;
+            const startX = (width - rowWidth) / 2;
+            for (let c = 0; c < dotsInRow; c++) {
+                pins.push({ x: startX + c * pinSpacingX, y: 120 + r * pinSpacingY });
+            }
+        }
+
+        const update = () => {
+            const gravity = 0.25;
+            const friction = 0.99;
+            const bounciness = 0.6;
+
+            particlesRef.current.forEach(p => {
+                if (p.finished) return;
+                p.vy += gravity; p.vx *= friction; p.x += p.vx; p.y += p.vy;
+                if (p.x < 20 || p.x > width - 20) { p.vx *= -bounciness; p.x = p.x < 20 ? 20 : width - 20; }
+                pins.forEach(pin => {
+                    const dx = p.x - pin.x; const dy = p.y - pin.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 15) {
+                        const angle = Math.atan2(dy, dx);
+                        const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+                        p.vx = Math.cos(angle) * speed * bounciness;
+                        p.vy = Math.sin(angle) * speed * bounciness;
+                        if (Math.abs(p.vy) > 1) { const s = tinkleAudio.current.cloneNode(); s.volume = 0.05; s.play().catch(() => {}); }
+                    }
+                });
+                if (p.y > height * 0.4 && p.y < height - 100) {
+                    const targetX = (p.targetSlot + 0.5) * (width / 8);
+                    p.vx += (targetX - p.x) * 0.015;
+                }
+                if (p.y > height - 60) {
+                    p.finished = true;
+                    const landedSlot = Math.floor(p.x / (width / 8));
+                    setActiveSlot(landedSlot);
+                    setTimeout(() => setActiveSlot(null), 500);
+                }
+            });
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#475569';
+            pins.forEach(pin => {
+                ctx.beginPath(); ctx.arc(pin.x, pin.y, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.arc(pin.x - 1, pin.y - 1, 1, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#475569';
+            });
+            particlesRef.current.forEach(p => {
+                if (p.finished) return;
+                const grad = ctx.createRadialGradient(p.x - 3, p.y - 3, 2, p.x, p.y, 10);
+                grad.addColorStop(0, '#fbbf24'); grad.addColorStop(1, '#d97706');
+                ctx.shadowBlur = 15; ctx.shadowColor = 'rgba(251, 191, 36, 0.5)';
+                ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+            });
+            animationFrameRef.current = requestAnimationFrame(update);
+        };
+        update();
+        return () => cancelAnimationFrame(animationFrameRef.current);
+    }, []);
 
     const rollDice = async () => {
         if (rolling) return;
         setRolling(true);
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {});
+        rollAudio.current.currentTime = 0; rollAudio.current.play().catch(() => {});
         try {
             const response = await api.post("/game/dice/roll");
             const data = response.data?.data || response.data;
-            
-            // snake_case 지원 정규화
-            const normalized = {
-                ...data,
-                rankName: data.rank_name || data.rankName || "NONE"
-            };
-
+            const normalized = { ...data, rankName: data.rank_name || data.rankName || "NONE" };
             setTimeout(() => {
                 setDice(data.dice); setGameResult(normalized); setMarbles(data.marbles); setRolling(false); setStep(2);
-                if (data.marbles > 0) toast.success(`${normalized.rankName}! 행운의 구슬을 획득했습니다!`);
-            }, 1500);
-        } catch (error) { setRolling(false); toast.error("주사위를 굴릴 수 없습니다."); }
+            }, 3000); // 3.0초 주기에 맞춤
+        } catch (error) { setRolling(false); toast.error("오류 발생"); }
     };
 
     const rerollDice = async () => {
         if (rolling || heldIndices.length < 1 || heldIndices.length > 4) return;
         setRolling(true);
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {});
+        rollAudio.current.currentTime = 0; rollAudio.current.play().catch(() => {});
         try {
             const response = await api.post("/game/dice/reroll", heldIndices);
             const data = response.data?.data || response.data;
-            
-            // snake_case 지원 정규화
-            const normalized = {
-                ...data,
-                rankName: data.rank_name || data.rankName || "NONE"
-            };
-
+            const normalized = { ...data, rankName: data.rank_name || data.rankName || "NONE" };
             setTimeout(() => {
                 setDice(data.dice); setGameResult(normalized); setMarbles(data.marbles); setRolling(false); setStep(3);
-                toast.success(`최종 결과: ${normalized.rankName}! 구슬 ${data.marbles}개 확정!`);
-            }, 1500);
+            }, 3000); 
         } catch (error) { setRolling(false); toast.error("재굴림 실패"); }
     };
 
@@ -144,32 +199,14 @@ export const LuckyPlinko = () => {
         try {
             const response = await api.post("/game/plinko/play");
             const data = response.data?.data || response.data;
-            
-            // snake_case 지원 정규화
-            const normalizedData = {
-                ...data,
-                landingSlots: data.landing_slots || data.landingSlots || [],
-                earnedPoint: data.earned_point !== undefined ? data.earned_point : data.earnedPoint,
-                totalPoint: data.total_point !== undefined ? data.total_point : data.totalPoint
-            };
-
-            setPlinkoResult(normalizedData);
-            setStep(4);
-            
-            const slots = normalizedData.landingSlots;
-            const earnedPoint = normalizedData.earnedPoint || 0;
-            
-            slots.forEach((slot, i) => {
-                setTimeout(() => {
-                    const newMarble = { id: `m-${Date.now()}-${i}`, slot };
-                    setAnimatingMarbles(prev => [...prev, newMarble]);
-                }, i * 600);
-            });
-
-            setTimeout(() => {
-                toast.success(`🎉 축하합니다! ${formatNumber(earnedPoint)} 포인트를 획득했습니다!`);
-            }, (slots.length * 600) + 3500);
-        } catch (error) { toast.error("플링코 실행 실패"); }
+            const normalized = { ...data, landingSlots: data.landing_slots || data.landingSlots || [], earnedPoint: data.earned_point ?? data.earnedPoint };
+            setPlinkoResult(normalized); setStep(4);
+            const newParticles = normalized.landingSlots.map((slot, i) => ({
+                x: (500 / 2) + (Math.random() * 40 - 20), y: 40, vx: Math.random() * 4 - 2, vy: 0, targetSlot: slot, finished: false
+            }));
+            newParticles.forEach((p, i) => setTimeout(() => particlesRef.current.push(p), i * 150));
+            setTimeout(() => { toast.success(`🎉 ${formatNumber(normalized.earnedPoint)} 포인트 획득!`); }, 5000);
+        } catch (error) { toast.error("플링코 오류"); }
     };
 
     const toggleHold = (idx) => {
@@ -178,140 +215,97 @@ export const LuckyPlinko = () => {
     };
 
     const resetGame = () => {
-        setStep(1); setDice([1, 2, 3, 4, 5]); setHeldIndices([]); setGameResult(null); setPlinkoResult(null); setMarbles(0); setAnimatingMarbles([]); setActiveSlot(null);
+        setStep(1); setDice([1, 2, 3, 4, 5]); setHeldIndices([]); setGameResult(null); setPlinkoResult(null); setMarbles(0); particlesRef.current = []; setActiveSlot(null);
     };
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-20 select-none text-slate-900">
-            {/* 상단 헤더 */}
-            <div className="card bg-slate-900 p-8 border-4 border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)] rounded-[3rem] relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30" />
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
-                    <div>
-                        <div className="flex items-center justify-center md:justify-start gap-4 mb-2">
-                            <div className="p-3 bg-amber-500 rounded-2xl shadow-lg">
-                                <TrendingUp className="h-8 w-8 text-slate-900" />
+            {/* 헤더 패널 */}
+            <div className="relative overflow-hidden rounded-[3rem] p-[3px] bg-gradient-to-r from-amber-300 via-orange-500 to-amber-600 shadow-2xl">
+                <div className="card bg-slate-950 p-8 rounded-[2.8rem] relative overflow-hidden border border-white/5">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(245,158,11,0.2),transparent)]" />
+                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                        <div className="flex items-center gap-5">
+                            <div className="p-4 bg-amber-500 rounded-3xl shadow-[0_0_25px_rgba(245,158,11,0.4)] rotate-3">
+                                <Dices className="h-10 w-10 text-slate-900" />
                             </div>
-                            <h1 className="text-5xl font-black text-amber-500 tracking-tighter italic uppercase">Lucky Plinko</h1>
+                            <div>
+                                <h1 className="text-5xl font-black text-white tracking-tighter italic uppercase">Lucky Plinko</h1>
+                                <p className="text-amber-500/70 font-black tracking-widest text-[10px] uppercase">Physics Arcade Edition</p>
+                            </div>
                         </div>
-                        <p className="text-slate-400 font-bold tracking-widest text-sm uppercase">Spin the Dice, Drop the Marbles</p>
-                    </div>
-                    <div className="flex flex-col items-center gap-2 bg-slate-800 p-6 rounded-3xl border-2 border-slate-700 shadow-inner min-w-[220px]">
-                        <span className="text-[10px] text-amber-500 font-black tracking-widest uppercase">My Points</span>
-                        <div className="text-4xl font-black text-white flex items-center gap-3">
-                            <Coins className="h-8 w-8 text-amber-400" />
-                            {formatNumber(plinkoResult?.totalPoint || user?.point || 0)}
+                        <div className="bg-slate-900/80 px-10 py-6 rounded-[2rem] border border-white/10 shadow-inner">
+                            <span className="text-[10px] text-amber-500 font-black tracking-widest uppercase mb-1 block opacity-50 text-center">Wallet</span>
+                            <div className="text-4xl font-black text-white flex items-center gap-3">
+                                <Coins className="h-8 w-8 text-amber-400" />
+                                {formatNumber(plinkoResult?.totalPoint || user?.point || 0)}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* 주사위 트레이 영역 */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                {/* 주사위 트레이 */}
                 <div className="lg:col-span-5">
-                    <div className="card bg-indigo-950 p-10 h-full flex flex-col rounded-[3rem] border-4 border-indigo-800 shadow-2xl relative">
-                        <h3 className="text-2xl font-black text-white italic tracking-tighter mb-8">DICE TRAY</h3>
-                        <div className="flex-1 flex flex-col justify-center items-center gap-12 bg-indigo-900/30 rounded-[2rem] p-8 shadow-inner border border-white/5 relative z-10">
-                            <div className="flex flex-wrap justify-center gap-6 perspective-1000">
+                    <div className="card bg-indigo-950 p-10 h-full flex flex-col rounded-[4rem] border-[6px] border-indigo-900 shadow-2xl relative overflow-hidden">
+                        <h3 className="text-2xl font-black text-indigo-300 italic tracking-tighter mb-8 uppercase">Dice Station</h3>
+                        <div className="flex-1 flex flex-col justify-center items-center gap-14 bg-black/40 rounded-[3rem] p-10 shadow-inner border border-white/5">
+                            <div className="flex flex-wrap justify-center gap-8 perspective-1000">
                                 {dice.map((val, idx) => (
-                                    <ThreeDDice 
-                                        key={idx} index={idx} value={val} 
-                                        rolling={rolling && !heldIndices.includes(idx)} 
-                                        isHeld={heldIndices.includes(idx)} 
-                                        onClick={toggleHold} 
-                                    />
+                                    <ThreeDDice key={idx} index={idx} value={val} rolling={rolling && !heldIndices.includes(idx)} isHeld={heldIndices.includes(idx)} onClick={toggleHold} />
                                 ))}
                             </div>
-
                             {gameResult && (
-                                <div className="text-center animate-slide-up bg-white/5 w-full py-6 rounded-3xl border border-white/10 shadow-lg">
-                                    <div className="text-4xl font-black text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)] mb-1 uppercase italic tracking-tighter">
-                                        {gameResult.rankName}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mb-2">Acquired Marbles</div>
-                                    <div className="text-6xl font-black text-white tabular-nums">{marbles}</div>
+                                <div className="text-center animate-slide-up bg-white/5 w-full py-8 rounded-[2.5rem] border border-white/10 shadow-lg">
+                                    <div className="text-4xl font-black text-amber-400 italic mb-1 uppercase tracking-tighter">{gameResult.rankName}</div>
+                                    <div className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-2 opacity-50">Marbles Awarded</div>
+                                    <div className="text-7xl font-black text-white tabular-nums tracking-tighter">{marbles}</div>
                                 </div>
                             )}
                         </div>
-
-                        <div className="mt-8 space-y-4 relative z-10">
+                        <div className="mt-10 space-y-4 relative z-10">
                             {step === 1 && (
-                                <button onClick={rollDice} disabled={rolling}
-                                    className="w-full py-6 rounded-2xl bg-amber-500 text-slate-900 font-black text-2xl shadow-[0_8px_0_rgb(180,120,0)] hover:translate-y-1 hover:shadow-[0_4px_0_rgb(180,120,0)] transition-all">
-                                    {rolling ? 'ROLLING...' : 'ROLL DICE (100P)'}
-                                </button>
+                                <button onClick={rollDice} disabled={rolling} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] active:translate-y-2 active:shadow-none transition-all">START (100P)</button>
                             )}
                             {step === 2 && (
                                 <div className="flex flex-col gap-4">
-                                    <button onClick={rerollDice} disabled={rolling || heldIndices.length < 1 || heldIndices.length > 4}
-                                        className="w-full py-5 rounded-2xl bg-amber-500 text-slate-900 font-black text-xl shadow-[0_6px_0_rgb(180,120,0)] disabled:opacity-50">
-                                        {rolling ? 'REROLLING...' : 'REROLL SELECTED'}
-                                    </button>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setStep(3)} className="flex-1 py-3 rounded-xl bg-indigo-800 text-white text-xs font-bold border border-indigo-600">KEEP RESULTS</button>
-                                        {marbles > 0 && (
-                                            <button onClick={playPlinko} className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-xs font-bold shadow-lg animate-pulse">GO PLINKO!</button>
-                                        )}
+                                    <button onClick={rerollDice} disabled={rolling || heldIndices.length < 1 || heldIndices.length > 4} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] disabled:opacity-50">REROLL</button>
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setStep(3)} className="flex-1 py-4 rounded-2xl bg-slate-800 text-indigo-300 font-bold border border-indigo-900">KEEP</button>
+                                        {marbles > 0 && <button onClick={playPlinko} className="flex-1 py-4 rounded-2xl bg-amber-500 text-black font-black shadow-lg animate-pulse">PLAY!</button>}
                                     </div>
                                 </div>
                             )}
                             {(step === 3 || step === 4) && (
-                                <button onClick={resetGame} disabled={animatingMarbles.length > 0}
-                                    className="w-full py-6 rounded-2xl bg-slate-800 text-white font-black text-xl border border-white/10 shadow-lg">
-                                    {animatingMarbles.length > 0 ? 'PLAYING...' : 'NEW GAME'}
-                                </button>
+                                <button onClick={resetGame} disabled={rolling} className="w-full py-6 rounded-3xl bg-slate-800 text-white font-black text-xl border border-white/10">NEW GAME</button>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* 플링코 아케이드 영역 */}
+                {/* 플링코 캐비닛 */}
                 <div className="lg:col-span-7">
-                    <div className="card bg-slate-900 p-10 rounded-[4rem] border-4 border-slate-800 shadow-2xl flex flex-col items-center relative overflow-hidden">
-                        <div className="w-full flex justify-between items-center mb-10 relative z-10">
-                            <h3 className="text-3xl font-black text-white italic tracking-tighter flex items-center gap-3">PLINKO BOARD</h3>
+                    <div className="card bg-slate-900 p-10 rounded-[5rem] border-[10px] border-slate-800 shadow-2xl flex flex-col items-center relative overflow-hidden">
+                        <div className="w-full flex justify-between items-center mb-10 z-10">
+                            <h3 className="text-3xl font-black text-white italic tracking-tighter uppercase">Physical Cabinet</h3>
                             {step === 3 && marbles > 0 && (
-                                <button onClick={playPlinko} className="bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 px-12 py-4 rounded-2xl font-black text-xl animate-bounce">
-                                    PUSH START
-                                </button>
+                                <button onClick={playPlinko} className="bg-amber-500 text-black px-12 py-4 rounded-2xl font-black text-2xl shadow-[0_0_30px_rgba(245,158,11,0.4)] animate-bounce">PUSH</button>
                             )}
                         </div>
 
-                        {/* 플링코 시뮬레이션 영역 */}
-                        <div className="relative w-full aspect-[4/6.5] bg-slate-800/50 rounded-[3rem] border-4 border-slate-700 shadow-inner overflow-hidden">
-                            {/* 상단 배출구 */}
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-14 bg-slate-700 rounded-b-3xl border-x-4 border-b-4 border-slate-600 z-40 flex items-center justify-center">
-                                <div className="w-20 h-4 bg-black rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.1)]" />
+                        <div className="relative w-full aspect-[4/6.5] bg-black/80 rounded-[4rem] border-4 border-slate-700 shadow-[inset_0_0_80px_black] overflow-hidden">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-20 bg-slate-800 rounded-b-full border-x-4 border-b-4 border-slate-700 z-[60] flex items-center justify-center shadow-2xl">
+                                <div className="w-24 h-6 bg-black rounded-full shadow-inner" />
                             </div>
-
-                            {/* 핀 레이아웃 */}
-                            <div className="absolute inset-0 flex flex-col justify-between py-32 px-12">
-                                {[...Array(8)].map((_, row) => (
-                                    <div key={row} className="flex justify-center gap-[12%]">
-                                        {[...Array(row + 3)].map((_, col) => (
-                                            <div key={col} className="w-2 h-2 bg-slate-500 rounded-full shadow-[0_0_5px_white]" />
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* 구슬 애니메이션 */}
-                            {animatingMarbles.map((marble) => (
-                                <PlinkoMarble key={marble.id} targetSlot={marble.slot} onFinish={() => {
-                                    setActiveSlot(marble.slot);
-                                    setTimeout(() => setActiveSlot(null), 500);
-                                    setAnimatingMarbles(prev => prev.filter(m => m.id !== marble.id));
-                                }} />
-                            ))}
-
-                            {/* 하단 슬롯 */}
-                            <div className="absolute bottom-8 left-8 right-8 h-24 flex gap-2">
+                            <canvas ref={canvasRef} width={500} height={800} className="w-full h-full relative z-50" />
+                            <div className="absolute bottom-8 left-8 right-8 h-28 flex gap-3 z-20">
                                 {[30.0, 10.0, 5.0, 1.0, 1.0, 5.0, 10.0, 30.0].map((mult, idx) => (
-                                    <div key={idx} className={`flex-1 rounded-2xl flex flex-col items-center justify-center border-t-4 transition-all duration-300 shadow-lg
-                                        ${activeSlot === idx ? 'scale-110 -translate-y-2 brightness-150' : ''}
+                                    <div key={idx} className={`flex-1 rounded-3xl flex flex-col items-center justify-center border-t-8 transition-all duration-300
+                                        ${activeSlot === idx ? 'scale-110 -translate-y-4 brightness-150 shadow-[0_0_40px_rgba(245,158,11,0.6)] border-amber-400' : 'brightness-75 shadow-lg'}
                                         ${mult >= 30 ? 'bg-amber-500/20 text-amber-400 border-amber-500 shadow-amber-500/20' : 'bg-slate-800 text-slate-500 border-slate-700'}`}>
-                                        <span className="text-[8px] font-black opacity-50 uppercase">Mult</span>
-                                        <span className="text-xl font-black italic tracking-tighter">x{mult}</span>
+                                        <span className="text-[8px] font-black opacity-40 uppercase mb-1">Scale</span>
+                                        <span className="text-2xl font-black italic tracking-tighter">x{Math.floor(mult)}</span>
                                     </div>
                                 ))}
                             </div>
@@ -323,34 +317,25 @@ export const LuckyPlinko = () => {
             <style>{`
                 .perspective-1000 { perspective: 1000px; }
                 .preserve-3d { transform-style: preserve-3d; }
-                .translate-z-12 { transform: translateZ(48px); }
-                .rotate-y-180 { transform: rotateY(180deg) translateZ(48px); }
-                .rotate-y--90 { transform: rotateY(-90deg) translateZ(48px); }
-                .rotate-y-90 { transform: rotateY(90deg) translateZ(48px); }
-                .rotate-x-90 { transform: rotateX(90deg) translateZ(48px); }
-                .rotate-x--90 { transform: rotateX(-90deg) translateZ(48px); }
+                .translate-z-14 { transform: translateZ(56px); }
+                .rotate-y-180 { transform: rotateY(180deg) translateZ(56px); }
+                .rotate-y--90 { transform: rotateY(-90deg) translateZ(56px); }
+                .rotate-y-90 { transform: rotateY(90deg) translateZ(56px); }
+                .rotate-x-90 { transform: rotateX(90deg) translateZ(56px); }
+                .rotate-x--90 { transform: rotateX(-90deg) translateZ(56px); }
                 
-                @keyframes plinko-fall {
-                    0% { top: 30px; left: 50%; opacity: 0; }
-                    5% { opacity: 1; }
-                    12.5% { top: 80px; left: calc(50% + var(--path-1)); }
-                    25% { top: 130px; left: calc(50% + var(--path-2)); }
-                    37.5% { top: 180px; left: calc(50% + var(--path-3)); }
-                    50% { top: 230px; left: calc(50% + var(--path-4)); }
-                    62.5% { top: 280px; left: calc(50% + var(--path-5)); }
-                    75% { top: 330px; left: calc(50% + var(--path-6)); }
-                    87.5% { top: 380px; left: calc(50% + var(--path-7)); }
-                    100% { top: 460px; left: calc(50% + var(--path-8)); opacity: 1; }
+                @keyframes dice-roll-natural {
+                    0% { transform: translateY(0) rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+                    25% { transform: translateY(-60px) rotateX(360deg) rotateY(180deg) rotateZ(45deg); }
+                    50% { transform: translateY(0) rotateX(720deg) rotateY(360deg) rotateZ(90deg); }
+                    75% { transform: translateY(-30px) rotateX(1080deg) rotateY(540deg) rotateZ(135deg); }
+                    100% { transform: translateY(0) rotateX(1440deg) rotateY(720deg) rotateZ(180deg); }
                 }
-                .marble-ball {
-                    position: absolute;
-                    width: 24px;
-                    height: 24px;
-                    background: radial-gradient(circle at 30% 30%, #fcd34d, #d97706);
-                    border-radius: 50%;
-                    box-shadow: 0 0 20px #fbbf24, inset -2px -2px 5px rgba(0,0,0,0.5);
-                    z-index: 50;
-                    animation: plinko-fall 3s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+                .dice-rolling-slow {
+                    animation: dice-roll-natural 3.0s infinite ease-in-out; /* 3.0초 주기로 변경 */
+                }
+                .dice-stopping-smooth {
+                    transition: transform 1.5s cubic-bezier(0.16, 1, 0.3, 1);
                 }
             `}</style>
         </div>
