@@ -146,7 +146,14 @@ export const FloatingChat = () => {
             const response = await api.get(`/chat/room/${roomId}/messages`);
             const data = response.data?.data || response.data;
             const safeMessages = Array.isArray(data) ? data : (data?.content || []);
-            setMessages(safeMessages.map(normalizeMessage).filter(Boolean));
+            
+            // 시간순 정렬 (과거 -> 최신)
+            const sortedMessages = safeMessages
+                .map(normalizeMessage)
+                .filter(Boolean)
+                .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                
+            setMessages(sortedMessages);
         } catch (error) {
             setMessages([]);
         } finally {
