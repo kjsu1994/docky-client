@@ -337,6 +337,7 @@ Frontend 권장 처리:
 | 채팅방 생성 | `POST` | `/chat/room` | `title`, `type`, `memberIds`(Array) 전송 (본인 자동 포함) |
 | 채팅방 목록 | `GET` | `/chat/rooms` | 내가 참여 중인 채팅방 목록 (안 읽은 메시지 수 포함) |
 | 방 멤버 조회 | `GET` | `/chat/room/{roomId}/members` | 특정 방의 전체 참여자 목록 조회 |
+| 방 나가기 | `DELETE` | `/chat/room/{roomId}/leave` | 채팅방 탈퇴 및 퇴장 알림 전송 |
 | 내역 조회 | `GET` | `/chat/room/{roomId}/messages` | 과거 대화 내역 조회 (페이징 지원) |
 | 멤버 초대 | `POST` | `/chat/room/{roomId}/invite` | 기존 방에 새로운 멤버 추가 (Body: `[memberId, ...]`) |
 | 파일 전송 | `POST` | `/chat/room/{roomId}/file` | 채팅 중 이미지/파일 업로드 (S3 URL 반환) |

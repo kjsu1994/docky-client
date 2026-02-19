@@ -51,6 +51,7 @@ stompClient.connect({ Authorization: 'Bearer ' + token }, (frame) => {
 | **방 생성** | `POST` | `/chat/room` | `title`, `type`, `memberIds` 전송 (본인 자동 포함) |
 | **목록 조회** | `GET` | `/chat/rooms` | 내가 참여 중인 방 목록 (안 읽은 메시지 수 포함) |
 | **멤버 조회** | `GET` | `/chat/room/{roomId}/members` | 특정 방의 전체 참여자 목록 조회 |
+| **방 나가기** | `DELETE` | `/chat/room/{roomId}/leave` | 채팅방 탈퇴 (참여 정보 삭제 및 퇴장 알림) |
 | **내역 조회** | `GET` | `/chat/room/{roomId}/messages` | 과거 대화 내역 조회 (페이징 지원) |
 | **멤버 초대** | `POST` | `/chat/room/{roomId}/invite` | 기존 방에 새로운 멤버 추가 (`[memberId, ...]` 형태) |
 | **읽음 처리** | `PATCH` | `/chat/room/{roomId}/read` | 해당 방의 안 읽은 메시지 카운트 0으로 초기화 |
