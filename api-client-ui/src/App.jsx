@@ -16,6 +16,7 @@ import {News} from "./pages/News.jsx";
 import {Calculators} from "./pages/Calculators.jsx";
 import { GptQuestion } from "./pages/GptQuestion.jsx";
 import { Statistics } from "./pages/Statistics.jsx";
+import { FloatingChat } from "./components/FloatingChat.jsx";
 
 // 보호된 라우트 컴포넌트
 const ProtectedRoute = ({ children }) => {
@@ -35,11 +36,12 @@ const ProtectedRoute = ({ children }) => {
 // 앱 레이아웃
 const AppLayout = ({ children }) => {
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-slate-50 relative">
             <Header />
             <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
                 {children}
             </main>
+            <FloatingChat />
         </div>
     );
 };

@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ["@stomp/stompjs", "sockjs-client"],
+  },
   server: {
     host: true,
     port: 5173,
@@ -15,6 +18,11 @@ export default defineConfig({
         secure: false,
         // /api/members/login -> /members/login 으로 바꿔서 백엔드에 전달
          rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+      "/ws": {
+        target: "http://backend:8080",
+        ws: true,
+        changeOrigin: true,
       },
     },
   },

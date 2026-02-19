@@ -38,6 +38,7 @@ Frontend rule:
 ### 4.2 Member
 - 회원가입: `POST /members`
 - 내 정보 조회: `GET /members`
+- 회원 목록/검색: `GET /members/list?keyword={name|email}&page={n}&size={n}`
 - 내 정보 수정: `PATCH /members/{member-id}`
 - 회원 탈퇴: `DELETE /members`
 - 프로필 업로드: `POST /members/uploadProfile` (multipart/form-data)
@@ -308,7 +309,8 @@ Frontend 권장 처리:
 실시간 채팅은 **WebSocket**과 **STOMP** 프로토콜을 사용하며, 다중 서버 대응을 위해 Redis Pub/Sub을 브로커로 사용한다.
 
 ### 13.1 Connection & Protocol
-- **WebSocket Endpoint**: `ws://localhost:8080/ws/chat`
+- **WebSocket Endpoint**: `ws://localhost:8080/ws/chat/websocket`
+  - *중요: 서버에 SockJS가 설정되어 있으므로 순수 WebSocket 클라이언트(Postman 등) 사용 시 경로 끝에 `/websocket`을 반드시 붙여야 합니다.*
 - **Support**: SockJS 사용 권장
 - **Protocol**: STOMP
 - **Headers**: 인증을 위해 `Authorization` 헤더 포함 필요 (STOMP connect 시)
@@ -332,10 +334,23 @@ Frontend 권장 처리:
 ### 13.3 Chat REST API
 | 기능 | Method | Endpoint | Description |
 | :--- | :--- | :--- | :--- |
-| 채팅방 생성 | `POST` | `/chat/room` | `title`, `type`(PERSONAL, GROUP), `memberIds` 필요 |
+| 채팅방 생성 | `POST` | `/chat/room` | `title`, `type`, `memberIds`(Array) 전송 (본인 자동 포함) |
 | 채팅방 목록 | `GET` | `/chat/rooms` | 내가 참여 중인 채팅방 목록 (안 읽은 메시지 수 포함) |
+| 방 멤버 조회 | `GET` | `/chat/room/{roomId}/members` | 특정 방의 전체 참여자 목록 조회 |
+| 내역 조회 | `GET` | `/chat/room/{roomId}/messages` | 과거 대화 내역 조회 (페이징 지원) |
+| 멤버 초대 | `POST` | `/chat/room/{roomId}/invite` | 기존 방에 새로운 멤버 추가 (Body: `[memberId, ...]`) |
 | 파일 전송 | `POST` | `/chat/room/{roomId}/file` | 채팅 중 이미지/파일 업로드 (S3 URL 반환) |
 | 읽음 처리 | `PATCH` | `/chat/room/{roomId}/read` | 해당 방의 안 읽은 메시지 카운트 초기화 |
+
+**채팅방 생성 요청 예시 (POST /chat/room)**:
+```json
+{
+  "title": "테스트 채팅방",
+  "type": "GROUP",
+  "memberIds": [1, 2] 
+}
+```
+*주의: `memberIds`에 포함된 유저 ID가 DB에 실제로 존재해야 생성에 성공하며, 존재하지 않을 경우 에러가 발생합니다.*
 
 ### 13.4 Message Types
 - `ENTER`: 채팅방 입장 (시스템 메시지 처리용)
@@ -343,7 +358,17 @@ Frontend 권장 처리:
 - `LEAVE`: 채팅방 퇴장
 - `FILE`: 파일/이미지 전송 (message 필드에 S3 URL 담아 전송)
 
-### 13.5 Frontend Tip
+### 13.5 Troubleshooting (에러 해결)
+1. **400 Bad Request (WebSocket 연결 실패)**:
+  - 주소 끝에 `/websocket`이 붙었는지 확인하세요. (예: `ws://localhost:8080/ws/chat/websocket`)
+  - STOMP 프로토콜 설정이 되어 있는지 확인하세요.
+2. **500 INTERNAL_SERVER_ERROR (채팅방 생성 실패)**:
+  - 요청 본문의 `memberIds`가 유효한지 확인하세요. (`GET /members/{id}`로 확인 가능)
+  - 서버 환경에 Redis(포트 6379)가 정상 실행 중인지 확인하세요.
+3. **403 Forbidden**:
+  - WebSocket 연결 시 `Authorization` 헤더(Bearer 토큰)가 올바른지 확인하세요.
+
+### 13.6 Frontend Tip
 - **SockJS + StompJS** 라이브러리 사용 권장.
 - 채팅방 진입 시 `PATCH /chat/room/{roomId}/read`를 호출하여 안 읽음 카운트를 초기화할 것.
 - 새로운 메시지 수신 시 리스트의 `lastMessage`를 갱신하고 본인이 해당 방에 없다면 토스트 알림 처리를 권장.
