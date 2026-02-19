@@ -1,6 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import {
     Home,
+    BarChart,
     MessageSquare,
     Leaf,
     Sprout,
@@ -63,6 +64,10 @@ export const Header = () => {
                     <nav className="hidden lg:flex items-center gap-2">
                         <NavItem to="/app" icon={Home}>
                             홈
+                        </NavItem>
+                        {/* 통계 페이지 링크 추가 */}
+                        <NavItem to="/app/statistics" icon={BarChart}>
+                            통계
                         </NavItem>
                         <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare}>
                             자유게시판
@@ -133,6 +138,10 @@ export const Header = () => {
                     <div className="lg:hidden border-t py-4 space-y-2 animate-slide-up">
                         <NavItem to="/app" icon={Home} mobile>
                             홈
+                        </NavItem>
+                        {/* 통계 페이지 링크 추가 (모바일) */}
+                        <NavItem to="/app/statistics" icon={BarChart} mobile>
+                            통계
                         </NavItem>
                         <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare} mobile>
                             자유게시판

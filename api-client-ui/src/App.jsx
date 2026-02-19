@@ -15,6 +15,7 @@ import {Ranks} from "./pages/Ranks.jsx";
 import {News} from "./pages/News.jsx";
 import {Calculators} from "./pages/Calculators.jsx";
 import { GptQuestion } from "./pages/GptQuestion.jsx";
+import { Statistics } from "./pages/Statistics.jsx";
 
 // 보호된 라우트 컴포넌트
 const ProtectedRoute = ({ children }) => {
@@ -113,6 +114,16 @@ function App() {
                     />
 
                     {/* 기능 페이지 */}
+                    <Route
+                        path="/app/statistics"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <Statistics />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route
                         path="/app/ranks"
                         element={

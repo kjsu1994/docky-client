@@ -199,6 +199,35 @@ Frontend 권장 처리:
   - 동점자 발생 시 순서가 매 요청마다 바뀌는 문제 방지
   - 게시판 랭킹 컨트롤러를 단일 API로 유지해 관리 복잡도 감소
 
+## 10-2) Level Rank 500 Fix (2026-02-17)
+- 현상:
+  - `GET /members/levelRanks` 호출 시 `500 INTERNAL_SERVER_ERROR`
+- 원인:
+  - `LEVEL_TB.member_id`가 삭제된 회원을 참조하는 깨진 FK 데이터가 존재해
+    JPA 로딩 시 `EntityNotFoundException` 발생
+- 조치:
+  - `Level.member` 매핑에 `@NotFound(action = NotFoundAction.IGNORE)` 적용
+  - `Level.member`를 `LAZY`로 설정해 불필요한 즉시 로딩 최소화
+  - 레벨 랭킹은 서비스 레이어 정렬+페이징으로 안정화 유지
+- docker compose 반영:
+  - `./gradlew clean bootJar`
+  - 빌드 산출물 `server/build/libs/app.jar`를 `C:\compose\backend\app.jar`로 교체
+  - `docker restart spring-backend`
+- 검증:
+  - `curl http://localhost:8080/members/levelRanks` -> `HTTP/1.1 200`
+
+## 12) bootJar 자동 배포 파일 교체 (2026-02-17)
+- 목적:
+  - `bootJar` 빌드 시 docker compose 백엔드 경로의 `app.jar`를 자동 생성/교체
+- 변경 파일:
+  - `server/build.gradle`
+- 적용 내용:
+  - `copyBootJarToCompose` 태스크 추가
+  - 복사 경로: `server/build/libs/app.jar` -> `C:/compose/backend/app.jar`
+  - `bootJar.finalizedBy(copyBootJarToCompose)` 설정으로 빌드 후 자동 복사
+- 사용 방법:
+  - `server` 경로에서 `./gradlew bootJar` 실행
+
 ## 11) Stats API Update (2026-02-17)
 - 통계 요약 조회: `GET /stats/summary`
 - 방문자 비교 조회: `GET /stats/visitors/compare`
@@ -274,3 +303,47 @@ Frontend 권장 처리:
   - `MemberRepository.countByMemberStatus`
   - `CommentRepository.countByCreatedAtBetween`
 - 주의사항: `CommentRepository`는 UTF-8 BOM 이슈를 제거한 뒤 재컴파일하여 정상 동작 확인(2026-02-17)
+
+## 13) Real-time Chat System (WebSocket + STOMP)
+실시간 채팅은 **WebSocket**과 **STOMP** 프로토콜을 사용하며, 다중 서버 대응을 위해 Redis Pub/Sub을 브로커로 사용한다.
+
+### 13.1 Connection & Protocol
+- **WebSocket Endpoint**: `ws://localhost:8080/ws/chat`
+- **Support**: SockJS 사용 권장
+- **Protocol**: STOMP
+- **Headers**: 인증을 위해 `Authorization` 헤더 포함 필요 (STOMP connect 시)
+
+### 13.2 Messaging Flow
+- **구독 (Subscribe)**: `/sub/chat/room/{roomId}`
+  - 특정 채팅방의 메시지를 수신하기 위해 해당 경로를 구독한다.
+- **발행 (Publish)**: `/pub/chat/message`
+  - 메시지를 보낼 때 아래 JSON 형식을 해당 경로로 전송한다.
+
+**Message Payload (JSON)**:
+```json
+{
+  "roomId": 1,
+  "senderId": 10,
+  "message": "안녕하세요!",
+  "type": "TALK" // ENTER, TALK, LEAVE, FILE
+}
+```
+
+### 13.3 Chat REST API
+| 기능 | Method | Endpoint | Description |
+| :--- | :--- | :--- | :--- |
+| 채팅방 생성 | `POST` | `/chat/room` | `title`, `type`(PERSONAL, GROUP), `memberIds` 필요 |
+| 채팅방 목록 | `GET` | `/chat/rooms` | 내가 참여 중인 채팅방 목록 (안 읽은 메시지 수 포함) |
+| 파일 전송 | `POST` | `/chat/room/{roomId}/file` | 채팅 중 이미지/파일 업로드 (S3 URL 반환) |
+| 읽음 처리 | `PATCH` | `/chat/room/{roomId}/read` | 해당 방의 안 읽은 메시지 카운트 초기화 |
+
+### 13.4 Message Types
+- `ENTER`: 채팅방 입장 (시스템 메시지 처리용)
+- `TALK`: 일반 텍스트 메시지
+- `LEAVE`: 채팅방 퇴장
+- `FILE`: 파일/이미지 전송 (message 필드에 S3 URL 담아 전송)
+
+### 13.5 Frontend Tip
+- **SockJS + StompJS** 라이브러리 사용 권장.
+- 채팅방 진입 시 `PATCH /chat/room/{roomId}/read`를 호출하여 안 읽음 카운트를 초기화할 것.
+- 새로운 메시지 수신 시 리스트의 `lastMessage`를 갱신하고 본인이 해당 방에 없다면 토스트 알림 처리를 권장.
