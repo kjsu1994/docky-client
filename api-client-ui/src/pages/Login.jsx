@@ -151,17 +151,6 @@ export const Login = () => {
                             </Link>
                         </p>
                     </div>
-
-                    {/* 테스트 계정 안내 */}
-                    <div className="mt-6 rounded-lg bg-slate-50 p-4">
-                        <p className="text-xs font-semibold text-slate-700 mb-2">
-                            테스트 계정
-                        </p>
-                        <div className="space-y-1 text-xs text-slate-600">
-                            <p>• 이메일: user@gmail.com</p>
-                            <p>• 비밀번호: qwer1234</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

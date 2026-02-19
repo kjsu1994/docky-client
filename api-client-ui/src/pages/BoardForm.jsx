@@ -25,8 +25,8 @@ const loadQuill = () =>
 
 const BOARD_CATEGORY_PATH = {
     FREE_BOARD: "free",
-    ECO_REVIEW: "eco",
-    GREEN_ACTIVE: "green",
+    ADMIN_NOTICE: "notice",
+    QUESTION_ANSWER: "eco",
 };
 
 const cloneFormData = (source) => {
@@ -61,6 +61,14 @@ export const BoardForm = () => {
         hasRole(user?.roles, "ROLE_ADMIN") ||
         hasRole(user?.role, "ROLE_ADMIN") ||
         hasRole(user?.member?.roles, "ROLE_ADMIN");
+
+    // 공지사항 권한 체크 (컴포넌트 진입 시)
+    useEffect(() => {
+        if (kind === "ADMIN_NOTICE" && !isAdmin) {
+            toast.error("공지사항은 관리자만 작성할 수 있습니다.");
+            navigate(`/app/boards/${kind}`, { replace: true });
+        }
+    }, [kind, isAdmin, navigate]);
 
     const [title, setTitle] = useState("");
     const [attachFiles, setAttachFiles] = useState([]);

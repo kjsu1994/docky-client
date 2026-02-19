@@ -191,7 +191,7 @@ Frontend 권장 처리:
 
 ## 10-1) Rank API Stabilization (2026-02-17)
 - Board rank API는 단일 엔드포인트로 통합:
-  - `GET /boards/rankBoards?kind={FREE_BOARD|ECO_REVIEW|GREEN_ACTIVE}`
+  - `GET /boards/rankBoards?kind={FREE_BOARD|ADMIN_NOTICE|QUESTION_ANSWER}`
 - Board rank 정렬 기본값:
   - `likeCount DESC`, `viewCount DESC`, `createdAt DESC`
 

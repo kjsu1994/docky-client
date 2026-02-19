@@ -20,8 +20,8 @@ export const formatRelativeTime = (date) => {
 export const getBoardKindLabel = (kind) => {
     const labels = {
         FREE_BOARD: "자유게시판",
-        ECO_REVIEW: "Q&A 게시판",
-        GREEN_ACTIVE: "녹색활동",
+        ADMIN_NOTICE: "공지사항",
+        QUESTION_ANSWER: "Q&A 게시판",
     };
     return labels[kind] || kind;
 };
@@ -30,8 +30,8 @@ export const getBoardKindLabel = (kind) => {
 export const getBoardKindColor = (kind) => {
     const colors = {
         FREE_BOARD: "bg-blue-100 text-blue-700",
-        ECO_REVIEW: "bg-green-100 text-green-700",
-        GREEN_ACTIVE: "bg-emerald-100 text-emerald-700",
+        ADMIN_NOTICE: "bg-amber-100 text-amber-700",
+        QUESTION_ANSWER: "bg-green-100 text-green-700",
     };
     return colors[kind] || "bg-slate-100 text-slate-700";
 };

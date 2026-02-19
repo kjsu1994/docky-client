@@ -41,17 +41,17 @@ export const Home = () => {
             setError("");
             try {
                 // 여러 게시판의 최신 게시글을 동시에 가져옴
-                const [freeRes, ecoRes, greenRes] = await Promise.all([
+                const [freeRes, noticeRes, qaRes] = await Promise.all([
                     api.get("/boards", { params: { kind: "FREE_BOARD", page: 0, size: 3 } }),
-                    api.get("/boards", { params: { kind: "ECO_REVIEW", page: 0, size: 3 } }),
-                    api.get("/boards", { params: { kind: "GREEN_ACTIVE", page: 0, size: 3 } }),
+                    api.get("/boards", { params: { kind: "ADMIN_NOTICE", page: 0, size: 3 } }),
+                    api.get("/boards", { params: { kind: "QUESTION_ANSWER", page: 0, size: 3 } }),
                 ]);
 
                 // 가져온 게시글들을 최신순으로 정렬
                 const boardItems = [
                     ...normalizeBoards(freeRes),
-                    ...normalizeBoards(ecoRes),
-                    ...normalizeBoards(greenRes),
+                    ...normalizeBoards(noticeRes),
+                    ...normalizeBoards(qaRes),
                 ].sort((a, b) => {
                     const aDate = new Date(a?.created_at || a?.createdAt || 0).getTime();
                     const bDate = new Date(b?.created_at || b?.createdAt || 0).getTime();
@@ -100,9 +100,9 @@ export const Home = () => {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <QuickLink to="/app/boards/FREE_BOARD" title="자유게시판" description="자유롭게 이야기를 나눠요" color="blue" />
-                    <QuickLink to="/app/boards/ECO_REVIEW" title="Q&A 게시판" description="질문과 답변을 자유롭게 나눠요" color="green" />
-                    <QuickLink to="/app/boards/GREEN_ACTIVE" title="녹색활동" description="환경 보호 활동을 기록해요" color="emerald" />
-                    <QuickLink to="/app/gpt" title="GPT 질문" description="AI 기반 환경 실천 팁 받기" color="teal" />
+                    <QuickLink to="/app/boards/QUESTION_ANSWER" title="Q&A 게시판" description="질문과 답변을 자유롭게 나눠요" color="green" />
+                    <QuickLink to="/app/plinko" title="럭키플링코" description="행운의 주사위와 플링코 게임" color="emerald" />
+                    <QuickLink to="/app/gpt" title="GPT 질문" description="AI 기반 똑똑한 답변 받기" color="teal" />
                 </div>
             </div>
 

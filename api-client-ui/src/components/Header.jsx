@@ -13,7 +13,9 @@ import {
     User,
     LogOut,
     Menu,
-    X
+    X,
+    Megaphone,
+    HelpCircle
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useState } from "react";
@@ -74,11 +76,8 @@ export const Header = () => {
                         <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare}>
                             자유게시판
                         </NavItem>
-                        <NavItem to="/app/boards/ECO_REVIEW" icon={Leaf}>
+                        <NavItem to="/app/boards/QUESTION_ANSWER" icon={HelpCircle}>
                             Q&A 게시판
-                        </NavItem>
-                        <NavItem to="/app/boards/GREEN_ACTIVE" icon={Sprout}>
-                            녹색활동
                         </NavItem>
                         <NavItem to="/app/ranks" icon={Trophy}>
                             랭킹
@@ -151,11 +150,8 @@ export const Header = () => {
                         <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare} mobile onClick={() => setMobileMenuOpen(false)}>
                             자유게시판
                         </NavItem>
-                        <NavItem to="/app/boards/ECO_REVIEW" icon={Leaf} mobile onClick={() => setMobileMenuOpen(false)}>
+                        <NavItem to="/app/boards/QUESTION_ANSWER" icon={HelpCircle} mobile onClick={() => setMobileMenuOpen(false)}>
                             Q&A 게시판
-                        </NavItem>
-                        <NavItem to="/app/boards/GREEN_ACTIVE" icon={Sprout} mobile onClick={() => setMobileMenuOpen(false)}>
-                            녹색활동
                         </NavItem>
                         <NavItem to="/app/ranks" icon={Trophy} mobile onClick={() => setMobileMenuOpen(false)}>
                             랭킹

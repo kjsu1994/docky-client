@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Trophy, TrendingUp, Heart, Award, Crown, Medal, Star } from "lucide-react";
 import api from "../utils/api";
@@ -36,14 +36,8 @@ const fetchWithFallbackEndpoints = async (endpoints) => {
         } catch (error) {
             lastError = error;
             const status = error?.response?.status;
-            // 404는 다음 후보 엔드포인트로 폴백
-            if (status === 404) {
-                continue;
-            }
-            // 500 등 서버 오류도 후보가 남아있으면 폴백 시도
-            if (endpoints[endpoints.length - 1] !== endpoint) {
-                continue;
-            }
+            if (status === 404) continue;
+            if (endpoints[endpoints.length - 1] !== endpoint) continue;
             throw error;
         }
     }
@@ -52,7 +46,7 @@ const fetchWithFallbackEndpoints = async (endpoints) => {
 };
 
 export const Ranks = () => {
-    const [activeTab, setActiveTab] = useState("boards"); // boards, level, donation
+    const [activeTab, setActiveTab] = useState("boards");
     const [boardRankType, setBoardRankType] = useState("FREE_BOARD");
     const [boardRanks, setBoardRanks] = useState([]);
     const [levelRanks, setLevelRanks] = useState([]);
@@ -60,100 +54,71 @@ export const Ranks = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [retryKey, setRetryKey] = useState(0);
+    
+    const lastBoardFetchRef = useRef("");
+    const lastLevelFetchRef = useRef(-1);
+    const lastDonationFetchRef = useRef(-1);
 
-    // 게시판 랭킹 불러오기
     useEffect(() => {
         if (activeTab !== "boards") return;
+        const currentFetchKey = `${boardRankType}-${retryKey}`;
+        if (lastBoardFetchRef.current === currentFetchKey) return;
 
         const fetchBoardRanks = async () => {
             setLoading(true);
             setError("");
             try {
-                // 최신 명세 반영: 단일 랭킹 API에 kind 쿼리를 전달한다.
                 try {
-                    const response = await api.get("/boards/rankBoards", {
-                        params: { kind: boardRankType },
-                    });
+                    const response = await api.get("/boards/rankBoards", { params: { kind: boardRankType } });
+                    lastBoardFetchRef.current = currentFetchKey;
                     setBoardRanks(normalizeList(response));
                 } catch (primaryError) {
-                    // 구버전 서버 호환: 404일 때만 기존 분리 엔드포인트로 재시도한다.
-                    if (primaryError?.response?.status !== 404) {
-                        throw primaryError;
-                    }
-
+                    if (primaryError?.response?.status !== 404) throw primaryError;
                     let fallbackEndpoint = "";
                     switch (boardRankType) {
-                        case "FREE_BOARD":
-                            fallbackEndpoint = "/boards/rankFreeBoards";
-                            break;
-                        case "ECO_REVIEW":
-                            fallbackEndpoint = "/boards/rankEcoBoards";
-                            break;
-                        case "GREEN_ACTIVE":
-                            fallbackEndpoint = "/boards/rankGreenBoards";
-                            break;
-                        default:
-                            fallbackEndpoint = "/boards/rankFreeBoards";
-                            break;
+                        case "FREE_BOARD": fallbackEndpoint = "/boards/rankFreeBoards"; break;
+                        case "ADMIN_NOTICE": fallbackEndpoint = "/boards/rankNoticeBoards"; break;
+                        case "QUESTION_ANSWER": fallbackEndpoint = "/boards/rankEcoBoards"; break;
+                        default: fallbackEndpoint = "/boards/rankFreeBoards"; break;
                     }
-
                     const fallbackResponse = await api.get(fallbackEndpoint);
+                    lastBoardFetchRef.current = currentFetchKey;
                     setBoardRanks(normalizeList(fallbackResponse));
                 }
             } catch (err) {
-                console.error("Failed to fetch board ranks:", err);
-                setError(getErrorMessage(err, "게시판 랭킹을 불러오는데 실패했습니다."));
-            } finally {
-                setLoading(false);
-            }
+                setError(getErrorMessage(err, "게시판 랭킹 로딩 실패"));
+            } finally { setLoading(false); }
         };
-
         fetchBoardRanks();
     }, [activeTab, boardRankType, retryKey]);
 
-    // 레벨 랭킹 불러오기
     useEffect(() => {
         if (activeTab !== "level") return;
-
+        if (lastLevelFetchRef.current === retryKey) return;
         const fetchLevelRanks = async () => {
-            setLoading(true);
-            setError("");
+            setLoading(true); setError("");
             try {
-                const ranks = await fetchWithFallbackEndpoints([
-                    "/members/levelRanks",
-                    "/members/level-ranks",
-                    "/members/ranks/level",
-                ]);
+                const ranks = await fetchWithFallbackEndpoints(["/members/levelRanks", "/members/level-ranks"]);
+                lastLevelFetchRef.current = retryKey;
                 setLevelRanks(ranks);
-            } catch (err) {
-                console.error("Failed to fetch level ranks:", err);
-                setError(getErrorMessage(err, "레벨 랭킹을 불러오는데 실패했습니다."));
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { setError(getErrorMessage(err, "레벨 랭킹 로딩 실패")); }
+            finally { setLoading(false); }
         };
-
         fetchLevelRanks();
     }, [activeTab, retryKey]);
 
-    // 기부 랭킹 불러오기
     useEffect(() => {
         if (activeTab !== "donation") return;
-
+        if (lastDonationFetchRef.current === retryKey) return;
         const fetchDonationRanks = async () => {
-            setLoading(true);
-            setError("");
+            setLoading(true); setError("");
             try {
                 const response = await api.get("/members/donationRanks");
+                lastDonationFetchRef.current = retryKey;
                 setDonationRanks(normalizeList(response));
-            } catch (err) {
-                console.error("Failed to fetch donation ranks:", err);
-                setError(getErrorMessage(err, "기부 랭킹을 불러오는데 실패했습니다."));
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { setError(getErrorMessage(err, "기부 랭킹 로딩 실패")); }
+            finally { setLoading(false); }
         };
-
         fetchDonationRanks();
     }, [activeTab, retryKey]);
 
@@ -173,7 +138,6 @@ export const Ranks = () => {
 
     return (
         <div className="space-y-6">
-            {/* 헤더 */}
             <div className="card p-6 bg-gradient-to-r from-purple-500 to-purple-600 text-white">
                 <div className="flex items-center gap-3 mb-2">
                     <Trophy className="h-8 w-8" />
@@ -182,301 +146,110 @@ export const Ranks = () => {
                 <p className="text-purple-100">커뮤니티 TOP 멤버와 인기 게시글을 확인하세요</p>
             </div>
 
-            {/* 탭 메뉴 */}
             <div className="card p-2">
                 <div className="flex gap-2">
-                    <TabButton
-                        active={activeTab === "boards"}
-                        onClick={() => setActiveTab("boards")}
-                        icon={TrendingUp}
-                    >
-                        게시판 랭킹
-                    </TabButton>
-                    <TabButton
-                        active={activeTab === "level"}
-                        onClick={() => setActiveTab("level")}
-                        icon={Award}
-                    >
-                        레벨 랭킹
-                    </TabButton>
-                    <TabButton
-                        active={activeTab === "donation"}
-                        onClick={() => setActiveTab("donation")}
-                        icon={Heart}
-                    >
-                        기부 랭킹
-                    </TabButton>
+                    <TabButton active={activeTab === "boards"} onClick={() => setActiveTab("boards")} icon={TrendingUp}>게시판 랭킹</TabButton>
+                    <TabButton active={activeTab === "level"} onClick={() => setActiveTab("level")} icon={Award}>레벨 랭킹</TabButton>
+                    <TabButton active={activeTab === "donation"} onClick={() => setActiveTab("donation")} icon={Heart}>기부 랭킹</TabButton>
                 </div>
             </div>
 
-            {/* 게시판 서브 탭 */}
             {activeTab === "boards" && (
                 <div className="card p-4">
                     <div className="flex gap-2">
-                        <BoardTypeButton
-                            active={boardRankType === "FREE_BOARD"}
-                            onClick={() => setBoardRankType("FREE_BOARD")}
-                        >
-                            자유게시판
-                        </BoardTypeButton>
-                        <BoardTypeButton
-                            active={boardRankType === "ECO_REVIEW"}
-                            onClick={() => setBoardRankType("ECO_REVIEW")}
-                        >
-                            Q&A 게시판
-                        </BoardTypeButton>
-                        <BoardTypeButton
-                            active={boardRankType === "GREEN_ACTIVE"}
-                            onClick={() => setBoardRankType("GREEN_ACTIVE")}
-                        >
-                            녹색활동
-                        </BoardTypeButton>
+                        <BoardTypeButton active={boardRankType === "FREE_BOARD"} onClick={() => setBoardRankType("FREE_BOARD")}>자유게시판</BoardTypeButton>
+                        <BoardTypeButton active={boardRankType === "ADMIN_NOTICE"} onClick={() => setBoardRankType("ADMIN_NOTICE")}>공지사항</BoardTypeButton>
+                        <BoardTypeButton active={boardRankType === "QUESTION_ANSWER"} onClick={() => setBoardRankType("QUESTION_ANSWER")}>Q&A 게시판</BoardTypeButton>
                     </div>
                 </div>
             )}
 
-            {/* 로딩 및 에러 처리 */}
-            {loading && <LoadingSpinner text="랭킹 데이터 로딩 중..." />}
-            {error && (
-                <ErrorMessage
-                    message={error}
-                    onRetry={() => {
-                        setError("");
-                        setRetryKey((prev) => prev + 1);
-                    }}
-                />
-            )}
+            {loading && <LoadingSpinner text="로딩 중..." />}
+            {error && <ErrorMessage message={error} onRetry={() => { setError(""); setRetryKey(prev => prev + 1); }} />}
 
-            {/* 랭킹 리스트 */}
             {!loading && !error && (
                 <div className="card overflow-hidden">
-                    {activeTab === "boards" && (
-                        <BoardRankList ranks={boardRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />
-                    )}
-                    {activeTab === "level" && (
-                        <LevelRankList ranks={levelRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />
-                    )}
-                    {activeTab === "donation" && (
-                        <DonationRankList ranks={donationRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />
-                    )}
+                    {activeTab === "boards" && <BoardRankList ranks={boardRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />}
+                    {activeTab === "level" && <LevelRankList ranks={levelRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />}
+                    {activeTab === "donation" && <DonationRankList ranks={donationRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />}
                 </div>
             )}
         </div>
     );
 };
 
-// 탭 버튼 컴포넌트
 const TabButton = ({ active, onClick, icon: Icon, children }) => (
-    <button
-        onClick={onClick}
-        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${
-            active
-                ? "bg-purple-600 text-white shadow-lg"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-        }`}
-    >
-        <Icon className="h-5 w-5" />
-        <span className="hidden sm:inline">{children}</span>
+    <button onClick={onClick} className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${active ? "bg-purple-600 text-white shadow-lg" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
+        <Icon className="h-5 w-5" /><span className="hidden sm:inline">{children}</span>
     </button>
 );
 
-// 게시판 타입 버튼
 const BoardTypeButton = ({ active, onClick, children }) => (
-    <button
-        onClick={onClick}
-        className={`flex-1 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
-            active
-                ? "bg-purple-100 text-purple-700 border-2 border-purple-600"
-                : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
-        }`}
-    >
-        {children}
-    </button>
+    <button onClick={onClick} className={`flex-1 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${active ? "bg-purple-100 text-purple-700 border-2 border-purple-600" : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"}`}>{children}</button>
 );
 
-// 게시판 랭킹 리스트
 const BoardRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    const safeRanks = Array.isArray(ranks) ? ranks : [];
-    if (safeRanks.length === 0) {
-        return (
-            <div className="p-12 text-center text-slate-500">
-                아직 랭킹 데이터가 없습니다.
-            </div>
-        );
-    }
-
+    if (!ranks?.length) return <div className="p-12 text-center text-slate-500">데이터가 없습니다.</div>;
     return (
         <div className="divide-y">
-            {safeRanks.map((board, index) => {
-                const rank = index + 1;
-                return (
-                    <Link
-                        key={board.board_id || board.boardId}
-                        to={`/app/boards/${board.kind_of_board || board.kindOfBoard || "FREE_BOARD"}/${board.board_id || board.boardId}`}
-                        className={`p-6 transition-colors ${
-                            rank <= 3 ? "bg-gradient-to-r from-slate-50 to-transparent" : "hover:bg-slate-50"
-                        } block`}
-                    >
-                        <div className="flex items-start gap-4">
-                            {/* 순위 */}
-                            <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(rank)} flex items-center justify-center font-bold text-lg shadow-md`}>
-                                {rank <= 3 ? getRankIcon(rank) : rank}
-                            </div>
-
-                            {/* 게시글 정보 */}
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-2">
-                                    {board.title}
-                                </h3>
-                                <div className="flex items-center gap-4 text-sm text-slate-600">
-                                    <div className="flex items-center gap-1">
-                                        <Heart className="h-4 w-4 text-red-500" />
-                                        <span className="font-semibold">{formatNumber(board.like_count || board.likeCount)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <TrendingUp className="h-4 w-4 text-blue-500" />
-                                        <span>{formatNumber(board.view_count || board.viewCount)}</span>
-                                    </div>
-                                </div>
+            {ranks.map((board, index) => (
+                <Link key={board.board_id || board.boardId} to={`/app/boards/${board.kind_of_board || board.kindOfBoard || "FREE_BOARD"}/${board.board_id || board.boardId}`} className={`p-6 transition-colors ${index < 3 ? "bg-gradient-to-r from-slate-50 to-transparent" : "hover:bg-slate-50"} block`}>
+                    <div className="flex items-start gap-4">
+                        <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-2">{board.title}</h3>
+                            <div className="flex items-center gap-4 text-sm text-slate-600">
+                                <div className="flex items-center gap-1"><Heart className="h-4 w-4 text-red-500" /><span>{formatNumber(board.like_count || board.likeCount)}</span></div>
+                                <div className="flex items-center gap-1"><TrendingUp className="h-4 w-4 text-blue-500" /><span>{formatNumber(board.view_count || board.viewCount)}</span></div>
                             </div>
                         </div>
-                    </Link>
-                );
-            })}
+                    </div>
+                </Link>
+            ))}
         </div>
     );
 };
 
-// 레벨 랭킹 리스트
 const LevelRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    const safeRanks = Array.isArray(ranks) ? ranks : [];
-    if (safeRanks.length === 0) {
-        return (
-            <div className="p-12 text-center text-slate-500">
-                아직 랭킹 데이터가 없습니다.
-            </div>
-        );
-    }
-
+    if (!ranks?.length) return <div className="p-12 text-center text-slate-500">데이터가 없습니다.</div>;
     return (
         <div className="divide-y">
-            {safeRanks.map((item, index) => {
-                const rank = index + 1;
-                return (
-                    <div
-                        key={item.member?.member_id || item.member?.memberId || index}
-                        className={`p-6 transition-colors ${
-                            rank <= 3 ? "bg-gradient-to-r from-slate-50 to-transparent" : "hover:bg-slate-50"
-                        }`}
-                    >
-                        <div className="flex items-center gap-4">
-                            {/* 순위 */}
-                            <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(rank)} flex items-center justify-center font-bold text-lg shadow-md`}>
-                                {rank <= 3 ? getRankIcon(rank) : rank}
-                            </div>
-
-                            {/* 프로필 이미지 */}
-                            <div className="flex-shrink-0">
-                                {item.member?.profile_url || item.member?.profileUrl ? (
-                                    <img
-                                        src={item.member.profile_url || item.member.profileUrl}
-                                        alt={item.member?.name || "프로필"}
-                                        className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
-                                    />
-                                ) : (
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
-                                        {(item.member?.name || "U").charAt(0).toUpperCase()}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 회원 정보 */}
-                            <div className="flex-1">
-                                <h3 className="font-bold text-slate-900 text-lg mb-1">
-                                    {item.member?.name || "익명"}
-                                </h3>
-                                <div className="flex items-center gap-4 text-sm">
-                                    <div className="flex items-center gap-1">
-                                        <Award className="h-4 w-4 text-purple-500" />
-                                        <span className="font-semibold text-purple-700">Lv. {item.level}</span>
-                                    </div>
-                                    <div className="text-slate-600">
-                                        총 경험치: <span className="font-semibold">{formatNumber(item.total_exp || item.totalExp)}</span>
-                                    </div>
-                                </div>
-                            </div>
+            {ranks.map((item, index) => (
+                <div key={index} className={`p-6 transition-colors ${index < 3 ? "bg-gradient-to-r from-slate-50 to-transparent" : "hover:bg-slate-50"}`}>
+                    <div className="flex items-center gap-4">
+                        <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
+                        <div className="flex-shrink-0">
+                            {item.member?.profile_url ? <img src={item.member.profile_url} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold">{(item.member?.name || "U").charAt(0)}</div>}
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-slate-900 text-lg mb-1">{item.member?.name || "익명"}</h3>
+                            <div className="flex items-center gap-4 text-sm"><div className="flex items-center gap-1"><Award className="h-4 w-4 text-purple-500" /><span className="font-semibold text-purple-700">Lv. {item.level}</span></div><div className="text-slate-600">EXP: {formatNumber(item.total_exp || item.totalExp)}</div></div>
                         </div>
                     </div>
-                );
-            })}
+                </div>
+            ))}
         </div>
     );
 };
 
-// 기부 랭킹 리스트
 const DonationRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    const safeRanks = Array.isArray(ranks) ? ranks : [];
-    if (safeRanks.length === 0) {
-        return (
-            <div className="p-12 text-center text-slate-500">
-                아직 랭킹 데이터가 없습니다.
-            </div>
-        );
-    }
-
+    if (!ranks?.length) return <div className="p-12 text-center text-slate-500">데이터가 없습니다.</div>;
     return (
         <div className="divide-y">
-            {safeRanks.map((member, index) => {
-                const rank = index + 1;
-                return (
-                    <div
-                        key={member.member_id || member.memberId}
-                        className={`p-6 transition-colors ${
-                            rank <= 3 ? "bg-gradient-to-r from-green-50 to-transparent" : "hover:bg-slate-50"
-                        }`}
-                    >
-                        <div className="flex items-center gap-4">
-                            {/* 순위 */}
-                            <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(rank)} flex items-center justify-center font-bold text-lg shadow-md`}>
-                                {rank <= 3 ? getRankIcon(rank) : rank}
-                            </div>
-
-                            {/* 프로필 이미지 */}
-                            <div className="flex-shrink-0">
-                                {member.profile_url || member.profileUrl ? (
-                                    <img
-                                        src={member.profile_url || member.profileUrl}
-                                        alt={member.name || "프로필"}
-                                        className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
-                                    />
-                                ) : (
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold text-lg">
-                                        {(member.name || "U").charAt(0).toUpperCase()}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 회원 정보 */}
-                            <div className="flex-1">
-                                <h3 className="font-bold text-slate-900 text-lg mb-1">
-                                    {member.name || "익명"}
-                                </h3>
-                                <div className="flex items-center gap-4 text-sm">
-                                    <div className="flex items-center gap-1">
-                                        <Heart className="h-4 w-4 text-green-500 fill-green-500" />
-                                        <span className="font-semibold text-green-700">
-                                            나무 {formatNumber(member.tree_count || member.treeCount)}그루
-                                        </span>
-                                    </div>
-                                    <div className="text-slate-600">
-                                        포인트: <span className="font-semibold">{formatNumber(member.point)}</span>
-                                    </div>
-                                </div>
-                            </div>
+            {ranks.map((member, index) => (
+                <div key={index} className={`p-6 transition-colors ${index < 3 ? "bg-gradient-to-r from-green-50 to-transparent" : "hover:bg-slate-50"}`}>
+                    <div className="flex items-center gap-4">
+                        <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
+                        <div className="flex-shrink-0">
+                            {member.profile_url ? <img src={member.profile_url} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold">{(member.name || "U").charAt(0)}</div>}
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-slate-900 text-lg mb-1">{member.name}</h3>
+                            <div className="flex items-center gap-4 text-sm"><div className="flex items-center gap-1"><Heart className="h-4 w-4 text-green-500 fill-green-500" /><span className="font-semibold text-green-700">{formatNumber(member.tree_count || member.treeCount)} Trees</span></div><div className="text-slate-600">Points: {formatNumber(member.point)}</div></div>
                         </div>
                     </div>
-                );
-            })}
+                </div>
+            ))}
         </div>
     );
 };

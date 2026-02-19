@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
@@ -30,6 +30,7 @@ export const BoardDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [liking, setLiking] = useState(false);
+    const fetchedRef = useRef(false);
 
     const fetchBoard = async () => {
         setLoading(true);
@@ -48,7 +49,10 @@ export const BoardDetail = () => {
     };
 
     useEffect(() => {
-        if (boardId) fetchBoard();
+        if (boardId && !fetchedRef.current) {
+            fetchBoard();
+            fetchedRef.current = true;
+        }
     }, [boardId]);
 
     const handleLike = async () => {

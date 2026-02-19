@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Search,
@@ -27,467 +27,253 @@ import {
 } from "../utils/helpers";
 import { canManageByOwnerOrAdmin, isAdminUser } from "../utils/authorization";
 
-// MinIO Docker 내부 URL → 브라우저 접근 가능 URL로 변환
+// ── 유틸리티 함수 ──────────────────────────────────────────
 const toPublicUrl = (url) => {
     if (!url) return null;
-    return url
-        .replace("http://host.docker.internal:9000", "http://localhost:9000")
-        .replace("http://minio:9000", "http://localhost:9000");
+    return url.replace("http://host.docker.internal:9000", "http://localhost:9000").replace("http://minio:9000", "http://localhost:9000");
 };
 
-// 이미지 파일 여부 확인
-const isImageUrl = (url) => {
-    if (!url) return false;
-    return /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+const isBoardNotice = (board) => {
+    const bKind = board.kind_of_board || board.kindOfBoard;
+    // 주입된 kind_of_board 값을 기반으로 판별
+    return bKind === "ADMIN_NOTICE" || board.is_notice === true || board.isNotice === true;
 };
 
-const hasRole = (roles, roleName) => {
-    if (!roles) return false;
-    if (Array.isArray(roles)) return roles.includes(roleName);
-    return String(roles).includes(roleName);
-};
-
-const isAdminPost = (board) => {
-    if (!board) return false;
-    if (board.is_notice === true || board.isNotice === true) return true;
-    if (board.admin_post === true || board.adminPost === true) return true;
-
-    return (
-        hasRole(board.roles, "ROLE_ADMIN") ||
-        hasRole(board.role, "ROLE_ADMIN") ||
-        hasRole(board.member?.roles, "ROLE_ADMIN") ||
-        hasRole(board.member?.role, "ROLE_ADMIN")
-    );
-};
-
+// ── 메인 컴포넌트 ──────────────────────────────────────────
 export const BoardList = () => {
     const { kind = "FREE_BOARD" } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const [pagingByKind, setPagingByKind] = useState({
-        FREE_BOARD: { page: 1, size: 10 },
-        ECO_REVIEW: { page: 1, size: 10 },
-        GREEN_ACTIVE: { page: 1, size: 10 },
-    });
+    const isAdmin = isAdminUser(user);
+
+    const [subTab, setSubTab] = useState("all"); // all, notice, normal
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("latest");
     const [refreshKey, setRefreshKey] = useState(0);
-    const [adminFilter, setAdminFilter] = useState("all");
-    const isAdmin = isAdminUser(user);
+    const [paging, setPaging] = useState({ page: 1, size: 10 });
 
-    const currentPaging = pagingByKind[kind] || { page: 1, size: 10 };
-    const page = currentPaging.page;
-    const size = currentPaging.size;
+    // 자유게시판인 경우 공지사항(ADMIN_NOTICE)과 일반글(FREE_BOARD)을 함께 가져옴
+    const fetchKind = kind === "FREE_BOARD" ? ["FREE_BOARD", "ADMIN_NOTICE"] : kind;
+    const { boards, loading, error, pageInfo } = useBoards(fetchKind, paging.page, paging.size, refreshKey);
 
-    const { boards, loading, error, pageInfo } = useBoards(kind, page, size, refreshKey);
+    // ── 데이터 처리 (useMemo) ──────────────────────────
+    const { noticeBoards, regularBoards, filteredCount } = useMemo(() => {
+        // 1. 공지사항 여부에 따른 분류
+        const notices = boards.filter(isBoardNotice);
+        const regulars = boards.filter(b => !isBoardNotice(b));
 
-    const filteredBoards = boards.filter((board) => {
-        if (!searchTerm) return true;
-        const searchLower = searchTerm.toLowerCase();
-        const plainContents = stripHtmlTags(board.contents || board.content || "");
-        return (
-            board.title?.toLowerCase().includes(searchLower) ||
-            plainContents.toLowerCase().includes(searchLower) ||
-            board.board_creator?.toLowerCase().includes(searchLower)
-        );
-    });
+        // 2. 검색어 필터링 함수
+        const applySearch = (list) => {
+            if (!searchTerm) return list;
+            const lower = searchTerm.toLowerCase();
+            return list.filter(b => 
+                b.title?.toLowerCase().includes(lower) || 
+                stripHtmlTags(b.contents || b.content || "").toLowerCase().includes(lower) ||
+                (b.board_creator || b.boardCreator || "").toLowerCase().includes(lower)
+            );
+        };
 
-    const sortedBoards = [...filteredBoards].sort((a, b) => {
-        switch (sortBy) {
-            case "latest":
-                return new Date(b.created_at) - new Date(a.created_at);
-            case "popular":
-                return (b.view_count || 0) - (a.view_count || 0);
-            case "likes":
-                return (b.like_count || 0) - (a.like_count || 0);
-            default:
-                return 0;
+        // 3. 현재 탭 상태에 따라 노출할 데이터 결정
+        let finalNotices = [];
+        let finalRegulars = [];
+
+        if (subTab === "all") {
+            finalNotices = applySearch(notices);
+            finalRegulars = applySearch(regulars);
+        } else if (subTab === "notice") {
+            finalNotices = applySearch(notices);
+            finalRegulars = [];
+        } else if (subTab === "normal") {
+            finalNotices = [];
+            finalRegulars = applySearch(regulars);
         }
-    });
 
-    const adminFilteredBoards = !isAdmin
-        ? sortedBoards
-        : adminFilter === "notice"
-            ? sortedBoards.filter(isAdminPost)
-            : adminFilter === "normal"
-                ? sortedBoards.filter((board) => !isAdminPost(board))
-                : sortedBoards;
+        // 정렬 로직
+        const sortFn = (a, b) => {
+            if (sortBy === "popular") return (b.view_count || b.viewCount || 0) - (a.view_count || a.viewCount || 0);
+            if (sortBy === "likes") return (b.like_count || b.likeCount || 0) - (a.like_count || a.likeCount || 0);
+            return new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt);
+        };
 
-    const noticeBoards = adminFilteredBoards.filter(isAdminPost);
-    const regularBoards = adminFilteredBoards.filter((board) => !isAdminPost(board));
+        finalNotices.sort(sortFn);
+        finalRegulars.sort(sortFn);
+
+        return { 
+            noticeBoards: finalNotices, 
+            regularBoards: finalRegulars,
+            filteredCount: finalNotices.length + finalRegulars.length
+        };
+    }, [boards, subTab, searchTerm, sortBy]);
 
     const handlePageChange = (newPage) => {
-        setPagingByKind((prev) => ({
-            ...prev,
-            [kind]: {
-                ...(prev[kind] || { size: 10 }),
-                page: newPage,
-            },
-        }));
+        setPaging(prev => ({ ...prev, page: newPage }));
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
     const handleSizeChange = (newSize) => {
-        setPagingByKind((prev) => ({
-            ...prev,
-            [kind]: {
-                page: 1,
-                size: newSize,
-            },
-        }));
+        setPaging({ page: 1, size: newSize });
     };
 
     const handleDeleteBoard = async (boardId) => {
-        if (!window.confirm("정말 이 게시글을 삭제하시겠습니까?")) return;
+        if (!window.confirm("정말 삭제하시겠습니까?")) return;
         try {
             await api.delete(`/boards/${boardId}`);
-            toast.success("게시글이 삭제되었습니다.");
-            setRefreshKey((prev) => prev + 1);
-        } catch (error) {
-            toast.error(error.response?.data?.message || "게시글 삭제에 실패했습니다.");
-        }
+            toast.success("삭제되었습니다.");
+            setRefreshKey(prev => prev + 1);
+        } catch (err) { toast.error("삭제 실패"); }
     };
+
+    const canWrite = kind !== "ADMIN_NOTICE" || isAdmin;
 
     return (
         <div className="space-y-6">
-            {/* 헤더 */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">
-                        {getBoardKindLabel(kind)}
-                    </h1>
-                    {pageInfo?.totalElements > 0 && (
-                        <p className="text-sm text-slate-500 mt-1">
-                            총 {formatNumber(pageInfo.totalElements)}개의 게시글
-                        </p>
-                    )}
+                    <h1 className="text-2xl font-bold text-slate-900">{getBoardKindLabel(kind)}</h1>
+                    <p className="text-sm text-slate-500 mt-1">총 {formatNumber(filteredCount)}개의 게시글</p>
                 </div>
-                <button
-                    onClick={() => navigate(`/app/boards/${kind}/new`)}
-                    className="btn-primary flex items-center gap-2"
-                >
-                    <PlusCircle className="h-4 w-4" />
-                    글쓰기
-                </button>
+                {canWrite && (
+                    <button 
+                        onClick={() => {
+                            const targetKind = (kind === "FREE_BOARD" && subTab === "notice") ? "ADMIN_NOTICE" : kind;
+                            navigate(`/app/boards/${targetKind}/new`);
+                        }} 
+                        className="btn-primary flex items-center gap-2"
+                    >
+                        <PlusCircle className="h-4 w-4" />글쓰기
+                    </button>
+                )}
             </div>
 
-            {/* 검색 + 정렬 */}
+            {kind === "FREE_BOARD" && (
+                <div className="flex border-b border-slate-200 gap-8">
+                    {[["all", "전체"], ["notice", "공지"], ["normal", "일반"]].map(([id, label]) => (
+                        <button key={id} onClick={() => setSubTab(id)} className={`pb-3 text-sm font-bold transition-all relative ${subTab === id ? "text-primary-600" : "text-slate-400 hover:text-slate-600"}`}>
+                            {label}
+                            {subTab === id && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary-600 animate-fade-in" />}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="제목, 내용, 작성자 검색..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="input-base pl-9 w-full"
-                    />
+                    <input type="text" placeholder="검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-base pl-9 w-full" />
                 </div>
                 <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-slate-400" />
-                    <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="input-base"
-                    >
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="input-base text-sm">
                         <option value="latest">최신순</option>
                         <option value="popular">조회순</option>
                         <option value="likes">좋아요순</option>
                     </select>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-600">표시 개수</span>
-                    <select
-                        value={size}
-                        onChange={(e) => handleSizeChange(Number(e.target.value))}
-                        className="input-base"
-                    >
-                        <option value={10}>10개</option>
-                        <option value={20}>20개</option>
-                        <option value={50}>50개</option>
+                    <select value={paging.size} onChange={(e) => handleSizeChange(Number(e.target.value))} className="input-base text-sm">
+                        {[10, 20, 50].map(s => <option key={s} value={s}>{s}개씩</option>)}
                     </select>
                 </div>
             </div>
 
-            {isAdmin && (
-                <div className="card p-3">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">관리자 필터</span>
-                        <button
-                            onClick={() => setAdminFilter("all")}
-                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                                adminFilter === "all"
-                                    ? "bg-amber-100 text-amber-800 border-amber-300"
-                                    : "bg-white border-slate-200 text-slate-600"
-                            }`}
-                        >
-                            전체
-                        </button>
-                        <button
-                            onClick={() => setAdminFilter("notice")}
-                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                                adminFilter === "notice"
-                                    ? "bg-amber-100 text-amber-800 border-amber-300"
-                                    : "bg-white border-slate-200 text-slate-600"
-                            }`}
-                        >
-                            공지
-                        </button>
-                        <button
-                            onClick={() => setAdminFilter("normal")}
-                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                                adminFilter === "normal"
-                                    ? "bg-amber-100 text-amber-800 border-amber-300"
-                                    : "bg-white border-slate-200 text-slate-600"
-                            }`}
-                        >
-                            일반
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* 게시글 목록 */}
-            {loading ? (
-                <LoadingSpinner text="게시글 불러오는 중..." />
-            ) : error ? (
-                <ErrorMessage message={error} />
-            ) : adminFilteredBoards.length === 0 ? (
-                <EmptyState
-                    title="게시글이 없습니다"
-                    description={
-                        searchTerm
-                            ? "검색 결과가 없습니다. 다른 키워드로 검색해보세요."
-                            : "첫 번째 게시글을 작성해보세요!"
-                    }
-                    actionLabel={!searchTerm ? "글쓰기" : ""}
-                    onAction={
-                        !searchTerm ? () => navigate(`/app/boards/${kind}/new`) : null
-                    }
-                />
+            {loading ? <LoadingSpinner text="로딩 중..." /> : error ? <ErrorMessage message={error} /> : (filteredCount === 0) ? (
+                <EmptyState title="게시글이 없습니다" />
             ) : (
                 <>
+                    {/* 1. 공지사항 섹션 */}
                     {noticeBoards.length > 0 && (
                         <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
-                                <Megaphone className="h-4 w-4" />
-                                관리자 공지
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {noticeBoards.map((board) => (
-                                    <NoticeBoardCard
-                                        key={`notice-${board.board_id || board.boardId}`}
-                                        board={board}
-                                        kind={kind}
-                                        user={user}
-                                        onDelete={handleDeleteBoard}
-                                        onOpen={(boardKind, id) => navigate(`/app/boards/${boardKind}/${id}`)}
+                            <div className="flex items-center gap-2 text-sm font-semibold text-amber-700"><Megaphone className="h-4 w-4" />필독 공지사항</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {noticeBoards.map(b => (
+                                    <NoticeBoardCard 
+                                        key={b.board_id || b.boardId} 
+                                        board={b} 
+                                        user={user} 
+                                        onDelete={handleDeleteBoard} 
+                                        onOpen={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}`)} 
                                     />
                                 ))}
                             </div>
                         </div>
                     )}
-                    <div className="space-y-3">
-                        {regularBoards.map((board) => (
-                            <BoardCard
-                                key={board.board_id || board.boardId}
-                                board={board}
-                                kind={kind}
-                                user={user}
-                                onDelete={handleDeleteBoard}
-                                onOpen={(boardKind, id) => navigate(`/app/boards/${boardKind}/${id}`)}
-                                onEdit={(boardKind, id) => navigate(`/app/boards/${boardKind}/${id}/edit`)}
-                            />
-                        ))}
-                    </div>
 
-                    {!searchTerm && pageInfo?.totalPages > 1 && (
-                        <div className="py-4">
-                            <Pagination
-                                currentPage={page}
-                                totalPages={pageInfo.totalPages}
-                                onPageChange={handlePageChange}
-                            />
+                    {/* 2. 일반 게시글 섹션 */}
+                    {regularBoards.length > 0 && (
+                        <div className="space-y-3 mt-4">
+                            {subTab === "all" && noticeBoards.length > 0 && (
+                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2 border-t pt-4">
+                                    <ImageIcon className="h-4 w-4" />일반 게시글
+                                </div>
+                            )}
+                            {regularBoards.map(b => (
+                                <BoardCard 
+                                    key={b.board_id || b.boardId} 
+                                    board={b} 
+                                    user={user} 
+                                    onDelete={handleDeleteBoard} 
+                                    onOpen={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}`)} 
+                                    onEdit={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}/edit`)} 
+                                />
+                            ))}
                         </div>
                     )}
+
+                    {pageInfo?.totalPages > 1 && <div className="py-4"><Pagination currentPage={paging.page} totalPages={pageInfo.totalPages} onPageChange={handlePageChange} /></div>}
                 </>
             )}
         </div>
     );
 };
 
-const BoardCard = ({ board, kind, user, onDelete, onOpen, onEdit }) => {
-    const boardId = board.board_id || board.boardId;
-    const plainContents = stripHtmlTags(board.contents || board.content || "");
-    const canManageBoard = canManageByOwnerOrAdmin(user, board.member, {
-        ownerName: board.board_creator || board.boardCreator || "",
-        userName: user?.name || "",
-    });
-
-    // 1. 본문(HTML)에서 첫 번째 이미지 태그 추출 시도 (사용자 요청: 첨부파일 이미지는 제외하고 본문 이미지만 노출)
+const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
+    const canManage = canManageByOwnerOrAdmin(user, board.member, { ownerName: board.board_creator || board.boardCreator, userName: user?.name });
     const contentHtml = board.contents || board.content || "";
-    const firstContentImageMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
-    const firstContentImage = firstContentImageMatch ? firstContentImageMatch[1] : null;
-
-    // 최종 썸네일: 본문에 삽입된 첫 번째 이미지만 사용 (첨부파일 리스트 기반 썸네일은 제외)
-    const rawThumbnail = firstContentImage;
-    const thumbnailUrl = isImageUrl(rawThumbnail) ? toPublicUrl(rawThumbnail) : null;
-
-    // 첨부파일 존재 여부 (이미지 아이콘 표시용)
-    const hasAttachments = !!(board.delegate_image_path || board.delegateImagePath || (board.uploadDto && board.uploadDto.length > 0));
-
-    // 이미지 로드 실패 시 fallback 처리
+    const imgMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
+    const thumbnailUrl = imgMatch ? toPublicUrl(imgMatch[1]) : null;
     const [imgError, setImgError] = useState(false);
-    const showThumbnail = thumbnailUrl && !imgError;
 
     return (
-        <div
-            onClick={() => onOpen(kind, boardId)}
-            className="card hover:shadow-lg transition-all block group overflow-hidden cursor-pointer"
-        >
-            <div className="flex justify-end p-2 pb-0">
-                {canManageBoard && (
-                    <div className="flex items-center gap-1">
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onEdit(kind, boardId);
-                            }}
-                            className="text-xs px-2 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50"
-                        >
-                            수정
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDelete(boardId);
-                            }}
-                            className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                        >
-                            삭제
-                        </button>
+        <div onClick={onOpen} className="card hover:shadow-lg transition-all group overflow-hidden cursor-pointer flex items-stretch min-h-[120px]">
+            {thumbnailUrl && !imgError && (
+                <div className="w-32 sm:w-40 flex-shrink-0 bg-slate-100 border-r relative">
+                    <img src={thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" onError={() => setImgError(true)} />
+                </div>
+            )}
+            <div className="flex-1 p-4 sm:p-5 min-w-0 flex flex-col justify-between">
+                <div>
+                    <div className="flex justify-between items-start mb-1">
+                        <h3 className="font-bold text-slate-900 group-hover:text-primary-600 transition-colors line-clamp-1 text-base sm:text-lg">{board.title}</h3>
+                        {canManage && (
+                            <div className="flex gap-1 ml-2 shrink-0">
+                                <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="text-xs px-2 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50">수정</button>
+                                <button onClick={(e) => { e.stopPropagation(); onDelete(board.board_id || board.boardId); }} className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50">삭제</button>
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
-            <div className="flex items-stretch">
-
-                {/* ── 썸네일 영역 ── */}
-                {showThumbnail ? (
-                    <div className="w-32 sm:w-40 flex-shrink-0 relative bg-slate-100">
-                        <img
-                            src={thumbnailUrl}
-                            alt="게시글 썸네일"
-                            className="w-full h-full object-cover"
-                            style={{ minHeight: "110px", maxHeight: "140px" }}
-                            onError={() => setImgError(true)}
-                        />
-                    </div>
-                ) : (
-                    // 이미지 없을 때는 0px (공간 차지 안 함)
-                    null
-                )}
-
-                {/* ── 텍스트 영역 ── */}
-                <div className={`flex-1 min-w-0 p-4 ${showThumbnail ? "sm:p-5" : "p-5"}`}>
-                    {/* 제목 */}
-                    <h3 className="font-semibold text-slate-900 mb-1.5 group-hover:text-primary-600 transition-colors line-clamp-1 text-base">
-                        {board.title}
-                    </h3>
-
-                    {/* 본문 미리보기 */}
-                    <p className="text-sm text-slate-500 mb-3 line-clamp-2 leading-relaxed">
-                        {truncateText(plainContents, 150)}
-                    </p>
-
-                    {/* 하단 메타 정보 */}
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                        {/* 작성자 */}
-                        <span className="font-medium text-slate-600">
-                            {board.board_creator || board.boardCreator || "익명"}
-                        </span>
-
-                        {/* 날짜 */}
-                        <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatRelativeTime(new Date(board.created_at || board.createdAt))}
-                        </span>
-
-                        {/* 구분선 */}
-                        <span className="ml-auto flex items-center gap-3">
-                            {/* 조회수 */}
-                            <span className="flex items-center gap-1">
-                                <Eye className="h-3 w-3" />
-                                {formatNumber(board.view_count || board.viewCount || 0)}
-                            </span>
-                            {/* 좋아요 */}
-                            <span className="flex items-center gap-1">
-                                <Heart className="h-3 w-3" />
-                                {formatNumber(board.like_count || board.likeCount || 0)}
-                            </span>
-                            {/* 이미지 첨부 뱃지 (이미지 없을 때만 아이콘으로 표시) */}
-                            {!showThumbnail && rawThumbnail && (
-                                <span className="flex items-center gap-1 text-slate-300">
-                                    <ImageIcon className="h-3 w-3" />
-                                </span>
-                            )}
-                        </span>
+                    <p className="text-sm text-slate-500 line-clamp-2 mb-3">{truncateText(stripHtmlTags(contentHtml), 150)}</p>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-slate-400">
+                    <span className="font-medium text-slate-600">{board.board_creator || board.boardCreator || "익명"}</span>
+                    <span>{formatRelativeTime(new Date(board.created_at || board.createdAt))}</span>
+                    <div className="ml-auto flex gap-3">
+                        <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{formatNumber(board.view_count || board.viewCount || 0)}</span>
+                        <span className="flex items-center gap-1"><Heart className="h-3.5 w-3.5" />{formatNumber(board.like_count || board.likeCount || 0)}</span>
                     </div>
                 </div>
-
             </div>
         </div>
     );
 };
 
-const NoticeBoardCard = ({ board, kind, user, onDelete, onOpen }) => {
-    const boardId = board.board_id || board.boardId;
-    const plainContents = stripHtmlTags(board.contents || board.content || "");
-    const canManageBoard = canManageByOwnerOrAdmin(user, board.member, {
-        ownerName: board.board_creator || board.boardCreator || "",
-        userName: user?.name || "",
-    });
+const NoticeBoardCard = ({ board, onDelete, onOpen, user }) => {
+    const canManage = canManageByOwnerOrAdmin(user, board.member, { ownerName: board.board_creator || board.boardCreator, userName: user?.name });
     return (
-        <div
-            onClick={() => onOpen(kind, boardId)}
-            className="block rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 hover:shadow-sm transition-all cursor-pointer"
-        >
-            <div className="flex items-center justify-between gap-2 text-[11px] text-amber-700 mb-1">
-                <span className="font-bold">공지</span>
-                <span>{formatRelativeTime(new Date(board.created_at || board.createdAt))}</span>
+        <div onClick={onOpen} className="p-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 hover:shadow-md transition-all cursor-pointer relative overflow-hidden">
+            <div className="flex items-center justify-between mb-1 text-[10px] font-black text-amber-600 uppercase tracking-widest">
+                <span className="flex items-center gap-1"><Megaphone className="h-3 w-3" />Notice</span>
+                {canManage && <button onClick={(e) => { e.stopPropagation(); onDelete(board.board_id || board.boardId); }} className="text-[11px] px-2 py-0.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 font-bold">삭제</button>}
             </div>
-            <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
-                {board.title}
-            </h3>
-            <div className="mt-1 text-xs text-slate-600 line-clamp-1">
-                {truncateText(plainContents, 80)}
-            </div>
-            {canManageBoard && (
-                <div className="mt-2 flex items-center gap-1">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onOpen(kind, boardId);
-                            window.location.href = `/app/boards/${kind}/${boardId}/edit`;
-                        }}
-                        className="text-[11px] px-2 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50"
-                    >
-                        공지 수정
-                    </button>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(boardId);
-                        }}
-                        className="text-[11px] px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                    >
-                        공지 삭제
-                    </button>
-                </div>
-            )}
+            <h3 className="text-sm font-bold text-slate-900 line-clamp-1">{board.title}</h3>
+            <p className="text-xs text-slate-600 mt-1 line-clamp-1 opacity-80">{truncateText(stripHtmlTags(board.contents || board.content || ""), 80)}</p>
         </div>
     );
 };

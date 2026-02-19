@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { MessageCircle, Heart, Edit2, Trash2, Send } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import api from "../utils/api.js";
@@ -14,9 +14,15 @@ export const Comments = ({ boardId, onUpdate }) => {
     const [editContent, setEditContent] = useState("");
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
+    const lastFetchedIdRef = useRef(null);
 
     // [추가] 해당 게시글의 댓글 목록을 서버에서 불러오는 함수
-    const fetchComments = useCallback(async () => {
+    const fetchComments = useCallback(async (force = false) => {
+        if (!boardId) return;
+        
+        // StrictMode 중복 호출 방지 (force가 true인 경우는 수동 갱신)
+        if (!force && lastFetchedIdRef.current === boardId) return;
+        
         try {
             setFetching(true);
             const response = await api.get(`/comments`, {
@@ -26,6 +32,9 @@ export const Comments = ({ boardId, onUpdate }) => {
                     size: 100 // 일단 넉넉하게 가져오거나 페이징 로직 추가 가능
                 }
             });
+            
+            lastFetchedIdRef.current = boardId;
+
             // MultiResponseDto 구조 대응: response.data.data 또는 response.data
             const data = response.data?.data || response.data;
             const content = Array.isArray(data)
@@ -36,7 +45,6 @@ export const Comments = ({ boardId, onUpdate }) => {
             setComments(content);
         } catch (error) {
             console.error("Failed to fetch comments:", error);
-            // toast.error("댓글을 불러오는데 실패했습니다.");
         } finally {
             setFetching(false);
         }
@@ -44,8 +52,8 @@ export const Comments = ({ boardId, onUpdate }) => {
 
     // [추가] 컴포넌트 마운트 시 댓글 로드
     useEffect(() => {
-        if (boardId) fetchComments();
-    }, [boardId, fetchComments]);
+        fetchComments();
+    }, [fetchComments]);
 
     // 댓글 작성
     const handleSubmitComment = async (e) => {
@@ -64,7 +72,7 @@ export const Comments = ({ boardId, onUpdate }) => {
 
             setNewComment("");
             toast.success("댓글이 작성되었습니다.");
-            fetchComments(); // 목록 새로고침
+            fetchComments(true); // 목록 수동 새로고침 (force=true)
             if (onUpdate) onUpdate(); // 부모(BoardDetail)의 게시글 정보(댓글 수 등) 갱신
         } catch (error) {
             console.error("Failed to create comment:", error);
