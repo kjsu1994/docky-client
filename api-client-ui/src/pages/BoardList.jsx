@@ -324,9 +324,17 @@ const BoardCard = ({ board, kind, user, onDelete, onOpen, onEdit }) => {
         userName: user?.name || "",
     });
 
-    // delegateImagePath: 게시글 대표 이미지 URL (백엔드가 업로드 파일 중 마지막 이미지를 저장)
-    const rawThumbnail = board.delegate_image_path || board.delegateImagePath || null;
+    // 1. 본문(HTML)에서 첫 번째 이미지 태그 추출 시도 (사용자 요청: 첨부파일 이미지는 제외하고 본문 이미지만 노출)
+    const contentHtml = board.contents || board.content || "";
+    const firstContentImageMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
+    const firstContentImage = firstContentImageMatch ? firstContentImageMatch[1] : null;
+
+    // 최종 썸네일: 본문에 삽입된 첫 번째 이미지만 사용 (첨부파일 리스트 기반 썸네일은 제외)
+    const rawThumbnail = firstContentImage;
     const thumbnailUrl = isImageUrl(rawThumbnail) ? toPublicUrl(rawThumbnail) : null;
+
+    // 첨부파일 존재 여부 (이미지 아이콘 표시용)
+    const hasAttachments = !!(board.delegate_image_path || board.delegateImagePath || (board.uploadDto && board.uploadDto.length > 0));
 
     // 이미지 로드 실패 시 fallback 처리
     const [imgError, setImgError] = useState(false);
