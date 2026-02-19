@@ -71,6 +71,9 @@ Frontend rule:
 - 뉴스 검색: `GET /news`
 - 전기요금 계산기: `POST /calculators`
 - GPT 질문: `POST /gpt/question`
+- 주사위 굴리기 (1단계): `POST /game/dice/roll`
+- 주사위 재굴림 (1.5단계): `POST /game/dice/reroll` (Body: `[indices]`)
+- 플링코 실행 (2단계): `POST /game/plinko/play`
 
 ## 5) Recommended Frontend Structure
 - `src/api/client.ts`: axios/fetch 공통 클라이언트

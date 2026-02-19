@@ -6,8 +6,8 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 export const Login = () => {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+    const [email, setEmail] = useState("user@gmail.com");
+    const [password, setPassword] = useState("qwer1234");
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const { login, loginWithTokens } = useAuth();
@@ -68,10 +68,10 @@ export const Login = () => {
                         <Leaf className="h-8 w-8" />
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900 mb-2">
-                        탄소저감 커뮤니티
+                        벌꿀오소리 커뮤니티
                     </h1>
                     <p className="text-slate-600">
-                        친환경 활동을 공유하고 소통하는 공간
+                        이것저것 사부작해보는 공간
                     </p>
                 </div>
 

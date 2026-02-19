@@ -9,6 +9,7 @@ import {
     Newspaper,
     Calculator,
     Bot,
+    Dices,
     User,
     LogOut,
     Menu,
@@ -18,10 +19,11 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { useState } from "react";
 import { isAdminUser } from "../utils/authorization";
 
-const NavItem = ({ to, icon: Icon, children, mobile = false }) => {
+const NavItem = ({ to, icon: Icon, children, mobile = false, onClick }) => {
     return (
         <NavLink
             to={to}
+            onClick={onClick}
             className={({ isActive }) =>
                 `flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
                     isActive
@@ -81,6 +83,9 @@ export const Header = () => {
                         <NavItem to="/app/ranks" icon={Trophy}>
                             랭킹
                         </NavItem>
+                        <NavItem to="/app/plinko" icon={Dices}>
+                            럭키플링코
+                        </NavItem>
                         <NavItem to="/app/news" icon={Newspaper}>
                             뉴스
                         </NavItem>
@@ -136,39 +141,45 @@ export const Header = () => {
                 {/* 모바일 메뉴 */}
                 {mobileMenuOpen && (
                     <div className="lg:hidden border-t py-4 space-y-2 animate-slide-up">
-                        <NavItem to="/app" icon={Home} mobile>
+                        <NavItem to="/app" icon={Home} mobile onClick={() => setMobileMenuOpen(false)}>
                             홈
                         </NavItem>
                         {/* 통계 페이지 링크 추가 (모바일) */}
-                        <NavItem to="/app/statistics" icon={BarChart} mobile>
+                        <NavItem to="/app/statistics" icon={BarChart} mobile onClick={() => setMobileMenuOpen(false)}>
                             통계
                         </NavItem>
-                        <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare} mobile>
+                        <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare} mobile onClick={() => setMobileMenuOpen(false)}>
                             자유게시판
                         </NavItem>
-                        <NavItem to="/app/boards/ECO_REVIEW" icon={Leaf} mobile>
+                        <NavItem to="/app/boards/ECO_REVIEW" icon={Leaf} mobile onClick={() => setMobileMenuOpen(false)}>
                             Q&A 게시판
                         </NavItem>
-                        <NavItem to="/app/boards/GREEN_ACTIVE" icon={Sprout} mobile>
+                        <NavItem to="/app/boards/GREEN_ACTIVE" icon={Sprout} mobile onClick={() => setMobileMenuOpen(false)}>
                             녹색활동
                         </NavItem>
-                        <NavItem to="/app/ranks" icon={Trophy} mobile>
+                        <NavItem to="/app/ranks" icon={Trophy} mobile onClick={() => setMobileMenuOpen(false)}>
                             랭킹
                         </NavItem>
-                        <NavItem to="/app/news" icon={Newspaper} mobile>
+                        <NavItem to="/app/plinko" icon={Dices} mobile onClick={() => setMobileMenuOpen(false)}>
+                            럭키플링코
+                        </NavItem>
+                        <NavItem to="/app/news" icon={Newspaper} mobile onClick={() => setMobileMenuOpen(false)}>
                             뉴스
                         </NavItem>
-                        <NavItem to="/app/calculators" icon={Calculator} mobile>
+                        <NavItem to="/app/calculators" icon={Calculator} mobile onClick={() => setMobileMenuOpen(false)}>
                             전기요금
                         </NavItem>
-                        <NavItem to="/app/gpt" icon={Bot} mobile>
+                        <NavItem to="/app/gpt" icon={Bot} mobile onClick={() => setMobileMenuOpen(false)}>
                             GPT 질문
                         </NavItem>
-                        <NavItem to="/app/mypage" icon={User} mobile>
+                        <NavItem to="/app/mypage" icon={User} mobile onClick={() => setMobileMenuOpen(false)}>
                             내정보
                         </NavItem>
                         <button
-                            onClick={logout}
+                            onClick={() => {
+                                setMobileMenuOpen(false);
+                                logout();
+                            }}
                             className="flex w-full items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 transition-all"
                         >
                             <LogOut className="h-4 w-4" />
