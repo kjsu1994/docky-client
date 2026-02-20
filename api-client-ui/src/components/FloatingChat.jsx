@@ -115,8 +115,20 @@ export const FloatingChat = () => {
             const response = await api.get("/chat/rooms");
             const rawData = response.data?.data || response.data;
             const safeData = Array.isArray(rawData) ? rawData : [];
-            setRooms(safeData);
-            return safeData;
+            
+            // ── 채팅방 목록 정렬 (최신 생성순으로 위로 정렬) ──
+            const sortedData = [...safeData].sort((a, b) => {
+                const timeA = new Date(a.createdAt || a.created_at || 0).getTime();
+                const timeB = new Date(b.createdAt || b.created_at || 0).getTime();
+                if (timeA !== timeB) return timeB - timeA;
+
+                const idA = Number(getRoomId(a) || 0);
+                const idB = Number(getRoomId(b) || 0);
+                return idB - idA;
+            });
+
+            setRooms(sortedData);
+            return sortedData;
         } catch (error) {
             return [];
         } finally {

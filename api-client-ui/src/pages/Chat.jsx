@@ -97,8 +97,22 @@ export const Chat = () => {
             const response = await api.get("/chat/rooms");
             const rawData = response.data?.data || response.data;
             const safeData = Array.isArray(rawData) ? rawData : [];
-            setRooms(safeData);
-            return safeData;
+            
+            // ── 채팅방 목록 정렬 (최신 생성순으로 위로 정렬) ──
+            const sortedData = [...safeData].sort((a, b) => {
+                // 1. 생성일시(createdAt) 기준 비교
+                const timeA = new Date(a.createdAt || a.created_at || 0).getTime();
+                const timeB = new Date(b.createdAt || b.created_at || 0).getTime();
+                if (timeA !== timeB) return timeB - timeA; // 날짜가 다르면 최신순
+
+                // 2. 일시가 같거나 없을 경우 ID 기준 비교 (ID가 클수록 최근 방으로 간주)
+                const idA = Number(getRoomId(a) || 0);
+                const idB = Number(getRoomId(b) || 0);
+                return idB - idA;
+            });
+
+            setRooms(sortedData);
+            return sortedData;
         } catch (error) {
             console.error("Failed to fetch chat rooms:", error);
             return [];
