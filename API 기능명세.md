@@ -308,8 +308,32 @@ Frontend 권장 처리:
   - `CommentRepository.countByCreatedAtBetween`
 - 주의사항: `CommentRepository`는 UTF-8 BOM 이슈를 제거한 뒤 재컴파일하여 정상 동작 확인(2026-02-17)
 
-## 13) Real-time Chat System (WebSocket + STOMP)
-실시간 채팅은 **WebSocket**과 **STOMP** 프로토콜을 사용하며, 다중 서버 대응을 위해 Redis Pub/Sub을 브로커로 사용한다.
+## 14) Virtual Waiting Queue (The Iron Queue)
+이 시스템은 대규모 트래픽 폭주 시 서버를 보호하기 위해 유저를 순서대로 대기시키고 입장시키는 **가상 대기열 엔진**입니다.
+
+### 14.1 Key Features
+- **Fair Queueing**: Redis ZSet을 활용하여 1ms의 오차 없이 공정한 순번 보장.
+- **Real-time Status**: 내 앞의 대기자 수와 예상 대기 시간을 실시간 조회 가능.
+- **Dynamic Throughput**: 초당 입장 허용 인원을 실시간으로 조절 가능.
+- **System Protection**: 허가된 유저(Active Set)만 실제 서비스 API에 접근 가능하도록 제어.
+
+### 14.2 API Endpoints
+| 기능 | Method | Endpoint | Description |
+| :--- | :--- | :--- | :--- |
+| **대기열 진입** | `POST` | `/api/queue/join` | 줄서기 시작 및 초기 순번 발급 |
+| **상태 조회** | `GET` | `/api/queue/status` | 현재 내 순번 및 입장 허용 여부 확인 |
+| **시스템 퇴장** | `DELETE` | `/api/queue/leave` | 서비스 이용 완료 후 세션 만료 처리 |
+
+### 14.3 Implementation Flow
+1. 유저는 로그인 후 `/api/queue/join`을 호출하여 대기열에 등록됩니다.
+2. `GET /api/queue/status`를 주기적으로 호출하여 `status`가 `ALLOWED`가 될 때까지 대기합니다.
+3. `status`가 `ALLOWED`가 되면 실제 구매/예약 API를 호출할 수 있는 권한을 가집니다.
+4. 모든 작업이 끝나면 `/api/queue/leave`를 통해 명시적으로 퇴장하거나, 설정된 TTL에 의해 자동 만료됩니다.
+
+### 14.4 Technical Stack
+- **Backend**: Spring Boot 2.7.x
+- **Infrastructure**: Redis (ZSet for Waiting, Set for Active)
+- **Concurrency Control**: Distributed Lock (Redisson) 고려 가능
 
 ### 13.1 Connection & Protocol
 - **WebSocket Endpoint**: `ws://localhost:8080/ws/chat/websocket`

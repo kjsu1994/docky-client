@@ -7,15 +7,16 @@
 ## 구현 상태
 
 ### 인증/회원
-- 로그인: `POST /members/login`
-- OAuth2 구글 로그인: `/oauth2/authorization/google` 리다이렉트 방식
+- 로그인: `POST /members/login` (로그인 성공 시 `/api/queue/join`으로 가상 대기열 자동 진입)
+- 가상 대기열: `POST /api/queue/join`, `GET /api/queue/status` 연동 및 전용 대기 페이지(`/queue`) 구현
+- OAuth2 구글 로그인: `/oauth2/authorization/google` 리다이렉트 방식 (성공 시 가상 대기열 확인 포함)
 - 로그아웃: `POST /members/logout`
 - 회원가입: `POST /members`
 - 내 정보 조회: `GET /members`
 - 내 정보 수정: `PATCH /members/{member-id}`
 - 회원 탈퇴: `DELETE /members`
 - 프로필 업로드: `POST /members/uploadProfile`
-- 토큰 자동 첨부 + 401 시 `/auth/reissue` 재발급 시도
+- 토큰 자동 첨부 + 401 시 `/api/auth/reissue` 재발급 시도
 - OAuth2 콜백에서 `accessToken`, `refreshToken` 쿼리 수신 시 자동 로그인 처리
 
 ### 게시글

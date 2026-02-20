@@ -324,14 +324,27 @@ export const FloatingChat = () => {
         if (!newRoomTitle.trim()) { toast.error("방 제목을 입력하세요."); return; }
         try {
             const myId = user.member_id || user.memberId;
-            const memberIds = selectedMembers.map(m => m.member_id || m.memberId);
-            if (myId && !memberIds.includes(myId)) memberIds.push(myId);
-            const payload = { title: newRoomTitle, type: newRoomType, memberIds: memberIds };
+            // 선택된 멤버들의 ID 추출 (다양한 필드명 대응)
+            const selectedIds = selectedMembers.map(m => m.member_id || m.memberId || m.id).filter(Boolean);
+            
+            // 본인 ID 추가 (서버에서 자동 추가하더라도 프론트에서 명시적으로 포함)
+            const memberIds = [...new Set([...selectedIds, myId])].filter(Boolean);
+
+            const payload = { 
+                title: newRoomTitle, 
+                type: newRoomType, 
+                memberIds: memberIds 
+            };
+            
+            console.log("[Chat] Creating room with payload:", payload);
+            
             const response = await api.post("/chat/room", payload);
             const createdData = response.data?.data || response.data;
+            
             toast.success("방이 생성되었습니다.");
             setShowCreateModal(false);
             resetMemberSelection();
+            
             const updatedRooms = await fetchRooms();
             const createdId = getRoomId(createdData);
             if (createdId) {
@@ -339,7 +352,8 @@ export const FloatingChat = () => {
                 setCurrentRoom(found || createdData);
             }
         } catch (error) {
-            toast.error("방 생성 실패");
+            console.error("Room creation failed:", error);
+            toast.error(error.response?.data?.message || "방 생성 실패");
         }
     };
 

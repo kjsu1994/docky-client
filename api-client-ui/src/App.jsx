@@ -17,6 +17,7 @@ import {Calculators} from "./pages/Calculators.jsx";
 import { GptQuestion } from "./pages/GptQuestion.jsx";
 import { Statistics } from "./pages/Statistics.jsx";
 import { LuckyPlinko } from "./pages/LuckyPlinko.jsx";
+import { Queue } from "./pages/Queue.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 
 // 보호된 라우트 컴포넌트
@@ -55,6 +56,7 @@ function App() {
                     {/* 공개 라우트 */}
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
+                    <Route path="/queue" element={<Queue />} />
 
                     {/* 보호된 라우트 */}
                     <Route

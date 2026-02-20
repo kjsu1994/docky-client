@@ -88,7 +88,24 @@ export const AuthProvider = ({ children }) => {
             setUser(withRolesFallback(userData, loginRoles || parseStoredRoles()));
 
             toast.success("로그인 성공!");
-            navigate("/app"); // 이제 정상 실행될 겁니다!
+
+            // 가상 대기열 진입 시도 (The Iron Queue)
+            try {
+                // 로그인 성공 직후 대기열 진입 요청
+                const queueResponse = await api.post("/api/queue/join");
+                const queueData = queueResponse.data?.data || queueResponse.data;
+                
+                // 만약 'WAITING' 상태라면 대기 페이지로 이동하여 순번 대기
+                if (queueData.status === "WAITING") {
+                    navigate("/queue", { replace: true });
+                    return;
+                }
+            } catch (err) {
+                // 대기열 시스템 오류 시에는 서비스 가용성을 위해 일단 진입 허용
+                console.error("Queue join failed, proceeding anyway:", err);
+            }
+
+            navigate("/app"); // 대기열이 없거나 'ALLOWED'인 경우 메인으로 이동
         } catch (error) {
             toast.error(error.response?.data?.message || "로그인 실패");
             throw error;
@@ -108,6 +125,24 @@ export const AuthProvider = ({ children }) => {
         const userResponse = await api.get("/members");
         const userData = userResponse.data.data || userResponse.data;
         setUser(withRolesFallback(userData, parseStoredRoles()));
+
+        // 가상 대기열 진입 시도 (OAuth 로그인 유저용)
+        try {
+            // OAuth로 로그인한 경우에도 동일하게 대기열 확인
+            const queueResponse = await api.post("/api/queue/join");
+            const queueData = queueResponse.data?.data || queueResponse.data;
+            
+            // 대기 중이면 전용 페이지로 리다이렉트
+            if (queueData.status === "WAITING") {
+                navigate("/queue", { replace: true });
+                return;
+            }
+        } catch (err) {
+            console.error("Queue join failed, proceeding anyway:", err);
+        }
+
+        // 바로 입장 가능하거나 대기열 오류 시 메인으로 이동
+        navigate("/app", { replace: true });
     };
 
     const logout = async (options = {}) => {
