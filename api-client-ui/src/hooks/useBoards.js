@@ -6,25 +6,27 @@ const getBodyData = (response) => response?.data?.data ?? response?.data;
 const fetchAllBoardsWithoutMeta = async (kind) => {
     const collected = [];
     const fetchSize = 100;
-    const targetKind = Array.isArray(kind) ? kind[0] : kind;
+    const maxPages = 3; // 무한 루프 방지를 위해 최대 페이지 탐색 수 제한
     
-    for (let index = 0; index < 3; index += 1) {
+    for (let index = 0; index < maxPages; index += 1) {
         try {
             const response = await api.get("/boards", {
-                params: { kind: targetKind, page: index, size: fetchSize }
+                params: { kind: (Array.isArray(kind) ? kind[0] : kind), page: index, size: fetchSize }
             });
             const data = getBodyData(response);
             const items = Array.isArray(data) ? data : (data?.content || []);
             
-            // 데이터 주입 (단일 조회 시에도 보장)
+            if (items.length === 0) break; // 데이터가 없으면 즉시 중단
+
             const taggedItems = items.map(item => ({
                 ...item,
-                kind_of_board: item.kind_of_board || item.kindOfBoard || targetKind
+                kind_of_board: item.kind_of_board || item.kindOfBoard || (Array.isArray(kind) ? kind[0] : kind)
             }));
             
             collected.push(...taggedItems);
             if (items.length < fetchSize) break;
         } catch (err) {
+            console.error("Fallback fetch error:", err);
             break;
         }
     }
@@ -52,7 +54,8 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
         const kindKey = Array.isArray(kind) ? kind.join(",") : kind;
         const fetchKey = `${kindKey}-${apiPage}-${safeSize}-${reloadKey}`;
 
-        if (lastFetchKeyRef.current === fetchKey && boards.length > 0) {
+        // 중복 방지 (이미 해당 키로 요청을 시도했거나 데이터가 없는 상태에서 키가 같다면 차단)
+        if (lastFetchKeyRef.current === fetchKey) {
             setLoading(false);
             return;
         }
@@ -77,7 +80,6 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
                             const data = getBodyData(result.value);
                             const items = Array.isArray(data) ? data : (data?.content || []);
                             
-                            // [핵심] 서버 응답에 종류가 없어도 요청한 카테고리명(k)을 강제로 주입
                             const taggedItems = items.map(item => ({
                                 ...item,
                                 kind_of_board: item.kind_of_board || item.kindOfBoard || kind[index]
@@ -121,7 +123,6 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
                         rawItems = fallbackData.slice(startIndex, startIndex + safeSize);
                     }
 
-                    // 단일 조회 시에도 kind 보장
                     allFetchedBoards = rawItems.map(item => ({
                         ...item,
                         kind_of_board: item.kind_of_board || item.kindOfBoard || kind
@@ -143,6 +144,7 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
                     console.error("[useBoards] Fetch Error:", err);
                     setError(err.response?.data?.message || "데이터 로딩 실패");
                     setBoards([]);
+                    lastFetchKeyRef.current = fetchKey; // 에러가 나도 키를 저장하여 무한 재요청 방지
                 }
             } finally {
                 if (isMounted) setLoading(false);
