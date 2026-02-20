@@ -10,6 +10,7 @@ import {
     Calculator,
     Bot,
     Dices,
+    MapPin,
     User,
     LogOut,
     Menu,
@@ -78,6 +79,9 @@ export const Header = () => {
                         </NavItem>
                         <NavItem to="/app/boards/QUESTION_ANSWER" icon={HelpCircle}>
                             Q&A 게시판
+                        </NavItem>
+                        <NavItem to="/app/optimizer" icon={MapPin}>
+                            중간장소
                         </NavItem>
                         <NavItem to="/app/ranks" icon={Trophy}>
                             랭킹
@@ -152,6 +156,9 @@ export const Header = () => {
                         </NavItem>
                         <NavItem to="/app/boards/QUESTION_ANSWER" icon={HelpCircle} mobile onClick={() => setMobileMenuOpen(false)}>
                             Q&A 게시판
+                        </NavItem>
+                        <NavItem to="/app/optimizer" icon={MapPin} mobile onClick={() => setMobileMenuOpen(false)}>
+                            중간장소
                         </NavItem>
                         <NavItem to="/app/ranks" icon={Trophy} mobile onClick={() => setMobileMenuOpen(false)}>
                             랭킹

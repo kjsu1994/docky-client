@@ -18,6 +18,7 @@ import { GptQuestion } from "./pages/GptQuestion.jsx";
 import { Statistics } from "./pages/Statistics.jsx";
 import { LuckyPlinko } from "./pages/LuckyPlinko.jsx";
 import { Queue } from "./pages/Queue.jsx";
+import { MeetingOptimizer } from "./pages/MeetingOptimizer.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 
 // 보호된 라우트 컴포넌트
@@ -195,6 +196,16 @@ function App() {
                             <ProtectedRoute>
                                 <AppLayout>
                                     <LuckyPlinko />
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/optimizer"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout>
+                                    <MeetingOptimizer />
                                 </AppLayout>
                             </ProtectedRoute>
                         }

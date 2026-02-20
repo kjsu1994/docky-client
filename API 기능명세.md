@@ -308,8 +308,24 @@ Frontend 권장 처리:
   - `CommentRepository.countByCreatedAtBetween`
 - 주의사항: `CommentRepository`는 UTF-8 BOM 이슈를 제거한 뒤 재컴파일하여 정상 동작 확인(2026-02-17)
 
-## 14) Virtual Waiting Queue (The Iron Queue)
-이 시스템은 대규모 트래픽 폭주 시 서버를 보호하기 위해 유저를 순서대로 대기시키고 입장시키는 **가상 대기열 엔진**입니다.
+## 15) Group Time Optimizer (Time Block Tetris)
+다수의 참여자가 모일 때, 실제 대중교통/자동차 이동 시간을 분석하여 가장 공정하고 최적인 약속 장소를 추천하는 **고성능 위치 최적화 엔진**입니다.
+
+### 15.1 Key Features
+- **Geocoding Engine**: 텍스트 주소를 정밀한 위도/경도 좌표로 실시간 변환.
+- **Fairness Scoring Algorithm**: 단순히 거리가 가까운 곳이 아닌, 참여자 전원의 **평균 이동 시간**과 **시간 편차(Standard Deviation)**를 결합한 공정성 지수 산출.
+- **Multi-Candidate Evaluation**: 주요 거점(Hubs)들에 대해 실제 교통 API 데이터를 전수 분석하여 최적지 도출.
+- **Detailed Travel Report**: 각 참여자별 예상 소요 시간과 경로 요약 데이터 제공.
+
+### 15.2 API Endpoints
+| 기능 | Method | Endpoint | Description |
+| :--- | :--- | :--- | :--- |
+| **최적지 추천** | `POST` | `/api/optimizer/optimize` | 주소 리스트를 입력받아 최적의 장소와 리포트 반환 |
+
+### 15.3 Technical Challenges
+- **API Call Optimization**: N명의 참여자와 M개의 후보지에 대한 기하급수적인 API 호출을 줄이기 위한 2단계 필터링 아키텍처.
+- **Geometric Median 연산**: 비유클리드 평면에서의 거리 합 최소화 로직 구현.
+- **Exception Handling**: API 키 제한이나 주소 불명확 시의 대체 연산(Euclidean Distance) 로직 설계.
 
 ### 14.1 Key Features
 - **Fair Queueing**: Redis ZSet을 활용하여 1ms의 오차 없이 공정한 순번 보장.
