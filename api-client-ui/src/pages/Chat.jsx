@@ -151,8 +151,9 @@ export const Chat = () => {
         try {
             const response = await api.get("/members/list", { params: { page: 0, size: 20 } });
             const memberList = response.data?.data || [];
-            const filtered = (Array.isArray(memberList) ? memberList : []).filter(m => 
-                (m.member_id || m.memberId) !== (user?.member_id || user?.memberId)
+            const safeList = Array.isArray(memberList) ? memberList : (memberList.content || []);
+            const filtered = safeList.filter(m => 
+                Number(m.member_id || m.memberId || m.id) !== Number(user?.member_id || user?.memberId || user?.id)
             );
             setRecommendedMembers(filtered);
         } catch (error) {
@@ -220,7 +221,7 @@ export const Chat = () => {
         if (e) e.preventDefault();
         const client = stompClientRef.current;
         const roomId = getRoomId(currentRoom);
-        const myId = user.member_id || user.memberId;
+        const myId = user.member_id || user.memberId || user.id;
         const text = newMessage.trim();
         
         if (!text || !client || !isConnected || !roomId) {
@@ -287,14 +288,16 @@ export const Chat = () => {
     const createRoom = async () => {
         if (!newRoomTitle.trim()) { toast.error("방 제목을 입력하세요."); return; }
         try {
-            const myId = user.member_id || user.memberId;
-            const memberIds = selectedMembers.map(m => m.member_id || m.memberId);
-            if (myId && !memberIds.includes(myId)) memberIds.push(myId);
+            // 방 생성 시에는 본인(방장)만 멤버로 등록하여 생성 (프로세스 간소화)
+            const myId = Number(user.member_id || user.memberId || user.id);
+            const memberIds = [myId];
+
+            console.log("[Chat] Creating room with title:", newRoomTitle);
 
             const payload = { title: newRoomTitle, type: newRoomType, memberIds: memberIds };
             const response = await api.post("/chat/room", payload);
             const createdData = response.data?.data || response.data;
-            toast.success("방이 생성되었습니다.");
+            toast.success("방이 생성되었습니다. 멤버를 초대해보세요!");
             setShowCreateModal(false);
             resetMemberSelection();
             
@@ -305,7 +308,8 @@ export const Chat = () => {
                 setCurrentRoom(found || createdData);
             }
         } catch (error) {
-            toast.error("방 생성 실패");
+            console.error("Room creation failed:", error);
+            toast.error(error.response?.data?.message || "방 생성 실패");
         }
     };
 
@@ -313,7 +317,13 @@ export const Chat = () => {
         const roomId = getRoomId(currentRoom);
         if (selectedMembers.length === 0 || !roomId) return;
         try {
-            const memberIds = selectedMembers.map(m => m.member_id || m.memberId);
+            // 초대할 멤버들의 ID를 안전하게 추출
+            const memberIds = selectedMembers
+                .map(m => Number(m.member_id || m.memberId || m.id))
+                .filter(id => !isNaN(id) && id > 0);
+
+            if (memberIds.length === 0) return;
+
             await api.post(`/chat/room/${roomId}/invite`, memberIds);
             toast.success("멤버를 초대했습니다.");
             setShowInviteModal(false);
@@ -321,7 +331,8 @@ export const Chat = () => {
             fetchRooms(); 
             fetchCurrentMembers(roomId); // 멤버 목록 즉시 갱신
         } catch (error) {
-            toast.error("멤버 초대 실패");
+            console.error("Invitation failed:", error);
+            toast.error(error.response?.data?.message || "멤버 초대 실패");
         }
     };
 
@@ -348,9 +359,17 @@ export const Chat = () => {
     };
 
     const toggleMemberSelection = (member) => {
-        const mId = member.member_id || member.memberId;
-        setSelectedMembers(prev => prev.find(m => (m.member_id || m.memberId) === mId) 
-            ? prev.filter(m => (m.member_id || m.memberId) !== mId) : [...prev, member]);
+        const mId = member.member_id || member.memberId || member.id;
+        if (!mId) return;
+
+        setSelectedMembers(prev => {
+            const isSelected = prev.some(m => (m.member_id || m.memberId || m.id) === mId);
+            if (isSelected) {
+                return prev.filter(m => (m.member_id || m.memberId || m.id) !== mId);
+            } else {
+                return [...prev, member];
+            }
+        });
     };
 
     const resetMemberSelection = () => {
@@ -500,28 +519,44 @@ export const Chat = () => {
                             <button onClick={() => { setShowCreateModal(false); setShowInviteModal(false); }} className="p-1 hover:bg-white/20 rounded-lg transition-colors"><X className="h-6 w-6" /></button>
                         </div>
                         <div className="p-6 space-y-5">
-                            {showCreateModal && (<div><label className="block text-sm font-bold text-slate-700 mb-2">채팅방 제목</label><input type="text" value={newRoomTitle} onChange={(e) => setNewRoomTitle(e.target.value)} placeholder="예: 개발팀 회의실" className="input-base" /></div>)}
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center justify-between">멤버 선택{memberSearch.trim().length === 0 && <span className="text-[10px] font-normal text-slate-400 flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> 전체 멤버 목록</span>}</label>
-                                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" /><input type="text" value={memberSearch} onChange={handleSearchChange} placeholder="이름 또는 이메일 검색..." className="input-base pl-10" /></div>
-                                <div className="mt-3 max-h-56 overflow-y-auto space-y-1 border rounded-2xl p-1 bg-slate-50/50">
-                                    {searching ? <div className="p-8 text-center"><LoadingSpinner size="sm" text="검색 중..." /></div> : displayedMembers.length === 0 ? <div className="p-8 text-center text-sm text-slate-400">{memberSearch.trim().length > 0 ? "검색 결과가 없습니다." : "불러올 수 있는 멤버가 없습니다."}</div> : displayedMembers.map(m => {
-                                        const mId = m.member_id || m.memberId;
-                                        const isSelected = selectedMembers.find(sm => (sm.member_id || sm.memberId) === mId);
-                                        return (
-                                            <button key={mId} onClick={() => toggleMemberSelection(m)} className={`w-full flex items-center justify-between p-3 rounded-xl text-sm transition-all ${isSelected ? "bg-primary-600 text-white shadow-md" : "hover:bg-white hover:shadow-sm"}`}>
-                                                <div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${isSelected ? "bg-white/20" : "bg-slate-200 text-slate-600"}`}>{m.name?.charAt(0).toUpperCase()}</div><div className="text-left"><div className="font-bold">{m.name}</div><div className={`text-[10px] ${isSelected ? "text-white/70" : "text-slate-400"}`}>{m.email}</div></div></div>
-                                                {isSelected && <Check className="h-5 w-5" />}
-                                            </button>
-                                        );
-                                    })}
+                            {showCreateModal ? (
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">채팅방 제목</label>
+                                    <input 
+                                        type="text" 
+                                        value={newRoomTitle} 
+                                        onChange={(e) => setNewRoomTitle(e.target.value)} 
+                                        placeholder="예: 우리들의 수다방" 
+                                        className="input-base" 
+                                        autoFocus
+                                    />
+                                    <p className="mt-2 text-xs text-slate-400 font-medium">* 방 생성 후 우측 참여자 목록에서 멤버를 초대할 수 있습니다.</p>
                                 </div>
-                            </div>
-                            {selectedMembers.length > 0 && (<div className="space-y-2"><div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">선택됨 ({selectedMembers.length})</div><div className="flex flex-wrap gap-2">{selectedMembers.map(m => (<div key={m.member_id || m.memberId} className="flex items-center gap-1.5 pl-2 pr-1 py-1 bg-primary-50 text-primary-700 border border-primary-100 rounded-xl text-xs font-bold animate-fade-in"><span>{m.name}</span><button onClick={() => toggleMemberSelection(m)} className="p-0.5 hover:bg-primary-200 rounded-lg transition-colors"><X className="h-3.5 w-3.5" /></button></div>))}</div></div>)}
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center justify-between">멤버 선택{memberSearch.trim().length === 0 && <span className="text-[10px] font-normal text-slate-400 flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> 전체 멤버 목록</span>}</label>
+                                        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" /><input type="text" value={memberSearch} onChange={handleSearchChange} placeholder="이름 또는 이메일 검색..." className="input-base pl-10" /></div>
+                                        <div className="mt-3 max-h-56 overflow-y-auto space-y-1 border rounded-2xl p-1 bg-slate-50/50">
+                                            {searching ? <div className="p-8 text-center"><LoadingSpinner size="sm" text="검색 중..." /></div> : displayedMembers.length === 0 ? <div className="p-8 text-center text-sm text-slate-400">{memberSearch.trim().length > 0 ? "검색 결과가 없습니다." : "불러올 수 있는 멤버가 없습니다."}</div> : displayedMembers.map(m => {
+                                                const mId = m.member_id || m.memberId || m.id;
+                                                const isSelected = selectedMembers.find(sm => (sm.member_id || sm.memberId || sm.id) === mId);
+                                                return (
+                                                    <button key={mId} onClick={() => toggleMemberSelection(m)} className={`w-full flex items-center justify-between p-3 rounded-xl text-sm transition-all ${isSelected ? "bg-primary-600 text-white shadow-md" : "hover:bg-white hover:shadow-sm"}`}>
+                                                        <div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${isSelected ? "bg-white/20" : "bg-slate-200 text-slate-600"}`}>{m.name?.charAt(0).toUpperCase()}</div><div className="text-left"><div className="font-bold">{m.name}</div><div className={`text-[10px] ${isSelected ? "text-white/70" : "text-slate-400"}`}>{m.email}</div></div></div>
+                                                        {isSelected && <Check className="h-5 w-5" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                    {selectedMembers.length > 0 && (<div className="space-y-2"><div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">선택됨 ({selectedMembers.length})</div><div className="flex flex-wrap gap-2">{selectedMembers.map(m => (<div key={m.member_id || m.memberId || m.id} className="flex items-center gap-1.5 pl-2 pr-1 py-1 bg-primary-50 text-primary-700 border border-primary-100 rounded-xl text-xs font-bold animate-fade-in"><span>{m.name}</span><button onClick={() => toggleMemberSelection(m)} className="p-0.5 hover:bg-primary-200 rounded-lg transition-colors"><X className="h-3.5 w-3.5" /></button></div>))}</div></div>)}
+                                </>
+                            )}
                         </div>
                         <div className="p-6 bg-slate-50 flex gap-3">
                             <button onClick={() => { setShowCreateModal(false); setShowInviteModal(false); }} className="flex-1 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50 transition-colors">취소</button>
-                            <button onClick={showCreateModal ? createRoom : inviteMembers} disabled={selectedMembers.length === 0} className={`flex-1 px-4 py-3 rounded-2xl font-bold transition-all shadow-lg ${selectedMembers.length > 0 ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}>{showCreateModal ? "채팅방 생성" : "멤버 초대"}</button>
+                            <button onClick={showCreateModal ? createRoom : inviteMembers} disabled={showCreateModal ? !newRoomTitle.trim() : selectedMembers.length === 0} className={`flex-1 px-4 py-3 rounded-2xl font-bold transition-all shadow-lg ${ (showCreateModal ? newRoomTitle.trim() : selectedMembers.length > 0) ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-slate-200 text-slate-400 cursor-not-allowed" }`}>{showCreateModal ? "채팅방 생성" : "멤버 초대"}</button>
                         </div>
                     </div>
                 </div>
