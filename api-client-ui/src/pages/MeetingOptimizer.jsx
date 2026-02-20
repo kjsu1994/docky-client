@@ -451,6 +451,33 @@ export const MeetingOptimizer = () => {
                                     추천 결과 리포트
                                 </h3>
                                 <div className="space-y-6">
+                                    {/* ── 중간 지점 상세 주소 표시 섹션 ── */}
+                                    {result.candidates && result.candidates[0] && (
+                                        <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100">
+                                            <span className="block text-[10px] text-amber-600 font-black uppercase tracking-widest mb-2">Final Destination</span>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div>
+                                                    <h4 className="text-lg font-black text-slate-900 mb-1 leading-tight">
+                                                        {result.candidates[0].name}
+                                                    </h4>
+                                                    <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                                                        {result.candidates[0].address}
+                                                    </p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(result.candidates[0].address);
+                                                        toast.success("주소가 복사되었습니다.");
+                                                    }}
+                                                    className="p-2 bg-white text-slate-400 hover:text-primary-600 rounded-xl shadow-sm transition-all shrink-0"
+                                                    title="주소 복사"
+                                                >
+                                                    <Plus className="h-4 w-4 rotate-45" /> {/* 복사 아이콘 대용 (X/Plus 조합) */}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="p-5 bg-primary-50 rounded-2xl border border-primary-100">
                                         <p className="text-sm text-primary-900 font-bold leading-relaxed italic">
                                             "{result.recommended_reason}"
