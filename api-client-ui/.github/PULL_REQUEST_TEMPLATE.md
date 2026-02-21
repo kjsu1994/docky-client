@@ -2,6 +2,11 @@
 - Goal:
 - Scope:
 
+# Feature Contract Input
+- UI Contract file path (required for new screen):
+- [ ] No UI contract (reason provided below)
+- Reason if missing:
+
 # API Contract
 - [ ] No API change
 - [ ] API change exists
@@ -22,6 +27,12 @@
 - [ ] Empty state
 - [ ] Error state
 - [ ] Forbidden/Unauthorized state
+
+# No Hollow Screen Check (Strict)
+- [ ] 모든 표시 버튼이 실제 동작에 연결됨
+- [ ] 폼 submit/검증/요청이 실제 동작함
+- [ ] TODO/placeholder/mock-only UI 없음
+- [ ] 미구현 기능은 disabled/hidden 처리 + PR에 명시됨
 
 # Impact Table
 - API impact: Yes / No
