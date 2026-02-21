@@ -89,3 +89,9 @@
 - `docs/VIBE_CODING_RULES.md`
 - `docs/UI_CONTRACT_TEMPLATE.md` (or concrete file under `docs/UI_CONTRACTS/`)
 - `docs/HANDOFF_TEMPLATE.md` (long-thread handoff)
+
+## 7) Encoding Safety (한글 인코딩 안전 규칙)
+- 한글이 포함된 소스/문서(.js, .jsx, .ts, .tsx, .md)는 UTF-8(권장: UTF-8 without BOM)으로 저장한다.
+- PowerShell로 파일 저장 시 기본 인코딩(CP949/ANSI) 저장을 금지하고 UTF-8을 명시한다.
+- 수정 후 �, ì, ë 같은 깨진 문자열이 보이면 즉시 인코딩 복구 후 진행한다.
+- 한글 UI 문자열이 있는 파일을 수정한 경우, 최소 1회 화면 확인(브라우저) 또는 문자열 grep 점검을 수행한다.

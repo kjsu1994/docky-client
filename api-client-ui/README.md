@@ -1,4 +1,4 @@
-﻿# 그린 커뮤니티 프론트엔드
+# 그린 커뮤니티 프론트엔드
 
 최종 업데이트: 2026-02-21
 
@@ -123,3 +123,6 @@ npm run dev
   - 숨김/복구 호출 전 ID 숫자 검증 추가로 `Parameter 'board-id' should be of type 'long'` 재발 방지
 - Admin 이상탐지 화면 한글 깨짐 복구
   - `src/pages/AdminAnomalies.jsx` 인코딩을 UTF-8로 정규화(CP949 저장 이슈 수정)
+- 프론트 인코딩 가드레일 문서화
+  - AGENTS.md에 UTF-8(한글) 저장 규칙 추가
+  - PowerShell 저장 시 CP949/ANSI 금지, 깨짐 문자열(�, ì, ë) 즉시 복구 규칙 추가
