@@ -51,6 +51,17 @@
   - `POST /game/plinko/play`
 - `/app/optimizer`
   - `POST /api/optimizer/optimize`
+- `/app/admin/anomalies` (ROLE_ADMIN)
+  - `GET /stats/summary`
+  - `GET /stats/anomalies?limit={1..200}`
+  - `GET /admin/anomalies/kpi?days={1..365}`
+  - `GET /admin/anomalies/rules`
+  - `PUT /admin/anomalies/rules`
+  - `GET /admin/anomalies/incidents?status={ALL|NEW|REVIEWING|RESOLVED|FALSE_POSITIVE}&page={n}&size={n}`
+  - `GET /admin/anomalies/incidents/{incident-id}`
+  - `PATCH /admin/anomalies/incidents/{incident-id}`
+  - `POST /admin/anomalies/incidents/{incident-id}/actions`
+  - `GET /admin/anomalies/report?days={1..365}`
 
 ## Real-time / Chat
 - WebSocket endpoint: `/ws/chat/websocket` (via `/ws` proxy)

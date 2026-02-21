@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 if (typeof global === 'undefined') { window.global = window; }
 import { 
     Dices, Trophy, Play, RefreshCcw, Coins, Info, Award, Lock, Unlock, AlertCircle, TrendingUp
@@ -8,11 +8,21 @@ import toast from "react-hot-toast";
 import { formatNumber } from "../utils/helpers";
 import { useAuth } from "../contexts/AuthContext";
 
-// ── 사운드 효과 (차분한 '톡토로록' 소리로 교체) ───────────────────────────────────
+// Audio assets
 const ROLL_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3";
-const SOFT_TAP_URL = "https://assets.mixkit.co/active_storage/sfx/1084/1084-preview.mp3"; // 짧고 가벼운 타격음
+const SOFT_TAP_URL = "https://assets.mixkit.co/active_storage/sfx/1084/1084-preview.mp3"; // short tap sound
+const DICE_FACE_ANGLES = {
+    1: { x: 0, y: 0, z: 0 },
+    2: { x: 0, y: 180, z: 0 },
+    3: { x: 0, y: -90, z: 0 },
+    4: { x: 0, y: 90, z: 0 },
+    5: { x: -90, y: 0, z: 0 },
+    6: { x: 90, y: 0, z: 0 }
+};
+const SHOW_LAYOUT_GUIDES = false;
+const BOARD_CROP_BOTTOM_PX = 34;
 
-// ── 주사위 눈 ──────────────────────────────────────────
+// Dice face renderer
 const DiceFace = ({ value }) => {
     const dots = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
     return (
@@ -28,28 +38,76 @@ const DiceFace = ({ value }) => {
     );
 };
 
-// ── 3D 주사위 ──────────────────────────
+// 3D dice component
 const ThreeDDice = ({ value, rolling, isHeld, onClick, index }) => {
-    const [rotation, setRotation] = useState({ x: 0, y: 0, z: 0 });
-    const animConfig = useRef({ duration: "3.00s", delay: (index * 0.15).toFixed(2) + "s" }).current;
+    const [rotation, setRotation] = useState(DICE_FACE_ANGLES[value] || { x: 0, y: 0, z: 0 });
+    const velocityRef = useRef({ x: 0, y: 0, z: 0 });
+    const rafRef = useRef(null);
 
     useEffect(() => {
+        const target = DICE_FACE_ANGLES[value] || DICE_FACE_ANGLES[1];
+
         if (rolling) {
-            const interval = setInterval(() => {
-                setRotation({ x: Math.random() * 1440 - 720, y: Math.random() * 1440 - 720, z: Math.random() * 360 });
-            }, 500); 
-            return () => clearInterval(interval);
-        } else {
-            const angles = { 1: { x: 0, y: 0, z: 0 }, 2: { x: 0, y: 180, z: 0 }, 3: { x: 0, y: -90, z: 0 }, 4: { x: 0, y: 90, z: 0 }, 5: { x: -90, y: 0, z: 0 }, 6: { x: 90, y: 0, z: 0 } };
-            setRotation(angles[value] || { x: 0, y: 0, z: 0 });
+            velocityRef.current = {
+                x: 900 + Math.random() * 760,
+                y: 720 + Math.random() * 640,
+                z: (Math.random() - 0.5) * 420
+            };
+
+            let lastTime = performance.now();
+            const animate = (time) => {
+                const dt = Math.min(0.05, (time - lastTime) / 1000);
+                lastTime = time;
+
+                const damping = Math.pow(0.992, dt * 60);
+                const minSpin = 540;
+                velocityRef.current.x *= damping;
+                velocityRef.current.y *= damping;
+                velocityRef.current.z *= Math.pow(0.975, dt * 60);
+
+                if (Math.abs(velocityRef.current.x) < minSpin) {
+                    velocityRef.current.x = Math.sign(velocityRef.current.x || 1) * minSpin;
+                }
+                if (Math.abs(velocityRef.current.y) < minSpin) {
+                    velocityRef.current.y = Math.sign(velocityRef.current.y || 1) * minSpin;
+                }
+
+                setRotation((prev) => ({
+                    x: prev.x + velocityRef.current.x * dt,
+                    y: prev.y + velocityRef.current.y * dt,
+                    z: prev.z + velocityRef.current.z * dt
+                }));
+
+                rafRef.current = requestAnimationFrame(animate);
+            };
+
+            rafRef.current = requestAnimationFrame(animate);
+            return () => {
+                if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            };
         }
-    }, [rolling, value]);
+
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+        setRotation((current) => {
+            const settle = (cur, face, extraTurns) => {
+                const delta = ((face - cur) % 360 + 360) % 360;
+                return cur + delta + extraTurns * 360;
+            };
+
+            return {
+                x: settle(current.x, target.x, 1),
+                y: settle(current.y, target.y, 1),
+                z: settle(current.z, target.z, 0)
+            };
+        });
+    }, [rolling, value, index]);
 
     return (
         <div onClick={() => onClick(index)} 
              className={`dice-scene w-24 h-24 sm:w-28 sm:h-28 perspective-1000 transition-all duration-700 ${!rolling && !isHeld ? 'hover:scale-110 cursor-pointer' : ''} ${isHeld ? 'scale-105 brightness-75' : ''}`}>
-            <div className={`dice-cube relative w-full h-full preserve-3d will-change-transform ${rolling ? 'dice-rolling-slow' : 'dice-stopping-smooth'}`}
-                 style={{ transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) rotateZ(${rotation.z}deg)`, animationDuration: rolling ? animConfig.duration : undefined, animationDelay: rolling ? animConfig.delay : undefined }}>
+            <div className={`dice-cube relative w-full h-full preserve-3d will-change-transform ${rolling ? 'dice-rolling-active' : 'dice-stopping-smooth'}`}
+                 style={{ transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) rotateZ(${rotation.z}deg)` }}>
                 <div className="dice-side front absolute w-full h-full translate-z-14"><DiceFace value={1} /></div>
                 <div className="dice-side back absolute w-full h-full rotate-y-180 translate-z-14"><DiceFace value={2} /></div>
                 <div className="dice-side left absolute w-full h-full rotate-y--90 translate-z-14"><DiceFace value={3} /></div>
@@ -72,129 +130,347 @@ export const LuckyPlinko = () => {
     const [plinkoResult, setPlinkoResult] = useState(null);
     const [marbles, setMarbles] = useState(0);
     const [activeSlot, setActiveSlot] = useState(null);
+    const [slotTopPercent, setSlotTopPercent] = useState(72);
     
     const canvasRef = useRef(null);
+    const boardRef = useRef(null);
+    const slotRefs = useRef([]);
+    const slotCentersRef = useRef(Array.from({ length: 8 }, (_, i) => (i + 0.5) / 8));
+    const boardSizeRef = useRef({ width: 500, height: 800 });
     const particlesRef = useRef([]);
     const animationFrameRef = useRef();
     const rollAudio = useRef(new Audio(ROLL_SOUND_URL));
     const tapAudio = useRef(new Audio(SOFT_TAP_URL));
+    const lastTapAtRef = useRef(0);
 
-    // ── 리얼 물리 엔진 (X좌표 일치 및 톡토로록 사운드) ──
+    useEffect(() => {
+        const updateSlotCenters = () => {
+            const boardEl = boardRef.current;
+            const canvasEl = canvasRef.current;
+            if (!boardEl || !canvasEl) return;
+
+            const canvasRect = canvasEl.getBoundingClientRect();
+            if (!canvasRect.width) return;
+
+            slotCentersRef.current = slotCentersRef.current.map((oldCenter, idx) => {
+                const el = slotRefs.current[idx];
+                if (!el) return oldCenter;
+                const rect = el.getBoundingClientRect();
+                const centerPx = rect.left + rect.width / 2 - canvasRect.left;
+                return Math.max(0, Math.min(1, centerPx / canvasRect.width));
+            });
+        };
+
+        updateSlotCenters();
+        window.addEventListener("resize", updateSlotCenters);
+
+        let observer;
+        if (typeof ResizeObserver !== "undefined" && boardRef.current) {
+            observer = new ResizeObserver(updateSlotCenters);
+            observer.observe(boardRef.current);
+        }
+
+        return () => {
+            window.removeEventListener("resize", updateSlotCenters);
+            if (observer) observer.disconnect();
+        };
+    }, []);
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
+        if (!ctx) return;
 
-        const rows = 9;
-        const pins = [];
-        for (let r = 0; r < rows; r++) {
-            const dotsInRow = r + 3;
-            const startX = (width - (dotsInRow - 1) * (width / 10)) / 2;
-            for (let c = 0; c < dotsInRow; c++) {
-                pins.push({ x: startX + c * (width / 10), y: 150 + r * (height / 12) });
+        const slotCount = 8;
+        let width = 500;
+        let height = 800;
+        const lineBelowOffsetPx = 45;
+        const landingLineOffsetPx = 12;
+        const slotHeightPx = 64;
+        let slotWidth = width / slotCount;
+        let lastPinY = 150 + 6 * (height / 12);
+        let slotTopY = lastPinY + landingLineOffsetPx + lineBelowOffsetPx;
+        let floorY = slotTopY + (slotHeightPx / 2);
+
+        const buildPins = (w, h) => {
+            const rows = 7; // 2..8 columns only (9th removed)
+            const nextPins = [];
+            for (let r = 0; r < rows; r++) {
+                const dotsInRow = Math.min(8, r + 2);
+                const startX = (w - (dotsInRow - 1) * (w / 10)) / 2;
+                for (let c = 0; c < dotsInRow; c++) {
+                    nextPins.push({ x: startX + c * (w / 10), y: 150 + r * (h / 12), radius: 4 });
+                }
             }
+            return nextPins;
+        };
+
+        let pins = buildPins(width, height);
+
+        const syncCanvasSize = () => {
+            const rect = canvas.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+
+            const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+            width = rect.width;
+            height = rect.height;
+            boardSizeRef.current = { width, height };
+            slotWidth = width / slotCount;
+            lastPinY = 150 + 6 * (height / 12);
+            slotTopY = lastPinY + landingLineOffsetPx + lineBelowOffsetPx;
+            floorY = slotTopY + (slotHeightPx / 2);
+            setSlotTopPercent((slotTopY / height) * 100);
+
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            pins = buildPins(width, height);
+        };
+
+        syncCanvasSize();
+
+        window.addEventListener("resize", syncCanvasSize);
+        let canvasObserver;
+        if (typeof ResizeObserver !== "undefined") {
+            canvasObserver = new ResizeObserver(syncCanvasSize);
+            canvasObserver.observe(canvas);
         }
 
-        const update = () => {
-            const gravity = 0.35;
-            const friction = 0.995;
-            const bounciness = 0.7;
+        const getTargetX = (slotIndex) => {
+            const normalized = slotCentersRef.current[slotIndex];
+            if (typeof normalized === "number" && Number.isFinite(normalized)) {
+                return normalized * width;
+            }
+            return (slotIndex + 0.5) * slotWidth;
+        };
+        const physics = {
+            gravity: 1650,
+            airDrag: 0.992,
+            wallRestitution: 0.56,
+            pinRestitution: 0.62,
+            pinFriction: 0.1,
+            maxHorizontalSpeed: 260
+        };
+        const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+        const finishParticle = (p, now) => {
+            if (p.finished) return;
+            const targetX = getTargetX(p.targetSlot);
+            p.x = targetX;
+            p.y = floorY - p.radius;
+            p.vx = 0;
+            p.vy = 0;
+            p.finished = true;
+            p.finishedAt = now;
+            setActiveSlot(p.targetSlot);
+            setTimeout(() => setActiveSlot(null), 180);
+        };
+        const stepParticle = (p, dt, now) => {
+            if (p.finished) return;
 
-            particlesRef.current.forEach(p => {
-                if (p.finished) return;
+            // Async predicted landing: synchronize disappearance and slot hit feedback.
+            if (now >= p.expectedAt && p.y > floorY * 0.86) {
+                finishParticle(p, now);
+                return;
+            }
 
-                p.vy += gravity; p.vx *= friction; p.x += p.vx; p.y += p.vy;
+            p.vy += physics.gravity * dt;
+            p.vx *= Math.pow(physics.airDrag, dt * 60);
+            p.vy *= Math.pow(0.997, dt * 60);
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.spin += p.angularVelocity * dt;
+            p.angularVelocity *= Math.pow(0.985, dt * 60);
+            let collidedWithPin = false;
+            if (p.x - p.radius < 25) {
+                p.x = 25 + p.radius;
+                p.vx = Math.abs(p.vx) * physics.wallRestitution;
+            } else if (p.x + p.radius > width - 25) {
+                p.x = width - 25 - p.radius;
+                p.vx = -Math.abs(p.vx) * physics.wallRestitution;
+            }
+            const targetX = getTargetX(p.targetSlot);
+            for (let i = 0; i < pins.length; i++) {
+                const pin = pins[i];
+                const dx = p.x - pin.x;
+                const dy = p.y - pin.y;
+                const minDist = p.radius + pin.radius;
+                const distSq = dx * dx + dy * dy;
+                if (distSq >= minDist * minDist) continue;
+                collidedWithPin = true;
+                const dist = Math.sqrt(distSq) || 0.0001;
+                const nx = dx / dist;
+                const ny = dy / dist;
+                const overlap = minDist - dist;
+                p.x += nx * overlap;
+                p.y += ny * overlap;
+                const normalVel = p.vx * nx + p.vy * ny;
+                if (normalVel < 0) {
+                    const impulse = -(1 + physics.pinRestitution) * normalVel;
+                    p.vx += impulse * nx;
+                    p.vy += impulse * ny;
+                    const tx = -ny;
+                    const ty = nx;
+                    const tangentSpeed = p.vx * tx + p.vy * ty;
+                    p.vx -= tangentSpeed * physics.pinFriction * tx;
+                    p.vy -= tangentSpeed * physics.pinFriction * ty;
+                    p.vx += (Math.random() - 0.5) * 22;
 
-                if (p.x < 25 || p.x > width - 25) {
-                    p.vx *= -bounciness; p.x = p.x < 25 ? 25 : width - 25;
-                }
-
-                pins.forEach(pin => {
-                    const dx = p.x - pin.x; const dy = p.y - pin.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 16) { 
-                        const angle = Math.atan2(dy, dx);
-                        const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy) * bounciness;
-                        p.vx = Math.cos(angle) * speed;
-                        p.vy = Math.sin(angle) * speed;
-                        p.x = pin.x + Math.cos(angle) * 16;
-                        p.y = pin.y + Math.sin(angle) * 16;
-
-                        // 톡토로로록 느낌의 조용한 소리 연출
+                    // Path correction happens only on pin collisions, not in free-fall.
+                    const targetDx = targetX - p.x;
+                    const depth = clamp(p.y / floorY, 0, 1);
+                    const correction = targetDx * (0.0018 + depth * 0.0028);
+                    p.vx += clamp(correction, -20, 20);
+                    p.angularVelocity += tangentSpeed * 0.025;
+                    if (now - p.lastTapAt > 80 && now - lastTapAtRef.current > 35) {
                         const s = tapAudio.current.cloneNode();
-                        s.volume = Math.min(0.02, speed * 0.005);
-                        s.playbackRate = 1.5 + Math.random() * 0.5;
+                        const speed = Math.hypot(p.vx, p.vy);
+                        s.volume = Math.min(0.035, speed / 18000);
+                        s.playbackRate = 1.15 + Math.random() * 0.45;
                         s.play().catch(() => {});
+                        p.lastTapAt = now;
+                        lastTapAtRef.current = now;
                     }
-                });
-
-                // 정밀 유도 로직 (X좌표 일치)
-                const targetX = (p.targetSlot + 0.5) * (width / 8);
-                const progress = p.y / height;
-                if (progress > 0.3) {
-                    const attraction = (progress - 0.3) * 0.5;
-                    p.vx += (targetX - p.x) * attraction * 0.15;
                 }
+            }
 
-                if (p.y > height - 70) {
-                    p.finished = true;
-                    setActiveSlot(p.targetSlot);
-                    setTimeout(() => setActiveSlot(null), 600);
-                }
-            });
+            // Prevent "stuck-on-pin" states: only apply escape impulse when actually colliding a pin.
+            const speed = Math.hypot(p.vx, p.vy);
+            if (collidedWithPin && speed < 22) {
+                const targetDx = getTargetX(p.targetSlot) - p.x;
+                p.vy += 90;
+                p.vx += clamp(targetDx * 0.004, -22, 22);
+            }
 
+            p.vx = clamp(p.vx, -physics.maxHorizontalSpeed, physics.maxHorizontalSpeed);
+            if (p.y + p.radius >= floorY) {
+                p.y = floorY - p.radius;
+                finishParticle(p, now);
+                return;
+            }
+            p.life += dt;
+            if (p.life > 20 || p.y > height + 30) {
+                p.y = floorY - p.radius;
+                finishParticle(p, now);
+            }
+        };
+        const render = () => {
             ctx.clearRect(0, 0, width, height);
-            pins.forEach(pin => {
-                ctx.beginPath();
-                const grad = ctx.createRadialGradient(pin.x - 1, pin.y - 1, 0, pin.x, pin.y, 4);
-                grad.addColorStop(0, '#94a3b8'); grad.addColorStop(1, '#1e293b');
-                ctx.fillStyle = grad;
-                ctx.arc(pin.x, pin.y, 4, 0, Math.PI * 2); ctx.fill();
-            });
 
-            particlesRef.current.forEach(p => {
+            if (SHOW_LAYOUT_GUIDES) {
+                // Slot center guide (where particles are considered landed)
+                ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 6]);
+                ctx.beginPath();
+                ctx.moveTo(0, floorY);
+                ctx.lineTo(width, floorY);
+                ctx.stroke();
+
+                // Last pin row guide (expected visual end of pin field)
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+                ctx.beginPath();
+                ctx.moveTo(0, lastPinY);
+                ctx.lineTo(width, lastPinY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            pins.forEach((pin) => {
+                ctx.beginPath();
+                const grad = ctx.createRadialGradient(pin.x - 1, pin.y - 1, 0, pin.x, pin.y, 5);
+                grad.addColorStop(0, '#e2e8f0');
+                grad.addColorStop(1, '#475569');
+                ctx.fillStyle = grad;
+                ctx.arc(pin.x, pin.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            particlesRef.current.forEach((p) => {
                 if (p.finished) return;
                 ctx.save();
                 const grad = ctx.createRadialGradient(p.x - 4, p.y - 4, 2, p.x, p.y, 12);
-                grad.addColorStop(0, '#fde68a'); grad.addColorStop(0.4, '#f59e0b'); grad.addColorStop(1, '#b45309');
-                ctx.shadowBlur = 20; ctx.shadowColor = 'rgba(245, 158, 11, 0.5)';
+                grad.addColorStop(0, '#fde68a');
+                grad.addColorStop(0.4, '#f59e0b');
+                grad.addColorStop(1, '#b45309');
+                ctx.shadowBlur = 16;
+                ctx.shadowColor = 'rgba(245, 158, 11, 0.45)';
                 ctx.fillStyle = grad;
-                ctx.beginPath(); ctx.arc(p.x, p.y, 12, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.restore();
             });
-
-            animationFrameRef.current = requestAnimationFrame(update);
         };
-        update();
-        return () => cancelAnimationFrame(animationFrameRef.current);
+        let lastTime = performance.now();
+        let accumulator = 0;
+        const fixedStep = 1 / 120;
+        const frame = (time) => {
+            const delta = Math.min(0.05, (time - lastTime) / 1000);
+            lastTime = time;
+            accumulator += delta;
+            while (accumulator >= fixedStep) {
+                const now = performance.now();
+                particlesRef.current.forEach((p) => stepParticle(p, fixedStep, now));
+                accumulator -= fixedStep;
+            }
+            particlesRef.current = particlesRef.current.filter((p) => !p.finished);
+            render();
+            animationFrameRef.current = requestAnimationFrame(frame);
+        };
+        animationFrameRef.current = requestAnimationFrame(frame);
+        return () => {
+            cancelAnimationFrame(animationFrameRef.current);
+            window.removeEventListener("resize", syncCanvasSize);
+            if (canvasObserver) canvasObserver.disconnect();
+        };
     }, []);
-
+    const MIN_ROLL_MS = 1800;
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const rollDice = async () => {
         if (rolling) return;
         setRolling(true);
-        rollAudio.current.currentTime = 0; rollAudio.current.play().catch(() => {});
+        const rollStartedAt = performance.now();
+        rollAudio.current.currentTime = 0;
+        rollAudio.current.play().catch(() => {});
         try {
-            const response = await api.post("/game/dice/roll");
+            const response = await api.post('/game/dice/roll');
             const data = response.data?.data || response.data;
-            const normalized = { ...data, rankName: data.rank_name || data.rankName || "NONE" };
-            setTimeout(() => { setDice(data.dice); setGameResult(normalized); setMarbles(data.marbles); setRolling(false); setStep(2); }, 3000);
-        } catch (error) { setRolling(false); toast.error("오류 발생"); }
+            const normalized = { ...data, rankName: data.rank_name || data.rankName || 'NONE' };
+            const elapsed = performance.now() - rollStartedAt;
+            if (elapsed < MIN_ROLL_MS) await wait(MIN_ROLL_MS - elapsed);
+            setDice(data.dice);
+            setGameResult(normalized);
+            setMarbles(data.marbles);
+            setRolling(false);
+            setStep(2);
+        } catch (error) {
+            setRolling(false);
+            toast.error('Error occurred');
+        }
     };
-
     const rerollDice = async () => {
         if (rolling || heldIndices.length < 1 || heldIndices.length > 4) return;
         setRolling(true);
-        rollAudio.current.currentTime = 0; rollAudio.current.play().catch(() => {});
+        const rollStartedAt = performance.now();
+        rollAudio.current.currentTime = 0;
+        rollAudio.current.play().catch(() => {});
         try {
-            const response = await api.post("/game/dice/reroll", heldIndices);
+            const response = await api.post('/game/dice/reroll', heldIndices);
             const data = response.data?.data || response.data;
-            const normalized = { ...data, rankName: data.rank_name || data.rankName || "NONE" };
-            setTimeout(() => { setDice(data.dice); setGameResult(normalized); setMarbles(data.marbles); setRolling(false); setStep(3); }, 3000); 
-        } catch (error) { setRolling(false); toast.error("재굴림 실패"); }
+            const normalized = { ...data, rankName: data.rank_name || data.rankName || 'NONE' };
+            const elapsed = performance.now() - rollStartedAt;
+            if (elapsed < MIN_ROLL_MS) await wait(MIN_ROLL_MS - elapsed);
+            setDice(data.dice);
+            setGameResult(normalized);
+            setMarbles(data.marbles);
+            setRolling(false);
+            setStep(3);
+        } catch (error) {
+            setRolling(false);
+            toast.error('Reroll failed');
+        }
     };
-
     const playPlinko = async () => {
         if (marbles <= 0) return;
         try {
@@ -207,12 +483,30 @@ export const LuckyPlinko = () => {
                 totalPoint: data.total_point !== undefined ? data.total_point : data.totalPoint
             };
             setPlinkoResult(normalized); setStep(4);
+            const spawnX = boardSizeRef.current.width / 2;
+            const startedAt = performance.now();
+            const estimateFlightMs = (slot, index) => {
+                const slotDistance = Math.abs(slot - 3.5);
+                return 2100 + index * 150 + slotDistance * 95;
+            };
             const newParticles = normalized.landingSlots.map((slot, i) => ({
-                x: (500 / 2) + (Math.random() * 60 - 30), y: 50, vx: Math.random() * 6 - 3, vy: Math.random() * 2, targetSlot: slot, finished: false
+                x: spawnX,
+                y: 48 + i * 2,
+                vx: 0,
+                vy: Math.random() * 25,
+                expectedAt: startedAt + i * 180 + estimateFlightMs(slot, i),
+                targetSlot: slot,
+                radius: 10 + Math.random() * 1.5,
+                spin: 0,
+                angularVelocity: (Math.random() - 0.5) * 20,
+                finished: false,
+                finishedAt: 0,
+                life: 0,
+                lastTapAt: 0
             }));
             newParticles.forEach((p, i) => setTimeout(() => particlesRef.current.push(p), i * 180));
-            setTimeout(() => { toast.success(`🎉 ${formatNumber(normalized.earnedPoint)} 포인트 획득!`); }, 5500);
-        } catch (error) { toast.error("플링코 오류"); }
+            toast.success(`${formatNumber(normalized.earnedPoint)} points earned!`);
+        } catch (error) { toast.error("Plinko error"); }
     };
 
     const toggleHold = (idx) => {
@@ -226,7 +520,7 @@ export const LuckyPlinko = () => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-20 select-none text-slate-900">
-            {/* 프리미엄 헤더 */}
+            {/* Premium Header */}
             <div className="relative overflow-hidden rounded-[3rem] p-[3px] bg-gradient-to-r from-amber-300 via-orange-500 to-amber-600 shadow-2xl">
                 <div className="card bg-slate-950 p-8 rounded-[2.8rem] relative overflow-hidden border border-white/5">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(245,158,11,0.25),transparent)]" />
@@ -246,6 +540,11 @@ export const LuckyPlinko = () => {
                                 <Coins className="h-8 w-8 text-amber-400" />
                                 {formatNumber(plinkoResult?.totalPoint || user?.point || 0)}
                             </div>
+                            {plinkoResult?.earnedPoint !== undefined && (
+                                <div className="mt-2 text-center text-emerald-300 text-sm font-black tracking-wide">
+                                    +{formatNumber(plinkoResult.earnedPoint)} EARNED
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -298,20 +597,25 @@ export const LuckyPlinko = () => {
                             )}
                         </div>
 
-                        <div className="relative w-full aspect-[4/6.5] bg-black/80 rounded-[4rem] border-4 border-slate-700 shadow-[inset_0_0_100px_black] overflow-hidden">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-44 h-24 bg-slate-800 rounded-b-full border-x-4 border-b-4 border-slate-700 z-[60] flex items-center justify-center shadow-2xl">
-                                <div className="w-28 h-8 bg-black rounded-full shadow-[inset_0_2px_20px_rgba(255,255,255,0.1)]" />
+                        <div ref={boardRef} style={{ clipPath: `inset(0 0 ${BOARD_CROP_BOTTOM_PX}px 0)` }} className="relative w-full aspect-[4/4.8] bg-gradient-to-b from-purple-700 via-indigo-700 to-indigo-900 rounded-[3.2rem] border-4 border-indigo-300/35 shadow-[inset_0_0_80px_rgba(0,0,0,0.35)] overflow-hidden">
+                            <div className="absolute inset-0 z-[5] bg-[radial-gradient(circle_at_50%_5%,rgba(255,255,255,0.2),transparent_35%)]" />
+                            <div className="absolute top-0 left-[14%] z-[8] h-[68%] w-[4px] bg-gradient-to-b from-pink-300 to-cyan-300 opacity-80 blur-[0.3px]" />
+                            <div className="absolute top-0 right-[14%] z-[8] h-[68%] w-[4px] bg-gradient-to-b from-pink-300 to-cyan-300 opacity-80 blur-[0.3px]" />
+
+                            <div className="absolute top-8 left-1/2 -translate-x-1/2 w-56 h-16 bg-gradient-to-b from-amber-300 to-amber-500 rounded-[1.5rem] border-4 border-amber-700 z-[25] flex items-center justify-center shadow-[0_8px_0_rgba(120,53,15,0.65)]">
+                                <div className="w-[90%] h-[68%] rounded-xl bg-slate-900/80 border border-slate-200/20 flex items-center justify-center">
+                                    <span className="text-white font-black tracking-tight text-xl">럭키 플링코</span>
+                                </div>
                             </div>
 
-                            <canvas ref={canvasRef} width={500} height={800} className="w-full h-full relative z-50 pointer-events-none" />
+                            <canvas ref={canvasRef} width={500} height={800} className="absolute inset-0 z-[20] w-full h-full pointer-events-none" />
 
-                            <div className="absolute bottom-8 left-8 right-8 h-28 flex gap-3 z-20">
+                            <div style={{ top: `${slotTopPercent}%` }} className="absolute left-6 right-6 h-16 flex gap-2 z-[30]">
                                 {[30.0, 10.0, 5.0, 1.0, 1.0, 5.0, 10.0, 30.0].map((mult, idx) => (
-                                    <div key={idx} className={`flex-1 rounded-3xl flex flex-col items-center justify-center border-t-8 transition-all duration-300
-                                        ${activeSlot === idx ? 'scale-110 -translate-y-4 brightness-150 shadow-[0_0_50px_rgba(245,158,11,0.7)] border-amber-400' : 'brightness-75 shadow-lg'}
-                                        ${mult >= 30 ? 'bg-amber-500/20 text-amber-400 border-amber-500' : 'bg-slate-800 text-slate-500 border-slate-700'}`}>
-                                        <span className="text-[8px] font-black opacity-40 uppercase mb-1">X-Factor</span>
-                                        <span className="text-2xl font-black italic tracking-tighter">x{Math.floor(mult)}</span>
+                                    <div ref={(el) => { slotRefs.current[idx] = el; }} key={idx} className={`flex-1 rounded-xl flex items-center justify-center border-2 transition-all duration-100
+                                        ${activeSlot === idx ? 'animate-slot-hit brightness-125 shadow-[0_0_28px_rgba(245,158,11,0.8)] ring-2 ring-amber-200/80' : 'brightness-95 shadow-md'}
+                                        ${mult >= 30 ? 'bg-red-500/95 text-white border-red-900' : mult >= 10 ? 'bg-amber-300/95 text-slate-900 border-amber-700' : mult >= 5 ? 'bg-yellow-200/95 text-slate-900 border-yellow-600' : 'bg-stone-100/95 text-slate-900 border-stone-400'}`}>
+                                        <span className="text-2xl font-black italic tracking-tight">x{Math.floor(mult)}</span>
                                     </div>
                                 ))}
                             </div>
@@ -329,15 +633,13 @@ export const LuckyPlinko = () => {
                 .rotate-y-90 { transform: rotateY(90deg) translateZ(56px); }
                 .rotate-x-90 { transform: rotateX(90deg) translateZ(56px); }
                 .rotate-x--90 { transform: rotateX(-90deg) translateZ(56px); }
+                .dice-rolling-active { transition: none; }
                 .dice-stopping-smooth { transition: transform 1.5s cubic-bezier(0.16, 1, 0.3, 1); }
-                @keyframes dice-roll-natural {
-                    0% { transform: translateY(0) rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
-                    25% { transform: translateY(-60px) rotateX(360deg) rotateY(180deg) rotateZ(45deg); }
-                    50% { transform: translateY(0) rotateX(720deg) rotateY(360deg) rotateZ(90deg); }
-                    75% { transform: translateY(-30px) rotateX(1080deg) rotateY(540deg) rotateZ(135deg); }
-                    100% { transform: translateY(0) rotateX(1440deg) rotateY(720deg) rotateZ(180deg); }
+                @keyframes slot-hit {
+                    0% { transform: scale(1.12) translateY(-4px); }
+                    100% { transform: scale(1.0) translateY(0); }
                 }
-                .dice-rolling-slow { animation: dice-roll-natural 3.0s infinite ease-in-out; }
+                .animate-slot-hit { animation: slot-hit 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
             `}</style>
         </div>
     );

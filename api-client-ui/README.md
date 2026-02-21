@@ -1,129 +1,152 @@
-# 탄소저감 커뮤니티 클라이언트
+﻿# ?꾩냼?媛?而ㅻ??덊떚 ?대씪?댁뼵??
 
-최종 업데이트: 2026-02-20
+理쒖쥌 ?낅뜲?댄듃: 2026-02-20
 
-이 프로젝트는 `API 기능명세.md` 기준으로 프론트 기능을 연결한 React + Vite 클라이언트입니다.
+???꾨줈?앺듃??`API 湲곕뒫紐낆꽭.md` 湲곗??쇰줈 ?꾨줎??湲곕뒫???곌껐??React + Vite ?대씪?댁뼵?몄엯?덈떎.
 
-## 구현 상태
+## 援ы쁽 ?곹깭
 
-### 인증/회원
-- 로그인: `POST /members/login` (로그인 성공 시 `/api/queue/join`으로 가상 대기열 자동 진입)
-- 가상 대기열: `POST /api/queue/join`, `GET /api/queue/status` 연동 및 전용 대기 페이지(`/queue`) 구현
-- OAuth2 구글 로그인: `/oauth2/authorization/google` 리다이렉트 방식 (성공 시 가상 대기열 확인 포함)
-- 로그아웃: `POST /members/logout`
-- 회원가입: `POST /members`
-- 내 정보 조회: `GET /members`
-- 내 정보 수정: `PATCH /members/{member-id}`
-- 회원 탈퇴: `DELETE /members`
-- 프로필 업로드: `POST /members/uploadProfile`
-- 토큰 자동 첨부 + 401 시 `/api/auth/reissue` 재발급 시도
-- OAuth2 콜백에서 `accessToken`, `refreshToken` 쿼리 수신 시 자동 로그인 처리
+### ?몄쬆/?뚯썝
+- 濡쒓렇?? `POST /members/login` (濡쒓렇???깃났 ??`/api/queue/join`?쇰줈 媛???湲곗뿴 ?먮룞 吏꾩엯)
+- 媛???湲곗뿴: `POST /api/queue/join`, `GET /api/queue/status` ?곕룞 諛??꾩슜 ?湲??섏씠吏(`/queue`) 援ы쁽
+- OAuth2 援ш? 濡쒓렇?? `/oauth2/authorization/google` 由щ떎?대젆??諛⑹떇 (?깃났 ??媛???湲곗뿴 ?뺤씤 ?ы븿)
+- 濡쒓렇?꾩썐: `POST /members/logout`
+- ?뚯썝媛?? `POST /members`
+- ???뺣낫 議고쉶: `GET /members`
+- ???뺣낫 ?섏젙: `PATCH /members/{member-id}`
+- ?뚯썝 ?덊눜: `DELETE /members`
+- ?꾨줈???낅줈?? `POST /members/uploadProfile`
+- ?좏겙 ?먮룞 泥⑤? + 401 ??`/api/auth/reissue` ?щ컻湲??쒕룄
+- OAuth2 肄쒕갚?먯꽌 `accessToken`, `refreshToken` 荑쇰━ ?섏떊 ???먮룞 濡쒓렇??泥섎━
 
-### 게시글
-- 목록: `GET /boards`
-- 상세: `GET /boards/{board-id}`
-- 작성: `POST /boards/{free|eco|green}`
-- 수정: `PATCH /boards/{board-id}` (multipart)
-- 삭제: `DELETE /boards/{board-id}`
-- 좋아요: `POST /boards/{board-id}/Like`
-- 내 게시글: `GET /boards/myBoards`
-- 파일 다운로드: `GET /file/{file-id}`
-- 게시판별 페이지네이션 상태 분리 (게시판마다 현재 페이지/표시개수 기억)
-- 한 화면 표시 개수 선택 지원: `10 / 20 / 50`
-- 페이지 인덱스 보정 적용 (UI 1페이지 ↔ API 0페이지)으로 조회 누락 방지
-- 게시글 상세에서 수정/삭제 버튼은 작성자 또는 `ROLE_ADMIN`에게만 노출
-- 댓글의 수정/삭제 버튼도 작성자 또는 `ROLE_ADMIN`에게만 노출
-- 게시글 목록에서 작성자/`ROLE_ADMIN`은 즉시 삭제 버튼 사용 가능
-- 게시글 목록에서 작성자/`ROLE_ADMIN`은 즉시 수정 버튼 사용 가능
-- `ROLE_ADMIN`은 게시글 목록에서 `전체/공지/일반` 관리자 필터 사용 가능
-- 권한 파싱은 문자열/배열/객체(`role`, `name`, `authority`) 형식을 모두 지원
-- 관리자 작성 글은 목록 최상단에 공지 카드(절반 크기)로 우선 노출
-- 게시글 등록 시 서버별 엔드포인트 차이 대응 폴백 적용
-  - 순차 시도: `/boards/free|eco|green` -> `/boards/{KIND}` -> `/boards?kind={KIND}` -> `/boards`
-- `ROLE_ADMIN` 사용자가 작성한 게시글은 등록 시 공지 플래그를 함께 전송 (`isNotice`, `notice`, `adminPost`)
-- 게시글 수정 페이지 직접 접근 시에도 작성자/`ROLE_ADMIN` 권한 검사 후 미권한자는 상세로 리다이렉트
-- `ECO_REVIEW` 게시판의 UI 명칭을 `Q&A 게시판`으로 변경
-- 게시글 수정 화면에서 기존 첨부파일 목록 표시
-- 게시글 수정 시 기존 첨부파일 삭제 + 새 첨부파일 추가 동시 지원
-- 첨부파일 수정 오류 대응:
-  - 삭제 파일 ID 추출 필드 다중 대응(`file_id`, `fileId`, `upload_id`, `uploadId`, `id`)
-  - 파일 삭제는 명세 API `DELETE /boards/{board-id}/files/{file-id}`로 선처리
-  - 게시글 `PATCH /boards/{board-id}`는 본문/신규 첨부만 처리
-- 게시글 목록/공지 미리보기에서 에디터 HTML 태그(`<p>`, `<br>` 등) 제거 후 본문 텍스트만 표시
-- 게시판 하단 페이지네이션 규칙 변경:
-  - `처음` / `이전5` / `페이지번호(최대 5개)` / `다음5` / `마지막`
-  - 페이지 번호는 5개 단위로 실제 존재하는 페이지만 노출
+### 寃뚯떆湲
+- 紐⑸줉: `GET /boards`
+- ?곸꽭: `GET /boards/{board-id}`
+- ?묒꽦: `POST /boards/{free|eco|green}`
+- ?섏젙: `PATCH /boards/{board-id}` (multipart)
+- ??젣: `DELETE /boards/{board-id}`
+- 醫뗭븘?? `POST /boards/{board-id}/Like`
+- ??寃뚯떆湲: `GET /boards/myBoards`
+- ?뚯씪 ?ㅼ슫濡쒕뱶: `GET /file/{file-id}`
+- 寃뚯떆?먮퀎 ?섏씠吏?ㅼ씠???곹깭 遺꾨━ (寃뚯떆?먮쭏???꾩옱 ?섏씠吏/?쒖떆媛쒖닔 湲곗뼲)
+- ???붾㈃ ?쒖떆 媛쒖닔 ?좏깮 吏?? `10 / 20 / 50`
+- ?섏씠吏 ?몃뜳??蹂댁젙 ?곸슜 (UI 1?섏씠吏 ??API 0?섏씠吏)?쇰줈 議고쉶 ?꾨씫 諛⑹?
+- 寃뚯떆湲 ?곸꽭?먯꽌 ?섏젙/??젣 踰꾪듉? ?묒꽦???먮뒗 `ROLE_ADMIN`?먭쾶留??몄텧
+- ?볤????섏젙/??젣 踰꾪듉???묒꽦???먮뒗 `ROLE_ADMIN`?먭쾶留??몄텧
+- 寃뚯떆湲 紐⑸줉?먯꽌 ?묒꽦??`ROLE_ADMIN`? 利됱떆 ??젣 踰꾪듉 ?ъ슜 媛??
+- 寃뚯떆湲 紐⑸줉?먯꽌 ?묒꽦??`ROLE_ADMIN`? 利됱떆 ?섏젙 踰꾪듉 ?ъ슜 媛??
+- `ROLE_ADMIN`? 寃뚯떆湲 紐⑸줉?먯꽌 `?꾩껜/怨듭?/?쇰컲` 愿由ъ옄 ?꾪꽣 ?ъ슜 媛??
+- 沅뚰븳 ?뚯떛? 臾몄옄??諛곗뿴/媛앹껜(`role`, `name`, `authority`) ?뺤떇??紐⑤몢 吏??
+- 愿由ъ옄 ?묒꽦 湲? 紐⑸줉 理쒖긽?⑥뿉 怨듭? 移대뱶(?덈컲 ?ш린)濡??곗꽑 ?몄텧
+- 寃뚯떆湲 ?깅줉 ???쒕쾭蹂??붾뱶?ъ씤??李⑥씠 ????대갚 ?곸슜
+  - ?쒖감 ?쒕룄: `/boards/free|eco|green` -> `/boards/{KIND}` -> `/boards?kind={KIND}` -> `/boards`
+- `ROLE_ADMIN` ?ъ슜?먭? ?묒꽦??寃뚯떆湲? ?깅줉 ??怨듭? ?뚮옒洹몃? ?④퍡 ?꾩넚 (`isNotice`, `notice`, `adminPost`)
+- 寃뚯떆湲 ?섏젙 ?섏씠吏 吏곸젒 ?묎렐 ?쒖뿉???묒꽦??`ROLE_ADMIN` 沅뚰븳 寃????誘멸텒?쒖옄???곸꽭濡?由щ떎?대젆??
+- `ECO_REVIEW` 寃뚯떆?먯쓽 UI 紐낆묶??`Q&A 寃뚯떆???쇰줈 蹂寃?
+- 寃뚯떆湲 ?섏젙 ?붾㈃?먯꽌 湲곗〈 泥⑤??뚯씪 紐⑸줉 ?쒖떆
+- 寃뚯떆湲 ?섏젙 ??湲곗〈 泥⑤??뚯씪 ??젣 + ??泥⑤??뚯씪 異붽? ?숈떆 吏??
+- 泥⑤??뚯씪 ?섏젙 ?ㅻ쪟 ???
+  - ??젣 ?뚯씪 ID 異붿텧 ?꾨뱶 ?ㅼ쨷 ???`file_id`, `fileId`, `upload_id`, `uploadId`, `id`)
+  - ?뚯씪 ??젣??紐낆꽭 API `DELETE /boards/{board-id}/files/{file-id}`濡??좎쿂由?
+  - 寃뚯떆湲 `PATCH /boards/{board-id}`??蹂몃Ц/?좉퇋 泥⑤?留?泥섎━
+- 寃뚯떆湲 紐⑸줉/怨듭? 誘몃━蹂닿린?먯꽌 ?먮뵒??HTML ?쒓렇(`<p>`, `<br>` ?? ?쒓굅 ??蹂몃Ц ?띿뒪?몃쭔 ?쒖떆
+- 寃뚯떆???섎떒 ?섏씠吏?ㅼ씠??洹쒖튃 蹂寃?
+  - `泥섏쓬` / `?댁쟾5` / `?섏씠吏踰덊샇(理쒕? 5媛?` / `?ㅼ쓬5` / `留덉?留?
+  - ?섏씠吏 踰덊샇??5媛??⑥쐞濡??ㅼ젣 議댁옱?섎뒗 ?섏씠吏留??몄텧
 
-### 댓글
-- 작성: `POST /comments`
-- 단건 조회: `GET /comments/{comment-id}`
-- 목록: `GET /comments?boardId={id}&page={n}&size={n}`
-- 수정/삭제: `PATCH`, `DELETE /comments/{comment-id}`
-- 좋아요: `POST /comments/{comment-id}/Like`
+### ?볤?
+- ?묒꽦: `POST /comments`
+- ?④굔 議고쉶: `GET /comments/{comment-id}`
+- 紐⑸줉: `GET /comments?boardId={id}&page={n}&size={n}`
+- ?섏젙/??젣: `PATCH`, `DELETE /comments/{comment-id}`
+- 醫뗭븘?? `POST /comments/{comment-id}/Like`
 
-### 랭킹/기타
-- 게시판 랭킹: `GET /boards/rankFreeBoards`, `/rankEcoBoards`, `/rankGreenBoards`
-- 레벨 랭킹: `GET /members/levelRanks`
-- 기부 랭킹: `GET /members/donationRanks`
-- 중간장소 최적화: `POST /api/optimizer/optimize` 연동 및 네이버 지도 시각화
-  - 주소 검색(Geocoding) 및 내 위치 찾기(Geolocation) 기능 구현
-  - 지도 클릭 시 해당 지점 주소 자동 입력 기능 추가
-- 뉴스 검색: `GET /news`
-- 전기요금 계산: `POST /calculators`
-- GPT 질문: `POST /gpt/question`
+### ??궧/湲고?
+- 寃뚯떆????궧: `GET /boards/rankFreeBoards`, `/rankEcoBoards`, `/rankGreenBoards`
+- ?덈꺼 ??궧: `GET /members/levelRanks`
+- 湲곕? ??궧: `GET /members/donationRanks`
+- 以묎컙?μ냼 理쒖쟻?? `POST /api/optimizer/optimize` ?곕룞 諛??ㅼ씠踰?吏???쒓컖??
+  - 二쇱냼 寃??Geocoding) 諛????꾩튂 李얘린(Geolocation) 湲곕뒫 援ы쁽
+  - 吏???대┃ ???대떦 吏??二쇱냼 ?먮룞 ?낅젰 湲곕뒫 異붽?
+- ?댁뒪 寃?? `GET /news`
+- ?꾧린?붽툑 怨꾩궛: `POST /calculators`
+- GPT 吏덈Ц: `POST /gpt/question`
 
-## 주요 UI/UX 개선
-- 랭킹 페이지 안정성 개선:
-  - `/boards/rank*`, `/members/levelRanks`, `/members/donationRanks` 응답 정규화 추가
-  - 배열 직접 반환, `content/items/ranks` 래핑 구조 모두 대응
-  - 비정형 응답으로 인한 `map is not a function` 런타임 오류 방지
-  - 리스트 컴포넌트에서 `Array.isArray` 방어 처리로 렌더링 안정성 추가
-  - 레벨 랭킹 `500` 대응 개선:
-    - 에러 메시지에 HTTP 상태/서버 메시지 노출
-    - 레벨 랭킹 엔드포인트 폴백 시도
+## 二쇱슂 UI/UX 媛쒖꽑
+- ??궧 ?섏씠吏 ?덉젙??媛쒖꽑:
+  - `/boards/rank*`, `/members/levelRanks`, `/members/donationRanks` ?묐떟 ?뺢퇋??異붽?
+  - 諛곗뿴 吏곸젒 諛섑솚, `content/items/ranks` ?섑븨 援ъ“ 紐⑤몢 ???
+  - 鍮꾩젙???묐떟?쇰줈 ?명븳 `map is not a function` ?고????ㅻ쪟 諛⑹?
+  - 由ъ뒪??而댄룷?뚰듃?먯꽌 `Array.isArray` 諛⑹뼱 泥섎━濡??뚮뜑留??덉젙??異붽?
+  - ?덈꺼 ??궧 `500` ???媛쒖꽑:
+    - ?먮윭 硫붿떆吏??HTTP ?곹깭/?쒕쾭 硫붿떆吏 ?몄텧
+    - ?덈꺼 ??궧 ?붾뱶?ъ씤???대갚 ?쒕룄
       (`/members/levelRanks` -> `/members/level-ranks` -> `/members/ranks/level`)
-    - 에러 카드 `다시 시도` 버튼으로 실제 재요청 수행(`retryKey` 기반)
-- 마이페이지 회원상태 표시 보정:
-  - `ACTIVE` 뿐 아니라 `MEMBER_ACTIVE`도 활성으로 인식하도록 수정
-  - 프로필 헤더 배지/프로필 탭의 상태 텍스트 규칙을 동일 로직으로 통일
-- 홈 통계 대시보드 API 연동:
-  - `GET /stats/summary`로 회원/게시글/댓글/방문자 요약 카드 표시
-  - `GET /stats/visitors/compare`로 전일 대비 방문자 증감률 표시
-  - `GET /stats/trend?days={n}`로 기간 추이(7/14/30일) 렌더링
-  - 기존 하드코딩 통계값 제거, 응답 파싱(`data.data`/`data`) 다중 대응
-- 마이페이지에 회원탈퇴 동작 연결
-- 마이페이지 편집 페이지 추가 (프로필 업로드 + 회원정보 수정)
-- 마이페이지 동작 안정화:
-  - 회원 정보 조회 실패 시 재시도 버튼 제공
-  - `GET /boards/myBoards` 응답 파싱 다중 대응 및 페이지 인덱스 `0` 기준 적용
-  - 게시글 본문 미리보기 HTML 제거, 날짜 파싱 실패 방어 처리
-  - 레벨 진행도 계산식(0~100%) 안전화 및 음수 경험치 표시 방지
-  - 프로필 수정 시 변경사항 없으면 PATCH 요청 생략
-  - 프로필 업로드 시 파일 형식/크기(5MB) 사전 검증
-  - 회원 수정 실패 시 `fieldErrors`/`violationErrors` 메시지 노출
-- 요청 반영: 마이페이지 `내 댓글` 탭 기능 제거
-- GPT 질문 페이지 추가
-- 홈 대시보드에서 상세 라우팅/빠른링크 정합성 개선
-- 랭킹/뉴스/댓글 응답 파싱 안정화
-- 글로벌 스타일 개선(배경 레이어, 카드/버튼 인터랙션, 타이포그래피)
+    - ?먮윭 移대뱶 `?ㅼ떆 ?쒕룄` 踰꾪듉?쇰줈 ?ㅼ젣 ?ъ슂泥??섑뻾(`retryKey` 湲곕컲)
+- 留덉씠?섏씠吏 ?뚯썝?곹깭 ?쒖떆 蹂댁젙:
+  - `ACTIVE` 肉??꾨땲??`MEMBER_ACTIVE`???쒖꽦?쇰줈 ?몄떇?섎룄濡??섏젙
+  - ?꾨줈???ㅻ뜑 諛곗?/?꾨줈????쓽 ?곹깭 ?띿뒪??洹쒖튃???숈씪 濡쒖쭅?쇰줈 ?듭씪
+- ???듦퀎 ??쒕낫??API ?곕룞:
+  - `GET /stats/summary`濡??뚯썝/寃뚯떆湲/?볤?/諛⑸Ц???붿빟 移대뱶 ?쒖떆
+  - `GET /stats/visitors/compare`濡??꾩씪 ?鍮?諛⑸Ц??利앷컧瑜??쒖떆
+  - `GET /stats/trend?days={n}`濡?湲곌컙 異붿씠(7/14/30?? ?뚮뜑留?
+  - 湲곗〈 ?섎뱶肄붾뵫 ?듦퀎媛??쒓굅, ?묐떟 ?뚯떛(`data.data`/`data`) ?ㅼ쨷 ???
+- 留덉씠?섏씠吏???뚯썝?덊눜 ?숈옉 ?곌껐
+- 留덉씠?섏씠吏 ?몄쭛 ?섏씠吏 異붽? (?꾨줈???낅줈??+ ?뚯썝?뺣낫 ?섏젙)
+- 留덉씠?섏씠吏 ?숈옉 ?덉젙??
+  - ?뚯썝 ?뺣낫 議고쉶 ?ㅽ뙣 ???ъ떆??踰꾪듉 ?쒓났
+  - `GET /boards/myBoards` ?묐떟 ?뚯떛 ?ㅼ쨷 ???諛??섏씠吏 ?몃뜳??`0` 湲곗? ?곸슜
+  - 寃뚯떆湲 蹂몃Ц 誘몃━蹂닿린 HTML ?쒓굅, ?좎쭨 ?뚯떛 ?ㅽ뙣 諛⑹뼱 泥섎━
+  - ?덈꺼 吏꾪뻾??怨꾩궛??0~100%) ?덉쟾??諛??뚯닔 寃쏀뿕移??쒖떆 諛⑹?
+  - ?꾨줈???섏젙 ??蹂寃쎌궗???놁쑝硫?PATCH ?붿껌 ?앸왂
+  - ?꾨줈???낅줈?????뚯씪 ?뺤떇/?ш린(5MB) ?ъ쟾 寃利?
+  - ?뚯썝 ?섏젙 ?ㅽ뙣 ??`fieldErrors`/`violationErrors` 硫붿떆吏 ?몄텧
+- ?붿껌 諛섏쁺: 留덉씠?섏씠吏 `???볤?` ??湲곕뒫 ?쒓굅
+- GPT 吏덈Ц ?섏씠吏 異붽?
+- ????쒕낫?쒖뿉???곸꽭 ?쇱슦??鍮좊Ⅸ留곹겕 ?뺥빀??媛쒖꽑
+- ??궧/?댁뒪/?볤? ?묐떟 ?뚯떛 ?덉젙??
+- 湲濡쒕쾶 ?ㅽ???媛쒖꽑(諛곌꼍 ?덉씠?? 移대뱶/踰꾪듉 ?명꽣?숈뀡, ??댄룷洹몃옒??
 
-## 최근 작업 로그 (2026-02-20)
-- 변경 파일:
-  - `src/pages/MeetingOptimizer.jsx` (주소 검색, 내 위치, 지도 클릭 기능 추가)
-  - `index.html` (Naver Maps SDK 파라미터 최신화: ncpKeyId)
-  - `src/pages/Home.jsx` (화면 하얗게 나오는 버그 수정 및 통계 대시보드 복구)
-  - `src/components/Header.jsx` (MapPin 아이콘 import 누락 수정)
+## 理쒓렐 ?묒뾽 濡쒓렇 (2026-02-20)
+- 蹂寃??뚯씪:
+  - `src/pages/MeetingOptimizer.jsx` (二쇱냼 寃?? ???꾩튂, 吏???대┃ 湲곕뒫 異붽?)
+  - `index.html` (Naver Maps SDK ?뚮씪誘명꽣 理쒖떊?? ncpKeyId)
+  - `src/pages/Home.jsx` (?붾㈃ ?섏뼏寃??섏삤??踰꾧렇 ?섏젙 諛??듦퀎 ??쒕낫??蹂듦뎄)
+  - `src/components/Header.jsx` (MapPin ?꾩씠肄?import ?꾨씫 ?섏젙)
 
-## 실행
+## ?ㅽ뻾
 ```bash
 cd api-client-ui
 npm install
 npm run dev
 ```
 
-백엔드 기본 URL: `http://localhost:8080`
-프론트 기본 URL: `http://localhost:5173`
+諛깆뿏??湲곕낯 URL: `http://localhost:8080`
+?꾨줎??湲곕낯 URL: `http://localhost:5173`
 
-## 참고
-- 공통 API 클라이언트: `src/utils/api.js`
-- 명세 문서: `../API 기능명세.md`
+## 李멸퀬
+- 怨듯넻 API ?대씪?댁뼵?? `src/utils/api.js`
+- 紐낆꽭 臾몄꽌: `../API 湲곕뒫紐낆꽭.md`
+
+## Admin Anomalies (2026-02-21)
+- Route: /app/admin/anomalies (ROLE_ADMIN only)
+- API: GET /stats/anomalies?limit={1..200}
+- States: loading / empty / error / forbidden + refresh action
+
+
+## Admin Dashboard Update (2026-02-21)
+- Route: /app/admin/anomalies (ROLE_ADMIN only)
+- APIs: GET /stats/summary, GET /stats/anomalies?limit={1..200}
+- Screen: 운영 통계 요약 카드 + 이상탐지 이벤트 테이블 + 새로고침
+
+
+## Admin Anomaly Console Expansion (2026-02-21)
+- Route: `/app/admin/anomalies` (ROLE_ADMIN only)
+- Added panels: Incident Inbox, Action Timeline, Rule Editor, KPI(7d), CSV report
+- Added action wiring: `BLOCK_QUEUE_USER`, `WARN_MEMBER`, `CLEAR_QUEUE_BLOCK`
+- API set: `/admin/anomalies/*` + `/stats/summary` + `/stats/anomalies`
+
+## Admin Console UI Upgrade (2026-02-21)
+- Incident Inbox에 인라인 편집 추가: `incidentStatus`, `assignee`, `note` 수정 후 즉시 저장
+- Incident 행에서 조치 버튼 직접 실행: `BLOCK_QUEUE_USER`, `WARN_MEMBER`, `CLEAR_QUEUE_BLOCK`
+- 규칙 관리에 신규 metric 추가 폼 추가: metric/hardLimit/zScore/enabled 입력 후 생성
