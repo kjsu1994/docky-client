@@ -1,21 +1,20 @@
-﻿# Feature Ownership Decision Matrix
+﻿# Feature Ownership Decision Matrix (FE/BE 판단표)
 
 ## Goal
-- Decide quickly whether a new requirement should be implemented in frontend, backend, or mixed layers.
+- 신규 요구사항을 FE / BE / Mixed 중 어디에 둘지 빠르게 판단한다.
 
 ## Quick Matrix
 - Backend-first:
-  - Permission/security validation needed
-  - Data consistency/transaction/concurrency needed
-  - Shared business rule used by multiple clients
-  - External API key/secret handling needed
+  - permission/security validation 필요
+  - data consistency/transaction/concurrency 필요
+  - shared business rule across clients
+  - external API key/secret handling 필요
 - Frontend-first:
-  - UI flow, interaction, visual state management
-  - Client-side formatting/filtering/sorting only
-  - No source-of-truth mutation on server
+  - UI flow/interaction/visual state가 핵심
+  - server truth mutation 없음
 - Mixed:
-  - Backend returns validated/calculated result
-  - Frontend renders and orchestrates UX flow
+  - Backend는 rule/validation/calculation 제공
+  - Frontend는 UX flow/presentation 담당
 
 ## Decision Output Format
 - Ownership: FE / BE / Mixed
@@ -24,12 +23,12 @@
 - Contract impact: API change Yes/No
 
 ## Examples
-- "게시글 좋아요 제한(중복 방지)"
+- "게시글 좋아요 중복 방지"
   - Ownership: BE-first
-  - Reason: 데이터 정합성 + 동시성
-- "정렬 버튼 UI와 로딩 스켈레톤 개선"
+  - Reason: 정합성 + 동시성
+- "정렬 버튼 UI/스켈레톤 개선"
   - Ownership: FE-first
-  - Reason: 화면 표현/UX
-- "추천 점수 계산 + 결과 시각화"
+  - Reason: 표현/UX
+- "추천 점수 계산 + 시각화"
   - Ownership: Mixed
-  - Reason: 계산은 BE, 표현은 FE
+  - Reason: 계산=BE, 표현=FE

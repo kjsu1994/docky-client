@@ -1,4 +1,4 @@
-﻿# Screen to API Mapping
+﻿# Screen to API Mapping (화면-API 매핑)
 
 ## Core Routes
 - `/login`
@@ -13,7 +13,7 @@
 
 ## App Routes
 - `/app` (Home)
-  - Summary/rank/stats related APIs based on widgets
+  - summary/rank/stats widget APIs
 - `/app/boards/:kind`
   - `GET /boards`
 - `/app/boards/:kind/:boardId`
@@ -24,7 +24,7 @@
   - `POST /boards/{free|eco|green}`
 - `/app/boards/:kind/:boardId/edit`
   - `PATCH /boards/{board-id}`
-  - `DELETE /boards/{board-id}/files/{file-id}` (if attachment delete)
+  - `DELETE /boards/{board-id}/files/{file-id}` (attachment delete)
 - `/app/mypage`
   - `GET /members`
   - `GET /boards/myBoards`
@@ -53,13 +53,13 @@
   - `POST /api/optimizer/optimize`
 
 ## Real-time / Chat
-- WebSocket endpoint: `/ws/chat/websocket` (through `/ws` proxy)
+- WebSocket endpoint: `/ws/chat/websocket` (via `/ws` proxy)
 - REST:
   - `POST /chat/room`
   - `GET /chat/rooms`
   - `GET /chat/room/{roomId}/messages`
   - `PATCH /chat/room/{roomId}/read`
 
-## Update Rule
-- If route behavior changes, update this file in same PR.
-- If endpoint contract changes, update OpenAPI-linked checks first.
+## Update Rule (갱신 규칙)
+- route behavior 변경 시 이 파일을 같은 PR에서 갱신한다.
+- endpoint contract 변경 시 OpenAPI-linked checks를 먼저 갱신한다.

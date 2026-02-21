@@ -1,13 +1,13 @@
-﻿# UI Contract Template
+﻿# UI Contract Template (화면 계약 템플릿)
 
 ## 1) Feature Meta
-- Feature name:
-- Owner:
+- Feature name (기능명):
+- Owner (담당):
 - Related backend feature/API:
 - Target release:
 
 ## 2) Goal
-- One-line goal of this screen:
+- One-line goal (한 줄 목표):
 - Success metric (optional):
 
 ## 3) Target User / Permission

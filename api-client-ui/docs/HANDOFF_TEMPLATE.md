@@ -1,4 +1,4 @@
-﻿# Conversation Handoff Template (Frontend)
+﻿# Conversation Handoff Template (프론트 인수인계)
 
 ## 1) Goal
 - Current feature goal:

@@ -1,26 +1,26 @@
-﻿# Screen Composition Baseline
+﻿# Screen Composition Baseline (기본 화면 구성)
 
 ## Goal
-- Use this as default UI composition when no feature-specific UI contract exists.
+- feature-specific UI contract가 없을 때 default layout 기준으로 사용한다.
 
 ## Layout Skeleton
 1. Header zone
 - Screen title
 - One-line intent text
-- Primary CTA button (top-right)
+- Primary CTA (top-right)
 
 2. Control zone
-- Search/filter/sort controls in one row
+- Search/filter/sort controls (one row)
 - Optional quick stats chips
 
 3. Content zone
 - Main list/grid/card area
-- Empty state card when no data
-- Inline error block with retry action
+- Empty state card
+- Inline error block + retry action
 
 4. Detail/Action zone
 - Secondary actions grouped below main content
-- Destructive actions separated and visually distinct
+- Destructive actions separated visually
 
 5. Feedback zone
 - Toast for success/error
@@ -33,8 +33,8 @@
 - Forbidden/Unauthorized
 
 ## Permission Rule
-- Owner/Admin actions are hidden or disabled by role check.
+- Owner/Admin actions are hidden or disabled by role checks.
 
 ## Data Rule
-- Display formats and fallback values must be consistent.
-- Do not parse mixed API response shapes in component; normalize in adapter.
+- Display format and fallback values must stay consistent.
+- Mixed API response shape parsing is forbidden in page components.
