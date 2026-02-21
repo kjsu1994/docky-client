@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     AlertTriangle,
     RefreshCw,
@@ -13,10 +13,17 @@ import {
     BellRing,
     PlusCircle,
     Save,
+    UserCog,
+    History,
+    UserX,
+    EyeOff,
+    RotateCcw,
+    ScrollText,
 } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
-import { isAdminUser } from "../utils/authorization";
+import { hasRole, isAdminUser } from "../utils/authorization";
+import toast from "react-hot-toast";
 
 const unwrapData = (payload) => payload?.data?.data ?? payload?.data ?? payload ?? null;
 
@@ -35,6 +42,13 @@ const toNumber = (value) => {
     if (Number.isNaN(parsed) || !Number.isFinite(parsed)) return 0;
     return parsed;
 };
+
+const getMemberIdValue = (member) => member?.memberId ?? member?.member_id ?? null;
+const getBoardIdValue = (board) => board?.boardId ?? board?.board_id ?? null;
+const getCommentIdValue = (comment) => comment?.commentId ?? comment?.comment_id ?? null;
+const getBoardCreatorValue = (board) => board?.boardCreator ?? board?.board_creator ?? '';
+const getWriterNameValue = (comment) => comment?.writerName ?? comment?.writer_name ?? '';
+const getHiddenYnValue = (target) => target?.hiddenYn ?? target?.hidden_yn ?? false;
 
 const STATUS_OPTIONS = ["ALL", "NEW", "REVIEWING", "RESOLVED", "FALSE_POSITIVE"];
 const EDITABLE_STATUS_OPTIONS = ["NEW", "REVIEWING", "RESOLVED", "FALSE_POSITIVE"];
@@ -61,6 +75,15 @@ const StatCard = ({ icon: Icon, label, value, tone = "slate" }) => {
 export const AdminAnomalies = () => {
     const { user } = useAuth();
     const isAdmin = useMemo(() => isAdminUser(user), [user]);
+    const isMaster = useMemo(() => {
+        if (!user) return false;
+        return (
+            hasRole(user.roles, "ROLE_MASTER") ||
+            hasRole(user.role, "ROLE_MASTER") ||
+            hasRole(user.member?.roles, "ROLE_MASTER") ||
+            hasRole(user.member?.role, "ROLE_MASTER")
+        );
+    }, [user]);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -70,6 +93,20 @@ export const AdminAnomalies = () => {
     const [events, setEvents] = useState([]);
     const [kpi, setKpi] = useState(null);
     const [rules, setRules] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+    const [reportList, setReportList] = useState({ items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 });
+    const [reportStatusFilter, setReportStatusFilter] = useState("ALL");
+    const [roleMembers, setRoleMembers] = useState({ items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 });
+    const [roleAudits, setRoleAudits] = useState({ items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 });
+    const [roleKeyword, setRoleKeyword] = useState("");
+    const [sanctions, setSanctions] = useState({ items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 });
+    const [sanctionStatusFilter, setSanctionStatusFilter] = useState("ALL");
+    const [moderationBoards, setModerationBoards] = useState({ items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 });
+    const [moderationComments, setModerationComments] = useState({ items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 });
+    const [moderationHiddenFilter, setModerationHiddenFilter] = useState("ALL");
+    const [auditItems, setAuditItems] = useState({ items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 });
+    const [auditTypeFilter, setAuditTypeFilter] = useState("ALL");
 
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [page, setPage] = useState(1);
@@ -78,6 +115,10 @@ export const AdminAnomalies = () => {
     const [ruleDrafts, setRuleDrafts] = useState({});
     const [incidentDrafts, setIncidentDrafts] = useState({});
     const [newRule, setNewRule] = useState({ metric: "", hardLimitPerMinute: 60, zScoreThreshold: 3.0, enabled: true });
+
+    const REPORT_STATUS_OPTIONS = ["ALL", "OPEN", "IN_REVIEW", "RESOLVED", "REJECTED"];
+    const SANCTION_STATUS_OPTIONS = ["ALL", "ACTIVE", "RELEASED"];
+    const AUDIT_TYPE_OPTIONS = ["ALL", "ROLE", "REPORT", "MODERATION", "SANCTION", "ANOMALY"];
 
     const fetchIncidents = async (nextStatus = statusFilter, nextPage = page) => {
         const response = await api.get("/admin/anomalies/incidents", {
@@ -102,17 +143,105 @@ export const AdminAnomalies = () => {
         setSelectedDetail(unwrapData(response.data));
     };
 
+    const fetchNotifications = async () => {
+        const response = await api.get("/admin/notifications", {
+            params: { readYn: false, page: 1, size: 8 },
+        });
+        const payload = unwrapData(response.data);
+        setNotifications(payload?.items || []);
+        setNotificationUnreadCount(payload?.unreadCount || 0);
+    };
+
+    const fetchReports = async (status = reportStatusFilter) => {
+        const response = await api.get("/admin/reports", {
+            params: { status, page: 1, size: 10 },
+        });
+        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+        setReportList(payload);
+    };
+
+    const fetchSanctions = async (status = sanctionStatusFilter) => {
+        const response = await api.get("/admin/sanctions", {
+            params: { status, page: 1, size: 10 },
+        });
+        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+        setSanctions(payload);
+    };
+
+    const fetchModerationBoards = async (hidden = moderationHiddenFilter) => {
+        const hiddenYn = hidden === "ALL" ? undefined : hidden === "HIDDEN";
+        const response = await api.get("/admin/moderation/boards", {
+            params: { hiddenYn, page: 1, size: 8 },
+        });
+        const payload = unwrapData(response.data) || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
+        setModerationBoards(payload);
+    };
+
+    const fetchModerationComments = async (hidden = moderationHiddenFilter) => {
+        const hiddenYn = hidden === "ALL" ? undefined : hidden === "HIDDEN";
+        const response = await api.get("/admin/moderation/comments", {
+            params: { hiddenYn, page: 1, size: 8 },
+        });
+        const payload = unwrapData(response.data) || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
+        setModerationComments(payload);
+    };
+
+    const fetchAudits = async (type = auditTypeFilter) => {
+        const response = await api.get("/admin/audits", {
+            params: { type, page: 1, size: 10 },
+        });
+        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+        setAuditItems(payload);
+    };
+
+    const fetchRoleMembers = async (keyword = roleKeyword) => {
+        if (!isMaster) return;
+        const response = await api.get("/admin/roles/members", {
+            params: { keyword: keyword || undefined, page: 1, size: 10 },
+        });
+        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+        setRoleMembers(payload);
+    };
+
+    const fetchRoleAudits = async () => {
+        if (!isMaster) return;
+        const response = await api.get("/admin/roles/audits", {
+            params: { page: 1, size: 10 },
+        });
+        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+        setRoleAudits(payload);
+    };
+
     const fetchDashboard = async (nextStatus = statusFilter, nextPage = page) => {
         setLoading(true);
         setError("");
         try {
             // 관리자 운영 대시보드 핵심 데이터(통계/KPI/규칙/사건함/실시간 이벤트)를 일괄 조회한다.
-            const [summaryRes, eventsRes, kpiRes, rulesRes, incidentsRes] = await Promise.all([
+            const roleMembersPromise = isMaster
+                ? api.get("/admin/roles/members", { params: { keyword: roleKeyword || undefined, page: 1, size: 10 } })
+                : Promise.resolve({ data: { data: { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 } } });
+            const roleAuditsPromise = isMaster
+                ? api.get("/admin/roles/audits", { params: { page: 1, size: 10 } })
+                : Promise.resolve({ data: { data: { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 } } });
+
+            const [summaryRes, eventsRes, kpiRes, rulesRes, incidentsRes, notificationsRes, reportsRes, sanctionsRes, moderationBoardsRes, moderationCommentsRes, auditsRes, roleMembersRes, roleAuditsRes] = await Promise.all([
                 api.get("/stats/summary"),
                 api.get("/stats/anomalies", { params: { limit: 50 } }),
                 api.get("/admin/anomalies/kpi", { params: { days: 7 } }),
                 api.get("/admin/anomalies/rules"),
                 api.get("/admin/anomalies/incidents", { params: { status: nextStatus, page: nextPage, size: 20 } }),
+                api.get("/admin/notifications", { params: { readYn: false, page: 1, size: 8 } }),
+                api.get("/admin/reports", { params: { status: reportStatusFilter, page: 1, size: 10 } }),
+                api.get("/admin/sanctions", { params: { status: sanctionStatusFilter, page: 1, size: 10 } }),
+                api.get("/admin/moderation/boards", {
+                    params: { hiddenYn: moderationHiddenFilter === "ALL" ? undefined : moderationHiddenFilter === "HIDDEN", page: 1, size: 8 },
+                }),
+                api.get("/admin/moderation/comments", {
+                    params: { hiddenYn: moderationHiddenFilter === "ALL" ? undefined : moderationHiddenFilter === "HIDDEN", page: 1, size: 8 },
+                }),
+                api.get("/admin/audits", { params: { type: auditTypeFilter, page: 1, size: 10 } }),
+                roleMembersPromise,
+                roleAuditsPromise,
             ]);
 
             const nextRules = unwrapData(rulesRes.data) || [];
@@ -122,6 +251,25 @@ export const AdminAnomalies = () => {
             setKpi(unwrapData(kpiRes.data));
             setRules(nextRules);
             setIncidentList(nextIncidents);
+            const nextNotifications = unwrapData(notificationsRes.data) || { items: [], unreadCount: 0 };
+            const nextReports = unwrapData(reportsRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextSanctions = unwrapData(sanctionsRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextModerationBoards = unwrapData(moderationBoardsRes.data) || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
+            const nextModerationComments = unwrapData(moderationCommentsRes.data) || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
+            const nextAudits = unwrapData(auditsRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextRoleMembers = unwrapData(roleMembersRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextRoleAudits = unwrapData(roleAuditsRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            setNotifications(nextNotifications.items || []);
+            setNotificationUnreadCount(nextNotifications.unreadCount || 0);
+            setReportList(nextReports);
+            setSanctions(nextSanctions);
+            setModerationBoards(nextModerationBoards);
+            setModerationComments(nextModerationComments);
+            setAuditItems(nextAudits);
+            if (isMaster) {
+                setRoleMembers(nextRoleMembers);
+                setRoleAudits(nextRoleAudits);
+            }
             setRuleDrafts(
                 nextRules.reduce((acc, rule) => {
                     acc[rule.metric] = {
@@ -168,6 +316,11 @@ export const AdminAnomalies = () => {
         await fetchIncidents(statusFilter, nextPage);
     };
 
+    const changeReportFilter = async (nextStatus) => {
+        setReportStatusFilter(nextStatus);
+        await fetchReports(nextStatus);
+    };
+
     const saveIncidentInline = async (incidentId) => {
         const draft = incidentDrafts[incidentId];
         if (!draft) return;
@@ -204,6 +357,157 @@ export const AdminAnomalies = () => {
         await fetchIncidents(statusFilter, page);
         await fetchDetail(incidentId);
         await fetchDashboard(statusFilter, page);
+    };
+
+    const markNotificationRead = async (notificationId) => {
+        await api.patch(`/admin/notifications/${notificationId}/read`, { readYn: true });
+        await fetchNotifications();
+    };
+
+    const markAllNotificationsRead = async () => {
+        await api.post("/admin/notifications/read-all");
+        await fetchNotifications();
+    };
+
+    const updateReportStatus = async (reportId, reportStatus) => {
+        const adminNote = window.prompt("처리 메모를 입력하세요.", "") || "";
+        await api.patch(`/admin/reports/${reportId}`, { reportStatus, adminNote });
+        await fetchReports(reportStatusFilter);
+        await fetchNotifications();
+    };
+
+    const createSanction = async () => {
+        const memberIdInput = window.prompt("제재할 회원 ID를 입력하세요.", "");
+        if (!memberIdInput) return;
+        const reason = window.prompt("제재 사유를 입력하세요.", "운영 정책 위반");
+        if (!reason) return;
+        const daysInput = window.prompt("제재 기간(일, 비우면 무기한)", "");
+        const days = daysInput ? Number(daysInput) : undefined;
+        try {
+            await api.post("/admin/sanctions", {
+                memberId: Number(memberIdInput),
+                reason,
+                days: Number.isFinite(days) && days > 0 ? days : undefined,
+            });
+            toast.success("회원 제재를 등록했습니다.");
+            await fetchSanctions(sanctionStatusFilter);
+            await fetchNotifications();
+            await fetchAudits(auditTypeFilter);
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "회원 제재 등록에 실패했습니다.");
+        }
+    };
+
+    const releaseSanction = async (sanctionId) => {
+        const reason = window.prompt("제재 해제 사유를 입력하세요.", "") || "";
+        try {
+            await api.patch(`/admin/sanctions/${sanctionId}/release`, { reason });
+            toast.success("회원 제재를 해제했습니다.");
+            await fetchSanctions(sanctionStatusFilter);
+            await fetchAudits(auditTypeFilter);
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "제재 해제에 실패했습니다.");
+        }
+    };
+
+    const updateBoardHidden = async (boardId, hiddenYn) => {
+        const normalizedBoardId = Number(boardId);
+        if (!Number.isFinite(normalizedBoardId) || normalizedBoardId <= 0) {
+            toast.error("유효한 게시글 ID를 찾지 못했습니다.");
+            return;
+        }
+
+        const reason = window.prompt(hiddenYn ? "숨김 사유를 입력하세요." : "복구 사유를 입력하세요.", "") || "";
+        try {
+            await api.patch(`/admin/moderation/boards/${normalizedBoardId}`, { hiddenYn, reason });
+            toast.success(hiddenYn ? "게시글을 숨겼습니다." : "게시글을 복구했습니다.");
+            await fetchModerationBoards(moderationHiddenFilter);
+            await fetchAudits(auditTypeFilter);
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "게시글 모더레이션에 실패했습니다.");
+        }
+    };
+
+    const updateCommentHidden = async (commentId, hiddenYn) => {
+        const normalizedCommentId = Number(commentId);
+        if (!Number.isFinite(normalizedCommentId) || normalizedCommentId <= 0) {
+            toast.error("유효한 댓글 ID를 찾지 못했습니다.");
+            return;
+        }
+
+        const reason = window.prompt(hiddenYn ? "숨김 사유를 입력하세요." : "복구 사유를 입력하세요.", "") || "";
+        try {
+            await api.patch(`/admin/moderation/comments/${normalizedCommentId}`, { hiddenYn, reason });
+            toast.success(hiddenYn ? "댓글을 숨겼습니다." : "댓글을 복구했습니다.");
+            await fetchModerationComments(moderationHiddenFilter);
+            await fetchAudits(auditTypeFilter);
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "댓글 모더레이션에 실패했습니다.");
+        }
+    };
+
+    const changeSanctionFilter = async (status) => {
+        setSanctionStatusFilter(status);
+        await fetchSanctions(status);
+    };
+
+    const changeModerationFilter = async (hiddenFilter) => {
+        setModerationHiddenFilter(hiddenFilter);
+        await Promise.all([
+            fetchModerationBoards(hiddenFilter),
+            fetchModerationComments(hiddenFilter),
+        ]);
+    };
+
+    const changeAuditFilter = async (type) => {
+        setAuditTypeFilter(type);
+        await fetchAudits(type);
+    };
+
+    const hasAdminRole = (roles) => Array.isArray(roles) && roles.includes("ROLE_ADMIN");
+
+    const updateMemberAdminRole = async (member) => {
+        const memberId = getMemberIdValue(member);
+        if (!memberId) {
+            toast.error("회원 ID를 확인할 수 없습니다.");
+            return;
+        }
+        const currentRoles = Array.isArray(member.roles) ? member.roles : [];
+        const hasAdmin = hasAdminRole(currentRoles);
+        // ROLE_USER는 기본 유지하고 ROLE_ADMIN만 토글해 운영 사고를 줄인다.
+        const nextRoles = hasAdmin
+            ? currentRoles.filter((role) => role !== "ROLE_ADMIN")
+            : Array.from(new Set([...currentRoles, "ROLE_ADMIN"]));
+
+        const reason = window.prompt(
+            hasAdmin ? "관리자 권한 해제 사유를 입력하세요." : "관리자 권한 부여 사유를 입력하세요.",
+            ""
+        );
+        if (reason === null) return;
+
+        try {
+            await api.patch(`/admin/roles/members/${memberId}`, {
+                roles: nextRoles,
+                reason,
+            });
+            await fetchRoleMembers(roleKeyword);
+            await fetchRoleAudits();
+            await fetchNotifications();
+            toast.success(hasAdmin ? "관리자 권한을 해제했습니다." : "관리자 권한을 부여했습니다.");
+        } catch (err) {
+            const message = err?.response?.data?.message || "권한 변경에 실패했습니다.";
+            toast.error(message);
+            console.error("Failed to update member admin role:", err);
+        }
+    };
+
+    const searchRoleMembers = async () => {
+        try {
+            await fetchRoleMembers(roleKeyword);
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "회원 조회에 실패했습니다.");
+            console.error("Failed to search role members:", err);
+        }
     };
 
     const refreshRules = async () => {
@@ -387,6 +691,299 @@ export const AdminAnomalies = () => {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+                            <UserX className="h-5 w-5" /> 사용자 제재
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={sanctionStatusFilter}
+                                onChange={(e) => changeSanctionFilter(e.target.value)}
+                                className="rounded border px-2 py-1 text-sm"
+                            >
+                                {SANCTION_STATUS_OPTIONS.map((status) => (
+                                    <option key={status} value={status}>{status}</option>
+                                ))}
+                            </select>
+                            <button className="rounded border px-2 py-1 text-xs" onClick={createSanction}>제재 등록</button>
+                        </div>
+                    </div>
+                    {!sanctions.items?.length ? (
+                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">제재 내역이 없습니다.</div>
+                    ) : (
+                        <div className="space-y-2">
+                            {sanctions.items.map((sanction) => (
+                                <div key={sanction.sanctionId} className="rounded-xl border p-3 text-sm">
+                                    <div className="mb-1 font-semibold">#{sanction.sanctionId} · {sanction.memberEmail}</div>
+                                    <div className="text-xs text-slate-600">{sanction.sanctionStatus} · {sanction.reason}</div>
+                                    <div className="text-[11px] text-slate-400">{sanction.createdAt}</div>
+                                    {sanction.sanctionStatus === "ACTIVE" && (
+                                        <button
+                                            className="mt-2 rounded border px-2 py-1 text-xs"
+                                            onClick={() => releaseSanction(sanction.sanctionId)}
+                                        >
+                                            제재 해제
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="rounded-2xl border bg-white p-5 shadow-sm xl:col-span-2">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+                            <EyeOff className="h-5 w-5" /> 콘텐츠 모더레이션
+                        </h2>
+                        <select
+                            value={moderationHiddenFilter}
+                            onChange={(e) => changeModerationFilter(e.target.value)}
+                            className="rounded border px-2 py-1 text-sm"
+                        >
+                            <option value="ALL">ALL</option>
+                            <option value="HIDDEN">HIDDEN</option>
+                            <option value="VISIBLE">VISIBLE</option>
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        <div>
+                            <h3 className="mb-2 text-sm font-semibold text-slate-700">게시글</h3>
+                            <div className="space-y-2">
+                                {(moderationBoards.items || []).map((board) => (
+                                    <div key={getBoardIdValue(board) ?? `board-${Math.random()}`} className="rounded border p-2 text-sm">
+                                        <div className="font-semibold">#{getBoardIdValue(board)} {board.title}</div>
+                                        <div className="text-xs text-slate-500">{getHiddenYnValue(board) ? "HIDDEN" : "VISIBLE"} · {getBoardCreatorValue(board)}</div>
+                                        <button
+                                            className="mt-1 rounded border px-2 py-1 text-xs"
+                                            onClick={() => updateBoardHidden(getBoardIdValue(board), !getHiddenYnValue(board))}
+                                        >
+                                            {getHiddenYnValue(board) ? <RotateCcw className="mr-1 inline h-3 w-3" /> : <EyeOff className="mr-1 inline h-3 w-3" />}
+                                            {getHiddenYnValue(board) ? "복구" : "숨김"}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <h3 className="mb-2 text-sm font-semibold text-slate-700">댓글</h3>
+                            <div className="space-y-2">
+                                {(moderationComments.items || []).map((comment) => (
+                                    <div key={getCommentIdValue(comment) ?? `comment-${Math.random()}`} className="rounded border p-2 text-sm">
+                                        <div className="font-semibold">#{getCommentIdValue(comment)} (board #{getBoardIdValue(comment)})</div>
+                                        <div className="text-xs text-slate-500">{getHiddenYnValue(comment) ? "HIDDEN" : "VISIBLE"} · {getWriterNameValue(comment)}</div>
+                                        <button
+                                            className="mt-1 rounded border px-2 py-1 text-xs"
+                                            onClick={() => updateCommentHidden(getCommentIdValue(comment), !getHiddenYnValue(comment))}
+                                        >
+                                            {getHiddenYnValue(comment) ? <RotateCcw className="mr-1 inline h-3 w-3" /> : <EyeOff className="mr-1 inline h-3 w-3" />}
+                                            {getHiddenYnValue(comment) ? "복구" : "숨김"}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                <div className="mb-3 flex items-center justify-between">
+                    <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+                        <ScrollText className="h-5 w-5" /> 통합 Audit
+                    </h2>
+                    <select
+                        value={auditTypeFilter}
+                        onChange={(e) => changeAuditFilter(e.target.value)}
+                        className="rounded border px-2 py-1 text-sm"
+                    >
+                        {AUDIT_TYPE_OPTIONS.map((type) => (
+                            <option key={type} value={type}>{type}</option>
+                        ))}
+                    </select>
+                </div>
+                {!auditItems.items?.length ? (
+                    <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">조회된 감사 이력이 없습니다.</div>
+                ) : (
+                    <div className="space-y-2">
+                        {auditItems.items.map((audit, idx) => (
+                            <div key={`${audit.auditType}-${audit.createdAt}-${idx}`} className="rounded border p-3 text-sm">
+                                <div className="font-semibold">{audit.auditType} · {audit.actionType}</div>
+                                <div className="text-xs text-slate-600">{audit.summary}</div>
+                                <div className="text-xs text-slate-500">{audit.actor} · {audit.createdAt}</div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {isMaster && (
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="text-lg font-bold text-slate-900">관리자 메신저</h2>
+                        <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">
+                                unread {toNumber(notificationUnreadCount)}
+                            </span>
+                            <button className="rounded border px-2 py-1 text-xs" onClick={markAllNotificationsRead}>전체읽음</button>
+                        </div>
+                    </div>
+
+                    {!notifications.length ? (
+                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">새 알림이 없습니다.</div>
+                    ) : (
+                        <div className="space-y-2">
+                            {notifications.map((notification) => (
+                                <div key={notification.notificationId} className="rounded-xl border p-3">
+                                    <div className="mb-1 flex items-center justify-between">
+                                        <div className="text-sm font-semibold">{notification.title}</div>
+                                        <span className="text-xs text-slate-500">{notification.severity}</span>
+                                    </div>
+                                    <p className="mb-2 text-xs text-slate-600">{notification.message}</p>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] text-slate-400">{notification.createdAt}</span>
+                                        <button
+                                            className="rounded border px-2 py-1 text-xs"
+                                            onClick={() => markNotificationRead(notification.notificationId)}
+                                        >
+                                            읽음
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="text-lg font-bold text-slate-900">신고함</h2>
+                        <select
+                            value={reportStatusFilter}
+                            onChange={(e) => changeReportFilter(e.target.value)}
+                            className="rounded border px-2 py-1 text-sm"
+                        >
+                            {REPORT_STATUS_OPTIONS.map((status) => (
+                                <option key={status} value={status}>{status}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {!reportList.items?.length ? (
+                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">신고 내역이 없습니다.</div>
+                    ) : (
+                        <div className="space-y-2">
+                            {reportList.items.map((report) => (
+                                <div key={report.reportId} className="rounded-xl border p-3">
+                                    <div className="mb-1 flex items-center justify-between">
+                                        <div className="text-sm font-semibold">
+                                            #{report.reportId} {report.targetType} {report.targetId}
+                                        </div>
+                                        <span className="text-xs text-slate-500">{report.reportStatus}</span>
+                                    </div>
+                                    <p className="mb-2 text-xs text-slate-600">{report.reason} {report.detail ? `- ${report.detail}` : ""}</p>
+                                    <div className="flex flex-wrap gap-1">
+                                        <button className="rounded border px-2 py-1 text-xs" onClick={() => updateReportStatus(report.reportId, "IN_REVIEW")}>검토중</button>
+                                        <button className="rounded border px-2 py-1 text-xs" onClick={() => updateReportStatus(report.reportId, "RESOLVED")}>해결</button>
+                                        <button className="rounded border px-2 py-1 text-xs" onClick={() => updateReportStatus(report.reportId, "REJECTED")}>반려</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+                                <UserCog className="h-5 w-5" /> 권한관리
+                            </h2>
+                            <span className={`rounded border px-2 py-0.5 text-xs ${isMaster ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-amber-300 bg-amber-50 text-amber-700"}`}>
+                                {isMaster ? "내 권한: MASTER" : "내 권한: ADMIN"}
+                            </span>
+                        </div>
+                        <button className="rounded border px-2 py-1 text-xs" onClick={() => fetchRoleMembers(roleKeyword)}>새로고침</button>
+                    </div>
+                    {!isMaster && (
+                        <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                            ROLE_MASTER 계정만 관리자 권한 부여/해제가 가능합니다.
+                        </div>
+                    )}
+                    <div className="mb-3 flex gap-2">
+                        <input
+                            value={roleKeyword}
+                            onChange={(e) => setRoleKeyword(e.target.value)}
+                            placeholder="이름/이메일 검색"
+                            className="w-full rounded border px-2 py-1 text-sm"
+                        />
+                        <button className="rounded border px-3 py-1 text-sm" onClick={searchRoleMembers}>검색</button>
+                    </div>
+
+                    {!roleMembers.items?.length ? (
+                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">조회된 회원이 없습니다.</div>
+                    ) : (
+                        <div className="space-y-2">
+                            {roleMembers.items.map((member) => (
+                                <div key={getMemberIdValue(member) || member.email} className="rounded-xl border p-3">
+                                    <div className="mb-1 flex items-center justify-between">
+                                        <div className="text-sm font-semibold">{member.name || "(이름없음)"} · #{getMemberIdValue(member)}</div>
+                                        <span className="text-xs text-slate-500">{member.memberStatus}</span>
+                                    </div>
+                                    <div className="mb-2 text-xs text-slate-600">{member.email}</div>
+                                    <div className="mb-2 flex flex-wrap gap-1">
+                                        {(member.roles || []).map((role) => (
+                                            <span key={`${getMemberIdValue(member)}-${role}`} className="rounded border bg-slate-50 px-2 py-0.5 text-[11px]">
+                                                {role}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <button
+                                        className={`rounded px-2 py-1 text-xs text-white ${hasAdminRole(member.roles) ? "bg-rose-600" : "bg-blue-600"}`}
+                                        onClick={() => updateMemberAdminRole(member)}
+                                        disabled={!isMaster}
+                                    >
+                                        {hasAdminRole(member.roles) ? "관리자 해제" : "관리자 부여"}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+                            <History className="h-5 w-5" /> 권한 변경 이력
+                        </h2>
+                        <button className="rounded border px-2 py-1 text-xs" onClick={fetchRoleAudits}>새로고침</button>
+                    </div>
+                    {!roleAudits.items?.length ? (
+                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">권한 변경 이력이 없습니다.</div>
+                    ) : (
+                        <div className="space-y-2">
+                            {roleAudits.items.map((audit) => (
+                                <div key={audit.roleAuditId} className="rounded-xl border p-3 text-sm">
+                                    <div className="mb-1 font-semibold">
+                                        #{audit.roleAuditId} · 대상 {audit.targetEmail} (#{audit.targetMemberId})
+                                    </div>
+                                    <div className="text-xs text-slate-600">변경자: {audit.changedByEmail} (#{audit.changedByMemberId})</div>
+                                    <div className="text-xs text-slate-600">변경: {audit.beforeRoles} → {audit.afterRoles}</div>
+                                    <div className="text-xs text-slate-600">사유: {audit.changeReason || "(없음)"}</div>
+                                    <div className="text-[11px] text-slate-400">{audit.createdAt}</div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -642,3 +1239,7 @@ export const AdminAnomalies = () => {
         </section>
     );
 };
+
+
+
+

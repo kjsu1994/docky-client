@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 if (typeof global === 'undefined') { window.global = window; }
 import { 
     Dices, Trophy, Play, RefreshCcw, Coins, Info, Award, Lock, Unlock, AlertCircle, TrendingUp
@@ -128,6 +128,10 @@ export const LuckyPlinko = () => {
     const [rolling, setRolling] = useState(false);
     const [gameResult, setGameResult] = useState(null);
     const [plinkoResult, setPlinkoResult] = useState(null);
+    const [pendingPlinkoResult, setPendingPlinkoResult] = useState(null);
+    const [landedCount, setLandedCount] = useState(0);
+    const [totalToLand, setTotalToLand] = useState(0);
+    const [playInProgress, setPlayInProgress] = useState(false);
     const [marbles, setMarbles] = useState(0);
     const [activeSlot, setActiveSlot] = useState(null);
     const [slotTopPercent, setSlotTopPercent] = useState(72);
@@ -142,6 +146,17 @@ export const LuckyPlinko = () => {
     const rollAudio = useRef(new Audio(ROLL_SOUND_URL));
     const tapAudio = useRef(new Audio(SOFT_TAP_URL));
     const lastTapAtRef = useRef(0);
+
+    useEffect(() => {
+        // 紐⑤뱺 援ъ뒳 李⑹?媛 ?앸궃 ?ㅼ뿉留?API 理쒖쥌 ?먯닔瑜??몄텧?쒕떎.
+        if (!playInProgress || !pendingPlinkoResult || totalToLand === 0) return;
+        if (landedCount < totalToLand) return;
+
+        setPlinkoResult(pendingPlinkoResult);
+        setPendingPlinkoResult(null);
+        setPlayInProgress(false);
+        toast.success(`${formatNumber(pendingPlinkoResult.earnedPoint)} points earned!`);
+    }, [landedCount, totalToLand, pendingPlinkoResult, playInProgress]);
 
     useEffect(() => {
         const updateSlotCenters = () => {
@@ -187,7 +202,7 @@ export const LuckyPlinko = () => {
         let height = 800;
         const lineBelowOffsetPx = 45;
         const landingLineOffsetPx = 12;
-        const slotHeightPx = 64;
+        let slotHeightPx = 64;
         let slotWidth = width / slotCount;
         let lastPinY = 150 + 6 * (height / 12);
         let slotTopY = lastPinY + landingLineOffsetPx + lineBelowOffsetPx;
@@ -208,6 +223,33 @@ export const LuckyPlinko = () => {
 
         let pins = buildPins(width, height);
 
+        const syncSlotGeometry = (canvasRect) => {
+            let hasAllSlotElements = true;
+            const centers = Array.from({ length: slotCount }, (_, idx) => {
+                const el = slotRefs.current[idx];
+                if (!el) {
+                    hasAllSlotElements = false;
+                    return (idx + 0.5) / slotCount;
+                }
+                const rect = el.getBoundingClientRect();
+                const centerPx = rect.left + rect.width / 2 - canvasRect.left;
+                return Math.max(0, Math.min(1, centerPx / Math.max(1, canvasRect.width)));
+            });
+            slotCentersRef.current = centers;
+
+            const firstSlot = slotRefs.current[0]?.getBoundingClientRect();
+            if (firstSlot) {
+                slotTopY = Math.max(0, firstSlot.top - canvasRect.top);
+                slotHeightPx = firstSlot.height;
+                floorY = slotTopY + (slotHeightPx / 2);
+                setSlotTopPercent((slotTopY / Math.max(1, height)) * 100);
+            } else if (!hasAllSlotElements) {
+                slotTopY = lastPinY + landingLineOffsetPx + lineBelowOffsetPx;
+                floorY = slotTopY + (slotHeightPx / 2);
+                setSlotTopPercent((slotTopY / Math.max(1, height)) * 100);
+            }
+        };
+
         const syncCanvasSize = () => {
             const rect = canvas.getBoundingClientRect();
             if (!rect.width || !rect.height) return;
@@ -227,6 +269,7 @@ export const LuckyPlinko = () => {
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             pins = buildPins(width, height);
+            syncSlotGeometry(rect);
         };
 
         syncCanvasSize();
@@ -246,12 +289,12 @@ export const LuckyPlinko = () => {
             return (slotIndex + 0.5) * slotWidth;
         };
         const physics = {
-            gravity: 1650,
-            airDrag: 0.992,
-            wallRestitution: 0.56,
-            pinRestitution: 0.62,
-            pinFriction: 0.1,
-            maxHorizontalSpeed: 260
+            gravity: 1480,
+            airDrag: 0.993,
+            wallRestitution: 0.58,
+            pinRestitution: 0.66,
+            pinFriction: 0.08,
+            maxHorizontalSpeed: 245
         };
         const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
         const finishParticle = (p, now) => {
@@ -263,17 +306,13 @@ export const LuckyPlinko = () => {
             p.vy = 0;
             p.finished = true;
             p.finishedAt = now;
+            p.removeAt = now + 260;
+            setLandedCount((prev) => prev + 1);
             setActiveSlot(p.targetSlot);
-            setTimeout(() => setActiveSlot(null), 180);
+            setTimeout(() => setActiveSlot(null), 260);
         };
         const stepParticle = (p, dt, now) => {
             if (p.finished) return;
-
-            // Async predicted landing: synchronize disappearance and slot hit feedback.
-            if (now >= p.expectedAt && p.y > floorY * 0.86) {
-                finishParticle(p, now);
-                return;
-            }
 
             p.vy += physics.gravity * dt;
             p.vx *= Math.pow(physics.airDrag, dt * 60);
@@ -344,6 +383,10 @@ export const LuckyPlinko = () => {
             }
 
             p.vx = clamp(p.vx, -physics.maxHorizontalSpeed, physics.maxHorizontalSpeed);
+            // 자유낙하 구간에서는 약한 유도력만 적용해 자연스러운 궤적을 유지한다.
+            const targetDx = targetX - p.x;
+            const descentRatio = clamp((p.y - lastPinY) / Math.max(1, floorY - lastPinY), 0, 1);
+            p.vx += clamp(targetDx * (0.00035 + descentRatio * 0.0016), -12, 12);
             if (p.y + p.radius >= floorY) {
                 p.y = floorY - p.radius;
                 finishParticle(p, now);
@@ -386,13 +429,18 @@ export const LuckyPlinko = () => {
                 ctx.arc(pin.x, pin.y, 5, 0, Math.PI * 2);
                 ctx.fill();
             });
+            const now = performance.now();
             particlesRef.current.forEach((p) => {
-                if (p.finished) return;
+                if (p.finished && now > (p.removeAt || p.finishedAt || now)) return;
                 ctx.save();
                 const grad = ctx.createRadialGradient(p.x - 4, p.y - 4, 2, p.x, p.y, 12);
                 grad.addColorStop(0, '#fde68a');
                 grad.addColorStop(0.4, '#f59e0b');
                 grad.addColorStop(1, '#b45309');
+                if (p.finished) {
+                    const remain = Math.max(0, (p.removeAt || now) - now);
+                    ctx.globalAlpha = Math.max(0.35, remain / 260);
+                }
                 ctx.shadowBlur = 16;
                 ctx.shadowColor = 'rgba(245, 158, 11, 0.45)';
                 ctx.fillStyle = grad;
@@ -410,11 +458,12 @@ export const LuckyPlinko = () => {
             lastTime = time;
             accumulator += delta;
             while (accumulator >= fixedStep) {
-                const now = performance.now();
-                particlesRef.current.forEach((p) => stepParticle(p, fixedStep, now));
+                const stepNow = performance.now();
+                particlesRef.current.forEach((p) => stepParticle(p, fixedStep, stepNow));
                 accumulator -= fixedStep;
             }
-            particlesRef.current = particlesRef.current.filter((p) => !p.finished);
+            const filterNow = performance.now();
+            particlesRef.current = particlesRef.current.filter((p) => !(p.finished && filterNow > (p.removeAt || p.finishedAt || filterNow)));
             render();
             animationFrameRef.current = requestAnimationFrame(frame);
         };
@@ -472,8 +521,9 @@ export const LuckyPlinko = () => {
         }
     };
     const playPlinko = async () => {
-        if (marbles <= 0) return;
+        if (marbles <= 0 || playInProgress) return;
         try {
+            setPlayInProgress(true);
             const response = await api.post("/game/plinko/play");
             const data = response.data?.data || response.data;
             const normalized = { 
@@ -482,19 +532,26 @@ export const LuckyPlinko = () => {
                 earnedPoint: data.earned_point !== undefined ? data.earned_point : data.earnedPoint,
                 totalPoint: data.total_point !== undefined ? data.total_point : data.totalPoint
             };
-            setPlinkoResult(normalized); setStep(4);
+            setStep(4);
+            if (normalized.landingSlots.length === 0) {
+                setPlinkoResult(normalized);
+                setPendingPlinkoResult(null);
+                setPlayInProgress(false);
+                toast.success(`${formatNumber(normalized.earnedPoint)} points earned!`);
+                return;
+            }
+            setPlinkoResult(null);
+            setPendingPlinkoResult(normalized);
+            setLandedCount(0);
+            setTotalToLand(normalized.landingSlots.length);
+            particlesRef.current = [];
+            setActiveSlot(null);
             const spawnX = boardSizeRef.current.width / 2;
-            const startedAt = performance.now();
-            const estimateFlightMs = (slot, index) => {
-                const slotDistance = Math.abs(slot - 3.5);
-                return 2100 + index * 150 + slotDistance * 95;
-            };
             const newParticles = normalized.landingSlots.map((slot, i) => ({
                 x: spawnX,
                 y: 48 + i * 2,
                 vx: 0,
                 vy: Math.random() * 25,
-                expectedAt: startedAt + i * 180 + estimateFlightMs(slot, i),
                 targetSlot: slot,
                 radius: 10 + Math.random() * 1.5,
                 spin: 0,
@@ -505,8 +562,10 @@ export const LuckyPlinko = () => {
                 lastTapAt: 0
             }));
             newParticles.forEach((p, i) => setTimeout(() => particlesRef.current.push(p), i * 180));
-            toast.success(`${formatNumber(normalized.earnedPoint)} points earned!`);
-        } catch (error) { toast.error("Plinko error"); }
+        } catch (error) {
+            setPlayInProgress(false);
+            toast.error("Plinko error");
+        }
     };
 
     const toggleHold = (idx) => {
@@ -515,7 +574,18 @@ export const LuckyPlinko = () => {
     };
 
     const resetGame = () => {
-        setStep(1); setDice([1, 2, 3, 4, 5]); setHeldIndices([]); setGameResult(null); setPlinkoResult(null); setMarbles(0); particlesRef.current = []; setActiveSlot(null);
+        setStep(1);
+        setDice([1, 2, 3, 4, 5]);
+        setHeldIndices([]);
+        setGameResult(null);
+        setPlinkoResult(null);
+        setPendingPlinkoResult(null);
+        setLandedCount(0);
+        setTotalToLand(0);
+        setPlayInProgress(false);
+        setMarbles(0);
+        particlesRef.current = [];
+        setActiveSlot(null);
     };
 
     return (
@@ -540,6 +610,11 @@ export const LuckyPlinko = () => {
                                 <Coins className="h-8 w-8 text-amber-400" />
                                 {formatNumber(plinkoResult?.totalPoint || user?.point || 0)}
                             </div>
+                            {playInProgress && (
+                                <div className="mt-2 text-center text-amber-200 text-xs font-black tracking-wide">
+                                    LANDING {landedCount}/{totalToLand}
+                                </div>
+                            )}
                             {plinkoResult?.earnedPoint !== undefined && (
                                 <div className="mt-2 text-center text-emerald-300 text-sm font-black tracking-wide">
                                     +{formatNumber(plinkoResult.earnedPoint)} EARNED
@@ -577,7 +652,7 @@ export const LuckyPlinko = () => {
                                     <button onClick={rerollDice} disabled={rolling || heldIndices.length < 1 || heldIndices.length > 4} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] disabled:opacity-50">REROLL OTHERS</button>
                                     <div className="flex gap-3">
                                         <button onClick={() => setStep(3)} className="flex-1 py-4 rounded-2xl bg-slate-800 text-indigo-300 font-bold border border-indigo-900">KEEP</button>
-                                        {marbles > 0 && <button onClick={playPlinko} className="flex-1 py-4 rounded-2xl bg-amber-500 text-black font-black shadow-lg animate-pulse">PLAY NOW!</button>}
+                                        {marbles > 0 && <button onClick={playPlinko} disabled={playInProgress} className="flex-1 py-4 rounded-2xl bg-amber-500 text-black font-black shadow-lg animate-pulse disabled:opacity-40 disabled:animate-none">PLAY NOW!</button>}
                                     </div>
                                 </div>
                             )}
@@ -593,7 +668,7 @@ export const LuckyPlinko = () => {
                         <div className="w-full flex justify-between items-center mb-10 z-10">
                             <h3 className="text-3xl font-black text-white italic tracking-tighter uppercase">Cabinet Board</h3>
                             {step === 3 && marbles > 0 && (
-                                <button onClick={playPlinko} className="bg-amber-500 text-black px-12 py-4 rounded-2xl font-black text-2xl shadow-[0_0_30px_rgba(245,158,11,0.4)] animate-bounce">PUSH START</button>
+                                <button onClick={playPlinko} disabled={playInProgress} className="bg-amber-500 text-black px-12 py-4 rounded-2xl font-black text-2xl shadow-[0_0_30px_rgba(245,158,11,0.4)] animate-bounce disabled:opacity-40 disabled:animate-none">PUSH START</button>
                             )}
                         </div>
 
@@ -604,7 +679,7 @@ export const LuckyPlinko = () => {
 
                             <div className="absolute top-8 left-1/2 -translate-x-1/2 w-56 h-16 bg-gradient-to-b from-amber-300 to-amber-500 rounded-[1.5rem] border-4 border-amber-700 z-[25] flex items-center justify-center shadow-[0_8px_0_rgba(120,53,15,0.65)]">
                                 <div className="w-[90%] h-[68%] rounded-xl bg-slate-900/80 border border-slate-200/20 flex items-center justify-center">
-                                    <span className="text-white font-black tracking-tight text-xl">럭키 플링코</span>
+                                    <span className="text-white font-black tracking-tight text-xl">Lucky Plinko</span>
                                 </div>
                             </div>
 
@@ -644,3 +719,4 @@ export const LuckyPlinko = () => {
         </div>
     );
 };
+

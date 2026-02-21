@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     User,
@@ -552,7 +552,7 @@ const StatsTab = ({ memberData, levelData }) => {
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <span className="font-semibold text-slate-900">
-                                Lv. {levelData.level || 1} -> Lv. {(levelData.level || 1) + 1}
+                                Lv. {levelData.level || 1} {"->"} Lv. {(levelData.level || 1) + 1}
                             </span>
                             <span className="text-sm text-slate-600">
                                 {formatNumber(currentExp)} / {formatNumber(nextExp)}

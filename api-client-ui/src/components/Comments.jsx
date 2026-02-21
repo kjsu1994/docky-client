@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MessageCircle, Heart, Edit2, Trash2, Send } from "lucide-react";
+import { MessageCircle, Heart, Edit2, Trash2, Send, Flag } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import api from "../utils/api.js";
 import toast from "react-hot-toast";
@@ -151,6 +151,24 @@ export const Comments = ({ boardId, onUpdate }) => {
         }
     };
 
+    const handleReportComment = async (commentId) => {
+        const reason = window.prompt("신고 사유를 입력하세요.", "부적절한 댓글");
+        if (!reason) return;
+        const detail = window.prompt("상세 내용을 입력하세요. (선택)", "") || "";
+
+        try {
+            await api.post("/reports", {
+                targetType: "COMMENT",
+                targetId: Number(commentId),
+                reason,
+                detail,
+            });
+            toast.success("신고가 접수되었습니다.");
+        } catch (reportError) {
+            toast.error(reportError.response?.data?.message || "신고 접수에 실패했습니다.");
+        }
+    };
+
     if (fetching) return <div className="text-center py-4 text-slate-500">댓글 로딩 중...</div>;
 
     return (
@@ -258,6 +276,15 @@ export const Comments = ({ boardId, onUpdate }) => {
                                             <Heart className={`h-4 w-4 group-hover:fill-red-500`} />
                                             <span>{comment.like_count ?? comment.likeCount ?? 0}</span>
                                         </button>
+
+                                        {user && (
+                                            <button
+                                                onClick={() => handleReportComment(commentId)}
+                                                className="flex items-center gap-1 text-sm text-slate-500 hover:text-amber-600"
+                                            >
+                                                <Flag className="h-3.5 w-3.5" /> 신고
+                                            </button>
+                                        )}
 
                                         {canManageComment && (
                                             <div className="flex gap-3 border-l pl-4">

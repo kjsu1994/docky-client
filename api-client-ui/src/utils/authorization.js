@@ -52,7 +52,11 @@ export const isAdminUser = (user) => {
         hasRole(user.roles, "ROLE_ADMIN") ||
         hasRole(user.role, "ROLE_ADMIN") ||
         hasRole(user.member?.roles, "ROLE_ADMIN") ||
-        hasRole(user.member?.role, "ROLE_ADMIN")
+        hasRole(user.member?.role, "ROLE_ADMIN") ||
+        hasRole(user.roles, "ROLE_MASTER") ||
+        hasRole(user.role, "ROLE_MASTER") ||
+        hasRole(user.member?.roles, "ROLE_MASTER") ||
+        hasRole(user.member?.role, "ROLE_MASTER")
     );
 };
 

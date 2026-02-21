@@ -7,7 +7,8 @@ import {
     Download,
     Edit,
     Trash2,
-    FileText
+    FileText,
+    Flag
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../utils/api";
@@ -103,6 +104,24 @@ export const BoardDetail = () => {
         }
     };
 
+    const handleReportBoard = async () => {
+        const reason = window.prompt("신고 사유를 입력하세요.", "부적절한 게시물");
+        if (!reason) return;
+        const detail = window.prompt("상세 내용을 입력하세요. (선택)", "") || "";
+
+        try {
+            await api.post("/reports", {
+                targetType: "BOARD",
+                targetId: Number(boardId),
+                reason,
+                detail,
+            });
+            toast.success("신고가 접수되었습니다.");
+        } catch (reportError) {
+            toast.error(reportError.response?.data?.message || "신고 접수에 실패했습니다.");
+        }
+    };
+
     if (loading) return <LoadingSpinner text="게시글 로딩 중..." />;
     if (error) return <div className="p-6"><ErrorMessage message={error} /></div>;
     if (!board) return <div className="p-6 text-center">게시글이 없습니다.</div>;
@@ -193,10 +212,15 @@ export const BoardDetail = () => {
                 </div>
 
                 <div className="p-6 border-t bg-slate-50/30">
-                    <button onClick={handleLike} disabled={liking} className="btn-secondary text-red-600 border-red-100 hover:bg-red-50">
-                        <Heart className={`h-4 w-4 mr-2 ${liking ? 'animate-ping' : ''}`} />
-                        좋아요 {formatNumber(currentLikeCount)}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                        <button onClick={handleLike} disabled={liking} className="btn-secondary text-red-600 border-red-100 hover:bg-red-50">
+                            <Heart className={`h-4 w-4 mr-2 ${liking ? 'animate-ping' : ''}`} />
+                            좋아요 {formatNumber(currentLikeCount)}
+                        </button>
+                        <button onClick={handleReportBoard} className="btn-secondary text-amber-700 border-amber-200 hover:bg-amber-50">
+                            <Flag className="h-4 w-4 mr-2" /> 게시글 신고
+                        </button>
+                    </div>
                 </div>
             </div>
 
