@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LoadingPage } from "./components/LoadingSpinner";
@@ -20,10 +20,12 @@ import { LuckyPlinko } from "./pages/LuckyPlinko.jsx";
 import { Queue } from "./pages/Queue.jsx";
 import { MeetingOptimizer } from "./pages/MeetingOptimizer.jsx";
 import { AdminAnomalies } from "./pages/AdminAnomalies.jsx";
+import { AdminOperations } from "./pages/AdminOperations.jsx";
 import { Chat } from "./pages/Chat.jsx";
 import { AllMenu } from "./pages/AllMenu.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
+import { CustomCursor } from "./components/CustomCursor.jsx";
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -36,9 +38,19 @@ const ProtectedRoute = ({ children }) => {
 
 const AppLayout = ({ children }) => {
     return (
-        <div className="min-h-screen bg-slate-50 relative">
+        <div className="min-h-screen relative overflow-hidden">
+            <CustomCursor />
+            {/* Dynamic Background Blobs */}
+            <div className="bg-vibe">
+                <div className="bg-vibe-blob" />
+                <div className="bg-vibe-blob" />
+                <div className="bg-vibe-blob" />
+            </div>
+            
             <Header />
-            <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8">{children}</main>
+            <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8 relative z-10">
+                {children}
+            </main>
             <FloatingChat />
             <BottomNav />
         </div>
@@ -73,6 +85,7 @@ function App() {
                     <Route path="/app/plinko" element={<ProtectedRoute><AppLayout><LuckyPlinko /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/optimizer" element={<ProtectedRoute><AppLayout><MeetingOptimizer /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/admin/anomalies" element={<ProtectedRoute><AppLayout><AdminAnomalies /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/admin/operations" element={<ProtectedRoute><AppLayout><AdminOperations /></AppLayout></ProtectedRoute>} />
 
                     <Route path="/" element={<Navigate to="/app" replace />} />
                     <Route path="*" element={<Navigate to="/app" replace />} />
@@ -99,3 +112,5 @@ function App() {
 }
 
 export default App;
+
+

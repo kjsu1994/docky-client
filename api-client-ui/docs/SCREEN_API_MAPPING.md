@@ -1,4 +1,4 @@
-﻿# Screen to API Mapping (화면-API 매핑)
+# Screen to API Mapping (화면-API 매핑)
 
 ## Core Routes
 - `/login`
@@ -74,3 +74,8 @@
 ## Update Rule (갱신 규칙)
 - route behavior 변경 시 이 파일을 같은 PR에서 갱신한다.
 - endpoint contract 변경 시 OpenAPI-linked checks를 먼저 갱신한다.
+
+- `/app/admin/operations` (ROLE_ADMIN | ROLE_MASTER)
+  - `PATCH /admin/moderation/boards/batch`
+  - `PATCH /admin/moderation/comments/batch`
+  - `GET /admin/members/{member-id}`

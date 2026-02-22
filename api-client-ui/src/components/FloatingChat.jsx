@@ -459,7 +459,7 @@ export const FloatingChat = () => {
                                     </div>
                                     <div>
                                         <div className="font-black text-sm uppercase tracking-wider">Secure Chat</div>
-                                        <div className="text-[10px] font-bold text-primary-100 uppercase tracking-widest">v2.0 Beta</div>
+                                        <div className="text-[10px] font-bold text-primary-100 uppercase tracking-widest">회원 메신저</div>
                                     </div>
                                 </>
                             )}

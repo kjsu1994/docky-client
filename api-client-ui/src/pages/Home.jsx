@@ -53,6 +53,15 @@ export const Home = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    // 마우스 추적 핸들러 (Spotlight Effect)
+    const handleMouseMove = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        e.currentTarget.style.setProperty("--mouse-x", `${x}px`);
+        e.currentTarget.style.setProperty("--mouse-y", `${y}px`);
+    };
+
     // 컴포넌트 마운트 시 데이터 로드
     useEffect(() => {
         const fetchData = async () => {
@@ -130,18 +139,21 @@ export const Home = () => {
                     label="전체 회원" 
                     value={formatNumber(stats.summary?.total_members || stats.summary?.totalMembers || 0)} 
                     color="blue" 
+                    onMouseMove={handleMouseMove}
                 />
                 <StatMiniCard 
                     icon={MessageSquare} 
                     label="전체 게시글" 
                     value={formatNumber(stats.summary?.total_boards || stats.summary?.totalBoards || 0)} 
                     color="indigo" 
+                    onMouseMove={handleMouseMove}
                 />
                 <StatMiniCard 
                     icon={Eye} 
                     label="오늘 방문자" 
                     value={formatNumber(stats.summary?.today_visitors || stats.summary?.todayVisitors || 0)} 
                     color="sky"
+                    onMouseMove={handleMouseMove}
                     trend={stats.compare ? {
                         isGrowth: changeRate >= 0,
                         label: toPercentLabel(changeRate)
@@ -152,6 +164,7 @@ export const Home = () => {
                     label="실시간 활성" 
                     value={formatNumber(stats.summary?.active_members || stats.summary?.activeMembers || 0)} 
                     color="slate" 
+                    onMouseMove={handleMouseMove}
                 />
             </div>
 
@@ -166,12 +179,12 @@ export const Home = () => {
                     </div>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
-                    <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" />
-                    <QuickMenuLink to="/app/optimizer" icon={MapPin} title="중간장소" color="rose" />
-                    <QuickMenuLink to="/app/ranks" icon={Trophy} title="랭킹" color="amber" />
-                    <QuickMenuLink to="/app/plinko" icon={Dices} title="플링코" color="emerald" />
-                    <QuickMenuLink to="/app/news" icon={Newspaper} title="뉴스" color="indigo" />
-                    <QuickMenuLink to="/app/gpt" icon={Bot} title="GPT 질문" color="slate" />
+                    <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" onMouseMove={handleMouseMove} />
+                    <QuickMenuLink to="/app/optimizer" icon={MapPin} title="중간장소" color="rose" onMouseMove={handleMouseMove} />
+                    <QuickMenuLink to="/app/ranks" icon={Trophy} title="랭킹" color="amber" onMouseMove={handleMouseMove} />
+                    <QuickMenuLink to="/app/plinko" icon={Dices} title="플링코" color="emerald" onMouseMove={handleMouseMove} />
+                    <QuickMenuLink to="/app/news" icon={Newspaper} title="뉴스" color="indigo" onMouseMove={handleMouseMove} />
+                    <QuickMenuLink to="/app/gpt" icon={Bot} title="GPT 질문" color="slate" onMouseMove={handleMouseMove} />
                 </div>
             </section>
 
@@ -192,7 +205,8 @@ export const Home = () => {
                             <Link
                                 key={board?.board_id || board?.boardId || Math.random()}
                                 to={`/app/boards/${toBoardKind(board)}/${board?.board_id || board?.boardId}`}
-                                className="card group bg-white p-7"
+                                onMouseMove={handleMouseMove}
+                                className="card spotlight-card group bg-white p-7"
                             >
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="rounded-lg bg-primary-50 px-2.5 py-1 text-[10px] font-black text-primary-600 uppercase tracking-wider">
@@ -227,7 +241,7 @@ export const Home = () => {
 };
 
 // 미니 통계 카드 컴포넌트
-const StatMiniCard = ({ icon: Icon, label, value, color, trend }) => {
+const StatMiniCard = ({ icon: Icon, label, value, color, trend, onMouseMove }) => {
     const colors = {
         blue: "text-blue-600 bg-blue-50/50",
         indigo: "text-indigo-600 bg-indigo-50/50",
@@ -236,7 +250,7 @@ const StatMiniCard = ({ icon: Icon, label, value, color, trend }) => {
     };
 
     return (
-        <div className="card flex flex-col items-center justify-center bg-white p-6 sm:p-8 text-center group">
+        <div onMouseMove={onMouseMove} className="card spotlight-card flex flex-col items-center justify-center bg-white p-6 sm:p-8 text-center group">
             <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl ${colors[color]} group-hover:scale-110 transition-transform duration-300`}>
                 <Icon className="h-7 w-7" />
             </div>
@@ -253,7 +267,7 @@ const StatMiniCard = ({ icon: Icon, label, value, color, trend }) => {
 };
 
 // 퀵 메뉴 링크 컴포넌트
-const QuickMenuLink = ({ to, icon: Icon, title, color }) => {
+const QuickMenuLink = ({ to, icon: Icon, title, color, onMouseMove }) => {
     const colors = {
         blue: "text-blue-500 bg-white shadow-blue-100",
         rose: "text-rose-500 bg-white shadow-rose-100",
@@ -264,7 +278,7 @@ const QuickMenuLink = ({ to, icon: Icon, title, color }) => {
     };
 
     return (
-        <Link to={to} className="flex flex-col items-center gap-3 group">
+        <Link to={to} onMouseMove={onMouseMove} className="flex flex-col items-center gap-3 group spotlight-card p-2 rounded-[2.5rem]">
             <div className={`flex w-full aspect-square items-center justify-center rounded-[2.5rem] bg-white shadow-xl transition-all duration-500 group-hover:scale-105 group-hover:-translate-y-2 group-hover:shadow-2xl group-active:scale-95 ${colors[color]}`}>
                 <Icon className="h-8 w-8 sm:h-10 sm:w-10" />
             </div>

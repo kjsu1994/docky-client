@@ -14,10 +14,10 @@ import { useBoards } from "../hooks/useBoards";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../utils/api";
 import toast from "react-hot-toast";
-import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { EmptyState } from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
+import { ListSkeleton } from "../components/Skeleton";
 import {
     getBoardKindLabel,
     formatRelativeTime,
@@ -174,8 +174,12 @@ export const BoardList = () => {
                 </div>
             </div>
 
-            {loading ? <LoadingSpinner text="로딩 중..." /> : error ? <ErrorMessage message={error} /> : (filteredCount === 0) ? (
-                <EmptyState title="게시글이 없습니다" />
+            {loading ? (
+                <ListSkeleton count={5} />
+            ) : error ? (
+                <ErrorMessage message={error} />
+            ) : (filteredCount === 0) ? (
+                <EmptyState message="게시글이 없습니다." subMessage="새로운 이야기를 시작해보세요!" />
             ) : (
                 <>
                     {/* 1. 공지사항 섹션 */}
@@ -183,14 +187,15 @@ export const BoardList = () => {
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 text-sm font-semibold text-amber-700"><Megaphone className="h-4 w-4" />필독 공지사항</div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {noticeBoards.map(b => (
-                                    <NoticeBoardCard 
-                                        key={b.board_id || b.boardId} 
-                                        board={b} 
-                                        user={user} 
-                                        onDelete={handleDeleteBoard} 
-                                        onOpen={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}`)} 
-                                    />
+                                {noticeBoards.map((b, idx) => (
+                                    <div key={b.board_id || b.boardId} className="animate-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
+                                        <NoticeBoardCard 
+                                            board={b} 
+                                            user={user} 
+                                            onDelete={handleDeleteBoard} 
+                                            onOpen={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}`)} 
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -204,15 +209,16 @@ export const BoardList = () => {
                                     <ImageIcon className="h-4 w-4" />일반 게시글
                                 </div>
                             )}
-                            {regularBoards.map(b => (
-                                <BoardCard 
-                                    key={b.board_id || b.boardId} 
-                                    board={b} 
-                                    user={user} 
-                                    onDelete={handleDeleteBoard} 
-                                    onOpen={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}`)} 
-                                    onEdit={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}/edit`)} 
-                                />
+                            {regularBoards.map((b, idx) => (
+                                <div key={b.board_id || b.boardId} className="animate-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
+                                    <BoardCard 
+                                        board={b} 
+                                        user={user} 
+                                        onDelete={handleDeleteBoard} 
+                                        onOpen={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}`)} 
+                                        onEdit={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}/edit`)} 
+                                    />
+                                </div>
                             ))}
                         </div>
                     )}

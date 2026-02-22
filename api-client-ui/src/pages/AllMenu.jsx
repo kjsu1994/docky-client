@@ -1,20 +1,20 @@
 import { Link } from "react-router-dom";
-import { 
-    Home, 
-    BarChart, 
-    MessageSquare, 
-    Trophy, 
-    Newspaper, 
-    Calculator, 
-    Bot, 
-    Dices, 
-    MapPin, 
-    User, 
-    ShieldAlert, 
+import {
+    Home,
+    BarChart,
+    MessageSquare,
+    Trophy,
+    Newspaper,
+    Calculator,
+    Bot,
+    Dices,
+    MapPin,
+    User,
+    ShieldAlert,
     Settings,
     LogOut,
     ChevronRight,
-    HelpCircle
+    HelpCircle,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdminUser } from "../utils/authorization";
@@ -55,11 +55,11 @@ export const AllMenu = () => {
 
     const tools = [
         { title: "중간장소 찾기", to: "/app/optimizer", icon: MapPin, color: "bg-rose-50 text-rose-600" },
-        { title: "랭킹 시스템", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
-        { title: "럭키 플링코", to: "/app/plinko", icon: Dices, color: "bg-violet-50 text-violet-600" },
-        { title: "최신 뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
+        { title: "랭킹", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
+        { title: "플링코", to: "/app/plinko", icon: Dices, color: "bg-violet-50 text-violet-600" },
+        { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
         { title: "전기요금 계산기", to: "/app/calculators", icon: Calculator, color: "bg-orange-50 text-orange-600" },
-        { title: "GPT 인공지능", to: "/app/gpt", icon: Bot, color: "bg-cyan-50 text-cyan-600" },
+        { title: "GPT", to: "/app/gpt", icon: Bot, color: "bg-cyan-50 text-cyan-600" },
     ];
 
     const account = [
@@ -69,11 +69,11 @@ export const AllMenu = () => {
 
     const admin = [
         { title: "관리자 콘솔", to: "/app/admin/anomalies", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
+        { title: "운영 툴", to: "/app/admin/operations", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
     ];
 
     return (
         <div className="space-y-8 pb-20 animate-fade-in">
-            {/* 상단 프로필 요약 */}
             <div className="p-8 rounded-[2.5rem] bg-white border border-slate-100 shadow-xl shadow-slate-200/50 flex items-center justify-between">
                 <div className="flex items-center gap-5">
                     <div className="h-16 w-16 rounded-[1.5rem] bg-gradient-to-tr from-primary-600 to-primary-400 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-primary-200">
@@ -84,7 +84,7 @@ export const AllMenu = () => {
                         <div className="text-sm font-medium text-slate-400">{user?.email}</div>
                     </div>
                 </div>
-                <button 
+                <button
                     onClick={logout}
                     className="p-4 rounded-3xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
                 >

@@ -4,14 +4,25 @@ import { Mail, Lock, Leaf } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import api from "../utils/api";
 
 export const Login = () => {
     const [email, setEmail] = useState("user@gmail.com");
     const [password, setPassword] = useState("qwer1234");
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [lockInfo, setLockInfo] = useState(null);
+    const [releaseReason, setReleaseReason] = useState("");
+    const [releaseLoading, setReleaseLoading] = useState(false);
     const { login, loginWithTokens } = useAuth();
     const navigate = useNavigate();
+
+    const formatDateTime = (value) => {
+        if (!value) return "No end date";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString();
+    };
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -53,9 +64,37 @@ export const Login = () => {
         try {
             await login(email, password);
         } catch (error) {
+            const data = error?.response?.data;
+            if (data?.code === "ACCOUNT_LOCKED") {
+                setLockInfo({
+                    email,
+                    reason: data?.sanction_info?.reason || "No reason provided",
+                    startsAt: data?.sanction_info?.startsAt || data?.sanction_info?.starts_at || null,
+                    endsAt: data?.sanction_info?.endsAt || data?.sanction_info?.ends_at || null,
+                });
+            }
             console.error("Login error:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleReleaseRequest = async () => {
+        if (!lockInfo?.email || releaseLoading) return;
+
+        const toastId = toast.loading("Submitting release request...");
+        setReleaseLoading(true);
+        try {
+            await api.post("/sanctions/release-request", {
+                email: lockInfo.email,
+                request_reason: releaseReason.trim() || undefined,
+            });
+            toast.success("Release request submitted.", { id: toastId });
+            setReleaseReason("");
+        } catch (error) {
+            toast.error(error?.response?.data?.message || "Failed to submit release request.", { id: toastId });
+        } finally {
+            setReleaseLoading(false);
         }
     };
 
@@ -157,6 +196,51 @@ export const Login = () => {
                     </div>
                 </div>
             </div>
+
+            {lockInfo && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-xl font-black text-slate-900">Account Locked</h2>
+                        <p className="mt-2 text-sm text-slate-600">
+                            This account is currently sanctioned. Please review the details below.
+                        </p>
+
+                        <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                            <div><b>Email:</b> {lockInfo.email}</div>
+                            <div><b>Reason:</b> {lockInfo.reason}</div>
+                            <div><b>Start:</b> {formatDateTime(lockInfo.startsAt)}</div>
+                            <div><b>End:</b> {formatDateTime(lockInfo.endsAt)}</div>
+                        </div>
+
+                        <textarea
+                            className="input-base mt-4 min-h-[88px] w-full"
+                            value={releaseReason}
+                            onChange={(e) => setReleaseReason(e.target.value)}
+                            placeholder="Add a message for release review (optional)"
+                            maxLength={500}
+                        />
+
+                        <div className="mt-4 flex gap-2">
+                            <button
+                                type="button"
+                                className="btn-secondary flex-1"
+                                onClick={() => setLockInfo(null)}
+                                disabled={releaseLoading}
+                            >
+                                Close
+                            </button>
+                            <button
+                                type="button"
+                                className="btn-primary flex-1"
+                                onClick={handleReleaseRequest}
+                                disabled={releaseLoading}
+                            >
+                                {releaseLoading ? "Submitting..." : "Request Release"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

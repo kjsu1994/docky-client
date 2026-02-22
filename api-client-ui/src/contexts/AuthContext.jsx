@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+﻿import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import toast from "react-hot-toast";
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    // 초기 로드 시 토큰 확인 및 사용자 정보 가져오기
+    // 珥덇린 濡쒕뱶 ???좏겙 ?뺤씤 諛??ъ슜???뺣낫 媛?몄삤湲?
     useEffect(() => {
         const initAuth = async () => {
             const token = localStorage.getItem("accessToken");
@@ -60,21 +60,21 @@ export const AuthProvider = ({ children }) => {
         initAuth();
     }, []);
 
-    //2026.02.12 수정
+    //2026.02.12 ?섏젙
     const login = async (email, password) => {
         try {
             const response = await api.post("/members/login", { email, password });
             const loginBody = response.data?.data || response.data;
             const loginRoles = Array.isArray(loginBody?.roles) ? loginBody.roles : null;
 
-            // 헤더에서 토큰 추출 (대소문자 및 Bearer 접두어 대응)
+            // ?ㅻ뜑?먯꽌 ?좏겙 異붿텧 (??뚮Ц??諛?Bearer ?묐몢?????
             const authHeader = response.headers?.authorization || response.headers?.Authorization;
             const refreshHeader = response.headers?.refresh || response.headers?.Refresh;
 
             const accessToken = authHeader?.replace(/^Bearer\s+/i, "");
             const refreshToken = refreshHeader?.replace(/^Bearer\s+/i, "");
 
-            if (!accessToken) throw new Error("토큰을 찾을 수 없습니다.");
+            if (!accessToken) throw new Error("?좏겙??李얠쓣 ???놁뒿?덈떎.");
 
             localStorage.setItem("accessToken", accessToken);
             localStorage.setItem("refreshToken", refreshToken);
@@ -82,39 +82,42 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem("userRoles", JSON.stringify(loginRoles));
             }
 
-            // 유저 정보를 가져올 때 토큰이 바로 적용되도록 설정 확인 필요
+            // ?좎? ?뺣낫瑜?媛?몄삱 ???좏겙??諛붾줈 ?곸슜?섎룄濡??ㅼ젙 ?뺤씤 ?꾩슂
             const userResponse = await api.get("/members");
             const userData = userResponse.data.data || userResponse.data;
             setUser(withRolesFallback(userData, loginRoles || parseStoredRoles()));
 
-            toast.success("로그인 성공!");
+            toast.success("로그인성공!");
 
-            // 가상 대기열 진입 시도 (The Iron Queue)
+            // 媛???湲곗뿴 吏꾩엯 ?쒕룄 (The Iron Queue)
             try {
-                // 로그인 성공 직후 대기열 진입 요청
+                // 濡쒓렇???깃났 吏곹썑 ?湲곗뿴 吏꾩엯 ?붿껌
                 const queueResponse = await api.post("/api/queue/join");
                 const queueData = queueResponse.data?.data || queueResponse.data;
                 
-                // 만약 'WAITING' 상태라면 대기 페이지로 이동하여 순번 대기
+                // 留뚯빟 'WAITING' ?곹깭?쇰㈃ ?湲??섏씠吏濡??대룞?섏뿬 ?쒕쾲 ?湲?
                 if (queueData.status === "WAITING") {
                     navigate("/queue", { replace: true });
                     return;
                 }
             } catch (err) {
-                // 대기열 시스템 오류 시에는 서비스 가용성을 위해 일단 진입 허용
+                // ?湲곗뿴 ?쒖뒪???ㅻ쪟 ?쒖뿉???쒕퉬??媛?⑹꽦???꾪빐 ?쇰떒 吏꾩엯 ?덉슜
                 console.error("Queue join failed, proceeding anyway:", err);
             }
 
-            navigate("/app"); // 대기열이 없거나 'ALLOWED'인 경우 메인으로 이동
+            navigate("/app"); // ?湲곗뿴???녾굅??'ALLOWED'??寃쎌슦 硫붿씤?쇰줈 ?대룞
         } catch (error) {
-            toast.error(error.response?.data?.message || "로그인 실패");
+            if (error?.response?.data?.code === "ACCOUNT_LOCKED") {
+                throw error;
+            }
+            toast.error(error.response?.data?.message || "로그인실패");
             throw error;
         }
     };
 
     const loginWithTokens = async ({ accessToken, refreshToken }) => {
         if (!accessToken) {
-            throw new Error("액세스 토큰이 없습니다.");
+            throw new Error("?≪꽭???좏겙???놁뒿?덈떎.");
         }
 
         localStorage.setItem("accessToken", accessToken);
@@ -126,13 +129,13 @@ export const AuthProvider = ({ children }) => {
         const userData = userResponse.data.data || userResponse.data;
         setUser(withRolesFallback(userData, parseStoredRoles()));
 
-        // 가상 대기열 진입 시도 (OAuth 로그인 유저용)
+        // 媛???湲곗뿴 吏꾩엯 ?쒕룄 (OAuth 濡쒓렇???좎???
         try {
-            // OAuth로 로그인한 경우에도 동일하게 대기열 확인
+            // OAuth濡?濡쒓렇?명븳 寃쎌슦?먮룄 ?숈씪?섍쾶 ?湲곗뿴 ?뺤씤
             const queueResponse = await api.post("/api/queue/join");
             const queueData = queueResponse.data?.data || queueResponse.data;
             
-            // 대기 중이면 전용 페이지로 리다이렉트
+            // ?湲?以묒씠硫??꾩슜 ?섏씠吏濡?由щ떎?대젆??
             if (queueData.status === "WAITING") {
                 navigate("/queue", { replace: true });
                 return;
@@ -141,7 +144,7 @@ export const AuthProvider = ({ children }) => {
             console.error("Queue join failed, proceeding anyway:", err);
         }
 
-        // 바로 입장 가능하거나 대기열 오류 시 메인으로 이동
+        // 諛붾줈 ?낆옣 媛?ν븯嫄곕굹 ?湲곗뿴 ?ㅻ쪟 ??硫붿씤?쇰줈 ?대룞
         navigate("/app", { replace: true });
     };
 
@@ -155,7 +158,7 @@ export const AuthProvider = ({ children }) => {
             try {
                 await api.post("/members/logout");
             } catch (error) {
-                // 서버 로그아웃 실패여도 클라이언트 세션은 정리
+                // ?쒕쾭 濡쒓렇?꾩썐 ?ㅽ뙣?щ룄 ?대씪?댁뼵???몄뀡? ?뺣━
                 console.error("Failed to logout from server:", error);
             }
         }
@@ -166,7 +169,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
 
         if (!silent) {
-            toast.success("로그아웃되었습니다");
+            toast.success("Logged out successfully.");
         }
         navigate("/login");
     };
@@ -174,10 +177,10 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             await api.post("/members", userData);
-            toast.success("회원가입 성공! 로그인해주세요.");
+            toast.success("?뚯썝媛???깃났! 濡쒓렇?명빐二쇱꽭??");
             navigate("/login");
         } catch (error) {
-            toast.error(error.response?.data?.message || "회원가입 실패");
+            toast.error(error.response?.data?.message || "?뚯썝媛???ㅽ뙣");
             throw error;
         }
     };

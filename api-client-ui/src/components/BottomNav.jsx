@@ -23,7 +23,7 @@ const NavItem = ({ to, icon: Icon, children }) => {
 
 export const BottomNav = () => {
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white/90 backdrop-blur-2xl border-t border-slate-100 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.08)] h-20 px-4 pb-safe">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden glass border-t-white/20 h-20 px-4 pb-safe">
             <div className="flex h-full items-center justify-between max-w-lg mx-auto">
                 <NavItem to="/app" icon={Home}>홈</NavItem>
                 <NavItem to="/app/boards/FREE_BOARD" icon={LayoutGrid}>게시판</NavItem>

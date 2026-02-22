@@ -1,29 +1,11 @@
-import { FileText, PlusCircle } from "lucide-react";
+import { FileX2 } from "lucide-react";
 
-export const EmptyState = ({
-                               icon: Icon = FileText,
-                               title = "데이터가 없습니다",
-                               description = "",
-                               actionLabel = "",
-                               onAction = null
-                           }) => {
-    return (
-        <div className="text-center py-12">
-            <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 mb-4">
-                <Icon className="h-8 w-8 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-1">{title}</h3>
-            {description && (
-                <p className="text-sm text-slate-600 mb-6 max-w-sm mx-auto">
-                    {description}
-                </p>
-            )}
-            {actionLabel && onAction && (
-                <button onClick={onAction} className="btn-primary">
-                    <PlusCircle className="h-4 w-4 inline mr-2" />
-                    {actionLabel}
-                </button>
-            )}
+export const EmptyState = ({ message = "데이터가 없습니다.", subMessage = "새로운 내용을 등록해보세요!" }) => (
+    <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+        <div className="bg-slate-50 p-6 rounded-full mb-4">
+            <FileX2 className="h-10 w-10 text-slate-300" />
         </div>
-    );
-};
+        <h3 className="text-lg font-bold text-slate-900 mb-1">{message}</h3>
+        <p className="text-sm text-slate-500">{subMessage}</p>
+    </div>
+);

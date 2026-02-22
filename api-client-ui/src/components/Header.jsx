@@ -1,4 +1,4 @@
-﻿import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import {
     Home,
     BarChart,
@@ -44,7 +44,7 @@ export const Header = () => {
     const isAdmin = isAdminUser(user);
 
     return (
-        <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/70 backdrop-blur-xl transition-all duration-300">
+        <header className="sticky top-0 z-50 glass border-b-white/20 transition-all duration-300">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-20 items-center justify-between">
                     <Link to="/app" className="flex items-center gap-3 group">
@@ -68,7 +68,8 @@ export const Header = () => {
                         <NavItem to="/app/news" icon={Newspaper}>뉴스</NavItem>
                         <NavItem to="/app/calculators" icon={Calculator}>전기요금</NavItem>
                         <NavItem to="/app/gpt" icon={Bot}>GPT</NavItem>
-                        {isAdmin && <NavItem to="/app/admin/anomalies" icon={ShieldAlert}>관리자</NavItem>}
+                        {isAdmin && <NavItem to="/app/admin/anomalies" icon={ShieldAlert}>관리자 콘솔</NavItem>}
+                        {isAdmin && <NavItem to="/app/admin/operations" icon={ShieldAlert}>운영 툴</NavItem>}
                     </nav>
 
                     <div className="flex items-center gap-2">
@@ -101,3 +102,5 @@ export const Header = () => {
         </header>
     );
 };
+
+
