@@ -67,6 +67,30 @@ export const AdminOperations = () => {
     const [memberError, setMemberError] = useState("");
     const [memberDetail, setMemberDetail] = useState(null);
 
+    const [bannerLoading, setBannerLoading] = useState(false);
+    const [bannerSaving, setBannerSaving] = useState(false);
+    const [bannerError, setBannerError] = useState("");
+    const [banners, setBanners] = useState([]);
+    const [editingBannerId, setEditingBannerId] = useState(null);
+    const [bannerForm, setBannerForm] = useState({
+        bannerType: "NOTICE",
+        placement: "HOME_HERO",
+        title: "",
+        description: "",
+        imageUrl: "",
+        linkUrl: "",
+        ctaText: "",
+        renderMode: "CONTENT",
+        adProvider: "",
+        adsenseClient: "",
+        adsenseSlot: "",
+        priority: 100,
+        startAt: "",
+        endAt: "",
+        targetAudience: "ALL",
+        activeYn: true,
+    });
+
     const filteredModerationItems = useMemo(() => {
         const keyword = String(bulkKeyword || "").trim().toLowerCase();
         return (moderationItems || []).filter((item) => {
@@ -115,6 +139,10 @@ export const AdminOperations = () => {
         }, 250);
         return () => clearTimeout(timer);
     }, [memberKeyword]);
+
+    useEffect(() => {
+        fetchAdminBanners();
+    }, []);
 
     const submitBatchModeration = async (actionType) => {
         const ids = [...new Set(selectedIds)].filter((value) => Number.isFinite(Number(value)) && Number(value) > 0);
@@ -166,6 +194,153 @@ export const AdminOperations = () => {
     };
 
     const clearSelected = () => setSelectedIds([]);
+
+    const fetchAdminBanners = async () => {
+        setBannerLoading(true);
+        setBannerError("");
+        try {
+            const response = await api.get("/admin/banners", {
+                params: { page: 1, size: 50 },
+            });
+            const payload = unwrapData(response.data);
+            const items = payload?.items || payload?.content || payload?.data || payload || [];
+            setBanners(Array.isArray(items) ? items : []);
+        } catch (err) {
+            setBanners([]);
+            setBannerError(err?.response?.data?.message || "Failed to load banners.");
+        } finally {
+            setBannerLoading(false);
+        }
+    };
+
+    const resetBannerForm = () => {
+        setEditingBannerId(null);
+        setBannerForm({
+            bannerType: "NOTICE",
+            placement: "HOME_HERO",
+            title: "",
+            description: "",
+            imageUrl: "",
+            linkUrl: "",
+            ctaText: "",
+            renderMode: "CONTENT",
+            adProvider: "",
+            adsenseClient: "",
+            adsenseSlot: "",
+            priority: 100,
+            startAt: "",
+            endAt: "",
+            targetAudience: "ALL",
+            activeYn: true,
+        });
+    };
+
+    const submitBannerForm = async () => {
+        const title = String(bannerForm.title || "").trim();
+        if (!title) {
+            toast.error("Banner title is required.");
+            return;
+        }
+        const isAdsense = String(bannerForm.renderMode || "").toUpperCase() === "ADSENSE";
+        if (isAdsense) {
+            if (!String(bannerForm.adProvider || "").trim()) {
+                toast.error("Ad provider is required for ADSENSE mode.");
+                return;
+            }
+            if (!String(bannerForm.adsenseClient || "").trim() || !String(bannerForm.adsenseSlot || "").trim()) {
+                toast.error("AdSense client and slot are required for ADSENSE mode.");
+                return;
+            }
+        }
+        const payload = {
+            banner_type: bannerForm.bannerType,
+            placement: bannerForm.placement,
+            title,
+            description: bannerForm.description || null,
+            image_url: bannerForm.imageUrl || null,
+            link_url: bannerForm.linkUrl || null,
+            cta_text: bannerForm.ctaText || null,
+            render_mode: bannerForm.renderMode || "CONTENT",
+            ad_provider: bannerForm.adProvider || null,
+            adsense_client: bannerForm.adsenseClient || null,
+            adsense_slot: bannerForm.adsenseSlot || null,
+            priority: Number(bannerForm.priority) || 0,
+            start_at: bannerForm.startAt ? `${bannerForm.startAt}:00` : null,
+            end_at: bannerForm.endAt ? `${bannerForm.endAt}:00` : null,
+            target_audience: bannerForm.targetAudience,
+            active_yn: Boolean(bannerForm.activeYn),
+        };
+
+        setBannerSaving(true);
+        try {
+            if (editingBannerId) {
+                await api.patch(`/admin/banners/${editingBannerId}`, payload);
+                toast.success("Banner updated.");
+            } else {
+                await api.post("/admin/banners", payload);
+                toast.success("Banner created.");
+            }
+            await fetchAdminBanners();
+            resetBannerForm();
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "Failed to save banner.");
+        } finally {
+            setBannerSaving(false);
+        }
+    };
+
+    const toggleBannerActive = async (banner) => {
+        const bannerId = Number(pick(banner, "bannerId", "banner_id", 0));
+        if (!bannerId) return;
+        const nextActive = !Boolean(pick(banner, "activeYn", "active_yn", false));
+        const toastId = toast.loading("Updating banner state...");
+        try {
+            await api.patch(`/admin/banners/${bannerId}/active`, { active_yn: nextActive });
+            await fetchAdminBanners();
+            toast.success(nextActive ? "Banner activated." : "Banner deactivated.", { id: toastId });
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "Failed to update banner state.", { id: toastId });
+        }
+    };
+
+    const removeBanner = async (banner) => {
+        const bannerId = Number(pick(banner, "bannerId", "banner_id", 0));
+        if (!bannerId) return;
+        if (!window.confirm("Delete this banner?")) return;
+        const toastId = toast.loading("Deleting banner...");
+        try {
+            await api.delete(`/admin/banners/${bannerId}`);
+            await fetchAdminBanners();
+            if (editingBannerId === bannerId) resetBannerForm();
+            toast.success("Banner deleted.", { id: toastId });
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "Failed to delete banner.", { id: toastId });
+        }
+    };
+
+    const startEditBanner = (banner) => {
+        const bannerId = Number(pick(banner, "bannerId", "banner_id", 0));
+        if (!bannerId) return;
+        setEditingBannerId(bannerId);
+        setBannerForm({
+            bannerType: pick(banner, "bannerType", "banner_type", "NOTICE"),
+            placement: pick(banner, "placement", "placement", "HOME_HERO"),
+            title: pick(banner, "title", "title", ""),
+            description: pick(banner, "description", "description", ""),
+            imageUrl: pick(banner, "imageUrl", "image_url", ""),
+            linkUrl: pick(banner, "linkUrl", "link_url", ""),
+            ctaText: pick(banner, "ctaText", "cta_text", ""),
+            renderMode: pick(banner, "renderMode", "render_mode", "CONTENT"),
+            adProvider: pick(banner, "adProvider", "ad_provider", ""),
+            adsenseClient: pick(banner, "adsenseClient", "adsense_client", ""),
+            adsenseSlot: pick(banner, "adsenseSlot", "adsense_slot", ""),
+            priority: Number(pick(banner, "priority", "priority", 100)) || 100,
+            startAt: String(pick(banner, "startAt", "start_at", "") || "").slice(0, 16),
+            endAt: String(pick(banner, "endAt", "end_at", "") || "").slice(0, 16),
+            targetAudience: pick(banner, "targetAudience", "target_audience", "ALL"),
+            activeYn: Boolean(pick(banner, "activeYn", "active_yn", true)),
+        });
+    };
 
     const fetchMemberCandidates = async (keyword) => {
         const trimmed = String(keyword || "").trim();
@@ -473,6 +648,115 @@ export const AdminOperations = () => {
                         </div>
                     ) : null}
                 </div>
+            </div>
+
+            <div className="card p-8 space-y-6">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-black text-slate-900">Banner Management</h2>
+                    <button
+                        type="button"
+                        className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200"
+                        onClick={fetchAdminBanners}
+                        disabled={bannerLoading}
+                    >
+                        {bannerLoading ? "Refreshing..." : "Refresh"}
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <select className="input-base" value={bannerForm.bannerType} onChange={(e) => setBannerForm((prev) => ({ ...prev, bannerType: e.target.value }))}>
+                        <option value="NOTICE">NOTICE</option>
+                        <option value="AD">AD</option>
+                    </select>
+                    <select className="input-base" value={bannerForm.renderMode} onChange={(e) => setBannerForm((prev) => ({ ...prev, renderMode: e.target.value }))}>
+                        <option value="CONTENT">CONTENT</option>
+                        <option value="ADSENSE">ADSENSE</option>
+                    </select>
+                    <select className="input-base" value={bannerForm.targetAudience} onChange={(e) => setBannerForm((prev) => ({ ...prev, targetAudience: e.target.value }))}>
+                        <option value="ALL">ALL</option>
+                        <option value="GUEST">GUEST</option>
+                        <option value="USER">USER</option>
+                        <option value="ADMIN">ADMIN</option>
+                    </select>
+                    <input className="input-base" value={bannerForm.adProvider} onChange={(e) => setBannerForm((prev) => ({ ...prev, adProvider: e.target.value }))} placeholder="Ad provider (e.g. ADSENSE)" />
+                    <input className="input-base md:col-span-2" value={bannerForm.title} onChange={(e) => setBannerForm((prev) => ({ ...prev, title: e.target.value }))} placeholder="Banner title" />
+                    <textarea className="input-base md:col-span-2 min-h-[88px]" value={bannerForm.description} onChange={(e) => setBannerForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="Banner description" />
+                    <input className="input-base md:col-span-2" value={bannerForm.imageUrl} onChange={(e) => setBannerForm((prev) => ({ ...prev, imageUrl: e.target.value }))} placeholder="Image URL (optional)" />
+                    <input className="input-base md:col-span-2" value={bannerForm.linkUrl} onChange={(e) => setBannerForm((prev) => ({ ...prev, linkUrl: e.target.value }))} placeholder="Link URL (optional)" />
+                    <input className="input-base" value={bannerForm.ctaText} onChange={(e) => setBannerForm((prev) => ({ ...prev, ctaText: e.target.value }))} placeholder="CTA text (optional)" />
+                    <input className="input-base" value={bannerForm.adsenseClient} onChange={(e) => setBannerForm((prev) => ({ ...prev, adsenseClient: e.target.value }))} placeholder="AdSense client (ca-pub-...)" />
+                    <input className="input-base" value={bannerForm.adsenseSlot} onChange={(e) => setBannerForm((prev) => ({ ...prev, adsenseSlot: e.target.value }))} placeholder="AdSense slot ID" />
+                    <input className="input-base" type="number" min={0} max={1000} value={bannerForm.priority} onChange={(e) => setBannerForm((prev) => ({ ...prev, priority: e.target.value }))} placeholder="Priority" />
+                    <input className="input-base" type="datetime-local" value={bannerForm.startAt} onChange={(e) => setBannerForm((prev) => ({ ...prev, startAt: e.target.value }))} />
+                    <input className="input-base" type="datetime-local" value={bannerForm.endAt} onChange={(e) => setBannerForm((prev) => ({ ...prev, endAt: e.target.value }))} />
+                    <label className="md:col-span-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <input type="checkbox" checked={bannerForm.activeYn} onChange={(e) => setBannerForm((prev) => ({ ...prev, activeYn: e.target.checked }))} />
+                        Active
+                    </label>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <button className="btn-primary" type="button" onClick={submitBannerForm} disabled={bannerSaving}>
+                        {bannerSaving ? "Saving..." : editingBannerId ? "Update Banner" : "Create Banner"}
+                    </button>
+                    {editingBannerId ? (
+                        <button className="btn-secondary" type="button" onClick={resetBannerForm} disabled={bannerSaving}>
+                            Cancel Edit
+                        </button>
+                    ) : null}
+                </div>
+
+                {bannerError ? (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                        {bannerError}
+                    </div>
+                ) : null}
+
+                {!banners.length ? (
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
+                        No banners yet.
+                    </div>
+                ) : (
+                    <div className="space-y-3 max-h-[420px] overflow-auto pr-1">
+                        {banners.map((banner, idx) => {
+                            const bannerId = Number(pick(banner, "bannerId", "banner_id", 0));
+                            const activeYn = Boolean(pick(banner, "activeYn", "active_yn", false));
+                            const selected = editingBannerId === bannerId;
+                            return (
+                                <div
+                                    key={bannerId || `banner-${idx}`}
+                                    className={`rounded-2xl border p-4 cursor-pointer ${selected ? "border-primary-300 bg-primary-50/40" : "border-slate-100 bg-slate-50/30"}`}
+                                    onClick={() => startEditBanner(banner)}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div className="text-sm font-black text-slate-900">#{bannerId} {pick(banner, "title", "title", "-")}</div>
+                                            <div className="mt-1 text-[11px] text-slate-500">
+                                                {pick(banner, "bannerType", "banner_type", "-")} | {pick(banner, "renderMode", "render_mode", "-")} | {pick(banner, "targetAudience", "target_audience", "-")} | priority {pick(banner, "priority", "priority", 0)}
+                                            </div>
+                                        </div>
+                                        <span className={`rounded-lg px-2 py-0.5 text-[10px] font-black ${activeYn ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
+                                            {activeYn ? "ACTIVE" : "INACTIVE"}
+                                        </span>
+                                    </div>
+                                    <p className="mt-2 text-xs text-slate-600">{pick(banner, "description", "description", "")}</p>
+                                    {(pick(banner, "adProvider", "ad_provider", "") || pick(banner, "adsenseClient", "adsense_client", "")) ? (
+                                        <div className="mt-2 text-[11px] text-slate-500">
+                                            Provider: {pick(banner, "adProvider", "ad_provider", "-")} | Client: {pick(banner, "adsenseClient", "adsense_client", "-")} | Slot: {pick(banner, "adsenseSlot", "adsense_slot", "-")}
+                                        </div>
+                                    ) : null}
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <button type="button" className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-black text-white hover:bg-primary-600" onClick={(e) => { e.stopPropagation(); startEditBanner(banner); }}>Edit</button>
+                                        <button type="button" className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200" onClick={() => toggleBannerActive(banner)}>
+                                            {activeYn ? "Deactivate" : "Activate"}
+                                        </button>
+                                        <button type="button" className="rounded-xl bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 hover:bg-rose-200" onClick={(e) => { e.stopPropagation(); removeBanner(banner); }}>Delete</button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {memberDetail ? (
