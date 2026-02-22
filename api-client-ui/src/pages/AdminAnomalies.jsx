@@ -48,26 +48,36 @@ const getBoardIdValue = (board) => board?.boardId ?? board?.board_id ?? null;
 const getCommentIdValue = (comment) => comment?.commentId ?? comment?.comment_id ?? null;
 const getBoardCreatorValue = (board) => board?.boardCreator ?? board?.board_creator ?? '';
 const getWriterNameValue = (comment) => comment?.writerName ?? comment?.writer_name ?? '';
-const getHiddenYnValue = (target) => target?.hiddenYn ?? target?.hidden_yn ?? false;
+const getHiddenYnValue = (target) => {
+    const value = target?.hiddenYn ?? target?.hidden_yn;
+    return value === "Y" || value === true;
+};
+const toHiddenYnLiteral = (value) => {
+    if (value === "Y" || value === true) return "Y";
+    if (value === "N" || value === false) return "N";
+    return null;
+};
 
 const STATUS_OPTIONS = ["ALL", "NEW", "REVIEWING", "RESOLVED", "FALSE_POSITIVE"];
 const EDITABLE_STATUS_OPTIONS = ["NEW", "REVIEWING", "RESOLVED", "FALSE_POSITIVE"];
 
 const StatCard = ({ icon: Icon, label, value, tone = "slate" }) => {
     const toneClass = {
-        slate: "text-slate-700 bg-slate-50 border-slate-200",
-        blue: "text-blue-700 bg-blue-50 border-blue-200",
-        emerald: "text-emerald-700 bg-emerald-50 border-emerald-200",
-        amber: "text-amber-700 bg-amber-50 border-amber-200",
+        slate: "text-slate-600 bg-slate-50/50 border-slate-100",
+        blue: "text-primary-600 bg-primary-50/50 border-primary-100",
+        emerald: "text-emerald-600 bg-emerald-50/50 border-emerald-100",
+        amber: "text-amber-600 bg-amber-50/50 border-amber-100",
     };
 
     return (
-        <div className={`rounded-xl border p-4 ${toneClass[tone] || toneClass.slate}`}>
-            <div className="flex items-center justify-between text-sm font-semibold">
-                <span>{label}</span>
-                <Icon className="h-4 w-4" />
+        <div className={`card p-6 flex flex-col items-center justify-center text-center ${toneClass[tone] || toneClass.slate}`}>
+            <div className="mb-3 p-3 rounded-2xl bg-white shadow-sm">
+                <Icon className="h-6 w-6" />
             </div>
-            <div className="mt-2 text-2xl font-bold">{value.toLocaleString()}</div>
+            <div className="text-[11px] font-black uppercase tracking-widest opacity-70 mb-1">
+                {label}
+            </div>
+            <div className="text-3xl font-black tracking-tight text-slate-900">{value.toLocaleString()}</div>
         </div>
     );
 };
@@ -416,11 +426,16 @@ export const AdminAnomalies = () => {
             toast.error("유효한 게시글 ID를 찾지 못했습니다.");
             return;
         }
+        const normalizedHiddenYn = toHiddenYnLiteral(hiddenYn);
+        if (!normalizedHiddenYn) {
+            toast.error("hiddenYn 값이 올바르지 않습니다.");
+            return;
+        }
 
-        const reason = window.prompt(hiddenYn ? "숨김 사유를 입력하세요." : "복구 사유를 입력하세요.", "") || "";
+        const reason = window.prompt(normalizedHiddenYn === "Y" ? "숨김 사유를 입력하세요." : "복구 사유를 입력하세요.", "") || "";
         try {
-            await api.patch(`/admin/moderation/boards/${normalizedBoardId}`, { hiddenYn, reason });
-            toast.success(hiddenYn ? "게시글을 숨겼습니다." : "게시글을 복구했습니다.");
+            await api.patch(`/admin/moderation/boards/${normalizedBoardId}`, { hiddenYn: normalizedHiddenYn, reason });
+            toast.success(normalizedHiddenYn === "Y" ? "게시글을 숨겼습니다." : "게시글을 복구했습니다.");
             await fetchModerationBoards(moderationHiddenFilter);
             await fetchAudits(auditTypeFilter);
         } catch (err) {
@@ -434,11 +449,16 @@ export const AdminAnomalies = () => {
             toast.error("유효한 댓글 ID를 찾지 못했습니다.");
             return;
         }
+        const normalizedHiddenYn = toHiddenYnLiteral(hiddenYn);
+        if (!normalizedHiddenYn) {
+            toast.error("hiddenYn 값이 올바르지 않습니다.");
+            return;
+        }
 
-        const reason = window.prompt(hiddenYn ? "숨김 사유를 입력하세요." : "복구 사유를 입력하세요.", "") || "";
+        const reason = window.prompt(normalizedHiddenYn === "Y" ? "숨김 사유를 입력하세요." : "복구 사유를 입력하세요.", "") || "";
         try {
-            await api.patch(`/admin/moderation/comments/${normalizedCommentId}`, { hiddenYn, reason });
-            toast.success(hiddenYn ? "댓글을 숨겼습니다." : "댓글을 복구했습니다.");
+            await api.patch(`/admin/moderation/comments/${normalizedCommentId}`, { hiddenYn: normalizedHiddenYn, reason });
+            toast.success(normalizedHiddenYn === "Y" ? "댓글을 숨겼습니다." : "댓글을 복구했습니다.");
             await fetchModerationComments(moderationHiddenFilter);
             await fetchAudits(auditTypeFilter);
         } catch (err) {
@@ -576,117 +596,119 @@ export const AdminAnomalies = () => {
 
     if (!isAdmin) {
         return (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-800">
-                <div className="mb-2 flex items-center gap-2 font-bold">
-                    <ShieldAlert className="h-5 w-5" /> 관리자 전용 화면
+            <div className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-rose-800 text-center space-y-4">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
+                    <ShieldAlert className="h-8 w-8 text-rose-500" />
                 </div>
-                <p className="text-sm">관리자 대시보드는 ROLE_ADMIN만 조회할 수 있습니다.</p>
+                <h1 className="text-xl font-black">관리자 전용 화면</h1>
+                <p className="text-sm font-medium opacity-70">관리자 대시보드는 ROLE_ADMIN 권한이 필요합니다.</p>
             </div>
         );
     }
 
-    if (loading) {
-        return (
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <div className="mb-3 h-6 w-56 animate-pulse rounded bg-slate-200" />
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="h-24 animate-pulse rounded bg-slate-100" />
-                    <div className="h-24 animate-pulse rounded bg-slate-100" />
-                    <div className="h-24 animate-pulse rounded bg-slate-100" />
-                    <div className="h-24 animate-pulse rounded bg-slate-100" />
-                </div>
-            </div>
-        );
-    }
+    if (loading) return <LoadingSpinner text="관리 대시보드를 로드 중입니다..." />;
 
     if (error) {
         return (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-800">
-                <div className="mb-2 flex items-center gap-2 font-bold">
-                    <AlertTriangle className="h-5 w-5" /> 조회 실패
+            <div className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-rose-800 text-center space-y-4">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
+                    <AlertTriangle className="h-8 w-8 text-rose-500" />
                 </div>
-                <p className="mb-4 text-sm">{error}</p>
+                <h1 className="text-xl font-black">조회 실패</h1>
+                <p className="text-sm font-medium opacity-70 mb-4">{error}</p>
                 <button
                     onClick={() => fetchDashboard(statusFilter, page)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                    className="btn-primary"
                 >
-                    <RefreshCw className="h-4 w-4" /> 다시 시도
+                    <RefreshCw className="mr-2 h-4 w-4" /> 다시 시도
                 </button>
             </div>
         );
     }
 
     return (
-        <section className="space-y-5">
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <h1 className="text-xl font-bold text-slate-900">관리자 이상탐지 콘솔</h1>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => fetchDashboard(statusFilter, page)}
-                            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            <RefreshCw className="h-4 w-4" /> 새로고침
-                        </button>
-                        <button
-                            onClick={downloadReport}
-                            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                        >
-                            <Download className="h-4 w-4" /> CSV
-                        </button>
-                    </div>
+        <section className="space-y-8 animate-fade-in pb-10">
+            <div className="flex flex-wrap items-center justify-between gap-6 px-2">
+                <div className="space-y-1">
+                    <h1 className="text-3xl font-black tracking-tight text-slate-900">관리자 대시보드</h1>
+                    <p className="text-sm font-medium text-slate-400">커뮤니티의 모든 활동과 보안 상태를 모니터링합니다.</p>
                 </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatCard icon={Users} label="전체 회원" value={toNumber(summary?.total_members ?? summary?.totalMembers)} tone="blue" />
-                    <StatCard icon={MessageSquare} label="전체 게시글" value={toNumber(summary?.total_boards ?? summary?.totalBoards)} tone="emerald" />
-                    <StatCard icon={Eye} label="오늘 방문자" value={toNumber(summary?.today_visitors ?? summary?.todayVisitors)} tone="amber" />
-                    <StatCard icon={Activity} label="실시간 이상탐지" value={events.length} tone="slate" />
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => fetchDashboard(statusFilter, page)}
+                        className="btn-secondary py-2.5 px-4"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                    </button>
+                    <button
+                        onClick={downloadReport}
+                        className="btn-primary"
+                    >
+                        <Download className="mr-2 h-4 w-4" /> 리포트 다운로드
+                    </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                    <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-slate-900">
-                        <ClipboardList className="h-5 w-5" /> 운영 KPI (7일)
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                <StatCard icon={Users} label="전체 회원" value={toNumber(summary?.total_members ?? summary?.totalMembers)} tone="blue" />
+                <StatCard icon={MessageSquare} label="전체 게시글" value={toNumber(summary?.total_boards ?? summary?.totalBoards)} tone="emerald" />
+                <StatCard icon={Eye} label="오늘 방문자" value={toNumber(summary?.today_visitors ?? summary?.todayVisitors)} tone="amber" />
+                <StatCard icon={Activity} label="탐지 이벤트" value={events.length} tone="slate" />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="card p-8">
+                    <h2 className="mb-6 flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
+                        <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
+                            <ClipboardList className="h-5 w-5" />
+                        </div>
+                        운영 KPI (7일)
                     </h2>
-                    <div className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span>총 사건</span><b>{toNumber(kpi?.totalIncidents)}</b></div>
-                        <div className="flex justify-between"><span>신규</span><b>{toNumber(kpi?.newCount)}</b></div>
-                        <div className="flex justify-between"><span>검토중</span><b>{toNumber(kpi?.reviewingCount)}</b></div>
-                        <div className="flex justify-between"><span>해결</span><b>{toNumber(kpi?.resolvedCount)}</b></div>
-                        <div className="flex justify-between"><span>오탐</span><b>{toNumber(kpi?.falsePositiveCount)}</b></div>
-                        <div className="flex justify-between"><span>평균 처리시간(분)</span><b>{toNumber(kpi?.avgResolveMinutes).toFixed(2)}</b></div>
-                        <div className="flex justify-between"><span>재발률(%)</span><b>{toNumber(kpi?.recurrenceRate).toFixed(2)}</b></div>
+                    <div className="space-y-4 text-sm">
+                        {[
+                            { label: "총 사건", val: toNumber(kpi?.totalIncidents) },
+                            { label: "신규", val: toNumber(kpi?.newCount), color: "text-primary-600" },
+                            { label: "검토중", val: toNumber(kpi?.reviewingCount), color: "text-amber-600" },
+                            { label: "해결", val: toNumber(kpi?.resolvedCount), color: "text-emerald-600" },
+                            { label: "오탐", val: toNumber(kpi?.falsePositiveCount), color: "text-slate-400" },
+                        ].map(item => (
+                            <div key={item.label} className="flex justify-between items-center py-1 border-b border-slate-50 last:border-0">
+                                <span className="font-bold text-slate-500">{item.label}</span>
+                                <b className={`text-base font-black ${item.color || "text-slate-900"}`}>{item.val}</b>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
-                <div className="rounded-2xl border bg-white p-5 shadow-sm xl:col-span-2">
-                    <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-slate-900">
-                        <BellRing className="h-5 w-5" /> 최근 이상탐지 이벤트
+                <div className="card p-8 xl:col-span-2">
+                    <h2 className="mb-6 flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
+                        <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
+                            <BellRing className="h-5 w-5" />
+                        </div>
+                        최근 이상탐지 이벤트
                     </h2>
                     {!events.length ? (
-                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">최근 이벤트가 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold">
+                            최근 탐지된 이벤트가 없습니다.
+                        </div>
                     ) : (
-                        <div className="max-h-64 overflow-auto">
+                        <div className="max-h-72 overflow-auto rounded-2xl border border-slate-50">
                             <table className="min-w-full text-sm">
-                                <thead className="bg-slate-50 text-slate-700">
+                                <thead className="bg-slate-50/50 text-slate-400 font-black uppercase text-[10px] tracking-widest">
                                     <tr>
-                                        <th className="px-2 py-2 text-left">시각</th>
-                                        <th className="px-2 py-2 text-left">Metric</th>
-                                        <th className="px-2 py-2 text-left">Actor</th>
-                                        <th className="px-2 py-2 text-right">Count</th>
-                                        <th className="px-2 py-2 text-right">Z</th>
+                                        <th className="px-4 py-4 text-left">시각</th>
+                                        <th className="px-4 py-4 text-left">Metric</th>
+                                        <th className="px-4 py-4 text-left">Actor</th>
+                                        <th className="px-4 py-4 text-right">Z-Score</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="font-bold text-slate-600">
                                     {events.map((event, idx) => (
-                                        <tr key={`${event.metric}-${event.actorId}-${event.detectedAt}-${idx}`} className="border-t">
-                                            <td className="px-2 py-2">{event.detectedAt}</td>
-                                            <td className="px-2 py-2">{event.metric}</td>
-                                            <td className="px-2 py-2">{event.actorId}</td>
-                                            <td className="px-2 py-2 text-right">{event.count}</td>
-                                            <td className="px-2 py-2 text-right">{toNumber(event.zScore).toFixed(2)}</td>
+                                        <tr key={`${event.metric}-${event.actorId}-${event.detectedAt}-${idx}`} className="border-t border-slate-50 hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-4 text-[11px] font-medium">{event.detectedAt}</td>
+                                            <td className="px-4 py-4"><span className="px-2 py-1 rounded-lg bg-slate-100 text-[10px] uppercase">{event.metric}</span></td>
+                                            <td className="px-4 py-4 text-slate-900">{event.actorId}</td>
+                                            <td className="px-4 py-4 text-right text-primary-600 font-black">{toNumber(event.zScore).toFixed(2)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -696,96 +718,124 @@ export const AdminAnomalies = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-                            <UserX className="h-5 w-5" /> 사용자 제재
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="card p-8">
+                    <div className="mb-8 flex items-center justify-between">
+                        <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
+                            <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+                                <UserX className="h-5 w-5" />
+                            </div>
+                            사용자 제재
                         </h2>
                         <div className="flex items-center gap-2">
                             <select
                                 value={sanctionStatusFilter}
                                 onChange={(e) => changeSanctionFilter(e.target.value)}
-                                className="rounded border px-2 py-1 text-sm"
+                                className="input-base py-1.5 px-3 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50"
                             >
                                 {SANCTION_STATUS_OPTIONS.map((status) => (
                                     <option key={status} value={status}>{status}</option>
                                 ))}
                             </select>
-                            <button className="rounded border px-2 py-1 text-xs" onClick={createSanction}>제재 등록</button>
+                            <button className="p-2 rounded-xl bg-primary-600 text-white shadow-lg shadow-primary-100" onClick={createSanction}><PlusCircle className="h-4 w-4" /></button>
                         </div>
                     </div>
                     {!sanctions.items?.length ? (
-                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">제재 내역이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">제재 내역이 없습니다.</div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-4 max-h-[400px] overflow-auto pr-2">
                             {sanctions.items.map((sanction) => (
-                                <div key={sanction.sanctionId} className="rounded-xl border p-3 text-sm">
-                                    <div className="mb-1 font-semibold">#{sanction.sanctionId} · {sanction.memberEmail}</div>
-                                    <div className="text-xs text-slate-600">{sanction.sanctionStatus} · {sanction.reason}</div>
-                                    <div className="text-[11px] text-slate-400">{sanction.createdAt}</div>
-                                    {sanction.sanctionStatus === "ACTIVE" && (
-                                        <button
-                                            className="mt-2 rounded border px-2 py-1 text-xs"
-                                            onClick={() => releaseSanction(sanction.sanctionId)}
-                                        >
-                                            제재 해제
-                                        </button>
-                                    )}
+                                <div key={sanction.sanctionId} className="p-5 rounded-2xl bg-slate-50/50 border border-slate-100 hover:border-rose-100 transition-colors">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="font-black text-slate-900 text-sm">#{sanction.sanctionId}</div>
+                                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${sanction.sanctionStatus === 'ACTIVE' ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600'}`}>
+                                            {sanction.sanctionStatus}
+                                        </span>
+                                    </div>
+                                    <div className="text-[13px] font-bold text-slate-600 mb-1">{sanction.memberEmail}</div>
+                                    <div className="text-[12px] font-medium text-slate-400 mb-4">{sanction.reason}</div>
+                                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-300">
+                                        <span>{sanction.createdAt}</span>
+                                        {sanction.sanctionStatus === "ACTIVE" && (
+                                            <button
+                                                className="text-primary-600 hover:underline"
+                                                onClick={() => releaseSanction(sanction.sanctionId)}
+                                            >
+                                                제재 해제
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     )}
                 </div>
 
-                <div className="rounded-2xl border bg-white p-5 shadow-sm xl:col-span-2">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-                            <EyeOff className="h-5 w-5" /> 콘텐츠 모더레이션
+                <div className="card p-8 xl:col-span-2">
+                    <div className="mb-8 flex items-center justify-between">
+                        <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
+                            <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
+                                <EyeOff className="h-5 w-5" />
+                            </div>
+                            콘텐츠 모더레이션
                         </h2>
                         <select
                             value={moderationHiddenFilter}
                             onChange={(e) => changeModerationFilter(e.target.value)}
-                            className="rounded border px-2 py-1 text-sm"
+                            className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50"
                         >
-                            <option value="ALL">ALL</option>
-                            <option value="HIDDEN">HIDDEN</option>
-                            <option value="VISIBLE">VISIBLE</option>
+                            <option value="ALL">ALL FILTERS</option>
+                            <option value="HIDDEN">HIDDEN ONLY</option>
+                            <option value="VISIBLE">VISIBLE ONLY</option>
                         </select>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        <div>
-                            <h3 className="mb-2 text-sm font-semibold text-slate-700">게시글</h3>
-                            <div className="space-y-2">
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                        <div className="space-y-4">
+                            <h3 className="px-2 text-xs font-black text-slate-400 uppercase tracking-widest">게시글</h3>
+                            <div className="space-y-3">
                                 {(moderationBoards.items || []).map((board) => (
-                                    <div key={getBoardIdValue(board) ?? `board-${Math.random()}`} className="rounded border p-2 text-sm">
-                                        <div className="font-semibold">#{getBoardIdValue(board)} {board.title}</div>
-                                        <div className="text-xs text-slate-500">{getHiddenYnValue(board) ? "HIDDEN" : "VISIBLE"} · {getBoardCreatorValue(board)}</div>
-                                        <button
-                                            className="mt-1 rounded border px-2 py-1 text-xs"
-                                            onClick={() => updateBoardHidden(getBoardIdValue(board), !getHiddenYnValue(board))}
-                                        >
-                                            {getHiddenYnValue(board) ? <RotateCcw className="mr-1 inline h-3 w-3" /> : <EyeOff className="mr-1 inline h-3 w-3" />}
-                                            {getHiddenYnValue(board) ? "복구" : "숨김"}
-                                        </button>
+                                    <div key={getBoardIdValue(board) ?? `board-${Math.random()}`} className="group p-5 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-white hover:shadow-xl transition-all duration-300">
+                                        <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div className="font-bold text-slate-900 text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">#{getBoardIdValue(board)} {board.title}</div>
+                                            <span className={`flex-shrink-0 px-2 py-0.5 rounded-lg text-[9px] font-black tracking-wider ${getHiddenYnValue(board) ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                {getHiddenYnValue(board) ? "HIDDEN" : "VISIBLE"}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11px] font-bold text-slate-400">{getBoardCreatorValue(board)}</span>
+                                            <button
+                                                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black transition-all ${getHiddenYnValue(board) ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}
+                                                onClick={() => updateBoardHidden(getBoardIdValue(board), !getHiddenYnValue(board))}
+                                            >
+                                                {getHiddenYnValue(board) ? <RotateCcw className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                                {getHiddenYnValue(board) ? "복구" : "숨김"}
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                        <div>
-                            <h3 className="mb-2 text-sm font-semibold text-slate-700">댓글</h3>
-                            <div className="space-y-2">
+                        <div className="space-y-4">
+                            <h3 className="px-2 text-xs font-black text-slate-400 uppercase tracking-widest">댓글</h3>
+                            <div className="space-y-3">
                                 {(moderationComments.items || []).map((comment) => (
-                                    <div key={getCommentIdValue(comment) ?? `comment-${Math.random()}`} className="rounded border p-2 text-sm">
-                                        <div className="font-semibold">#{getCommentIdValue(comment)} (board #{getBoardIdValue(comment)})</div>
-                                        <div className="text-xs text-slate-500">{getHiddenYnValue(comment) ? "HIDDEN" : "VISIBLE"} · {getWriterNameValue(comment)}</div>
-                                        <button
-                                            className="mt-1 rounded border px-2 py-1 text-xs"
-                                            onClick={() => updateCommentHidden(getCommentIdValue(comment), !getHiddenYnValue(comment))}
-                                        >
-                                            {getHiddenYnValue(comment) ? <RotateCcw className="mr-1 inline h-3 w-3" /> : <EyeOff className="mr-1 inline h-3 w-3" />}
-                                            {getHiddenYnValue(comment) ? "복구" : "숨김"}
-                                        </button>
+                                    <div key={getCommentIdValue(comment) ?? `comment-${Math.random()}`} className="group p-5 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-white hover:shadow-xl transition-all duration-300">
+                                        <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div className="font-bold text-slate-900 text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">#{getCommentIdValue(comment)} (board #{getBoardIdValue(comment)})</div>
+                                            <span className={`flex-shrink-0 px-2 py-0.5 rounded-lg text-[9px] font-black tracking-wider ${getHiddenYnValue(comment) ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                {getHiddenYnValue(comment) ? "HIDDEN" : "VISIBLE"}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11px] font-bold text-slate-400">{getWriterNameValue(comment)}</span>
+                                            <button
+                                                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black transition-all ${getHiddenYnValue(comment) ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}
+                                                onClick={() => updateCommentHidden(getCommentIdValue(comment), !getHiddenYnValue(comment))}
+                                            >
+                                                {getHiddenYnValue(comment) ? <RotateCcw className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                                {getHiddenYnValue(comment) ? "복구" : "숨김"}
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -794,15 +844,18 @@ export const AdminAnomalies = () => {
                 </div>
             </div>
 
-            <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
-                    <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-                        <ScrollText className="h-5 w-5" /> 통합 Audit
+            <div className="card p-8">
+                <div className="mb-8 flex items-center justify-between">
+                    <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
+                        <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
+                            <ScrollText className="h-5 w-5" />
+                        </div>
+                        통합 Audit Log
                     </h2>
                     <select
                         value={auditTypeFilter}
                         onChange={(e) => changeAuditFilter(e.target.value)}
-                        className="rounded border px-2 py-1 text-sm"
+                        className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50"
                     >
                         {AUDIT_TYPE_OPTIONS.map((type) => (
                             <option key={type} value={type}>{type}</option>
@@ -810,14 +863,23 @@ export const AdminAnomalies = () => {
                     </select>
                 </div>
                 {!auditItems.items?.length ? (
-                    <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">조회된 감사 이력이 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">감사 이력이 없습니다.</div>
                 ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         {auditItems.items.map((audit, idx) => (
-                            <div key={`${audit.auditType}-${audit.createdAt}-${idx}`} className="rounded border p-3 text-sm">
-                                <div className="font-semibold">{audit.auditType} · {audit.actionType}</div>
-                                <div className="text-xs text-slate-600">{audit.summary}</div>
-                                <div className="text-xs text-slate-500">{audit.actor} · {audit.createdAt}</div>
+                            <div key={`${audit.auditType}-${audit.createdAt}-${idx}`} className="flex flex-wrap items-center justify-between p-5 rounded-2xl bg-slate-50/30 border border-slate-50 hover:bg-white transition-all">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">{audit.auditType}</span>
+                                        <div className="h-1 w-1 rounded-full bg-slate-200" />
+                                        <span className="text-sm font-bold text-slate-900">{audit.actionType}</span>
+                                    </div>
+                                    <p className="text-[13px] font-medium text-slate-500">{audit.summary}</p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[11px] font-black text-slate-900">{audit.actor}</div>
+                                    <div className="text-[10px] font-bold text-slate-300">{audit.createdAt}</div>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -825,36 +887,36 @@ export const AdminAnomalies = () => {
             </div>
 
             {isMaster && (
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h2 className="text-lg font-bold text-slate-900">관리자 메신저</h2>
-                        <div className="flex items-center gap-2">
-                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">
-                                unread {toNumber(notificationUnreadCount)}
-                            </span>
-                            <button className="rounded border px-2 py-1 text-xs" onClick={markAllNotificationsRead}>전체읽음</button>
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <div className="card p-8">
+                    <div className="mb-8 flex items-center justify-between">
+                        <h2 className="text-lg font-black text-slate-900 tracking-tight">관리자 메신저</h2>
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-[10px] font-black text-rose-600 uppercase">
+                                <BellRing className="h-3 w-3" /> {toNumber(notificationUnreadCount)} UNREAD
+                            </div>
+                            <button className="text-[11px] font-bold text-slate-400 hover:text-primary-600" onClick={markAllNotificationsRead}>전체읽음</button>
                         </div>
                     </div>
 
                     {!notifications.length ? (
-                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">새 알림이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">새 알림이 없습니다.</div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-4 max-h-[500px] overflow-auto pr-2">
                             {notifications.map((notification) => (
-                                <div key={notification.notificationId} className="rounded-xl border p-3">
-                                    <div className="mb-1 flex items-center justify-between">
-                                        <div className="text-sm font-semibold">{notification.title}</div>
-                                        <span className="text-xs text-slate-500">{notification.severity}</span>
+                                <div key={notification.notificationId} className="group p-6 rounded-3xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:shadow-xl transition-all">
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <div className="text-sm font-black text-slate-900 line-clamp-1">{notification.title}</div>
+                                        <span className="px-2 py-0.5 rounded-lg bg-slate-200 text-[9px] font-black text-slate-600 uppercase tracking-tighter">{notification.severity}</span>
                                     </div>
-                                    <p className="mb-2 text-xs text-slate-600">{notification.message}</p>
+                                    <p className="mb-5 text-[13px] font-medium text-slate-500 leading-relaxed">{notification.message}</p>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] text-slate-400">{notification.createdAt}</span>
+                                        <span className="text-[10px] font-bold text-slate-300">{notification.createdAt}</span>
                                         <button
-                                            className="rounded border px-2 py-1 text-xs"
+                                            className="btn-primary py-1.5 px-4 text-[11px]"
                                             onClick={() => markNotificationRead(notification.notificationId)}
                                         >
-                                            읽음
+                                            읽음 처리
                                         </button>
                                     </div>
                                 </div>
@@ -863,13 +925,13 @@ export const AdminAnomalies = () => {
                     )}
                 </div>
 
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h2 className="text-lg font-bold text-slate-900">신고함</h2>
+                <div className="card p-8">
+                    <div className="mb-8 flex items-center justify-between">
+                        <h2 className="text-lg font-black text-slate-900 tracking-tight">사용자 신고함</h2>
                         <select
                             value={reportStatusFilter}
                             onChange={(e) => changeReportFilter(e.target.value)}
-                            className="rounded border px-2 py-1 text-sm"
+                            className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50"
                         >
                             {REPORT_STATUS_OPTIONS.map((status) => (
                                 <option key={status} value={status}>{status}</option>
@@ -878,22 +940,26 @@ export const AdminAnomalies = () => {
                     </div>
 
                     {!reportList.items?.length ? (
-                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">신고 내역이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">신고 내역이 없습니다.</div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-4 max-h-[500px] overflow-auto pr-2">
                             {reportList.items.map((report) => (
-                                <div key={report.reportId} className="rounded-xl border p-3">
-                                    <div className="mb-1 flex items-center justify-between">
-                                        <div className="text-sm font-semibold">
-                                            #{report.reportId} {report.targetType} {report.targetId}
+                                <div key={report.reportId} className="p-6 rounded-3xl bg-white border border-slate-100 shadow-sm">
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-black text-slate-900 tracking-tighter">#{report.reportId}</span>
+                                            <span className="px-2 py-0.5 rounded-lg bg-primary-50 text-[9px] font-black text-primary-600 uppercase tracking-widest">{report.targetType}</span>
+                                            <span className="text-[10px] font-bold text-slate-400">ID: {report.targetId}</span>
                                         </div>
-                                        <span className="text-xs text-slate-500">{report.reportStatus}</span>
+                                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black tracking-tight ${report.reportStatus === 'OPEN' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                            {report.reportStatus}
+                                        </span>
                                     </div>
-                                    <p className="mb-2 text-xs text-slate-600">{report.reason} {report.detail ? `- ${report.detail}` : ""}</p>
-                                    <div className="flex flex-wrap gap-1">
-                                        <button className="rounded border px-2 py-1 text-xs" onClick={() => updateReportStatus(report.reportId, "IN_REVIEW")}>검토중</button>
-                                        <button className="rounded border px-2 py-1 text-xs" onClick={() => updateReportStatus(report.reportId, "RESOLVED")}>해결</button>
-                                        <button className="rounded border px-2 py-1 text-xs" onClick={() => updateReportStatus(report.reportId, "REJECTED")}>반려</button>
+                                    <p className="mb-6 text-sm font-bold text-slate-700 leading-relaxed">{report.reason} <span className="text-slate-400 font-medium">{report.detail ? `- ${report.detail}` : ""}</span></p>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button className="flex-1 rounded-2xl bg-slate-50 py-2.5 text-[11px] font-black text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-all" onClick={() => updateReportStatus(report.reportId, "IN_REVIEW")}>검토중</button>
+                                        <button className="flex-1 rounded-2xl bg-emerald-50 py-2.5 text-[11px] font-black text-emerald-600 hover:bg-emerald-100 transition-all" onClick={() => updateReportStatus(report.reportId, "RESOLVED")}>해결</button>
+                                        <button className="flex-1 rounded-2xl bg-rose-50 py-2.5 text-[11px] font-black text-rose-600 hover:bg-rose-100 transition-all" onClick={() => updateReportStatus(report.reportId, "REJECTED")}>반려</button>
                                     </div>
                                 </div>
                             ))}
@@ -903,54 +969,58 @@ export const AdminAnomalies = () => {
             </div>
             )}
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-                                <UserCog className="h-5 w-5" /> 권한관리
-                            </h2>
-                            <span className={`rounded border px-2 py-0.5 text-xs ${isMaster ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-amber-300 bg-amber-50 text-amber-700"}`}>
-                                {isMaster ? "내 권한: MASTER" : "내 권한: ADMIN"}
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <div className="card p-8">
+                    <div className="mb-8 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-lg font-black text-slate-900 tracking-tight">권한 관리</h2>
+                            <span className={`rounded-xl px-3 py-1 text-[10px] font-black tracking-widest uppercase ${isMaster ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                {isMaster ? "MASTER ACCESS" : "ADMIN ACCESS"}
                             </span>
                         </div>
-                        <button className="rounded border px-2 py-1 text-xs" onClick={() => fetchRoleMembers(roleKeyword)}>새로고침</button>
+                        <button className="text-slate-300 hover:text-primary-600 transition-colors" onClick={() => fetchRoleMembers(roleKeyword)}><RefreshCw className="h-4 w-4" /></button>
                     </div>
                     {!isMaster && (
-                        <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        <div className="mb-6 rounded-2xl bg-amber-50 p-4 text-[11px] font-bold text-amber-700 leading-relaxed">
                             ROLE_MASTER 계정만 관리자 권한 부여/해제가 가능합니다.
                         </div>
                     )}
-                    <div className="mb-3 flex gap-2">
-                        <input
-                            value={roleKeyword}
-                            onChange={(e) => setRoleKeyword(e.target.value)}
-                            placeholder="이름/이메일 검색"
-                            className="w-full rounded border px-2 py-1 text-sm"
-                        />
-                        <button className="rounded border px-3 py-1 text-sm" onClick={searchRoleMembers}>검색</button>
+                    <div className="mb-8 flex gap-3">
+                        <div className="relative flex-1">
+                            <input
+                                value={roleKeyword}
+                                onChange={(e) => setRoleKeyword(e.target.value)}
+                                placeholder="이름 또는 이메일로 검색"
+                                className="input-base w-full pl-4 pr-10"
+                            />
+                        </div>
+                        <button className="btn-primary py-2.5 px-6 whitespace-nowrap" onClick={searchRoleMembers}>검색</button>
                     </div>
 
                     {!roleMembers.items?.length ? (
-                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">조회된 회원이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">조회된 회원이 없습니다.</div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-4 max-h-[600px] overflow-auto pr-2">
                             {roleMembers.items.map((member) => (
-                                <div key={getMemberIdValue(member) || member.email} className="rounded-xl border p-3">
-                                    <div className="mb-1 flex items-center justify-between">
-                                        <div className="text-sm font-semibold">{member.name || "(이름없음)"} · #{getMemberIdValue(member)}</div>
-                                        <span className="text-xs text-slate-500">{member.memberStatus}</span>
+                                <div key={getMemberIdValue(member) || member.email} className="group p-6 rounded-3xl border border-slate-100 bg-white hover:shadow-xl transition-all duration-300">
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <div className="text-base font-black text-slate-900">{member.name || "(이름없음)"}</div>
+                                            <div className="text-xs font-bold text-slate-400">{member.email} <span className="ml-2">#{getMemberIdValue(member)}</span></div>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded-lg text-[9px] font-black tracking-widest uppercase ${member.memberStatus === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                                            {member.memberStatus}
+                                        </span>
                                     </div>
-                                    <div className="mb-2 text-xs text-slate-600">{member.email}</div>
-                                    <div className="mb-2 flex flex-wrap gap-1">
+                                    <div className="mb-6 flex flex-wrap gap-1.5">
                                         {(member.roles || []).map((role) => (
-                                            <span key={`${getMemberIdValue(member)}-${role}`} className="rounded border bg-slate-50 px-2 py-0.5 text-[11px]">
+                                            <span key={`${getMemberIdValue(member)}-${role}`} className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500 uppercase tracking-tighter">
                                                 {role}
                                             </span>
                                         ))}
                                     </div>
                                     <button
-                                        className={`rounded px-2 py-1 text-xs text-white ${hasAdminRole(member.roles) ? "bg-rose-600" : "bg-blue-600"}`}
+                                        className={`w-full rounded-2xl py-3 text-xs font-black transition-all ${hasAdminRole(member.roles) ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "bg-primary-50 text-primary-600 hover:bg-primary-100"}`}
                                         onClick={() => updateMemberAdminRole(member)}
                                         disabled={!isMaster}
                                     >
@@ -962,26 +1032,34 @@ export const AdminAnomalies = () => {
                     )}
                 </div>
 
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-                            <History className="h-5 w-5" /> 권한 변경 이력
+                <div className="card p-8">
+                    <div className="mb-8 flex items-center justify-between">
+                        <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
+                            <History className="h-5 w-5 text-primary-600" />
+                            권한 변경 이력
                         </h2>
-                        <button className="rounded border px-2 py-1 text-xs" onClick={fetchRoleAudits}>새로고침</button>
+                        <button className="text-slate-300 hover:text-primary-600" onClick={fetchRoleAudits}><RefreshCw className="h-4 w-4" /></button>
                     </div>
                     {!roleAudits.items?.length ? (
-                        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">권한 변경 이력이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">변경 이력이 없습니다.</div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-4 max-h-[700px] overflow-auto pr-2">
                             {roleAudits.items.map((audit) => (
-                                <div key={audit.roleAuditId} className="rounded-xl border p-3 text-sm">
-                                    <div className="mb-1 font-semibold">
-                                        #{audit.roleAuditId} · 대상 {audit.targetEmail} (#{audit.targetMemberId})
+                                <div key={audit.roleAuditId} className="p-6 rounded-3xl bg-slate-50/30 border border-slate-50">
+                                    <div className="mb-4 flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                        <span>#{audit.roleAuditId}</span>
+                                        <span>{audit.createdAt}</span>
                                     </div>
-                                    <div className="text-xs text-slate-600">변경자: {audit.changedByEmail} (#{audit.changedByMemberId})</div>
-                                    <div className="text-xs text-slate-600">변경: {audit.beforeRoles} → {audit.afterRoles}</div>
-                                    <div className="text-xs text-slate-600">사유: {audit.changeReason || "(없음)"}</div>
-                                    <div className="text-[11px] text-slate-400">{audit.createdAt}</div>
+                                    <div className="mb-4 space-y-2">
+                                        <div className="text-[13px] font-bold text-slate-900"><span className="text-slate-400">TARGET:</span> {audit.targetEmail} (#{audit.targetMemberId})</div>
+                                        <div className="text-[13px] font-bold text-slate-900"><span className="text-slate-400">ADMIN:</span> {audit.changedByEmail}</div>
+                                    </div>
+                                    <div className="mb-4 flex items-center gap-3 py-3 px-4 rounded-2xl bg-white shadow-sm font-black text-xs">
+                                        <span className="text-slate-300 line-through decoration-rose-400">{audit.beforeRoles}</span>
+                                        <ArrowRight className="h-3 w-3 text-primary-400" />
+                                        <span className="text-primary-600">{audit.afterRoles}</span>
+                                    </div>
+                                    <div className="text-[12px] font-bold text-slate-500 italic"><span className="text-slate-300 font-medium">REASON:</span> {audit.changeReason || "(없음)"}</div>
                                 </div>
                             ))}
                         </div>
@@ -989,15 +1067,18 @@ export const AdminAnomalies = () => {
                 </div>
             </div>
 
-            <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-lg font-bold text-slate-900">Incident Inbox (인라인 수정)</h2>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600">상태</span>
+            <div className="card p-8 overflow-hidden">
+                <div className="mb-10 flex flex-wrap items-center justify-between gap-6">
+                    <div className="space-y-1">
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Incident Inbox</h2>
+                        <p className="text-sm font-medium text-slate-400">실시간으로 탐지된 이상 활동을 즉시 처리합니다.</p>
+                    </div>
+                    <div className="flex items-center gap-4 rounded-3xl bg-slate-50 p-2">
+                        <span className="ml-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">상태 필터</span>
                         <select
                             value={statusFilter}
                             onChange={(e) => changeFilter(e.target.value)}
-                            className="rounded-lg border px-3 py-2 text-sm"
+                            className="input-base py-2 px-6 w-auto rounded-2xl border-0 bg-white shadow-sm text-sm font-black"
                         >
                             {STATUS_OPTIONS.map((status) => (
                                 <option key={status} value={status}>{status}</option>
@@ -1007,22 +1088,21 @@ export const AdminAnomalies = () => {
                 </div>
 
                 {!incidentList.items?.length ? (
-                    <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">조회된 사건이 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">조회된 사건이 없습니다.</div>
                 ) : (
-                    <div className="overflow-auto">
+                    <div className="overflow-x-auto -mx-8">
                         <table className="min-w-full text-sm">
-                            <thead className="bg-slate-50 text-slate-700">
+                            <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                                 <tr>
-                                    <th className="px-2 py-2 text-left">ID</th>
-                                    <th className="px-2 py-2 text-left">Metric</th>
-                                    <th className="px-2 py-2 text-left">Actor</th>
-                                    <th className="px-2 py-2 text-left">Status</th>
-                                    <th className="px-2 py-2 text-left">Assignee</th>
-                                    <th className="px-2 py-2 text-left">Note</th>
-                                    <th className="px-2 py-2 text-right">Action</th>
+                                    <th className="px-8 py-5 text-left">ID</th>
+                                    <th className="px-8 py-5 text-left">Detected Metric</th>
+                                    <th className="px-8 py-5 text-left">Actor Info</th>
+                                    <th className="px-8 py-5 text-left">Processing Status</th>
+                                    <th className="px-8 py-5 text-left">Assignee / Note</th>
+                                    <th className="px-8 py-5 text-right">Instant Action</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="font-bold text-slate-600">
                                 {incidentList.items.map((item) => {
                                     const draft = incidentDrafts[item.incidentId] || {
                                         incidentStatus: item.incidentStatus,
@@ -1031,13 +1111,13 @@ export const AdminAnomalies = () => {
                                     };
 
                                     return (
-                                        <tr key={item.incidentId} className="border-t align-top">
-                                            <td className="px-2 py-2">{item.incidentId}</td>
-                                            <td className="px-2 py-2">{item.metric}</td>
-                                            <td className="px-2 py-2">{item.actorId}</td>
-                                            <td className="px-2 py-2">
+                                        <tr key={item.incidentId} className="border-t border-slate-50 group transition-all hover:bg-slate-50/50 align-top">
+                                            <td className="px-8 py-6 font-black text-slate-900">#{item.incidentId}</td>
+                                            <td className="px-8 py-6"><span className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 text-[11px] uppercase tracking-tighter">{item.metric}</span></td>
+                                            <td className="px-8 py-6 text-slate-900">{item.actorId}</td>
+                                            <td className="px-8 py-6">
                                                 <select
-                                                    className="w-36 rounded border px-2 py-1"
+                                                    className="input-base py-2 px-4 w-40 rounded-xl border-0 bg-white shadow-sm text-[12px] font-black"
                                                     value={draft.incidentStatus}
                                                     onChange={(e) => setIncidentDrafts((prev) => ({
                                                         ...prev,
@@ -1049,39 +1129,41 @@ export const AdminAnomalies = () => {
                                                     ))}
                                                 </select>
                                             </td>
-                                            <td className="px-2 py-2">
+                                            <td className="px-8 py-6 space-y-2">
                                                 <input
-                                                    className="w-40 rounded border px-2 py-1"
+                                                    className="input-base py-2 px-4 w-full rounded-xl border-0 bg-white shadow-sm text-[12px] font-bold"
                                                     value={draft.assignee}
+                                                    placeholder="담당자 입력"
                                                     onChange={(e) => setIncidentDrafts((prev) => ({
                                                         ...prev,
                                                         [item.incidentId]: { ...draft, assignee: e.target.value },
                                                     }))}
                                                 />
-                                            </td>
-                                            <td className="px-2 py-2">
                                                 <textarea
-                                                    className="w-64 rounded border px-2 py-1"
-                                                    rows={2}
+                                                    className="input-base py-2 px-4 w-full rounded-xl border-0 bg-white shadow-sm text-[12px] font-medium"
+                                                    rows={1}
                                                     value={draft.note}
+                                                    placeholder="처리 내역 메모"
                                                     onChange={(e) => setIncidentDrafts((prev) => ({
                                                         ...prev,
                                                         [item.incidentId]: { ...draft, note: e.target.value },
                                                     }))}
                                                 />
                                             </td>
-                                            <td className="px-2 py-2">
-                                                <div className="flex flex-wrap justify-end gap-1">
-                                                    <button className="rounded border px-2 py-1" onClick={() => fetchDetail(item.incidentId)}>상세</button>
-                                                    <button className="rounded border px-2 py-1" onClick={() => applyAction(item.incidentId, "BLOCK_QUEUE_USER")}>차단</button>
-                                                    <button className="rounded border px-2 py-1" onClick={() => applyAction(item.incidentId, "WARN_MEMBER")}>경고</button>
-                                                    <button className="rounded border px-2 py-1" onClick={() => applyAction(item.incidentId, "CLEAR_QUEUE_BLOCK")}>해제</button>
+                                            <td className="px-8 py-6">
+                                                <div className="flex flex-wrap justify-end gap-2">
+                                                    <div className="flex gap-1.5 bg-white p-1 rounded-2xl shadow-sm">
+                                                        <button className="p-2 rounded-xl hover:bg-primary-50 text-slate-300 hover:text-primary-600 transition-all" onClick={() => fetchDetail(item.incidentId)} title="상세조회"><Activity className="h-4 w-4" /></button>
+                                                        <button className="p-2 rounded-xl hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-all" onClick={() => applyAction(item.incidentId, "BLOCK_QUEUE_USER")} title="접속차단"><UserX className="h-4 w-4" /></button>
+                                                        <button className="p-2 rounded-xl hover:bg-amber-50 text-slate-300 hover:text-amber-600 transition-all" onClick={() => applyAction(item.incidentId, "WARN_MEMBER")} title="경고발송"><BellRing className="h-4 w-4" /></button>
+                                                    </div>
                                                     <button
-                                                        className="inline-flex items-center gap-1 rounded bg-slate-900 px-2 py-1 text-white disabled:opacity-50"
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 text-[12px] font-black text-white hover:bg-primary-600 disabled:opacity-20 transition-all duration-300"
                                                         disabled={savingIncidentId === item.incidentId}
                                                         onClick={() => saveIncidentInline(item.incidentId)}
                                                     >
-                                                        <Save className="h-3 w-3" /> 저장
+                                                        {savingIncidentId === item.incidentId ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Save className="h-3.5 w-3.5" />} 
+                                                        SAVE
                                                     </button>
                                                 </div>
                                             </td>
@@ -1093,101 +1175,155 @@ export const AdminAnomalies = () => {
                     </div>
                 )}
 
-                <div className="mt-3 flex items-center justify-between text-sm">
-                    <span>총 {toNumber(incidentList.totalElements)}건</span>
-                    <div className="flex gap-2">
+                <div className="mt-10 flex items-center justify-between bg-slate-50/50 p-6 rounded-[2rem]">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Total: {toNumber(incidentList.totalElements)} incidents</span>
+                    <div className="flex items-center gap-6">
                         <button
-                            className="rounded border px-3 py-1 disabled:opacity-40"
+                            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm text-slate-400 hover:text-primary-600 disabled:opacity-30 transition-all"
                             disabled={page <= 1}
                             onClick={() => changePage(page - 1)}
                         >
-                            이전
+                            <ArrowRight className="h-5 w-5 rotate-180" />
                         </button>
-                        <span>{page} / {Math.max(1, toNumber(incidentList.totalPages))}</span>
+                        <span className="text-sm font-black text-slate-900">{page} <span className="text-slate-300 mx-2">/</span> {Math.max(1, toNumber(incidentList.totalPages))}</span>
                         <button
-                            className="rounded border px-3 py-1 disabled:opacity-40"
+                            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm text-slate-400 hover:text-primary-600 disabled:opacity-30 transition-all"
                             disabled={page >= Math.max(1, toNumber(incidentList.totalPages))}
                             onClick={() => changePage(page + 1)}
                         >
-                            다음
+                            <ArrowRight className="h-5 w-5" />
                         </button>
                     </div>
                 </div>
             </div>
 
             {selectedDetail?.incident && (
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                    <h2 className="mb-3 text-lg font-bold text-slate-900">Incident Detail #{selectedDetail.incident.incidentId}</h2>
-                    <div className="mb-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                        <div><b>Metric:</b> {selectedDetail.incident.metric}</div>
-                        <div><b>Actor:</b> {selectedDetail.incident.actorId}</div>
-                        <div><b>Status:</b> {selectedDetail.incident.incidentStatus}</div>
-                        <div><b>Z:</b> {selectedDetail.incident.zScore}</div>
+                <div className="card p-10 bg-slate-900 text-white animate-slide-up">
+                    <div className="mb-10 flex flex-wrap items-center justify-between gap-6">
+                        <div className="space-y-2">
+                            <h2 className="text-3xl font-black tracking-tight">Incident Deep Dive <span className="text-primary-400">#{selectedDetail.incident.incidentId}</span></h2>
+                            <p className="text-sm font-medium text-slate-400">탐지된 활동에 대한 상세 데이터 및 타임라인 분석</p>
+                        </div>
+                        <button className="text-slate-500 hover:text-white transition-colors" onClick={() => setSelectedDetail(null)}><X className="h-8 w-8" /></button>
                     </div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                        <button className="rounded border px-3 py-2" onClick={() => applyAction(selectedDetail.incident.incidentId, "BLOCK_QUEUE_USER")}>큐 차단</button>
-                        <button className="rounded border px-3 py-2" onClick={() => applyAction(selectedDetail.incident.incidentId, "WARN_MEMBER")}>경고 플래그</button>
-                        <button className="rounded border px-3 py-2" onClick={() => applyAction(selectedDetail.incident.incidentId, "CLEAR_QUEUE_BLOCK")}>차단 해제</button>
+                    
+                    <div className="mb-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                        {[
+                            { label: "Detected Metric", val: selectedDetail.incident.metric, color: "text-primary-400" },
+                            { label: "Target Actor", val: selectedDetail.incident.actorId, color: "text-white" },
+                            { label: "Current Status", val: selectedDetail.incident.incidentStatus, color: "text-amber-400" },
+                            { label: "Z-Score Analysis", val: selectedDetail.incident.zScore, color: "text-rose-400" },
+                        ].map(stat => (
+                            <div key={stat.label} className="p-6 rounded-[2rem] bg-white/5 border border-white/10">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{stat.label}</p>
+                                <p className={`text-xl font-black tracking-tight ${stat.color}`}>{stat.val}</p>
+                            </div>
+                        ))}
                     </div>
 
-                    <div className="rounded-xl border bg-slate-50 p-3">
-                        <h3 className="mb-2 font-semibold">Action Timeline</h3>
+                    <div className="mb-12 space-y-4">
+                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest px-2">Decision Actions</h3>
+                        <div className="flex flex-wrap gap-4">
+                            <button className="flex-1 rounded-[2rem] bg-primary-600 py-6 text-sm font-black hover:bg-primary-700 transition-all shadow-xl shadow-primary-900/40" onClick={() => applyAction(selectedDetail.incident.incidentId, "BLOCK_QUEUE_USER")}>QUEUE BLOCK</button>
+                            <button className="flex-1 rounded-[2rem] bg-white/5 border border-white/10 py-6 text-sm font-black hover:bg-white/10 transition-all" onClick={() => applyAction(selectedDetail.incident.incidentId, "WARN_MEMBER")}>WARN USER</button>
+                            <button className="flex-1 rounded-[2rem] bg-white/5 border border-white/10 py-6 text-sm font-black hover:bg-white/10 transition-all" onClick={() => applyAction(selectedDetail.incident.incidentId, "CLEAR_QUEUE_BLOCK")}>RESTORE ACCESS</button>
+                        </div>
+                    </div>
+
+                    <div className="rounded-[2.5rem] bg-black/30 p-10">
+                        <h3 className="mb-8 flex items-center gap-3 text-lg font-black tracking-tight">
+                            <History className="h-5 w-5 text-primary-400" />
+                            Action Timeline Analysis
+                        </h3>
                         {!selectedDetail.actions?.length ? (
-                            <div className="text-sm text-slate-600">기록된 조치가 없습니다.</div>
+                            <div className="flex flex-col items-center justify-center h-48 text-slate-600 font-bold italic">No actions recorded for this incident.</div>
                         ) : (
-                            <ul className="space-y-1 text-sm">
+                            <div className="space-y-6 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-white/5">
                                 {selectedDetail.actions.map((action) => (
-                                    <li key={action.actionLogId}>
-                                        [{action.createdAt}] {action.actionType} - {action.actor} - {action.description}
-                                    </li>
+                                    <div key={action.actionLogId} className="relative pl-10">
+                                        <div className="absolute left-0 top-1.5 h-6 w-6 rounded-full bg-slate-900 border-4 border-primary-500 shadow-xl" />
+                                        <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-[10px] font-black text-primary-400 uppercase tracking-widest">{action.actionType}</span>
+                                                <div className="h-1 w-1 rounded-full bg-slate-700" />
+                                                <span className="text-[13px] font-black">{action.actor}</span>
+                                            </div>
+                                            <span className="text-[11px] font-bold text-slate-500">{action.createdAt}</span>
+                                        </div>
+                                        <p className="text-sm font-medium text-slate-400 leading-relaxed bg-white/5 p-4 rounded-2xl">{action.description}</p>
+                                    </div>
                                 ))}
-                            </ul>
+                            </div>
                         )}
                     </div>
                 </div>
             )}
 
-            <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-slate-900">
-                    <Settings className="h-5 w-5" /> 탐지 규칙 관리
-                </h2>
-
-                <div className="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-dashed p-3 sm:grid-cols-5 sm:items-center">
-                    <input
-                        className="rounded border px-2 py-1"
-                        placeholder="new.metric.name"
-                        value={newRule.metric}
-                        onChange={(e) => setNewRule((prev) => ({ ...prev, metric: e.target.value }))}
-                    />
-                    <input
-                        type="number"
-                        className="rounded border px-2 py-1"
-                        value={newRule.hardLimitPerMinute}
-                        onChange={(e) => setNewRule((prev) => ({ ...prev, hardLimitPerMinute: e.target.value }))}
-                    />
-                    <input
-                        type="number"
-                        step="0.1"
-                        className="rounded border px-2 py-1"
-                        value={newRule.zScoreThreshold}
-                        onChange={(e) => setNewRule((prev) => ({ ...prev, zScoreThreshold: e.target.value }))}
-                    />
-                    <label className="flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
-                            checked={Boolean(newRule.enabled)}
-                            onChange={(e) => setNewRule((prev) => ({ ...prev, enabled: e.target.checked }))}
-                        />
-                        enabled
-                    </label>
-                    <button className="inline-flex items-center justify-center gap-1 rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white" onClick={createRule}>
-                        <PlusCircle className="h-4 w-4" /> 규칙 추가
-                    </button>
+            <div className="card p-8">
+                <div className="mb-10 flex items-center gap-3 px-2">
+                    <div className="p-2 rounded-xl bg-slate-900 text-white shadow-xl shadow-slate-200">
+                        <Settings className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-0.5">
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Detection Rule Management</h2>
+                        <p className="text-[12px] font-medium text-slate-400 uppercase tracking-widest">Global Threshold Configuration</p>
+                    </div>
                 </div>
+
+                <div className="mb-12 grid grid-cols-1 gap-4 rounded-[2.5rem] bg-slate-50/50 p-6 sm:grid-cols-5 sm:items-center border-2 border-dashed border-slate-200">
+                    <div className="px-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 ml-1">Metric Name</p>
+                        <input
+                            className="input-base border-0 shadow-sm rounded-2xl font-bold"
+                            placeholder="e.g. login.attempt"
+                            value={newRule.metric}
+                            onChange={(e) => setNewRule((prev) => ({ ...prev, metric: e.target.value }))}
+                        />
+                    </div>
+                    <div className="px-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 ml-1">Hard Limit / m</p>
+                        <input
+                            type="number"
+                            className="input-base border-0 shadow-sm rounded-2xl font-bold"
+                            value={newRule.hardLimitPerMinute}
+                            onChange={(e) => setNewRule((prev) => ({ ...prev, hardLimitPerMinute: e.target.value }))}
+                        />
+                    </div>
+                    <div className="px-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 ml-1">Z-Threshold</p>
+                        <input
+                            type="number"
+                            step="0.1"
+                            className="input-base border-0 shadow-sm rounded-2xl font-bold"
+                            value={newRule.zScoreThreshold}
+                            onChange={(e) => setNewRule((prev) => ({ ...prev, zScoreThreshold: e.target.value }))}
+                        />
+                    </div>
+                    <div className="flex items-center justify-center pt-4 sm:pt-6">
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <div className={`flex h-12 w-20 items-center rounded-full p-1 transition-all duration-300 ${newRule.enabled ? 'bg-primary-500' : 'bg-slate-300'}`}>
+                                <input
+                                    type="checkbox"
+                                    className="hidden"
+                                    checked={Boolean(newRule.enabled)}
+                                    onChange={(e) => setNewRule((prev) => ({ ...prev, enabled: e.target.checked }))}
+                                />
+                                <div className={`h-10 w-10 rounded-full bg-white shadow-md transition-all duration-300 ${newRule.enabled ? 'translate-x-8' : 'translate-x-0'}`} />
+                            </div>
+                            <span className="text-[11px] font-black uppercase tracking-widest text-slate-400 group-hover:text-primary-600 transition-colors">Enabled</span>
+                        </label>
+                    </div>
+                    <div className="pt-4 sm:pt-6 px-2">
+                        <button className="w-full btn-primary shadow-xl shadow-primary-200" onClick={createRule}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> CREATE RULE
+                        </button>
+                    </div>
+                </div>
+                
                 {!rules.length ? (
-                    <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">등록된 규칙이 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">등록된 탐지 규칙이 없습니다.</div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                         {rules.map((rule) => {
                             const draft = ruleDrafts[rule.metric] || {
                                 hardLimitPerMinute: rule.hardLimitPerMinute,
@@ -1195,41 +1331,54 @@ export const AdminAnomalies = () => {
                                 enabled: rule.enabled,
                             };
                             return (
-                                <div key={rule.metric} className="grid grid-cols-1 gap-2 rounded-xl border p-3 sm:grid-cols-5 sm:items-center">
-                                    <div className="font-semibold">{rule.metric}</div>
-                                    <input
-                                        type="number"
-                                        className="rounded border px-2 py-1"
-                                        value={draft.hardLimitPerMinute}
-                                        onChange={(e) => setRuleDrafts((prev) => ({
-                                            ...prev,
-                                            [rule.metric]: { ...draft, hardLimitPerMinute: e.target.value },
-                                        }))}
-                                    />
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        className="rounded border px-2 py-1"
-                                        value={draft.zScoreThreshold}
-                                        onChange={(e) => setRuleDrafts((prev) => ({
-                                            ...prev,
-                                            [rule.metric]: { ...draft, zScoreThreshold: e.target.value },
-                                        }))}
-                                    />
-                                    <label className="flex items-center gap-2 text-sm">
+                                <div key={rule.metric} className="group grid grid-cols-1 gap-6 rounded-[2rem] bg-white border border-slate-100 p-8 sm:grid-cols-5 sm:items-center transition-all hover:shadow-xl hover:-translate-y-1">
+                                    <div className="font-black text-slate-900 text-lg tracking-tight px-2">{rule.metric}</div>
+                                    <div className="px-2">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Limit / min</p>
                                         <input
-                                            type="checkbox"
-                                            checked={Boolean(draft.enabled)}
+                                            type="number"
+                                            className="input-base py-2.5 px-4 bg-slate-50/50 border-0 rounded-xl font-black text-sm"
+                                            value={draft.hardLimitPerMinute}
                                             onChange={(e) => setRuleDrafts((prev) => ({
                                                 ...prev,
-                                                [rule.metric]: { ...draft, enabled: e.target.checked },
+                                                [rule.metric]: { ...draft, hardLimitPerMinute: e.target.value },
                                             }))}
                                         />
-                                        enabled
-                                    </label>
-                                    <button className="rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white" onClick={() => saveRule(rule.metric)}>
-                                        저장
-                                    </button>
+                                    </div>
+                                    <div className="px-2">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Z-Score</p>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            className="input-base py-2.5 px-4 bg-slate-50/50 border-0 rounded-xl font-black text-sm"
+                                            value={draft.zScoreThreshold}
+                                            onChange={(e) => setRuleDrafts((prev) => ({
+                                                ...prev,
+                                                [rule.metric]: { ...draft, zScoreThreshold: e.target.value },
+                                            }))}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-center pt-2">
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <div className={`flex h-8 w-14 items-center rounded-full p-1 transition-all duration-300 ${draft.enabled ? 'bg-primary-500' : 'bg-slate-300'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="hidden"
+                                                    checked={Boolean(draft.enabled)}
+                                                    onChange={(e) => setRuleDrafts((prev) => ({
+                                                        ...prev,
+                                                        [rule.metric]: { ...draft, enabled: e.target.checked },
+                                                    }))}
+                                                />
+                                                <div className={`h-6 w-6 rounded-full bg-white shadow-sm transition-all duration-300 ${draft.enabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div className="px-2">
+                                        <button className="w-full h-12 rounded-2xl bg-slate-900 text-white text-[11px] font-black hover:bg-primary-600 transition-all uppercase tracking-widest" onClick={() => saveRule(rule.metric)}>
+                                            UPDATE
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })}
@@ -1239,7 +1388,6 @@ export const AdminAnomalies = () => {
         </section>
     );
 };
-
 
 
 

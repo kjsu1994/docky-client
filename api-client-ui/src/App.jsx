@@ -20,7 +20,10 @@ import { LuckyPlinko } from "./pages/LuckyPlinko.jsx";
 import { Queue } from "./pages/Queue.jsx";
 import { MeetingOptimizer } from "./pages/MeetingOptimizer.jsx";
 import { AdminAnomalies } from "./pages/AdminAnomalies.jsx";
+import { Chat } from "./pages/Chat.jsx";
+import { AllMenu } from "./pages/AllMenu.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
+import { BottomNav } from "./components/BottomNav.jsx";
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -35,8 +38,9 @@ const AppLayout = ({ children }) => {
     return (
         <div className="min-h-screen bg-slate-50 relative">
             <Header />
-            <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+            <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8">{children}</main>
             <FloatingChat />
+            <BottomNav />
         </div>
     );
 };
@@ -55,6 +59,9 @@ function App() {
                     <Route path="/app/boards/:kind/new" element={<ProtectedRoute><AppLayout><BoardForm /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/boards/:kind/:boardId/edit" element={<ProtectedRoute><AppLayout><BoardForm /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/boards/:kind/:boardId" element={<ProtectedRoute><AppLayout><BoardDetail /></AppLayout></ProtectedRoute>} />
+
+                    <Route path="/app/chat" element={<ProtectedRoute><AppLayout><Chat /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/all-menu" element={<ProtectedRoute><AppLayout><AllMenu /></AppLayout></ProtectedRoute>} />
 
                     <Route path="/app/statistics" element={<ProtectedRoute><AppLayout><Statistics /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/ranks" element={<ProtectedRoute><AppLayout><Ranks /></AppLayout></ProtectedRoute>} />

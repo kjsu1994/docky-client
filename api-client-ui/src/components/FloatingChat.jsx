@@ -13,6 +13,7 @@ import {
     MoreVertical, 
     Search,
     MessageSquare,
+    MessageCircle,
     Image as ImageIcon,
     File as FileIcon,
     ArrowLeft,
@@ -435,122 +436,132 @@ export const FloatingChat = () => {
     if (!isAuthenticated) return null;
 
     return (
-        <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4 pointer-events-none text-slate-900">
+        <div className="fixed bottom-28 right-6 lg:bottom-6 z-[100] flex flex-col items-end gap-4 pointer-events-none text-slate-900">
             {isOpen && (
-                <div className={`pointer-events-auto bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden transition-all duration-300 ${isMinimized ? "h-14 w-72" : "h-[550px] w-[400px] max-w-[calc(100vw-48px)]"}`}>
-                    <div className="bg-primary-600 p-3 flex items-center justify-between text-white shrink-0">
-                        <div className="flex items-center gap-2 overflow-hidden">
+                <div className={`pointer-events-auto bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden transition-all duration-500 ${isMinimized ? "h-16 w-72" : "h-[600px] w-[400px] max-w-[calc(100vw-48px)]"}`}>
+                    <div className="bg-gradient-to-r from-primary-600 to-primary-500 p-4 flex items-center justify-between text-white shrink-0">
+                        <div className="flex items-center gap-3 overflow-hidden">
                             {currentRoom ? (
                                 <>
-                                    <button onClick={() => setCurrentRoom(null)} className="p-1 hover:bg-white/20 rounded-lg"><ArrowLeft className="h-4 w-4" /></button>
-                                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                                        {currentRoom.type === "PERSONAL" ? <User className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                                    <button onClick={() => setCurrentRoom(null)} className="p-1.5 hover:bg-white/20 rounded-xl transition-colors"><ArrowLeft className="h-4 w-4" /></button>
+                                    <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
+                                        {currentRoom.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
                                     </div>
-                                    <span className="font-bold text-sm truncate">{currentRoom.title}</span>
+                                    <div className="min-w-0">
+                                        <div className="font-black text-sm truncate leading-tight">{currentRoom.title}</div>
+                                        <div className="text-[10px] font-bold text-primary-100 uppercase tracking-tighter">Live Connection</div>
+                                    </div>
                                 </>
                             ) : (
                                 <>
-                                    <MessageSquare className="h-5 w-5" />
-                                    <span className="font-bold text-sm">실시간 채팅</span>
+                                    <div className="p-2 rounded-xl bg-white/20">
+                                        <MessageSquare className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <div className="font-black text-sm uppercase tracking-wider">Secure Chat</div>
+                                        <div className="text-[10px] font-bold text-primary-100 uppercase tracking-widest">v2.0 Beta</div>
+                                    </div>
                                 </>
                             )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                            <button onClick={() => setIsMinimized(!isMinimized)} className="p-1.5 hover:bg-white/20 rounded-lg">{isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}</button>
-                            <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/20 rounded-lg"><X className="h-4 w-4" /></button>
+                            <button onClick={() => setIsMinimized(!isMinimized)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">{isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}</button>
+                            <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/20 rounded-xl transition-colors"><X className="h-4 w-4" /></button>
                         </div>
                     </div>
 
                     {!isMinimized && (
                         <div className="flex-1 flex flex-col min-h-0 bg-white">
                             {!currentRoom ? (
-                                <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
-                                    <div className="p-3 border-b bg-white flex items-center justify-between">
+                                <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50">
+                                    <div className="p-4 border-b bg-white/80 backdrop-blur-md flex items-center justify-between">
                                         <div className="relative flex-1">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                                            <input type="text" placeholder="방 검색..." className="w-full pl-9 pr-3 py-1.5 bg-slate-100 border-none rounded-lg text-xs" />
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                                            <input type="text" placeholder="Search conversations..." className="input-base py-2 pl-10 pr-4 text-xs font-bold bg-slate-50 border-0" />
                                         </div>
-                                        <button onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="ml-2 p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100"><Plus className="h-4 w-4" /></button>
+                                        <button onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="ml-3 p-2.5 rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-100 hover:scale-105 transition-transform"><Plus className="h-5 w-5" /></button>
                                     </div>
-                                    <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                                        {loadingRooms ? <div className="p-8 flex justify-center"><LoadingSpinner size="sm" /></div> : rooms.length > 0 ? (
+                                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                                        {loadingRooms ? <div className="p-12 flex justify-center"><LoadingSpinner size="sm" /></div> : rooms.length > 0 ? (
                                             rooms.map((room) => {
                                                 const roomId = getRoomId(room);
                                                 const isActive = getRoomId(currentRoom) === roomId;
                                                 return (
                                                     <button key={roomId || Math.random()} onClick={() => { setCurrentRoom(room); setMessages([]); }}
                                                         onContextMenu={(e) => handleContextMenu(e, roomId)}
-                                                        className={`w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition-all text-slate-700 ${isActive ? 'bg-white shadow-sm' : ''}`}>
-                                                        <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold shrink-0">
-                                                            {room.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                                                        className={`w-full flex items-center gap-4 p-4 rounded-[1.5rem] transition-all text-slate-700 hover:shadow-xl hover:-translate-y-0.5 ${isActive ? 'bg-white shadow-xl ring-2 ring-primary-100' : 'bg-white/50 border border-slate-100'}`}>
+                                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 text-primary-600 flex items-center justify-center font-black shrink-0 shadow-sm">
+                                                            {room.type === "PERSONAL" ? <User className="h-6 w-6" /> : <Users className="h-6 w-6" />}
                                                         </div>
                                                         <div className="flex-1 text-left min-w-0">
-                                                            <div className="flex justify-between items-center mb-0.5">
-                                                                <span className="font-bold text-sm truncate">{room.title}</span>
-                                                                {(room.unread_count > 0 || room.unreadCount > 0) && <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white">{room.unread_count || room.unreadCount}</span>}
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <span className="font-black text-sm truncate text-slate-900">{room.title}</span>
+                                                                {(room.unread_count > 0 || room.unreadCount > 0) && <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-primary-600 text-white shadow-lg shadow-primary-200">{room.unread_count || room.unreadCount}</span>}
                                                             </div>
-                                                            <div className="text-[11px] text-slate-500 truncate">{room.last_message || room.lastMessage || "대화 내용이 없습니다."}</div>
+                                                            <div className="text-[11px] font-medium text-slate-400 truncate line-clamp-1">{room.last_message || room.lastMessage || "No recent messages."}</div>
                                                         </div>
                                                     </button>
                                                 );
                                             })
-                                        ) : <div className="p-8 text-center text-slate-400 text-xs">참여 중인 방이 없습니다.</div>}
+                                        ) : <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2 opacity-50 font-bold italic"><MessageSquare className="h-10 w-10" /><span>No active rooms</span></div>}
                                     </div>
                                 </div>
                             ) : (
                                 <div className="flex-1 flex flex-col min-h-0 relative">
-                                    <div className="p-2 border-b bg-white flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 pl-1">
-                                            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}></span>
-                                            {isConnected ? "실시간" : "연결끊김"}
+                                    <div className="px-4 py-2 border-b bg-white flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 border border-emerald-100">
+                                                <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}></span>
+                                                <span className="text-[9px] font-black text-emerald-700 uppercase tracking-tighter">{isConnected ? "Live" : "Offline"}</span>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-1">
-                                            <button onClick={() => setShowMemberList(!showMemberList)} className="p-1 hover:bg-slate-100 rounded text-slate-500 flex items-center gap-1"><Users className="h-3.5 w-3.5" /><span className="text-[10px]">{membersToList.length}</span></button>
-                                            {currentRoom.type === "GROUP" && <button onClick={() => { resetMemberSelection(); setShowInviteModal(true); }} className="p-1 hover:bg-slate-100 rounded text-slate-500"><UserPlus className="h-3.5 w-3.5" /></button>}
+                                        <div className="flex gap-1.5">
+                                            <button onClick={() => setShowMemberList(!showMemberList)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors flex items-center gap-1.5"><Users className="h-4 w-4" /><span className="text-[10px] font-black">{membersToList.length}</span></button>
+                                            {currentRoom.type === "GROUP" && <button onClick={() => { resetMemberSelection(); setShowInviteModal(true); }} className="p-2 hover:bg-primary-50 rounded-xl text-primary-600 transition-colors"><UserPlus className="h-4 w-4" /></button>}
                                         </div>
                                     </div>
-                                    <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50">
-                                        {loadingMessages ? <div className="p-8 flex justify-center"><LoadingSpinner size="sm" /></div> : messages.length === 0 ? (
-                                            <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2 opacity-40"><MessageSquare className="h-8 w-8" /><p className="text-[10px]">대화를 시작해보세요!</p></div>
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+                                        {loadingMessages ? <div className="p-12 flex justify-center"><LoadingSpinner size="sm" /></div> : messages.length === 0 ? (
+                                            <div className="h-full flex flex-col items-center justify-center text-slate-300 space-y-2 opacity-50 font-bold italic"><MessageSquare className="h-8 w-8" /><p className="text-[11px]">Start a conversation</p></div>
                                         ) : messages.map((msg, idx) => {
                                             const normalized = normalizeMessage(msg);
                                             const isMe = Number(normalized.senderId) === Number(user.member_id || user.memberId);
                                             return (
                                                 <div key={idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                                                    <div className={`flex max-w-[85%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-1.5`}>
-                                                        {!isMe && <div className="w-7 h-7 rounded-lg bg-slate-200 shrink-0 flex items-center justify-center text-[10px] font-bold text-slate-600">{normalized.senderName?.charAt(0).toUpperCase()}</div>}
+                                                    <div className={`flex max-w-[85%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
+                                                        {!isMe && <div className="w-8 h-8 rounded-xl bg-white shadow-sm border border-slate-100 shrink-0 flex items-center justify-center text-[11px] font-black text-primary-600">{normalized.senderName?.charAt(0).toUpperCase()}</div>}
                                                         <div className="flex flex-col">
-                                                            {!isMe && <span className="text-[9px] text-slate-500 mb-0.5 ml-0.5">{normalized.senderName}</span>}
-                                                            <div className={`px-3 py-1.5 rounded-xl text-xs shadow-sm ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-800 border border-slate-100 rounded-bl-none"}`}>
-                                                                {normalized.type === "FILE" ? <img src={normalized.message} alt="파일" className="max-w-[180px] rounded-lg cursor-pointer" onClick={() => window.open(normalized.message)} /> : normalized.message}
+                                                            {!isMe && <span className="text-[10px] font-bold text-slate-400 mb-1 ml-1 uppercase tracking-tighter">{normalized.senderName}</span>}
+                                                            <div className={`px-4 py-2.5 rounded-2xl text-[13px] font-medium shadow-sm leading-relaxed ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-700 border border-slate-100 rounded-bl-none"}`}>
+                                                                {normalized.type === "FILE" ? <img src={normalized.message} alt="파일" className="max-w-[200px] rounded-xl cursor-pointer" onClick={() => window.open(normalized.message)} /> : normalized.message}
                                                             </div>
                                                         </div>
-                                                        <span className="text-[8px] text-slate-400 pb-0.5 shrink-0">{formatRelativeTime(new Date(normalized.createdAt))}</span>
+                                                        <span className="text-[9px] font-bold text-slate-300 pb-1 shrink-0 uppercase">{formatRelativeTime(new Date(normalized.createdAt))}</span>
                                                     </div>
                                                 </div>
                                             );
                                         })}
                                         <div ref={messagesEndRef} />
                                     </div>
-                                    <div className="p-2 border-t shrink-0 bg-white">
-                                        <form onSubmit={handleSendMessage} className="flex items-center gap-1.5">
-                                            <button type="button" onClick={() => fileInputRef.current.click()} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"><ImageIcon className="h-4 w-4" /></button>
+                                    <div className="p-3 border-t shrink-0 bg-white">
+                                        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                                            <button type="button" onClick={() => fileInputRef.current.click()} className="p-2.5 text-slate-300 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"><ImageIcon className="h-5 w-5" /></button>
                                             <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" />
-                                            <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="메시지 입력..." className="flex-1 bg-slate-100 border-none rounded-xl px-3 py-1.5 text-xs focus:ring-1 focus:ring-primary-500" />
-                                            <button type="submit" disabled={!newMessage.trim() || !isConnected} className="p-2 bg-primary-600 text-white rounded-xl disabled:bg-slate-200 transition-colors"><Send className="h-3.5 w-3.5" /></button>
+                                            <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="Type a message..." className="input-base h-11 border-0 bg-slate-50 font-medium" />
+                                            <button type="submit" disabled={!newMessage.trim() || !isConnected} className="p-2.5 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-100 disabled:opacity-20 transition-all active:scale-90"><Send className="h-5 w-5" /></button>
                                         </form>
                                     </div>
                                     {showMemberList && (
-                                        <div className="absolute inset-0 bg-white z-20 flex flex-col animate-fade-in">
-                                            <div className="p-3 border-b flex items-center justify-between bg-slate-50 shrink-0">
-                                                <h4 className="font-bold text-xs">참여자 ({membersToList.length})</h4>
-                                                <button onClick={() => setShowMemberList(false)} className="p-1 hover:bg-slate-200 rounded-lg"><X className="h-3.5 w-3.5" /></button>
+                                        <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-20 flex flex-col animate-fade-in p-2">
+                                            <div className="p-4 flex items-center justify-between border-b border-slate-50">
+                                                <h4 className="font-black text-[11px] uppercase tracking-widest text-slate-400">Members ({membersToList.length})</h4>
+                                                <button onClick={() => setShowMemberList(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"><X className="h-4 w-4" /></button>
                                             </div>
-                                            <div className="flex-1 overflow-y-auto p-2">
+                                            <div className="flex-1 overflow-y-auto p-2 space-y-1">
                                                 {membersToList.map(m => (
-                                                    <div key={m.member_id || m.memberId} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                                                        <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[10px] text-slate-600">{m.name?.charAt(0).toUpperCase()}</div>
-                                                        <div className="min-w-0 flex-1"><div className="text-xs font-bold truncate flex items-center gap-1">{m.name}{(m.member_id || m.memberId) === (user?.member_id || user?.memberId) && <span className="text-[8px] px-1 py-0.5 bg-primary-100 text-primary-600 rounded">나</span>}</div><div className="text-[9px] text-slate-400 truncate">{m.email}</div></div>
+                                                    <div key={m.member_id || m.memberId} className="flex items-center gap-3 p-3 rounded-[1.25rem] bg-slate-50/50 border border-transparent hover:bg-white hover:border-slate-100 hover:shadow-lg transition-all">
+                                                        <div className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center font-black text-xs text-primary-600">{m.name?.charAt(0).toUpperCase()}</div>
+                                                        <div className="min-w-0 flex-1"><div className="text-sm font-black truncate text-slate-900 flex items-center gap-2">{m.name}{(m.member_id || m.memberId) === (user?.member_id || user?.memberId) && <span className="text-[9px] px-1.5 py-0.5 bg-primary-600 text-white rounded-lg">YOU</span>}</div><div className="text-[10px] font-bold text-slate-400 truncate">{m.email}</div></div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -564,52 +575,61 @@ export const FloatingChat = () => {
             )}
 
             {contextMenu.visible && (
-                <div className="fixed z-[200] bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-32 pointer-events-auto animate-fade-in" style={{ left: contextMenu.x, top: contextMenu.y }}>
-                    <button onClick={() => leaveRoom(contextMenu.roomId)} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
-                        <LogOut className="h-3.5 w-3.5" />방 나가기
+                <div className="fixed z-[200] bg-white border border-slate-100 rounded-2xl shadow-2xl py-2 w-40 pointer-events-auto animate-fade-in" style={{ left: contextMenu.x, top: contextMenu.y }}>
+                    <button onClick={() => leaveRoom(contextMenu.roomId)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-black text-rose-600 hover:bg-rose-50 transition-colors uppercase tracking-widest">
+                        <LogOut className="h-4 w-4" />Leave Room
                     </button>
                 </div>
             )}
 
             <button onClick={() => { if (isMinimized) { setIsMinimized(false); } else { setIsOpen(!isOpen); } }}
-                className={`pointer-events-auto w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${isOpen && !isMinimized ? "bg-white text-primary-600 rotate-90" : "bg-primary-600 text-white hover:scale-110"}`}>
-                {isOpen && !isMinimized ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
-                {rooms.some(r => (r.unread_count || r.unreadCount) > 0) && <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></span>}
+                className={`pointer-events-auto w-16 h-16 rounded-[2rem] shadow-2xl flex items-center justify-center transition-all duration-500 active:scale-90 ${isOpen && !isMinimized ? "bg-white text-primary-600 rotate-90 scale-90" : "bg-primary-600 text-white hover:scale-110 shadow-primary-200"}`}>
+                {isOpen && !isMinimized ? <X className="h-7 w-7" /> : <MessageCircle className="h-7 w-7" />}
+                {rooms.some(r => (r.unread_count || r.unreadCount) > 0) && <span className="absolute top-0 right-0 w-5 h-5 bg-rose-500 rounded-full border-4 border-white shadow-lg animate-bounce"></span>}
             </button>
 
             {(showCreateModal || showInviteModal) && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm pointer-events-auto">
-                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-slide-up">
-                        <div className="p-4 border-b flex items-center justify-between bg-primary-600 text-white">
-                            <h3 className="font-bold text-sm">{showCreateModal ? "새 채팅방 만들기" : "멤버 초대"}</h3>
-                            <button onClick={() => { setShowCreateModal(false); setShowInviteModal(false); }} className="p-1 hover:bg-white/20 rounded-lg transition-colors"><X className="h-4 w-4" /></button>
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md pointer-events-auto">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden animate-slide-up border border-white/20">
+                        <div className="p-6 border-b flex items-center justify-between bg-primary-600 text-white">
+                            <div>
+                                <h3 className="font-black text-lg tracking-tight uppercase">{showCreateModal ? "New Room" : "Invite Members"}</h3>
+                                <p className="text-[10px] font-bold text-primary-100 uppercase tracking-[0.2em]">{showCreateModal ? "Start conversation" : "Add collaborators"}</p>
+                            </div>
+                            <button onClick={() => { setShowCreateModal(false); setShowInviteModal(false); }} className="p-2.5 hover:bg-white/20 rounded-2xl transition-colors"><X className="h-6 w-6" /></button>
                         </div>
-                        <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto">
+                        <div className="p-6 space-y-6 max-h-[450px] overflow-y-auto bg-slate-50/30">
                             {showCreateModal ? (
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">방 제목</label>
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Room Title</label>
                                     <input 
                                         type="text" 
                                         value={newRoomTitle} 
                                         onChange={(e) => setNewRoomTitle(e.target.value)} 
-                                        placeholder="제목 입력" 
-                                        className="input-base text-sm py-2" 
+                                        placeholder="e.g. Project Discussion" 
+                                        className="input-base h-14 bg-white font-bold" 
                                         autoFocus
                                     />
-                                    <p className="mt-2 text-[10px] text-slate-400">* 방을 만든 후 참여자 목록에서 초대할 수 있습니다.</p>
+                                    <p className="mt-3 ml-1 text-[10px] text-slate-400 font-bold italic">* You can invite members after creating the room.</p>
                                 </div>
                             ) : (
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex justify-between items-center">멤버 선택{memberSearch.trim().length === 0 && <span className="text-[9px] text-amber-500 flex items-center gap-0.5"><Star className="h-2.5 w-2.5 fill-amber-400" /> 추천</span>}</label>
-                                    <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" /><input type="text" value={memberSearch} onChange={handleSearchChange} placeholder="이름/이메일 검색" className="input-base pl-9 text-sm py-2" /></div>
-                                    <div className="mt-2 space-y-1 text-slate-700">
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center px-1">
+                                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Select Members</label>
+                                        {memberSearch.trim().length === 0 && <span className="text-[9px] text-amber-500 font-black uppercase flex items-center gap-1.5 px-2 py-1 bg-amber-50 rounded-lg"><Star className="h-3 w-3 fill-amber-400" /> Recommended</span>}
+                                    </div>
+                                    <div className="relative group">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                        <input type="text" value={memberSearch} onChange={handleSearchChange} placeholder="Search by name or email..." className="input-base pl-11 h-12 bg-white font-bold" />
+                                    </div>
+                                    <div className="space-y-2">
                                         {displayedMembers.map(m => {
                                             const mId = m.member_id || m.memberId || m.id;
                                             const isSelected = selectedMembers.find(sm => (sm.member_id || sm.memberId || sm.id) === mId);
                                             return (
-                                                <button key={mId} onClick={() => toggleMemberSelection(m)} className={`w-full flex items-center justify-between p-2 rounded-xl text-xs transition-all ${isSelected ? "bg-primary-50 text-primary-700 border-primary-200" : "hover:bg-slate-50 border-transparent"} border`}>
-                                                    <div className="flex items-center gap-2"><div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center font-bold">{m.name?.charAt(0)}</div><div className="text-left min-w-0 flex-1"><div className="font-bold truncate">{m.name}</div><div className="text-[9px] opacity-60 truncate">{m.email}</div></div></div>
-                                                    {isSelected && <Check className="h-3.5 w-3.5 text-primary-600" />}
+                                                <button key={mId} onClick={() => toggleMemberSelection(m)} className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all border ${isSelected ? "bg-primary-50 text-primary-700 border-primary-200 shadow-sm" : "bg-white hover:bg-slate-50 border-slate-100 shadow-sm"}`}>
+                                                    <div className="flex items-center gap-3"><div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-xs ${isSelected ? "bg-primary-600 text-white shadow-lg shadow-primary-200" : "bg-slate-100 text-slate-400"}`}>{m.name?.charAt(0)}</div><div className="text-left min-w-0 flex-1"><div className="font-black text-sm truncate">{m.name}</div><div className="text-[9px] font-bold opacity-50 truncate uppercase tracking-tighter">{m.email}</div></div></div>
+                                                    {isSelected && <div className="p-1 rounded-lg bg-primary-600 text-white shadow-md"><Check className="h-3.5 w-3.5" /></div>}
                                                 </button>
                                             );
                                         })}
@@ -617,9 +637,9 @@ export const FloatingChat = () => {
                                 </div>
                             )}
                         </div>
-                        <div className="p-4 bg-slate-50 flex gap-2 shrink-0">
-                            <button onClick={() => { setShowCreateModal(false); setShowInviteModal(false); }} className="flex-1 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold">취소</button>
-                            <button onClick={showCreateModal ? createRoom : inviteMembers} disabled={showCreateModal ? !newRoomTitle.trim() : selectedMembers.length === 0} className="flex-1 py-2 rounded-xl bg-primary-600 text-white text-xs font-bold disabled:bg-slate-300">{showCreateModal ? "방 만들기" : "초대하기"}</button>
+                        <div className="p-6 bg-white flex gap-3 shrink-0">
+                            <button onClick={() => { setShowCreateModal(false); setShowInviteModal(false); }} className="flex-1 py-4 rounded-2xl bg-slate-50 text-slate-400 text-xs font-black uppercase tracking-widest hover:bg-slate-100 transition-colors">Cancel</button>
+                            <button onClick={showCreateModal ? createRoom : inviteMembers} disabled={showCreateModal ? !newRoomTitle.trim() : selectedMembers.length === 0} className="flex-1 py-4 rounded-2xl bg-primary-600 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-primary-200 disabled:opacity-20 transition-all hover:bg-primary-700">{showCreateModal ? "Create Room" : "Add Members"}</button>
                         </div>
                     </div>
                 </div>

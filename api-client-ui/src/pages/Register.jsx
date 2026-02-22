@@ -76,163 +76,136 @@ export const Register = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
+            {/* Background decorative elements */}
+            <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary-100/50 rounded-full blur-3xl opacity-50" />
+            <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-sky-100/50 rounded-full blur-3xl opacity-50" />
+
+            <div className="w-full max-w-md relative z-10 py-10">
                 {/* 로고 & 타이틀 */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white mb-4 shadow-lg">
-                        <Leaf className="h-8 w-8" />
+                <div className="text-center mb-10">
+                    <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-primary-600 to-primary-400 text-white mb-6 shadow-2xl shadow-primary-200 group hover:scale-110 transition-transform duration-500">
+                        <span className="text-3xl font-black italic tracking-tighter">C</span>
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">회원가입</h1>
-                    <p className="text-slate-600">
-                        벌꿀오소리 커뮤니티에 오신 것을 환영합니다
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">JOIN US</h1>
+                    <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">
+                        START YOUR JOURNEY TODAY
                     </p>
                 </div>
 
                 {/* 회원가입 폼 */}
-                <div className="card p-8 animate-fade-in">
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="card p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50 shadow-2xl shadow-slate-200">
+                    <form onSubmit={handleSubmit} className="space-y-6">
                         {/* 이메일 */}
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                이메일
-                            </label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
                                 <input
                                     type="email"
                                     name="email"
                                     value={formData.email}
                                     onChange={handleChange}
-                                    className={`input-base pl-11 ${
-                                        errors.email ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
-                                    }`}
-                                    placeholder="example@email.com"
+                                    className={`input-base pl-12 h-14 bg-white font-bold ${errors.email ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                    placeholder="your@email.com"
                                 />
                             </div>
-                            {errors.email && (
-                                <p className="mt-1 text-xs text-red-600">{errors.email}</p>
-                            )}
+                            {errors.email && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.email}</p>}
                         </div>
 
                         {/* 비밀번호 */}
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                비밀번호
-                            </label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                                <input
-                                    type="password"
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    className={`input-base pl-11 ${
-                                        errors.password ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
-                                    }`}
-                                    placeholder="8자 이상"
-                                />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+                                <div className="relative group">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <input
+                                        type="password"
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        className={`input-base pl-12 h-14 bg-white font-bold text-xs ${errors.password ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                        placeholder="Min 8 chars"
+                                    />
+                                </div>
                             </div>
-                            {errors.password && (
-                                <p className="mt-1 text-xs text-red-600">{errors.password}</p>
-                            )}
-                        </div>
-
-                        {/* 비밀번호 확인 */}
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                비밀번호 확인
-                            </label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                                <input
-                                    type="password"
-                                    name="confirmPassword"
-                                    value={formData.confirmPassword}
-                                    onChange={handleChange}
-                                    className={`input-base pl-11 ${
-                                        errors.confirmPassword ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
-                                    }`}
-                                    placeholder="비밀번호 재입력"
-                                />
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Confirm</label>
+                                <div className="relative group">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <input
+                                        type="password"
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        className={`input-base pl-12 h-14 bg-white font-bold text-xs ${errors.confirmPassword ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                        placeholder="Repeat"
+                                    />
+                                </div>
                             </div>
-                            {errors.confirmPassword && (
-                                <p className="mt-1 text-xs text-red-600">
-                                    {errors.confirmPassword}
-                                </p>
-                            )}
                         </div>
+                        {(errors.password || errors.confirmPassword) && (
+                            <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.password || errors.confirmPassword}</p>
+                        )}
 
                         {/* 이름 */}
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                이름
-                            </label>
-                            <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
+                            <div className="relative group">
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
                                 <input
                                     type="text"
                                     name="name"
                                     value={formData.name}
                                     onChange={handleChange}
-                                    className={`input-base pl-11 ${
-                                        errors.name ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
-                                    }`}
-                                    placeholder="홍길동"
+                                    className={`input-base pl-12 h-14 bg-white font-bold ${errors.name ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                    placeholder="Enter your name"
                                 />
                             </div>
-                            {errors.name && (
-                                <p className="mt-1 text-xs text-red-600">{errors.name}</p>
-                            )}
+                            {errors.name && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.name}</p>}
                         </div>
 
                         {/* 전화번호 */}
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                전화번호
-                            </label>
-                            <div className="relative">
-                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
+                            <div className="relative group">
+                                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
                                 <input
                                     type="tel"
                                     name="phone"
                                     value={formData.phone}
                                     onChange={handleChange}
-                                    className={`input-base pl-11 ${
-                                        errors.phone ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
-                                    }`}
-                                    placeholder="010-1234-5678"
+                                    className={`input-base pl-12 h-14 bg-white font-bold ${errors.phone ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                    placeholder="010-0000-0000"
                                 />
                             </div>
-                            {errors.phone && (
-                                <p className="mt-1 text-xs text-red-600">{errors.phone}</p>
-                            )}
+                            {errors.phone && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.phone}</p>}
                         </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="btn-primary w-full"
+                            className="btn-primary w-full h-14 text-base tracking-tight shadow-xl shadow-primary-200 mt-4"
                         >
                             {loading ? (
-                                <span className="flex items-center justify-center gap-2">
-                  <div className="loading-spinner" />
-                  가입 중...
-                </span>
+                                <span className="flex items-center justify-center gap-3">
+                                    <div className="loading-spinner border-white/30 border-t-white" />
+                                    CREATING ACCOUNT...
+                                </span>
                             ) : (
-                                "회원가입"
+                                "COMPLETE REGISTRATION"
                             )}
                         </button>
                     </form>
 
-                    <div className="mt-6 pt-6 border-t text-center">
-                        <p className="text-sm text-slate-600">
-                            이미 계정이 있으신가요?{" "}
+                    <div className="mt-10 pt-8 border-t border-slate-50 text-center">
+                        <p className="text-sm font-medium text-slate-400">
+                            Already have an account?{" "}
                             <Link
                                 to="/login"
-                                className="font-semibold text-primary-600 hover:text-primary-700"
+                                className="font-black text-primary-600 hover:text-primary-700 underline underline-offset-4 decoration-primary-200"
                             >
-                                로그인
+                                LOG IN
                             </Link>
                         </p>
                     </div>
