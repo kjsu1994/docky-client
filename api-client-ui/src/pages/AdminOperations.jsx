@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert, UserSearch, EyeOff, RotateCcw, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
@@ -22,6 +22,13 @@ const pick = (obj, camel, snake, fallback = null) => {
     return fallback;
 };
 
+const getMemberIdValue = (member) => {
+    const raw = pick(member, "memberId", "member_id", null);
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+};
+
 export const AdminOperations = () => {
     const { user } = useAuth();
     const isAdmin = useMemo(() => isAdminUser(user), [user]);
@@ -35,14 +42,24 @@ export const AdminOperations = () => {
     const [batchResult, setBatchResult] = useState(null);
 
     const [memberIdInput, setMemberIdInput] = useState("");
+    const [memberKeyword, setMemberKeyword] = useState("");
+    const [memberCandidates, setMemberCandidates] = useState([]);
+    const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+    const [memberSearchError, setMemberSearchError] = useState("");
     const [memberLoading, setMemberLoading] = useState(false);
     const [memberError, setMemberError] = useState("");
     const [memberDetail, setMemberDetail] = useState(null);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchMemberCandidates(memberKeyword);
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [memberKeyword]);
 
     const submitBatchModeration = async () => {
         const ids = parseIds(idsInput);
         if (!ids.length) {
-            toast.error("???ID瑜?1媛??댁긽 ?낅젰?섏꽭??");
+            toast.error("Enter at least one target ID.");
             return;
         }
 
@@ -59,9 +76,9 @@ export const AdminOperations = () => {
             const response = await api.patch(endpoint, payload);
             const data = unwrapData(response.data) || {};
             setBatchResult(data);
-            toast.success("?쇨큵 紐⑤뜑?덉씠???묒뾽???꾨즺?섏뿀?듬땲??");
+            toast.success("Bulk moderation completed.");
         } catch (err) {
-            const message = err?.response?.data?.message || "?쇨큵 紐⑤뜑?덉씠???묒뾽???ㅽ뙣?덉뒿?덈떎.";
+            const message = err?.response?.data?.message || "Bulk moderation failed.";
             setBatchError(message);
             toast.error(message);
         } finally {
@@ -69,10 +86,35 @@ export const AdminOperations = () => {
         }
     };
 
-    const fetchMemberDetail = async () => {
-        const memberId = Number(memberIdInput);
+    const fetchMemberCandidates = async (keyword) => {
+        const trimmed = String(keyword || "").trim();
+        if (!trimmed) {
+            setMemberCandidates([]);
+            setMemberSearchError("");
+            return;
+        }
+
+        setMemberSearchLoading(true);
+        setMemberSearchError("");
+        try {
+            const response = await api.get("/members/list", {
+                params: { keyword: trimmed, page: 0, size: 20 },
+            });
+            const payload = unwrapData(response.data);
+            const items = payload?.items || payload?.content || payload?.data || payload || [];
+            setMemberCandidates(Array.isArray(items) ? items : []);
+        } catch (err) {
+            setMemberCandidates([]);
+            setMemberSearchError(err?.response?.data?.message || "Failed to search members.");
+        } finally {
+            setMemberSearchLoading(false);
+        }
+    };
+
+    const fetchMemberDetail = async (memberIdOverride) => {
+        const memberId = Number(memberIdOverride ?? memberIdInput);
         if (!Number.isFinite(memberId) || memberId <= 0) {
-            toast.error("?좏슚???뚯썝 ID瑜??낅젰?섏꽭??");
+            toast.error("Enter a valid member ID.");
             return;
         }
 
@@ -83,7 +125,7 @@ export const AdminOperations = () => {
             const data = unwrapData(response.data);
             setMemberDetail(data);
         } catch (err) {
-            const message = err?.response?.data?.message || "?뚯썝 ?곸꽭 議고쉶???ㅽ뙣?덉뒿?덈떎.";
+            const message = err?.response?.data?.message || "Failed to fetch member detail.";
             setMemberError(message);
             setMemberDetail(null);
             toast.error(message);
@@ -92,14 +134,26 @@ export const AdminOperations = () => {
         }
     };
 
+    const selectCandidate = async (member) => {
+        const memberId = getMemberIdValue(member);
+        if (!memberId) {
+            toast.error("Invalid member candidate.");
+            return;
+        }
+        setMemberIdInput(String(memberId));
+        setMemberKeyword(`${pick(member, "name", "name", "")} (${pick(member, "email", "email", "")})`);
+        setMemberCandidates([]);
+        await fetchMemberDetail(memberId);
+    };
+
     if (!isAdmin) {
         return (
             <section className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-rose-800 text-center space-y-4">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
                     <ShieldAlert className="h-8 w-8 text-rose-500" />
                 </div>
-                <h1 className="text-xl font-black">愿由ъ옄 ?꾩슜 ?붾㈃</h1>
-                <p className="text-sm font-medium opacity-70">ROLE_ADMIN ?먮뒗 ROLE_MASTER 沅뚰븳???꾩슂?⑸땲??</p>
+                <h1 className="text-xl font-black">Admin Only Page</h1>
+                <p className="text-sm font-medium opacity-70">ROLE_ADMIN or ROLE_MASTER is required.</p>
             </section>
         );
     }
@@ -115,9 +169,30 @@ export const AdminOperations = () => {
         <section className="space-y-8 animate-fade-in pb-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900">愿由ъ옄 ?댁쁺 ?붾㈃</h1>
-                    <p className="text-sm font-medium text-slate-400">?쇨큵 紐⑤뜑?덉씠?섍낵 ?뚯썝 360 ?곸꽭 議고쉶瑜??쒓났?⑸땲??</p>
+                    <h1 className="text-3xl font-black tracking-tight text-slate-900">Admin Operations</h1>
+                    <p className="text-sm font-medium text-slate-400">Bulk moderation tools and member 360 detail lookup.</p>
                 </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-6">
+                <h2 className="text-base font-black text-slate-900">How To Use</h2>
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl bg-white p-4">
+                        <div className="text-xs font-black uppercase tracking-widest text-primary-600">Bulk Moderation</div>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Enter board/comment IDs, choose hide or recover, add a reason, then run once for batch processing.
+                        </p>
+                    </div>
+                    <div className="rounded-2xl bg-white p-4">
+                        <div className="text-xs font-black uppercase tracking-widest text-primary-600">Member 360 Detail</div>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Search a member ID to review profile summary, recent content, sanctions, and report history in one view.
+                        </p>
+                    </div>
+                </div>
+                <p className="mt-4 text-xs font-semibold text-slate-500">
+                    Note: All actions are audited and reflected in admin logs.
+                </p>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -129,25 +204,25 @@ export const AdminOperations = () => {
                             <option value="COMMENT">COMMENT</option>
                         </select>
                         <select className="input-base" value={hiddenAction} onChange={(e) => setHiddenAction(e.target.value)}>
-                            <option value="HIDE">?④?(HIDE)</option>
-                            <option value="RECOVER">蹂듦뎄(RECOVER)</option>
+                            <option value="HIDE">Hide (HIDE)</option>
+                            <option value="RECOVER">Recover (RECOVER)</option>
                         </select>
                         <button className="btn-primary" disabled={batchLoading} onClick={submitBatchModeration}>
                             {batchLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : hiddenAction === "HIDE" ? <EyeOff className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
-                            <span className="ml-2">?ㅽ뻾</span>
+                            <span className="ml-2">Run</span>
                         </button>
                     </div>
                     <textarea
                         className="input-base min-h-[110px]"
                         value={idsInput}
                         onChange={(e) => setIdsInput(e.target.value)}
-                        placeholder="???ID瑜?肄ㅻ쭏 ?먮뒗 怨듬갚?쇰줈 ?낅젰?섏꽭?? ?? 10,11,12"
+                        placeholder="Enter target IDs separated by comma or space. e.g. 10,11,12"
                     />
                     <input
                         className="input-base"
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
-                        placeholder="?ъ쑀(?좏깮, 理쒕? 500??"
+                        placeholder="Reason (optional, max 500)"
                         maxLength={500}
                     />
 
@@ -159,29 +234,69 @@ export const AdminOperations = () => {
 
                     {batchResult ? (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 text-sm space-y-1">
-                            <div><b>?붿껌 嫄댁닔:</b> {pick(batchResult, "totalRequested", "total_requested", 0)}</div>
-                            <div><b>泥섎━ 嫄댁닔:</b> {pick(batchResult, "processedCount", "processed_count", 0)}</div>
-                            <div><b>?ㅽ뙣 ID:</b> {(pick(batchResult, "failedIds", "failed_ids", []) || []).join(", ") || "?놁쓬"}</div>
+                            <div><b>Total requested:</b> {pick(batchResult, "totalRequested", "total_requested", 0)}</div>
+                            <div><b>Processed:</b> {pick(batchResult, "processedCount", "processed_count", 0)}</div>
+                            <div><b>Failed IDs:</b> {(pick(batchResult, "failedIds", "failed_ids", []) || []).join(", ") || "None"}</div>
                         </div>
                     ) : (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
-                            ?ㅽ뻾 寃곌낵媛 ?ш린???쒖떆?⑸땲??
+                            Execution result will appear here.
                         </div>
                     )}
                 </div>
 
                 <div className="card p-8 space-y-5">
-                    <h2 className="text-lg font-black text-slate-900">?뚯썝 360 ?곸꽭 議고쉶</h2>
+                    <h2 className="text-lg font-black text-slate-900">Member 360 Detail</h2>
+                    <div className="space-y-2">
+                        <input
+                            className="input-base"
+                            value={memberKeyword}
+                            onChange={(e) => setMemberKeyword(e.target.value)}
+                            placeholder="Search member by name/email"
+                        />
+                        {memberSearchLoading ? (
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs font-semibold text-slate-500">
+                                Searching members...
+                            </div>
+                        ) : null}
+                        {memberSearchError ? (
+                            <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+                                {memberSearchError}
+                            </div>
+                        ) : null}
+                        {memberCandidates.length ? (
+                            <div className="max-h-44 overflow-auto rounded-2xl border border-slate-100 bg-slate-50/50 p-2 space-y-2">
+                                {memberCandidates.map((member, idx) => {
+                                    const candidateId = getMemberIdValue(member);
+                                    return (
+                                        <button
+                                            key={candidateId || `member-candidate-${idx}`}
+                                            type="button"
+                                            onClick={() => selectCandidate(member)}
+                                            className="w-full rounded-xl bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-primary-50"
+                                        >
+                                            <div>{pick(member, "name", "name", "(No name)")} ({pick(member, "email", "email", "-")})</div>
+                                            <div className="text-[10px] text-slate-400">#{candidateId || "-"}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : String(memberKeyword || "").trim() ? (
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs font-semibold text-slate-500">
+                                No candidates found.
+                            </div>
+                        ) : null}
+                    </div>
                     <div className="flex gap-3">
                         <input
                             className="input-base flex-1"
                             value={memberIdInput}
                             onChange={(e) => setMemberIdInput(e.target.value)}
-                            placeholder="?뚯썝 ID ?낅젰"
+                            placeholder="Enter member ID"
                         />
                         <button className="btn-primary" disabled={memberLoading} onClick={fetchMemberDetail}>
                             {memberLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UserSearch className="h-4 w-4" />}
-                            <span className="ml-2">議고쉶</span>
+                            <span className="ml-2">Search</span>
                         </button>
                     </div>
 
@@ -193,7 +308,7 @@ export const AdminOperations = () => {
 
                     {!memberLoading && !memberError && !memberDetail ? (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
-                            ?뚯썝 ID瑜??낅젰?섍퀬 議고쉶?섏꽭??
+                            Enter a member ID and search.
                         </div>
                     ) : null}
                 </div>
@@ -202,24 +317,24 @@ export const AdminOperations = () => {
             {memberDetail ? (
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div className="card p-6 xl:col-span-1 space-y-3">
-                        <h3 className="text-base font-black text-slate-900">湲곕낯 ?뺣낫</h3>
+                        <h3 className="text-base font-black text-slate-900">Basic Info</h3>
                         <div className="text-sm"><b>ID:</b> {pick(memberInfo, "memberId", "member_id", "-")}</div>
-                        <div className="text-sm"><b>?대찓??</b> {pick(memberInfo, "email", "email", "-")}</div>
-                        <div className="text-sm"><b>?대쫫:</b> {pick(memberInfo, "name", "name", "-")}</div>
-                        <div className="text-sm"><b>?곹깭:</b> {pick(memberInfo, "memberStatus", "member_status", "-")}</div>
-                        <div className="text-sm"><b>沅뚰븳:</b> {(pick(memberInfo, "roles", "roles", []) || []).join(", ") || "-"}</div>
-                        <div className="text-sm"><b>?ъ씤??</b> {pick(memberInfo, "point", "point", 0)}</div>
-                        <div className="text-sm"><b>?섎Т:</b> {pick(memberInfo, "treeCount", "tree_count", 0)}</div>
-                        <div className="text-sm"><b>寃뚯떆湲:</b> {pick(memberInfo, "boardCount", "board_count", 0)}</div>
-                        <div className="text-sm"><b>?볤?:</b> {pick(memberInfo, "commentCount", "comment_count", 0)}</div>
+                        <div className="text-sm"><b>Email:</b> {pick(memberInfo, "email", "email", "-")}</div>
+                        <div className="text-sm"><b>Name:</b> {pick(memberInfo, "name", "name", "-")}</div>
+                        <div className="text-sm"><b>Status:</b> {pick(memberInfo, "memberStatus", "member_status", "-")}</div>
+                        <div className="text-sm"><b>Roles:</b> {(pick(memberInfo, "roles", "roles", []) || []).join(", ") || "-"}</div>
+                        <div className="text-sm"><b>Points:</b> {pick(memberInfo, "point", "point", 0)}</div>
+                        <div className="text-sm"><b>Trees:</b> {pick(memberInfo, "treeCount", "tree_count", 0)}</div>
+                        <div className="text-sm"><b>Boards:</b> {pick(memberInfo, "boardCount", "board_count", 0)}</div>
+                        <div className="text-sm"><b>Comments:</b> {pick(memberInfo, "commentCount", "comment_count", 0)}</div>
                     </div>
 
                     <div className="card p-6 xl:col-span-2">
-                        <h3 className="mb-3 text-base font-black text-slate-900">理쒓렐 寃뚯떆湲 / ?볤?</h3>
+                        <h3 className="mb-3 text-base font-black text-slate-900">Recent Boards / Comments</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="rounded-2xl bg-slate-50/50 p-4">
                                 <div className="mb-2 text-xs font-black text-slate-500 uppercase">Recent Boards</div>
-                                {!recentBoards.length ? <div className="text-xs text-slate-400">?곗씠???놁쓬</div> : (
+                                {!recentBoards.length ? <div className="text-xs text-slate-400">No data</div> : (
                                     <ul className="space-y-2 text-sm">
                                         {recentBoards.map((board, idx) => (
                                             <li key={`${pick(board, "boardId", "board_id", idx)}-${idx}`} className="flex items-center justify-between gap-2">
@@ -234,7 +349,7 @@ export const AdminOperations = () => {
                             </div>
                             <div className="rounded-2xl bg-slate-50/50 p-4">
                                 <div className="mb-2 text-xs font-black text-slate-500 uppercase">Recent Comments</div>
-                                {!recentComments.length ? <div className="text-xs text-slate-400">?곗씠???놁쓬</div> : (
+                                {!recentComments.length ? <div className="text-xs text-slate-400">No data</div> : (
                                     <ul className="space-y-2 text-sm">
                                         {recentComments.map((comment, idx) => (
                                             <li key={`${pick(comment, "commentId", "comment_id", idx)}-${idx}`} className="flex items-center justify-between gap-2">
@@ -253,7 +368,7 @@ export const AdminOperations = () => {
                     <div className="card p-6 xl:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div className="rounded-2xl bg-slate-50/50 p-4">
                             <div className="mb-2 text-xs font-black text-slate-500 uppercase">Sanctions</div>
-                            {!sanctions.length ? <div className="text-xs text-slate-400">?곗씠???놁쓬</div> : (
+                            {!sanctions.length ? <div className="text-xs text-slate-400">No data</div> : (
                                 <ul className="space-y-2 text-sm">
                                     {sanctions.map((item, idx) => (
                                         <li key={`${pick(item, "sanctionId", "sanction_id", idx)}-${idx}`}>
@@ -265,7 +380,7 @@ export const AdminOperations = () => {
                         </div>
                         <div className="rounded-2xl bg-slate-50/50 p-4">
                             <div className="mb-2 text-xs font-black text-slate-500 uppercase">Received Reports</div>
-                            {!receivedReports.length ? <div className="text-xs text-slate-400">?곗씠???놁쓬</div> : (
+                            {!receivedReports.length ? <div className="text-xs text-slate-400">No data</div> : (
                                 <ul className="space-y-2 text-sm">
                                     {receivedReports.map((item, idx) => (
                                         <li key={`${pick(item, "reportId", "report_id", idx)}-${idx}`}>
@@ -277,7 +392,7 @@ export const AdminOperations = () => {
                         </div>
                         <div className="rounded-2xl bg-slate-50/50 p-4">
                             <div className="mb-2 text-xs font-black text-slate-500 uppercase">Made Reports</div>
-                            {!madeReports.length ? <div className="text-xs text-slate-400">?곗씠???놁쓬</div> : (
+                            {!madeReports.length ? <div className="text-xs text-slate-400">No data</div> : (
                                 <ul className="space-y-2 text-sm">
                                     {madeReports.map((item, idx) => (
                                         <li key={`${pick(item, "reportId", "report_id", idx)}-${idx}`}>
@@ -293,4 +408,5 @@ export const AdminOperations = () => {
         </section>
     );
 };
+
 
