@@ -473,14 +473,27 @@ export const AdminAnomalies = () => {
     };
 
     const markNotificationRead = async (notificationId) => {
-        await api.patch(`/admin/notifications/${notificationId}/read`, { read_yn: true });
-        await fetchNotifications();
-        await fetchReleaseRequests();
+        const normalizedId = Number(notificationId);
+        if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
+            toast.error("Invalid notification ID.");
+            return;
+        }
+        await api.patch(`/admin/notifications/${normalizedId}/read`, { read_yn: true });
+        setNotifications((prev) =>
+            (prev || []).filter((item) => Number(item?.notificationId ?? item?.notification_id) !== normalizedId)
+        );
+        setReleaseRequests((prev) => ({
+            ...prev,
+            items: (prev?.items || []).filter((item) => Number(item?.notificationId ?? item?.notification_id) !== normalizedId),
+            totalElements: Math.max(0, Number(prev?.totalElements || 0) - 1),
+        }));
+        setNotificationUnreadCount((prev) => Math.max(0, Number(prev || 0) - 1));
     };
 
     const markAllNotificationsRead = async () => {
         await api.post("/admin/notifications/read-all");
         await fetchNotifications();
+        await fetchReleaseRequests();
     };
 
     const updateReportStatus = async (reportId, reportStatus) => {
@@ -1238,24 +1251,27 @@ export const AdminAnomalies = () => {
                         <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">No unread notifications.</div>
                     ) : (
                         <div className="space-y-4 max-h-[500px] overflow-auto pr-2">
-                            {notifications.map((notification) => (
-                                <div key={notification.notificationId} className="group p-6 rounded-3xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:shadow-xl transition-all">
+                            {notifications.map((notification, idx) => {
+                                const notificationId = Number(notification?.notificationId ?? notification?.notification_id);
+                                return (
+                                <div key={Number.isFinite(notificationId) ? notificationId : `notif-${idx}`} className="group p-6 rounded-3xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:shadow-xl transition-all">
                                     <div className="mb-3 flex items-center justify-between">
-                                        <div className="text-sm font-black text-slate-900 line-clamp-1">{notification.title}</div>
-                                        <span className="px-2 py-0.5 rounded-lg bg-slate-200 text-[9px] font-black text-slate-600 uppercase tracking-tighter">{notification.severity}</span>
+                                        <div className="text-sm font-black text-slate-900 line-clamp-1">{notification?.title}</div>
+                                        <span className="px-2 py-0.5 rounded-lg bg-slate-200 text-[9px] font-black text-slate-600 uppercase tracking-tighter">{notification?.severity}</span>
                                     </div>
-                                    <p className="mb-5 text-[13px] font-medium text-slate-500 leading-relaxed">{notification.message}</p>
+                                    <p className="mb-5 text-[13px] font-medium text-slate-500 leading-relaxed">{notification?.message}</p>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-bold text-slate-300">{notification.createdAt}</span>
+                                        <span className="text-[10px] font-bold text-slate-300">{notification?.createdAt ?? notification?.created_at}</span>
                                         <button
                                             className="btn-primary py-1.5 px-4 text-[11px]"
-                                            onClick={() => markNotificationRead(notification.notificationId)}
+                                            disabled={!Number.isFinite(notificationId) || notificationId <= 0}
+                                            onClick={() => markNotificationRead(notificationId)}
                                         >
                                             Mark as read
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     )}
                 </div>
