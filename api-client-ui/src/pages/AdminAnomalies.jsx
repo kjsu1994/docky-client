@@ -411,6 +411,13 @@ export const AdminAnomalies = () => {
         fetchDashboard("ALL", 1);
     }, [isAdmin]);
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchSanctionMembers(sanctionKeyword);
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [sanctionKeyword]);
+
     const changeFilter = async (nextStatus) => {
         setStatusFilter(nextStatus);
         setPage(1);
@@ -907,21 +914,15 @@ export const AdminAnomalies = () => {
                         </div>
                     </div>
                     <div className="mb-6 space-y-3">
-                        <div className="flex gap-2">
-                            <input
-                                value={sanctionKeyword}
-                                onChange={(e) => setSanctionKeyword(e.target.value)}
-                                placeholder="Search member (name/email)"
-                                className="input-base w-full"
-                            />
-                            <button
-                                className="btn-secondary py-2 px-4 whitespace-nowrap"
-                                onClick={() => fetchSanctionMembers(sanctionKeyword)}
-                                disabled={sanctionMemberLoading}
-                            >
-                                {sanctionMemberLoading ? "Searching..." : "Search"}
-                            </button>
-                        </div>
+                        <input
+                            value={sanctionKeyword}
+                            onChange={(e) => setSanctionKeyword(e.target.value)}
+                            placeholder="Search member (name/email)"
+                            className="input-base w-full"
+                        />
+                        {sanctionMemberLoading ? (
+                            <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">Searching...</div>
+                        ) : null}
                         {sanctionSearchError ? (
                             <div className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{sanctionSearchError}</div>
                         ) : null}
