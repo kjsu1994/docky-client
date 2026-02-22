@@ -60,9 +60,9 @@ const getHiddenYnValue = (target) => {
     const value = target?.hiddenYn ?? target?.hidden_yn;
     return value === "Y" || value === true;
 };
-const toHiddenYnLiteral = (value) => {
-    if (value === "Y" || value === true) return "Y";
-    if (value === "N" || value === false) return "N";
+const toHiddenYnBoolean = (value) => {
+    if (value === "Y" || value === true) return true;
+    if (value === "N" || value === false) return false;
     return null;
 };
 
@@ -594,13 +594,13 @@ export const AdminAnomalies = () => {
             toast.error("Invalid board ID.");
             return;
         }
-        const normalizedHiddenYn = toHiddenYnLiteral(hiddenYn);
-        if (!normalizedHiddenYn) {
+        const normalizedHiddenYn = toHiddenYnBoolean(hiddenYn);
+        if (normalizedHiddenYn === null) {
             toast.error("Invalid hiddenYn value.");
             return;
         }
 
-        const reason = window.prompt(normalizedHiddenYn === "Y" ? "Enter hide reason." : "Enter restore reason.", "") || "";
+        const reason = window.prompt(normalizedHiddenYn ? "Enter hide reason." : "Enter restore reason.", "") || "";
         try {
             await api.patch(`/admin/moderation/boards/${normalizedBoardId}`, { hidden_yn: normalizedHiddenYn, reason });
             toast.success(normalizedHiddenYn === "Y" ? "Board hidden." : "Board restored.");
@@ -617,13 +617,13 @@ export const AdminAnomalies = () => {
             toast.error("Invalid comment ID.");
             return;
         }
-        const normalizedHiddenYn = toHiddenYnLiteral(hiddenYn);
-        if (!normalizedHiddenYn) {
+        const normalizedHiddenYn = toHiddenYnBoolean(hiddenYn);
+        if (normalizedHiddenYn === null) {
             toast.error("Invalid hiddenYn value.");
             return;
         }
 
-        const reason = window.prompt(normalizedHiddenYn === "Y" ? "Enter hide reason." : "Enter restore reason.", "") || "";
+        const reason = window.prompt(normalizedHiddenYn ? "Enter hide reason." : "Enter restore reason.", "") || "";
         try {
             await api.patch(`/admin/moderation/comments/${normalizedCommentId}`, { hidden_yn: normalizedHiddenYn, reason });
             toast.success(normalizedHiddenYn === "Y" ? "Comment hidden." : "Comment restored.");
