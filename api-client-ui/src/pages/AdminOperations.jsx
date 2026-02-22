@@ -7,14 +7,6 @@ import { isAdminUser } from "../utils/authorization";
 
 const unwrapData = (payload) => payload?.data?.data ?? payload?.data ?? payload ?? null;
 
-const parseIds = (raw) => {
-    const values = String(raw || "")
-        .split(/[\s,]+/)
-        .map((token) => Number(token.trim()))
-        .filter((value) => Number.isFinite(value) && value > 0);
-    return [...new Set(values)];
-};
-
 const pick = (obj, camel, snake, fallback = null) => {
     if (!obj || typeof obj !== "object") return fallback;
     if (Object.prototype.hasOwnProperty.call(obj, camel) && obj[camel] !== undefined) return obj[camel];
@@ -29,14 +21,39 @@ const getMemberIdValue = (member) => {
     return parsed;
 };
 
+const getModerationItemId = (item, targetType) => {
+    const raw = targetType === "BOARD"
+        ? pick(item, "boardId", "board_id", null)
+        : pick(item, "commentId", "comment_id", null);
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+};
+
+const getModerationItemHidden = (item) => Boolean(pick(item, "hiddenYn", "hidden_yn", false));
+
+const getModerationPrimaryText = (item, targetType) => {
+    if (targetType === "BOARD") return pick(item, "title", "title", "(No title)");
+    return pick(item, "contents", "contents", "(No contents)");
+};
+
+const getModerationSecondaryText = (item, targetType) => {
+    if (targetType === "BOARD") return pick(item, "boardCreator", "board_creator", "-");
+    return pick(item, "writerName", "writer_name", "-");
+};
+
 export const AdminOperations = () => {
     const { user } = useAuth();
     const isAdmin = useMemo(() => isAdminUser(user), [user]);
 
     const [targetType, setTargetType] = useState("BOARD");
-    const [idsInput, setIdsInput] = useState("");
-    const [hiddenAction, setHiddenAction] = useState("HIDE");
+    const [bulkKeyword, setBulkKeyword] = useState("");
+    const [bulkHiddenFilter, setBulkHiddenFilter] = useState("ALL");
     const [reason, setReason] = useState("");
+    const [moderationItems, setModerationItems] = useState([]);
+    const [moderationLoading, setModerationLoading] = useState(false);
+    const [moderationError, setModerationError] = useState("");
+    const [selectedIds, setSelectedIds] = useState([]);
     const [batchLoading, setBatchLoading] = useState(false);
     const [batchError, setBatchError] = useState("");
     const [batchResult, setBatchResult] = useState(null);
@@ -49,6 +66,49 @@ export const AdminOperations = () => {
     const [memberLoading, setMemberLoading] = useState(false);
     const [memberError, setMemberError] = useState("");
     const [memberDetail, setMemberDetail] = useState(null);
+
+    const filteredModerationItems = useMemo(() => {
+        const keyword = String(bulkKeyword || "").trim().toLowerCase();
+        return (moderationItems || []).filter((item) => {
+            const hidden = getModerationItemHidden(item);
+            if (bulkHiddenFilter === "HIDDEN" && !hidden) return false;
+            if (bulkHiddenFilter === "VISIBLE" && hidden) return false;
+
+            if (!keyword) return true;
+            const id = getModerationItemId(item, targetType);
+            const primary = getModerationPrimaryText(item, targetType).toLowerCase();
+            const secondary = getModerationSecondaryText(item, targetType).toLowerCase();
+            return String(id || "").includes(keyword) || primary.includes(keyword) || secondary.includes(keyword);
+        });
+    }, [bulkHiddenFilter, bulkKeyword, moderationItems, targetType]);
+
+    const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+    const fetchModerationItems = async (nextTargetType = targetType) => {
+        setModerationLoading(true);
+        setModerationError("");
+        try {
+            const endpoint = nextTargetType === "BOARD" ? "/admin/moderation/boards" : "/admin/moderation/comments";
+            const response = await api.get(endpoint, {
+                params: { page: 1, size: 100 },
+            });
+            const payload = unwrapData(response.data);
+            const items = payload?.items || payload?.content || payload?.data || payload || [];
+            setModerationItems(Array.isArray(items) ? items : []);
+        } catch (err) {
+            setModerationItems([]);
+            setModerationError(err?.response?.data?.message || "Failed to load moderation list.");
+        } finally {
+            setModerationLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setSelectedIds([]);
+        setBatchResult(null);
+        fetchModerationItems();
+    }, [targetType]);
+
     useEffect(() => {
         const timer = setTimeout(() => {
             fetchMemberCandidates(memberKeyword);
@@ -56,17 +116,17 @@ export const AdminOperations = () => {
         return () => clearTimeout(timer);
     }, [memberKeyword]);
 
-    const submitBatchModeration = async () => {
-        const ids = parseIds(idsInput);
+    const submitBatchModeration = async (actionType) => {
+        const ids = [...new Set(selectedIds)].filter((value) => Number.isFinite(Number(value)) && Number(value) > 0);
         if (!ids.length) {
-            toast.error("Enter at least one target ID.");
+            toast.error("Select at least one item.");
             return;
         }
 
         const endpoint = targetType === "BOARD" ? "/admin/moderation/boards/batch" : "/admin/moderation/comments/batch";
         const payload = {
             ids,
-            hidden_yn: hiddenAction === "HIDE",
+            hidden_yn: actionType === "HIDE",
             reason: reason.trim() || null,
         };
 
@@ -76,7 +136,9 @@ export const AdminOperations = () => {
             const response = await api.patch(endpoint, payload);
             const data = unwrapData(response.data) || {};
             setBatchResult(data);
-            toast.success("Bulk moderation completed.");
+            await fetchModerationItems(targetType);
+            setSelectedIds([]);
+            toast.success(actionType === "HIDE" ? "Selected items are now hidden." : "Selected items are now visible.");
         } catch (err) {
             const message = err?.response?.data?.message || "Bulk moderation failed.";
             setBatchError(message);
@@ -85,6 +147,25 @@ export const AdminOperations = () => {
             setBatchLoading(false);
         }
     };
+
+    const toggleSelectId = (id) => {
+        const normalized = Number(id);
+        if (!Number.isFinite(normalized) || normalized <= 0) return;
+        setSelectedIds((prev) => (
+            prev.includes(normalized)
+                ? prev.filter((item) => item !== normalized)
+                : [...prev, normalized]
+        ));
+    };
+
+    const selectAllFiltered = () => {
+        const allIds = filteredModerationItems
+            .map((item) => getModerationItemId(item, targetType))
+            .filter((id) => Number.isFinite(id) && id > 0);
+        setSelectedIds((prev) => [...new Set([...prev, ...allIds])]);
+    };
+
+    const clearSelected = () => setSelectedIds([]);
 
     const fetchMemberCandidates = async (keyword) => {
         const trimmed = String(keyword || "").trim();
@@ -180,7 +261,7 @@ export const AdminOperations = () => {
                     <div className="rounded-2xl bg-white p-4">
                         <div className="text-xs font-black uppercase tracking-widest text-primary-600">Bulk Moderation</div>
                         <p className="mt-2 text-sm text-slate-600">
-                            Enter board/comment IDs, choose hide or recover, add a reason, then run once for batch processing.
+                            Search board/comment list by keyword, select multiple targets, then run hide or recover in one batch.
                         </p>
                     </div>
                     <div className="rounded-2xl bg-white p-4">
@@ -198,26 +279,106 @@ export const AdminOperations = () => {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <div className="card p-8 space-y-5">
                     <h2 className="text-lg font-black text-slate-900">Bulk Moderation</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <select className="input-base" value={targetType} onChange={(e) => setTargetType(e.target.value)}>
                             <option value="BOARD">BOARD</option>
                             <option value="COMMENT">COMMENT</option>
                         </select>
-                        <select className="input-base" value={hiddenAction} onChange={(e) => setHiddenAction(e.target.value)}>
-                            <option value="HIDE">Hide (HIDE)</option>
-                            <option value="RECOVER">Recover (RECOVER)</option>
+                        <select className="input-base" value={bulkHiddenFilter} onChange={(e) => setBulkHiddenFilter(e.target.value)}>
+                            <option value="ALL">All status</option>
+                            <option value="VISIBLE">Visible only</option>
+                            <option value="HIDDEN">Hidden only</option>
                         </select>
-                        <button className="btn-primary" disabled={batchLoading} onClick={submitBatchModeration}>
-                            {batchLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : hiddenAction === "HIDE" ? <EyeOff className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
-                            <span className="ml-2">Run</span>
+                        <button
+                            className="btn-primary"
+                            disabled={batchLoading}
+                            onClick={() => submitBatchModeration("HIDE")}
+                        >
+                            {batchLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <EyeOff className="h-4 w-4" />}
+                            <span className="ml-2">Hide Selected</span>
+                        </button>
+                        <button
+                            className="btn-secondary"
+                            disabled={batchLoading}
+                            onClick={() => submitBatchModeration("RECOVER")}
+                        >
+                            {batchLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                            <span className="ml-2">Recover Selected</span>
                         </button>
                     </div>
-                    <textarea
-                        className="input-base min-h-[110px]"
-                        value={idsInput}
-                        onChange={(e) => setIdsInput(e.target.value)}
-                        placeholder="Enter target IDs separated by comma or space. e.g. 10,11,12"
+
+                    <input
+                        className="input-base"
+                        value={bulkKeyword}
+                        onChange={(e) => setBulkKeyword(e.target.value)}
+                        placeholder="Search by id/title/content/writer"
                     />
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <button
+                            type="button"
+                            className="rounded-xl bg-slate-100 px-3 py-1.5 font-black text-slate-700 hover:bg-slate-200"
+                            onClick={selectAllFiltered}
+                            disabled={!filteredModerationItems.length}
+                        >
+                            Select Filtered
+                        </button>
+                        <button
+                            type="button"
+                            className="rounded-xl bg-slate-100 px-3 py-1.5 font-black text-slate-700 hover:bg-slate-200"
+                            onClick={clearSelected}
+                            disabled={!selectedIds.length}
+                        >
+                            Clear Selected
+                        </button>
+                        <span className="font-semibold text-slate-500">Selected: {selectedIds.length}</span>
+                    </div>
+
+                    {moderationLoading ? (
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
+                            Loading moderation list...
+                        </div>
+                    ) : moderationError ? (
+                        <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                            {moderationError}
+                        </div>
+                    ) : !filteredModerationItems.length ? (
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
+                            No matching items.
+                        </div>
+                    ) : (
+                        <div className="max-h-56 overflow-auto rounded-2xl border border-slate-100 bg-slate-50/40 p-2 space-y-2">
+                            {filteredModerationItems.map((item, idx) => {
+                                const id = getModerationItemId(item, targetType);
+                                if (!id) return null;
+                                const checked = selectedIdSet.has(id);
+                                const hidden = getModerationItemHidden(item);
+                                return (
+                                    <label
+                                        key={`${targetType}-${id}-${idx}`}
+                                        className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl border px-3 py-2 ${checked ? "border-primary-300 bg-primary-50" : "border-slate-100 bg-white"}`}
+                                    >
+                                        <div className="flex items-start gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => toggleSelectId(id)}
+                                                className="mt-1"
+                                            />
+                                            <div>
+                                                <div className="text-xs font-black text-slate-800">#{id} {getModerationPrimaryText(item, targetType)}</div>
+                                                <div className="text-[11px] text-slate-500">{getModerationSecondaryText(item, targetType)}</div>
+                                            </div>
+                                        </div>
+                                        <span className={`rounded-lg px-2 py-0.5 text-[10px] font-black ${hidden ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
+                                            {hidden ? "HIDDEN" : "VISIBLE"}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    )}
+
                     <input
                         className="input-base"
                         value={reason}
@@ -240,7 +401,7 @@ export const AdminOperations = () => {
                         </div>
                     ) : (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
-                            Execution result will appear here.
+                            Select targets from the list, then execute bulk moderation.
                         </div>
                     )}
                 </div>
@@ -408,5 +569,3 @@ export const AdminOperations = () => {
         </section>
     );
 };
-
-
