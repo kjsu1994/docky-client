@@ -81,7 +81,7 @@ export const Header = () => {
             {
                 title: "Tools",
                 items: [
-                    { title: "중간취소", to: "/app/optimizer", icon: MapPin },
+                    { title: "중간장소", to: "/app/optimizer", icon: MapPin },
                     { title: "순위", to: "/app/ranks", icon: Trophy },
                     { title: "플린코", to: "/app/plinko", icon: Dices },
                     { title: "뉴스", to: "/app/news", icon: Newspaper },
@@ -167,7 +167,7 @@ export const Header = () => {
                                     className="hidden lg:block fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[1px] transition-opacity duration-200"
                                     aria-label="메뉴 닫기"
                                 />
-                                <div className="hidden lg:block absolute left-0 top-[calc(100%+12px)] z-50 w-[420px] max-h-[72vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ease-out opacity-100 translate-y-0 scale-100">
+                                <div className="hidden lg:block absolute left-0 top-[calc(100%+12px)] z-50 w-[min(420px,92vw)] max-h-[72vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ease-out opacity-100 translate-y-0 scale-100">
                                     <div className="mb-3 flex items-center justify-between px-1">
                                         <div className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">All Menu</div>
                                         <span className="rounded-full bg-primary-50 px-2 py-1 text-[10px] font-black text-primary-600">Desktop</span>

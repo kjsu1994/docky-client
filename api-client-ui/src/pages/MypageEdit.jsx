@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Save, User } from "lucide-react";
+import axios from "axios";
 import api from "../utils/api";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../components/LoadingSpinner";
@@ -28,11 +29,14 @@ export const MypageEdit = () => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [verifyingPassword, setVerifyingPassword] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [passwordVerified, setPasswordVerified] = useState(false);
     const [member, setMember] = useState(null);
     const [form, setForm] = useState({
         name: "",
         phone: "",
+        currentPassword: "",
         password: "",
     });
 
@@ -40,7 +44,9 @@ export const MypageEdit = () => {
         () => member?.member_id ?? member?.memberId ?? user?.member_id ?? user?.memberId ?? null,
         [member, user]
     );
+
     const profileUrl = normalizeProfileImageUrl(member?.profile_url || member?.profileUrl || "");
+
     const isDirty = useMemo(() => {
         if (!member) return false;
         const nameChanged = (form.name || "").trim() !== (member.name || "").trim();
@@ -55,9 +61,11 @@ export const MypageEdit = () => {
             const response = await api.get("/members");
             const data = unwrapData(response);
             setMember(data);
+            setPasswordVerified(false);
             setForm({
                 name: data?.name || "",
                 phone: data?.phone || "",
+                currentPassword: "",
                 password: "",
             });
         } catch (error) {
@@ -74,17 +82,51 @@ export const MypageEdit = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        if (name === "currentPassword") {
+            setPasswordVerified(false);
+        }
         setForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleVerifyCurrentPassword = async () => {
+        const email = member?.email || user?.email || "";
+        const currentPassword = form.currentPassword.trim();
+
+        if (!email) {
+            toast.error("이메일 정보를 찾을 수 없습니다.");
+            return;
+        }
+        if (!currentPassword) {
+            toast.error("현재 비밀번호를 먼저 입력해주세요.");
+            return;
+        }
+
+        setVerifyingPassword(true);
+        try {
+            await axios.post("/api/members/login", {
+                email,
+                password: currentPassword,
+            });
+            setPasswordVerified(true);
+            toast.success("비밀번호 확인이 완료되었습니다.");
+        } catch (error) {
+            setPasswordVerified(false);
+            toast.error(extractErrorMessage(error, "현재 비밀번호가 일치하지 않습니다."));
+        } finally {
+            setVerifyingPassword(false);
+        }
     };
 
     const handleProfileUpload = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
         if (!file.type.startsWith("image/")) {
             toast.error("이미지 파일만 업로드할 수 있습니다.");
             e.target.value = "";
             return;
         }
+
         if (file.size > 5 * 1024 * 1024) {
             toast.error("프로필 이미지는 5MB 이하로 업로드해주세요.");
             e.target.value = "";
@@ -111,12 +153,30 @@ export const MypageEdit = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
         if (!memberId) {
             toast.error("회원 식별자를 찾을 수 없습니다.");
             return;
         }
+
         if (!isDirty) {
             toast("변경된 내용이 없습니다.");
+            return;
+        }
+
+        const nextPassword = form.password.trim();
+        const currentPassword = form.currentPassword.trim();
+
+        if (nextPassword && !currentPassword) {
+            toast.error("새 비밀번호를 변경하려면 현재 비밀번호를 입력해주세요.");
+            return;
+        }
+        if (nextPassword && !passwordVerified) {
+            toast.error("비밀번호 확인을 완료해주세요.");
+            return;
+        }
+        if (nextPassword && nextPassword.length < 8) {
+            toast.error("새 비밀번호는 8자 이상이어야 합니다.");
             return;
         }
 
@@ -126,8 +186,10 @@ export const MypageEdit = () => {
                 name: (form.name || "").trim(),
                 phone: (form.phone || "").trim(),
             };
-            if (form.password.trim()) {
-                payload.password = form.password;
+
+            if (nextPassword) {
+                payload.currentPassword = currentPassword;
+                payload.password = nextPassword;
             }
 
             await api.patch(`/members/${memberId}`, payload);
@@ -141,7 +203,7 @@ export const MypageEdit = () => {
     };
 
     if (loading) {
-        return <LoadingSpinner text="회원 정보 로딩 중..." />;
+        return <LoadingSpinner text="회원 정보 로딩 중.." />;
     }
 
     return (
@@ -171,9 +233,10 @@ export const MypageEdit = () => {
                             <User className="h-10 w-10" />
                         </div>
                     )}
+
                     <label className="btn-secondary cursor-pointer inline-flex items-center gap-2">
                         <Camera className="h-4 w-4" />
-                        {uploading ? "업로드 중..." : "프로필 이미지 변경"}
+                        {uploading ? "업로드 중.." : "프로필 이미지 변경"}
                         <input
                             type="file"
                             accept="image/*"
@@ -216,9 +279,33 @@ export const MypageEdit = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            새 비밀번호 (선택)
-                        </label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">현재 비밀번호 (새 비밀번호 변경 시 필수)</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="password"
+                                name="currentPassword"
+                                value={form.currentPassword}
+                                onChange={handleChange}
+                                className="input-base"
+                                placeholder="현재 비밀번호 입력"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleVerifyCurrentPassword}
+                                disabled={verifyingPassword || !form.currentPassword.trim()}
+                                className={`shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition-all ${
+                                    passwordVerified
+                                        ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                        : "bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 disabled:opacity-60"
+                                }`}
+                            >
+                                {verifyingPassword ? "확인 중.." : passwordVerified ? "확인 완료" : "확인"}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">새 비밀번호 (선택)</label>
                         <input
                             type="password"
                             name="password"
@@ -237,7 +324,7 @@ export const MypageEdit = () => {
                         data-busy-indicator="true"
                     >
                         <Save className="h-4 w-4" />
-                        {saving ? "저장 중..." : "수정 내용 저장"}
+                        {saving ? "저장 중.." : "수정 내용 저장"}
                     </button>
                 </form>
             </div>
