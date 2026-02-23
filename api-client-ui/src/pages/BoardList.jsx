@@ -173,9 +173,28 @@ export const BoardList = () => {
             {loading ? (
                 <ListSkeleton count={5} />
             ) : error ? (
-                <ErrorMessage message={error} />
+                <div className="space-y-3">
+                    <ErrorMessage message={error} />
+                    <button type="button" className="btn-secondary" onClick={() => setRefreshKey((prev) => prev + 1)}>
+                        다시 시도
+                    </button>
+                </div>
             ) : (filteredCount === 0) ? (
-                <EmptyState message="게시글이 없습니다." subMessage="새로운 이야기를 시작해보세요!" />
+                <div className="space-y-4">
+                    <EmptyState message="게시글이 없습니다." subMessage="새로운 이야기를 시작해보세요!" />
+                    {canWrite && (
+                        <button
+                            type="button"
+                            className="btn-primary"
+                            onClick={() => {
+                                const targetKind = (kind === "FREE_BOARD" && subTab === "notice") ? "ADMIN_NOTICE" : kind;
+                                navigate(`/app/boards/${targetKind}/new`);
+                            }}
+                        >
+                            첫 글 작성하기
+                        </button>
+                    )}
+                </div>
             ) : (
                 <>
                     {/* 1. 공지사항 섹션 */}

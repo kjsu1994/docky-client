@@ -22,6 +22,28 @@ export const Register = () => {
     const hasConfirmValue = formData.confirmPassword.length > 0;
     const passwordsMatch = hasConfirmValue && formData.password === formData.confirmPassword;
     const passwordsMismatch = hasConfirmValue && !passwordsMatch;
+    const emailFormatValid = /\S+@\S+\.\S+/.test(formData.email);
+    const passwordValid = formData.password.length >= 8;
+    const nameValid = formData.name.trim().length > 0;
+    const phoneValid = formData.phone.trim().length > 0;
+    const emailChecked = checkedEmail === formData.email && emailAvailable === true;
+
+    const submitBlockMessage = !formData.email
+        ? "이메일을 입력해주세요."
+        : !emailFormatValid
+          ? "올바른 이메일 형식을 입력해주세요."
+          : !emailChecked
+            ? "이메일 중복 확인을 완료해주세요."
+            : !passwordValid
+              ? "비밀번호는 8자 이상이어야 합니다."
+              : !passwordsMatch
+                ? "비밀번호 확인이 일치하지 않습니다."
+                : !nameValid
+                  ? "이름을 입력해주세요."
+                  : !phoneValid
+                    ? "전화번호를 입력해주세요."
+                    : "";
+    const canSubmit = !loading && !submitBlockMessage;
 
     const formatPhoneNumber = (rawValue) => {
         const digits = rawValue.replace(/\D/g, "").slice(0, 11);
@@ -46,6 +68,10 @@ export const Register = () => {
 
         if ((name === "password" || name === "confirmPassword") && errors.confirmPassword) {
             setErrors((prev) => ({ ...prev, confirmPassword: "" }));
+        }
+
+        if (name === "email" && errors.email) {
+            setErrors((prev) => ({ ...prev, email: "" }));
         }
     };
 
@@ -117,13 +143,21 @@ export const Register = () => {
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        const firstErrorField = Object.keys(newErrors)[0] || null;
+        return { ok: Object.keys(newErrors).length === 0, firstErrorField };
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!validate()) return;
+        const { ok, firstErrorField } = validate();
+        if (!ok) {
+            if (firstErrorField) {
+                const target = document.querySelector(`[name="${firstErrorField}"]`);
+                target?.focus();
+            }
+            return;
+        }
 
         setLoading(true);
         try {
@@ -184,6 +218,9 @@ export const Register = () => {
                             {!errors.email && checkedEmail === formData.email.trim() && emailAvailable === true && (
                                 <p className="mt-1 ml-1 text-[10px] font-black text-emerald-600 uppercase tracking-wider">Email is available.</p>
                             )}
+                            {!errors.email && formData.email && !emailFormatValid && (
+                                <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">Invalid email format.</p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -231,6 +268,9 @@ export const Register = () => {
                         {!errors.password && !errors.confirmPassword && passwordsMatch && (
                             <p className="mt-1 ml-1 text-[10px] font-black text-sky-600 uppercase tracking-wider">Passwords match.</p>
                         )}
+                        {!errors.password && formData.password && !passwordValid && (
+                            <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">Password must be at least 8 characters.</p>
+                        )}
 
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
@@ -266,7 +306,7 @@ export const Register = () => {
 
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={!canSubmit}
                             aria-busy={loading}
                             className="btn-primary w-full h-14 text-base tracking-tight shadow-xl shadow-primary-200 mt-4"
                         >
@@ -279,6 +319,11 @@ export const Register = () => {
                                 "COMPLETE REGISTRATION"
                             )}
                         </button>
+                        {!!submitBlockMessage && (
+                            <p className="mt-1 text-center text-[11px] font-bold text-slate-500" aria-live="polite">
+                                {submitBlockMessage}
+                            </p>
+                        )}
                     </form>
 
                     <div className="mt-10 pt-8 border-t border-slate-50 text-center">

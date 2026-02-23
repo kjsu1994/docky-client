@@ -61,6 +61,13 @@ export const BoardDetail = () => {
     const handleLike = async () => {
         if (liking) return;
         setLiking(true);
+        const prevLikeCount = board.like_count ?? board.likeCount ?? 0;
+        setBoard((prev) => ({
+            ...prev,
+            like_count: prevLikeCount + 1,
+            likeCount: prevLikeCount + 1,
+        }));
+
         try {
             const response = await api.post(`/boards/${boardId}/Like`);
             const updatedData = response.data?.data || response.data;
@@ -73,6 +80,11 @@ export const BoardDetail = () => {
             }));
             toast.success("좋아요 상태가 반영되었습니다.");
         } catch (error) {
+            setBoard((prev) => ({
+                ...prev,
+                like_count: prevLikeCount,
+                likeCount: prevLikeCount,
+            }));
             toast.error(error.response?.data?.message || "좋아요 처리에 실패했습니다.");
         } finally {
             setLiking(false);

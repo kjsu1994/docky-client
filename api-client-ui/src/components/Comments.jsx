@@ -10,6 +10,7 @@ import { normalizeProfileImageUrl } from "../utils/profileImage.js";
 export const Comments = ({ boardId, onUpdate }) => {
     const { user } = useAuth();
     const [comments, setComments] = useState([]);
+    const [fetchError, setFetchError] = useState("");
     const [newComment, setNewComment] = useState("");
     const [editingId, setEditingId] = useState(null);
     const [editContent, setEditContent] = useState("");
@@ -26,6 +27,7 @@ export const Comments = ({ boardId, onUpdate }) => {
         
         try {
             setFetching(true);
+            setFetchError("");
             const response = await api.get(`/comments`, {
                 params: {
                     boardId: boardId,
@@ -46,6 +48,7 @@ export const Comments = ({ boardId, onUpdate }) => {
             setComments(content);
         } catch (error) {
             console.error("Failed to fetch comments:", error);
+            setFetchError(error?.response?.data?.message || "댓글을 불러오지 못했습니다.");
         } finally {
             setFetching(false);
         }
@@ -59,23 +62,38 @@ export const Comments = ({ boardId, onUpdate }) => {
     // 댓글 작성
     const handleSubmitComment = async (e) => {
         e.preventDefault();
-        if (!newComment.trim()) {
+        const content = newComment.trim();
+        if (!content) {
             toast.error("댓글 내용을 입력해주세요.");
             return;
         }
 
+        const tempId = `temp-${Date.now()}`;
+        const optimisticComment = {
+            comment_id: tempId,
+            contents: content,
+            created_at: new Date().toISOString(),
+            like_count: 0,
+            member: {
+                name: user?.name || "나",
+                profile_url: user?.profile_url || user?.profileUrl || "",
+                profileUrl: user?.profileUrl || user?.profile_url || "",
+            },
+        };
+
+        setComments((prev) => [optimisticComment, ...prev]);
+        setNewComment("");
         setLoading(true);
         try {
             await api.post(`/comments`, {
                 boardId: boardId,
-                contents: newComment
+                contents: content
             });
-
-            setNewComment("");
             toast.success("댓글이 작성되었습니다.");
             fetchComments(true); // 목록 수동 새로고침 (force=true)
             if (onUpdate) onUpdate(); // 부모(BoardDetail)의 게시글 정보(댓글 수 등) 갱신
         } catch (error) {
+            setComments((prev) => prev.filter((comment) => (comment.comment_id || comment.commentId) !== tempId));
             console.error("Failed to create comment:", error);
             toast.error(error.response?.data?.message || "댓글 작성에 실패했습니다.");
         } finally {
@@ -121,12 +139,16 @@ export const Comments = ({ boardId, onUpdate }) => {
     const handleDeleteComment = async (commentId) => {
         if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
 
+        const existing = comments.find((comment) => (comment.comment_id || comment.commentId) === commentId);
+        if (!existing) return;
+        setComments((prev) => prev.filter((comment) => (comment.comment_id || comment.commentId) !== commentId));
+
         try {
             await api.delete(`/comments/${commentId}`);
             toast.success("댓글이 삭제되었습니다.");
-            fetchComments(); // 목록 새로고침
             if (onUpdate) onUpdate();
         } catch (error) {
+            setComments((prev) => [existing, ...prev]);
             console.error("Failed to delete comment:", error);
             toast.error(error.response?.data?.message || "댓글 삭제에 실패했습니다.");
         }
@@ -174,6 +196,15 @@ export const Comments = ({ boardId, onUpdate }) => {
 
     return (
         <div className="space-y-6">
+            {fetchError && (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    <div className="font-semibold">{fetchError}</div>
+                    <button type="button" onClick={() => fetchComments(true)} className="mt-2 btn-secondary py-1.5 px-3 text-xs">
+                        다시 시도
+                    </button>
+                </div>
+            )}
+
             {/* 댓글 작성 폼 */}
             <div className="card p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">

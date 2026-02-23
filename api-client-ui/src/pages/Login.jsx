@@ -2,7 +2,6 @@
 import { Link } from "react-router-dom";
 import { Mail, Lock, Leaf } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 
@@ -15,8 +14,8 @@ export const Login = () => {
     const [releaseReason, setReleaseReason] = useState("");
     const [releaseLoading, setReleaseLoading] = useState(false);
     const { login, loginWithTokens } = useAuth();
-    const navigate = useNavigate();
     const oauthHandledRef = useRef(false);
+    const lockCloseBtnRef = useRef(null);
 
     const formatDateTime = (value) => {
         if (!value) return "No end date";
@@ -26,6 +25,8 @@ export const Login = () => {
     };
 
     useEffect(() => {
+        if (oauthHandledRef.current) return;
+
         const params = new URLSearchParams(window.location.search);
         const accessToken = params.get("accessToken") || params.get("access_token");
         const refreshToken = params.get("refreshToken") || params.get("refresh_token");
@@ -33,27 +34,39 @@ export const Login = () => {
 
         if (oauthError) {
             toast.error("구글 로그인에 실패했습니다.");
+            oauthHandledRef.current = true;
             return;
         }
 
         if (!accessToken) return;
+        oauthHandledRef.current = true;
+        window.history.replaceState({}, document.title, window.location.pathname);
 
         const run = async () => {
             setGoogleLoading(true);
             try {
                 await loginWithTokens({ accessToken, refreshToken });
                 toast.success("구글 로그인 성공!");
-                navigate("/app", { replace: true });
             } catch (error) {
                 toast.error(error.response?.data?.message || "구글 로그인 처리에 실패했습니다.");
+                oauthHandledRef.current = false;
             } finally {
                 setGoogleLoading(false);
-                window.history.replaceState({}, document.title, window.location.pathname);
             }
         };
 
         run();
-    }, [loginWithTokens, navigate]);
+    }, [loginWithTokens]);
+
+    useEffect(() => {
+        if (!lockInfo) return;
+        const onKeyDown = (e) => {
+            if (e.key === "Escape") setLockInfo(null);
+        };
+        window.addEventListener("keydown", onKeyDown);
+        window.setTimeout(() => lockCloseBtnRef.current?.focus(), 0);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [lockInfo]);
 
     const handleGoogleLogin = () => {
         window.location.href = "/api/oauth2/authorization/google";
@@ -226,6 +239,7 @@ export const Login = () => {
 
                         <div className="mt-4 flex gap-2">
                             <button
+                                ref={lockCloseBtnRef}
                                 type="button"
                                 className="btn-secondary flex-1"
                                 onClick={() => setLockInfo(null)}
