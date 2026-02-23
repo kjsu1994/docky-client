@@ -6,6 +6,14 @@ import toast from "react-hot-toast";
 import api from "../utils/api";
 
 export const Login = () => {
+    const [oauthProcessing, setOauthProcessing] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return Boolean(
+            params.get("accessToken") ||
+            params.get("access_token") ||
+            params.get("error")
+        );
+    });
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -35,12 +43,17 @@ export const Login = () => {
         if (oauthError) {
             toast.error("구글 로그인에 실패했습니다.");
             oauthHandledRef.current = true;
+            setOauthProcessing(false);
             return;
         }
 
-        if (!accessToken) return;
+        if (!accessToken) {
+            setOauthProcessing(false);
+            return;
+        }
         oauthHandledRef.current = true;
         window.history.replaceState({}, document.title, window.location.pathname);
+        setOauthProcessing(true);
 
         const run = async () => {
             setGoogleLoading(true);
@@ -50,6 +63,7 @@ export const Login = () => {
             } catch (error) {
                 toast.error(error.response?.data?.message || "구글 로그인 처리에 실패했습니다.");
                 oauthHandledRef.current = false;
+                setOauthProcessing(false);
             } finally {
                 setGoogleLoading(false);
             }
@@ -69,8 +83,27 @@ export const Login = () => {
     }, [lockInfo]);
 
     const handleGoogleLogin = () => {
+        setGoogleLoading(true);
         window.location.href = "/api/oauth2/authorization/google";
     };
+
+    if (oauthProcessing) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <div className="card p-8 w-full max-w-md text-center space-y-4">
+                    <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600/10 text-primary-600 mx-auto">
+                        <Leaf className="h-7 w-7 animate-pulse" />
+                    </div>
+                    <h1 className="text-xl font-black text-slate-900">구글 로그인 처리중</h1>
+                    <p className="text-sm text-slate-500">잠시만 기다려주세요. 자동으로 이동합니다.</p>
+                    <div className="flex items-center justify-center gap-2 text-primary-600 font-bold text-sm">
+                        <div className="loading-spinner !w-4 !h-4 !border-2 border-primary-200 border-t-primary-600" />
+                        인증 확인중...
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
