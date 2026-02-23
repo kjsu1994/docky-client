@@ -58,7 +58,7 @@
 
 ## ?ㅽ뻾 諛⑸쾿
 ```bash
-cd api-client-ui
+cd client
 npm install
 npm run dev
 ```

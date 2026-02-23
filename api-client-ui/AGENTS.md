@@ -1,7 +1,7 @@
 ﻿# Client Agent Playbook (프론트 운영 규칙)
 
 ## 1) Scope (범위)
-- Frontend project root: `api-client-ui`
+- Frontend project root: `client`
 - Runtime: React + Vite
 - API base through Vite proxy: `/api`
 
