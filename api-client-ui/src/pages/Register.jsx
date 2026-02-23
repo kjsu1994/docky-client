@@ -19,6 +19,9 @@ export const Register = () => {
     const [checkedEmail, setCheckedEmail] = useState("");
     const [errors, setErrors] = useState({});
     const { register } = useAuth();
+    const hasConfirmValue = formData.confirmPassword.length > 0;
+    const passwordsMatch = hasConfirmValue && formData.password === formData.confirmPassword;
+    const passwordsMismatch = hasConfirmValue && !passwordsMatch;
 
     const formatPhoneNumber = (rawValue) => {
         const digits = rawValue.replace(/\D/g, "").slice(0, 11);
@@ -39,6 +42,10 @@ export const Register = () => {
 
         if (errors[name]) {
             setErrors((prev) => ({ ...prev, [name]: "" }));
+        }
+
+        if ((name === "password" || name === "confirmPassword") && errors.confirmPassword) {
+            setErrors((prev) => ({ ...prev, confirmPassword: "" }));
         }
     };
 
@@ -201,7 +208,13 @@ export const Register = () => {
                                         name="confirmPassword"
                                         value={formData.confirmPassword}
                                         onChange={handleChange}
-                                        className={`input-base pl-12 h-14 bg-white font-bold text-xs ${errors.confirmPassword ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                        className={`input-base pl-12 h-14 bg-white font-bold text-xs ${
+                                            errors.confirmPassword || passwordsMismatch
+                                                ? "border-rose-300 ring-4 ring-rose-100"
+                                                : passwordsMatch
+                                                  ? "border-sky-300 ring-4 ring-sky-100"
+                                                  : ""
+                                        }`}
                                         placeholder="Repeat"
                                     />
                                 </div>
@@ -209,6 +222,12 @@ export const Register = () => {
                         </div>
                         {(errors.password || errors.confirmPassword) && (
                             <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.password || errors.confirmPassword}</p>
+                        )}
+                        {!errors.password && !errors.confirmPassword && passwordsMismatch && (
+                            <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">Passwords do not match.</p>
+                        )}
+                        {!errors.password && !errors.confirmPassword && passwordsMatch && (
+                            <p className="mt-1 ml-1 text-[10px] font-black text-sky-600 uppercase tracking-wider">Passwords match.</p>
                         )}
 
                         <div className="space-y-2">
