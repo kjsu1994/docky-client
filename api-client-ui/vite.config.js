@@ -9,6 +9,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    allowedHosts: ["ctfmon.shop", "www.ctfmon.shop"],
     proxy: {
       "/api": {
         // 중요: docker 내부에서는 localhost가 아니라 서비스명으로 접근

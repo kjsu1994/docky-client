@@ -14,8 +14,6 @@ import {
     Dices,
     Newspaper,
     Bot,
-    ChevronLeft,
-    ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../utils/api";
@@ -83,7 +81,8 @@ export const Home = () => {
     const [stats, setStats] = useState({ summary: null, compare: null });
     const [recentBoards, setRecentBoards] = useState([]);
     const [heroBanners, setHeroBanners] = useState([]);
-    const [bannerIndex, setBannerIndex] = useState(0);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isTransitioning, setIsTransitioning] = useState(true);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [adsConsent, setAdsConsent] = useState(() => {
@@ -97,6 +96,18 @@ export const Home = () => {
     const adsenseInitializedRef = useRef(false);
 
     const bannerCount = heroBanners.length;
+    
+    const loopBanners = useMemo(() => {
+        if (bannerCount === 0) return [];
+        if (bannerCount === 1) return heroBanners;
+        return [...heroBanners, heroBanners[0]];
+    }, [heroBanners, bannerCount]);
+
+    const bannerIndex = useMemo(() => {
+        if (bannerCount === 0) return 0;
+        return currentIndex % bannerCount;
+    }, [currentIndex, bannerCount]);
+
     const hasAdsenseBanner = useMemo(() => {
         return heroBanners.some(
             (banner) => banner?.renderMode === "ADSENSE" && banner?.adProvider?.toUpperCase() === "ADSENSE"
@@ -110,11 +121,29 @@ export const Home = () => {
         return fromBanner || import.meta.env.VITE_ADSENSE_CLIENT || "";
     }, [heroBanners]);
 
+    const handleNext = () => {
+        if (bannerCount <= 1) return;
+        setIsTransitioning(true);
+        setCurrentIndex((prev) => prev + 1);
+    };
+
+    const handleTransitionEnd = () => {
+        if (bannerCount <= 1) return;
+        if (currentIndex === bannerCount) {
+            setIsTransitioning(false);
+            setCurrentIndex(0);
+        }
+    };
+
+    useEffect(() => {
+        if (isTransitioning) return;
+        const frame = window.requestAnimationFrame(() => setIsTransitioning(true));
+        return () => window.cancelAnimationFrame(frame);
+    }, [isTransitioning]);
+
     useEffect(() => {
         if (bannerCount <= 1) return;
-        const timer = setInterval(() => {
-            setBannerIndex((prev) => (prev + 1) % bannerCount);
-        }, 4500);
+        const timer = setInterval(handleNext, 4500);
         return () => clearInterval(timer);
     }, [bannerCount]);
 
@@ -154,8 +183,10 @@ export const Home = () => {
                 });
 
                 setRecentBoards(boardItems.slice(0, 6));
-                setHeroBanners(normalizeBanners(bannerRes.status === "fulfilled" ? bannerRes.value : null, user?.name || user?.email?.split("@")[0]));
-                setBannerIndex(0);
+                const fetchedBanners = normalizeBanners(bannerRes.status === "fulfilled" ? bannerRes.value : null, user?.name || user?.email?.split("@")[0]);
+                setHeroBanners(fetchedBanners);
+                setCurrentIndex(0);
+                setIsTransitioning(true);
                 impressionSentRef.current = new Set();
             } catch (fetchError) {
                 console.error("Home fetch failed:", fetchError);
@@ -243,7 +274,6 @@ export const Home = () => {
     if (loading) return <LoadingSpinner text="데이터를 불러오는 중입니다..." />;
     if (error) return <ErrorMessage message={error} />;
 
-    const currentBanner = heroBanners[bannerIndex] || null;
     const changeRate = Number(stats.compare?.day_over_day_change_rate || stats.compare?.dayOverDayChangeRate) || 0;
 
     const openBannerLink = (banner) => {
@@ -256,89 +286,110 @@ export const Home = () => {
         window.location.href = banner.linkUrl;
     };
 
+    const isAdsenseMode = (banner) => banner?.renderMode === "ADSENSE" && banner?.adProvider?.toUpperCase() === "ADSENSE";
+
     return (
         <div className="space-y-10 animate-fade-in pb-10">
-            <section className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-primary-600 to-primary-400 p-8 text-white shadow-2xl shadow-primary-200 sm:p-10">
-                <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-                <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-primary-300/20 blur-2xl" />
+            <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white shadow-2xl shadow-slate-200/70">
+                <div
+                    className={`flex flex-nowrap min-w-full ${isTransitioning ? "transition-transform duration-700 ease-in-out" : ""}`}
+                    style={{ 
+                        transform: `translateX(-${currentIndex * 100}%)`
+                    }}
+                    onTransitionEnd={handleTransitionEnd}
+                >
+                    {loopBanners.map((banner, idx) => (
+                        <div key={`${banner.id}-${idx}`} className="w-full flex-shrink-0">
+                            {(() => {
+                                const adsense = isAdsenseMode(banner);
+                                const imageUrl = String(banner?.imageUrl || "").trim();
+                                const hasImageBackground = !adsense && Boolean(imageUrl);
+                                // 운영 배너 규칙/ops rule: CONTENT + image_url는 배너 전체 배경으로 사용.
+                                const contentBannerStyle = hasImageBackground
+                                    ? {
+                                        backgroundImage: `linear-gradient(120deg, rgba(2, 6, 23, 0.72), rgba(30, 64, 175, 0.48)), url("${imageUrl}")`,
+                                        backgroundSize: "cover",
+                                        backgroundPosition: "center",
+                                    }
+                                    : undefined;
 
-                {currentBanner && (
-                    <div className="relative z-10">
-                        <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-1 text-xs font-bold backdrop-blur-md">
-                            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                            {currentBanner.type === "AD" ? "Sponsored" : "Notice"}
+                                return (
+                                    <div
+                                        className={`relative min-h-[240px] p-8 sm:min-h-[280px] sm:p-10 ${adsense ? "bg-white text-slate-900" : "text-white"} ${!adsense && !hasImageBackground ? "bg-gradient-to-br from-primary-600 to-primary-400" : ""}`}
+                                        style={contentBannerStyle}
+                                    >
+                                        {!adsense && !hasImageBackground ? (
+                                            <>
+                                                <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+                                                <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-primary-300/20 blur-2xl" />
+                                            </>
+                                        ) : null}
+                                        <div className="relative z-10">
+                                            <div className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-bold backdrop-blur-md ${adsense ? "bg-slate-100 text-slate-600" : "bg-white/20 text-white"}`}>
+                                                <Sparkles className={`h-3.5 w-3.5 ${adsense ? "text-primary-500" : "text-amber-300"}`} />
+                                                {banner.type === "AD" ? "Sponsored" : "Notice"}
+                                            </div>
+
+                                            {adsense ? (
+                                                <div className="mt-4">
+                                                    <h1 className="text-xl font-black tracking-tight text-slate-900 sm:text-3xl">{banner.title || "Sponsored"}</h1>
+                                                    {banner.description ? (
+                                                        <p className="mt-2 max-w-3xl text-sm font-medium text-slate-600 sm:text-base">{banner.description}</p>
+                                                    ) : null}
+                                                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                                                        <ins
+                                                            className="adsbygoogle"
+                                                            style={{ display: "block", minHeight: "130px" }}
+                                                            data-ad-client={banner.adsenseClient || adsenseClientId}
+                                                            data-ad-slot={banner.adsenseSlot || "0000000000"}
+                                                            data-ad-format="auto"
+                                                            data-full-width-responsive="true"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">{banner.title}</h1>
+                                                    <p className="mt-3 max-w-2xl text-base font-medium leading-relaxed text-white/90 sm:text-lg">
+                                                        {banner.description}
+                                                    </p>
+                                                    <div className="mt-6 flex flex-wrap items-center gap-3">
+                                                        {banner.linkUrl ? (
+                                                            <button
+                                                                type="button"
+                                                                className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-primary-700 hover:bg-primary-50"
+                                                                onClick={() => openBannerLink(banner)}
+                                                            >
+                                                                {banner.ctaText || "자세히 보기"}
+                                                                <ArrowRight className="h-4 w-4" />
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
-
-                        {currentBanner.renderMode === "ADSENSE" && currentBanner.adProvider?.toUpperCase() === "ADSENSE" ? (
-                            <div className="mt-4 rounded-2xl bg-white/90 p-4 text-slate-900">
-                                <h1 className="text-xl font-black tracking-tight sm:text-2xl">{currentBanner.title}</h1>
-                                {currentBanner.description ? (
-                                    <p className="mt-2 text-sm font-medium text-slate-600">{currentBanner.description}</p>
-                                ) : null}
-                                <div className="mt-3 rounded-xl border border-slate-200 bg-white p-2">
-                                    <ins
-                                        className="adsbygoogle"
-                                        style={{ display: "block", minHeight: "90px" }}
-                                        data-ad-client={currentBanner.adsenseClient || adsenseClientId}
-                                        data-ad-slot={currentBanner.adsenseSlot || "0000000000"}
-                                        data-ad-format="auto"
-                                        data-full-width-responsive="true"
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">{currentBanner.title}</h1>
-                                <p className="mt-3 max-w-2xl text-base font-medium leading-relaxed text-primary-50/90 sm:text-lg">
-                                    {currentBanner.description}
-                                </p>
-                            </>
-                        )}
-
-                        <div className="mt-6 flex flex-wrap items-center gap-3">
-                            {currentBanner.linkUrl && !(currentBanner.renderMode === "ADSENSE" && currentBanner.adProvider?.toUpperCase() === "ADSENSE") ? (
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-primary-700 hover:bg-primary-50"
-                                    onClick={() => openBannerLink(currentBanner)}
-                                >
-                                    {currentBanner.ctaText || "자세히 보기"}
-                                    <ArrowRight className="h-4 w-4" />
-                                </button>
-                            ) : null}
-                            <span className="text-xs font-semibold text-primary-100/90">{bannerIndex + 1} / {Math.max(1, bannerCount)}</span>
-                        </div>
-                    </div>
-                )}
+                    ))}
+                </div>
 
                 {bannerCount > 1 && (
-                    <div className="relative z-10 mt-6 flex items-center justify-between">
+                    <div className="absolute bottom-8 right-8 z-10 sm:bottom-10 sm:right-10">
                         <div className="flex items-center gap-2">
                             {heroBanners.map((banner, idx) => (
                                 <button
                                     key={banner.id}
                                     type="button"
-                                    className={`h-2.5 rounded-full transition-all ${idx === bannerIndex ? "w-8 bg-white" : "w-2.5 bg-white/50"}`}
-                                    onClick={() => setBannerIndex(idx)}
+                                    className={`h-2.5 rounded-full transition-all ${idx === bannerIndex ? "w-8 bg-primary-500" : "w-2.5 bg-slate-400/70"}`}
+                                    onClick={() => {
+                                        setIsTransitioning(true);
+                                        setCurrentIndex(idx);
+                                    }}
                                     aria-label={`banner-${idx + 1}`}
                                 />
                             ))}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/20 hover:bg-white/30"
-                                onClick={() => setBannerIndex((prev) => (prev - 1 + bannerCount) % bannerCount)}
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                            </button>
-                            <button
-                                type="button"
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/20 hover:bg-white/30"
-                                onClick={() => setBannerIndex((prev) => (prev + 1) % bannerCount)}
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                            </button>
                         </div>
                     </div>
                 )}

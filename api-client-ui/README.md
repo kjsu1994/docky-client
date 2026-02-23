@@ -142,3 +142,16 @@ npm run dev
   - `AdminAnomalies.jsx` 내 깨진 JSX 문자열/태그(헤더, 권한관리 버튼, 검색 placeholder 등) 문법 복구
 - 검증
   - `npm run build` 성공
+
+- Home banner carousel fix (`src/pages/Home.jsx`)
+  - Fixed blank hero area by correcting slider track transform/width behavior.
+  - Updated loop logic to one-way infinite autoplay using only registered banners.
+  - Removed reverse navigation controls to keep operational one-direction flow.
+- Home banner behavior update (`src/pages/Home.jsx`)
+  - `CONTENT` + `image_url`: render banner background image with readable overlay.
+  - `ADSENSE`: switch whole banner frame to ad-first layout (not inner card-only).
+  - Keep gradient fallback when `image_url` is empty.
+- Mypage level experience UX update (`src/pages/Mypage.jsx`)
+  - Fetches `/members/level/history` when level tab is active.
+  - Shows XP history cards with granted XP, penalty, and timestamp.
+  - Normalizes wrapped API payload shapes (`data/items/content`) for stable rendering.

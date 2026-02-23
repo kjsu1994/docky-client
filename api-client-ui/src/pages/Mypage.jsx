@@ -33,6 +33,16 @@ const normalizeMyBoards = (response) => {
     return [];
 };
 
+const normalizeLevelHistory = (response) => {
+    const data = unwrapData(response);
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.content)) return data.content;
+    return [];
+};
+
 const getRawMemberStatus = (member) => member?.member_status || member?.memberStatus || "MEMBER_ACTIVE";
 const normalizeMemberStatus = (member) => String(getRawMemberStatus(member)).toUpperCase();
 const isActiveMember = (member) => {
@@ -139,6 +149,8 @@ export const Mypage = () => {
     const [myBoards, setMyBoards] = useState([]);
     const [loading, setLoading] = useState(true);
     const [boardsLoading, setBoardsLoading] = useState(false);
+    const [levelHistoryLoading, setLevelHistoryLoading] = useState(false);
+    const [levelHistory, setLevelHistory] = useState([]);
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState("profile");
 
@@ -200,6 +212,27 @@ export const Mypage = () => {
         };
 
         fetchMyBoards();
+    }, [activeTab]);
+
+    useEffect(() => {
+        if (activeTab !== "stats") return;
+
+        const fetchLevelHistory = async () => {
+            setLevelHistoryLoading(true);
+            try {
+                const response = await api.get("/members/level/history", {
+                    params: { page: 1, size: 12 },
+                });
+                setLevelHistory(normalizeLevelHistory(response));
+            } catch (err) {
+                console.error("Failed to fetch level history:", err);
+                setLevelHistory([]);
+            } finally {
+                setLevelHistoryLoading(false);
+            }
+        };
+
+        fetchLevelHistory();
     }, [activeTab]);
 
     if (loading) {
@@ -325,13 +358,22 @@ export const Mypage = () => {
                 <ProfileTab
                     memberData={memberData}
                     levelData={levelData}
+                    levelHistory={levelHistory}
+                    levelHistoryLoading={levelHistoryLoading}
                     onDeleteAccount={handleDeleteAccount}
                 />
             )}
             {activeTab === "posts" && (
                 <PostsTab boards={myBoards} loading={boardsLoading} navigate={navigate} />
             )}
-            {activeTab === "stats" && <StatsTab memberData={memberData} levelData={levelData} />}
+            {activeTab === "stats" && (
+                <StatsTab
+                    memberData={memberData}
+                    levelData={levelData}
+                    levelHistory={levelHistory}
+                    levelHistoryLoading={levelHistoryLoading}
+                />
+            )}
         </div>
     );
 };
@@ -368,7 +410,7 @@ const TabButton = ({ active, onClick, children }) => (
     </button>
 );
 
-const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
+const ProfileTab = ({ memberData, levelData, levelHistory, levelHistoryLoading, onDeleteAccount }) => {
     const levelProgress = resolveLevelProgressInfo(levelData);
     const progress = levelProgress.progress;
     const currentExp = levelProgress.currentExp;
@@ -451,6 +493,33 @@ const ProfileTab = ({ memberData, levelData, onDeleteAccount }) => {
                     </button>
                 </div>
             </div>
+
+            <div className="card p-6">
+                <h3 className="text-lg font-bold text-slate-900 mb-4">XP History</h3>
+                {levelHistoryLoading ? (
+                    <LoadingSpinner text="Loading XP history..." />
+                ) : !levelHistory.length ? (
+                    <div className="text-sm text-slate-500">No XP history yet.</div>
+                ) : (
+                    <div className="space-y-2">
+                        {levelHistory.map((item) => (
+                            <div key={item.ledger_id || item.ledgerId} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="text-sm font-semibold text-slate-900">
+                                        {item.reason || item.event_type || item.eventType}
+                                    </div>
+                                    <div className="text-sm font-black text-emerald-600">
+                                        +{formatNumber(item.granted_exp ?? item.grantedExp ?? 0)} XP
+                                    </div>
+                                </div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                    penalty: {formatNumber(item.penalty_exp ?? item.penaltyExp ?? 0)} | {toDisplayDate(item.created_at || item.createdAt) || "-"}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -507,7 +576,7 @@ const PostsTab = ({ boards, loading, navigate }) => {
     );
 };
 
-const StatsTab = ({ memberData, levelData }) => {
+const StatsTab = ({ memberData, levelData, levelHistory, levelHistoryLoading }) => {
     const levelProgress = resolveLevelProgressInfo(levelData);
     const progress = levelProgress.progress;
     const currentExp = levelProgress.currentExp;
