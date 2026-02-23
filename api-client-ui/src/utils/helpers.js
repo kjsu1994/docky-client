@@ -1,13 +1,13 @@
-import { format, formatDistanceToNow } from "date-fns";
+﻿import { format, formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 
-// ?醫롮? ?????
+// URL에서 쿼리 파라미터 읽기
 export const formatDate = (date) => {
     if (!date) return "";
     return format(new Date(date), "yyyy-MM-dd HH:mm", { locale: ko });
 };
 
-// ?怨? ??볦퍢 ??뽯뻻 (?? 3???? 2??볦퍢 ??
+// 상대 시간 표시 (예: 3일 전, 2시간 전)
 export const formatRelativeTime = (date) => {
     if (!date) return "";
     return formatDistanceToNow(new Date(date), {
@@ -16,7 +16,7 @@ export const formatRelativeTime = (date) => {
     });
 };
 
-// 野껊슣????ル굝履???? 癰궰??
+// text-fixed
 export const getBoardKindLabel = (kind) => {
     const labels = {
         FREE_BOARD: "자유게시판",
@@ -26,7 +26,7 @@ export const getBoardKindLabel = (kind) => {
     return labels[kind] || kind;
 };
 
-// 野껊슣????ル굝履???깃맒
+// text-fixed
 export const getBoardKindColor = (kind) => {
     const colors = {
         FREE_BOARD: "bg-blue-100 text-blue-700",
@@ -36,7 +36,7 @@ export const getBoardKindColor = (kind) => {
     return colors[kind] || "bg-slate-100 text-slate-700";
 };
 
-// ???뵬 ??由??????
+// text-fixed
 export const formatFileSize = (bytes) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -45,21 +45,21 @@ export const formatFileSize = (bytes) => {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
 };
 
-// ???筌왖 ???뵬 ?類ㅼ뵥
+// text-fixed
 export const isImageFile = (filename) => {
     if (!filename) return false;
     const ext = filename.split(".").pop().toLowerCase();
     return ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext);
 };
 
-// ??용뮞???癒?뀮疫?(筌띾Ŋ夷??
+// text-fixed
 export const truncateText = (text, maxLength = 100) => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + "...";
 };
 
-// HTML ?얜챷???곸뱽 筌뤴뫖以?野꺜??깆뒠 ??곗뺘 ??용뮞?紐껋쨮 ?類ㅼ젫
+// text-fixed
 export const stripHtmlTags = (html) => {
     if (!html) return "";
     return String(html)
@@ -74,7 +74,7 @@ export const stripHtmlTags = (html) => {
         .trim();
 };
 
-// ??ъ쁽 ?????(筌???μ맄 ?꾠끇彛?
+// text-fixed
 const INTERNAL_HOST_PATTERN = /^(localhost|127\.0\.0\.1|minio|host\.docker\.internal)$/i;
 
 const getAssetOrigin = () => {
@@ -147,7 +147,7 @@ export const formatNumber = (num) => {
     return num.toLocaleString("ko-KR");
 };
 
-// ?遺얠뺍??곷뮞 ??λ땾
+// text-fixed
 export const debounce = (func, wait) => {
     let timeout;
     return function executedFunction(...args) {
@@ -160,7 +160,7 @@ export const debounce = (func, wait) => {
     };
 };
 
-// 嚥≪뮇類???쎈꽅?귐? ????
+// text-fixed
 export const storage = {
     get: (key) => {
         try {

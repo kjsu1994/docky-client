@@ -148,7 +148,7 @@ export const LuckyPlinko = () => {
     const lastTapAtRef = useRef(0);
 
     useEffect(() => {
-        // 紐⑤뱺 援ъ뒳 李⑹?媛 ?앸궃 ?ㅼ뿉留?API 理쒖쥌 ?먯닔瑜??몄텧?쒕떎.
+        // 모든 구슬 착지가 끝난 뒤 API 최종 점수를 호출한다.
         if (!playInProgress || !pendingPlinkoResult || totalToLand === 0) return;
         if (landedCount < totalToLand) return;
 

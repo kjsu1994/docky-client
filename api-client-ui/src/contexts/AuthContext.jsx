@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    // 珥덇린 濡쒕뱶 ???좏겙 ?뺤씤 諛??ъ슜???뺣낫 媛?몄삤湲?
+    // text-fixed
     useEffect(() => {
         const initAuth = async () => {
             const token = localStorage.getItem("accessToken");
@@ -67,14 +67,14 @@ export const AuthProvider = ({ children }) => {
             const loginBody = response.data?.data || response.data;
             const loginRoles = Array.isArray(loginBody?.roles) ? loginBody.roles : null;
 
-            // ?ㅻ뜑?먯꽌 ?좏겙 異붿텧 (??뚮Ц??諛?Bearer ?묐몢?????
+            // text-fixed
             const authHeader = response.headers?.authorization || response.headers?.Authorization;
             const refreshHeader = response.headers?.refresh || response.headers?.Refresh;
 
             const accessToken = authHeader?.replace(/^Bearer\s+/i, "");
             const refreshToken = refreshHeader?.replace(/^Bearer\s+/i, "");
 
-            if (!accessToken) throw new Error("?좏겙??李얠쓣 ???놁뒿?덈떎.");
+            if (!accessToken) throw new Error("토큰을 찾을 수 없습니다.");
 
             localStorage.setItem("accessToken", accessToken);
             localStorage.setItem("refreshToken", refreshToken);
@@ -82,42 +82,42 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem("userRoles", JSON.stringify(loginRoles));
             }
 
-            // ?좎? ?뺣낫瑜?媛?몄삱 ???좏겙??諛붾줈 ?곸슜?섎룄濡??ㅼ젙 ?뺤씤 ?꾩슂
+            // text-fixed
             const userResponse = await api.get("/members");
             const userData = userResponse.data.data || userResponse.data;
             setUser(withRolesFallback(userData, loginRoles || parseStoredRoles()));
 
-            toast.success("로그인성공!");
+            toast.success("로그인 성공!");
 
-            // 媛???湲곗뿴 吏꾩엯 ?쒕룄 (The Iron Queue)
+            // text-fixed
             try {
-                // 濡쒓렇???깃났 吏곹썑 ?湲곗뿴 吏꾩엯 ?붿껌
+                // text-fixed
                 const queueResponse = await api.post("/api/queue/join");
                 const queueData = queueResponse.data?.data || queueResponse.data;
                 
-                // 留뚯빟 'WAITING' ?곹깭?쇰㈃ ?湲??섏씠吏濡??대룞?섏뿬 ?쒕쾲 ?湲?
+                // text-fixed
                 if (queueData.status === "WAITING") {
                     navigate("/queue", { replace: true });
                     return;
                 }
             } catch (err) {
-                // ?湲곗뿴 ?쒖뒪???ㅻ쪟 ?쒖뿉???쒕퉬??媛?⑹꽦???꾪빐 ?쇰떒 吏꾩엯 ?덉슜
+                // text-fixed
                 console.error("Queue join failed, proceeding anyway:", err);
             }
 
-            navigate("/app"); // ?湲곗뿴???녾굅??'ALLOWED'??寃쎌슦 硫붿씤?쇰줈 ?대룞
+            navigate("/app"); // If queue status is ALLOWED, move to main
         } catch (error) {
             if (error?.response?.data?.code === "ACCOUNT_LOCKED") {
                 throw error;
             }
-            toast.error(error.response?.data?.message || "로그인실패");
+            toast.error(error.response?.data?.message || "로그인 실패");
             throw error;
         }
     };
 
     const loginWithTokens = async ({ accessToken, refreshToken }) => {
         if (!accessToken) {
-            throw new Error("?≪꽭???좏겙???놁뒿?덈떎.");
+            throw new Error("액세스 토큰이 없습니다.");
         }
 
         localStorage.setItem("accessToken", accessToken);
@@ -129,13 +129,13 @@ export const AuthProvider = ({ children }) => {
         const userData = userResponse.data.data || userResponse.data;
         setUser(withRolesFallback(userData, parseStoredRoles()));
 
-        // 媛???湲곗뿴 吏꾩엯 ?쒕룄 (OAuth 濡쒓렇???좎???
+        // text-fixed
         try {
-            // OAuth濡?濡쒓렇?명븳 寃쎌슦?먮룄 ?숈씪?섍쾶 ?湲곗뿴 ?뺤씤
+            // text-fixed
             const queueResponse = await api.post("/api/queue/join");
             const queueData = queueResponse.data?.data || queueResponse.data;
             
-            // ?湲?以묒씠硫??꾩슜 ?섏씠吏濡?由щ떎?대젆??
+            // text-fixed
             if (queueData.status === "WAITING") {
                 navigate("/queue", { replace: true });
                 return;
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }) => {
             console.error("Queue join failed, proceeding anyway:", err);
         }
 
-        // 諛붾줈 ?낆옣 媛?ν븯嫄곕굹 ?湲곗뿴 ?ㅻ쪟 ??硫붿씤?쇰줈 ?대룞
+        // text-fixed
         navigate("/app", { replace: true });
     };
 
@@ -158,7 +158,7 @@ export const AuthProvider = ({ children }) => {
             try {
                 await api.post("/members/logout");
             } catch (error) {
-                // ?쒕쾭 濡쒓렇?꾩썐 ?ㅽ뙣?щ룄 ?대씪?댁뼵???몄뀡? ?뺣━
+                // text-fixed
                 console.error("Failed to logout from server:", error);
             }
         }
@@ -177,10 +177,10 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             await api.post("/members", userData);
-            toast.success("?뚯썝媛???깃났! 濡쒓렇?명빐二쇱꽭??");
+            toast.success("회원가입 성공! 로그인해주세요.");
             navigate("/login");
         } catch (error) {
-            toast.error(error.response?.data?.message || "?뚯썝媛???ㅽ뙣");
+            toast.error(error.response?.data?.message || "회원가입 실패");
             throw error;
         }
     };
