@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Lock, Leaf } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -16,6 +16,7 @@ export const Login = () => {
     const [releaseLoading, setReleaseLoading] = useState(false);
     const { login, loginWithTokens } = useAuth();
     const navigate = useNavigate();
+    const oauthHandledRef = useRef(false);
 
     const formatDateTime = (value) => {
         if (!value) return "No end date";

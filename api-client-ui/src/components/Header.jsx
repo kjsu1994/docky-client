@@ -48,7 +48,7 @@ export const Header = () => {
                         </div>
                         <div className="leading-tight">
                             <div className="text-lg font-black tracking-tight text-slate-900 transition-colors group-hover:text-primary-600">커뮤니티</div>
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-primary-400">Next Gen Platform</div>
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-primary-400">ctfmon shop</div>
                         </div>
                     </Link>
 

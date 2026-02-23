@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useState, useEffect } from "react";
+﻿import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import toast from "react-hot-toast";
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const loginWithTokens = async ({ accessToken, refreshToken }) => {
+    const loginWithTokens = useCallback(async ({ accessToken, refreshToken }) => {
         if (!accessToken) {
             throw new Error("액세스 토큰이 없습니다.");
         }
@@ -146,7 +146,7 @@ export const AuthProvider = ({ children }) => {
 
         // text-fixed
         navigate("/app", { replace: true });
-    };
+    }, [navigate]);
 
     const logout = async (options = {}) => {
         if (options && typeof options.preventDefault === "function") {
