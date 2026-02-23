@@ -13,8 +13,6 @@ import { Mypage } from "./pages/Mypage.jsx";
 import { MypageEdit } from "./pages/MypageEdit.jsx";
 import { Ranks } from "./pages/Ranks.jsx";
 import { News } from "./pages/News.jsx";
-import { Calculators } from "./pages/Calculators.jsx";
-import { GptQuestion } from "./pages/GptQuestion.jsx";
 import { Statistics } from "./pages/Statistics.jsx";
 import { LuckyPlinko } from "./pages/LuckyPlinko.jsx";
 import { Queue } from "./pages/Queue.jsx";
@@ -78,10 +76,8 @@ function App() {
                     <Route path="/app/statistics" element={<ProtectedRoute><AppLayout><Statistics /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/ranks" element={<ProtectedRoute><AppLayout><Ranks /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/news" element={<ProtectedRoute><AppLayout><News /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/calculators" element={<ProtectedRoute><AppLayout><Calculators /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/mypage" element={<ProtectedRoute><AppLayout><Mypage /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/mypage/edit" element={<ProtectedRoute><AppLayout><MypageEdit /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/gpt" element={<ProtectedRoute><AppLayout><GptQuestion /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/plinko" element={<ProtectedRoute><AppLayout><LuckyPlinko /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/optimizer" element={<ProtectedRoute><AppLayout><MeetingOptimizer /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/admin/anomalies" element={<ProtectedRoute><AppLayout><AdminAnomalies /></AppLayout></ProtectedRoute>} />

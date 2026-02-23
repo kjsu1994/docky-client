@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Lock, User, Phone, Leaf } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -15,10 +15,19 @@ export const Register = () => {
     const [errors, setErrors] = useState({});
     const { register } = useAuth();
 
+    const formatPhoneNumber = (rawValue) => {
+        // 전화번호 UX 개선 / Better UX: keep digits only and auto-insert hyphen.
+        const digits = rawValue.replace(/\D/g, "").slice(0, 11);
+        if (digits.length < 4) return digits;
+        if (digits.length < 8) return digits.slice(0, 3) + "-" + digits.slice(3);
+        return digits.slice(0, 3) + "-" + digits.slice(3, 7) + "-" + digits.slice(7);
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
-        // 입력 시 해당 필드 에러 제거
+        const nextValue = name === "phone" ? formatPhoneNumber(value) : value;
+        setFormData((prev) => ({ ...prev, [name]: nextValue }));
+        // ?낅젰 ???대떦 ?꾨뱶 ?먮윭 ?쒓굅
         if (errors[name]) {
             setErrors((prev) => ({ ...prev, [name]: "" }));
         }
@@ -28,27 +37,27 @@ export const Register = () => {
         const newErrors = {};
 
         if (!formData.email) {
-            newErrors.email = "이메일을 입력해주세요";
+            newErrors.email = "?대찓?쇱쓣 ?낅젰?댁＜?몄슂";
         } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-            newErrors.email = "올바른 이메일 형식이 아닙니다";
+            newErrors.email = "?щ컮瑜??대찓???뺤떇???꾨떃?덈떎";
         }
 
         if (!formData.password) {
-            newErrors.password = "비밀번호를 입력해주세요";
+            newErrors.password = "鍮꾨?踰덊샇瑜??낅젰?댁＜?몄슂";
         } else if (formData.password.length < 8) {
-            newErrors.password = "비밀번호는 8자 이상이어야 합니다";
+            newErrors.password = "Password must be at least 8 characters.";
         }
 
         if (formData.password !== formData.confirmPassword) {
-            newErrors.confirmPassword = "비밀번호가 일치하지 않습니다";
+            newErrors.confirmPassword = "鍮꾨?踰덊샇媛 ?쇱튂?섏? ?딆뒿?덈떎";
         }
 
         if (!formData.name) {
-            newErrors.name = "이름을 입력해주세요";
+            newErrors.name = "?대쫫???낅젰?댁＜?몄슂";
         }
 
         if (!formData.phone) {
-            newErrors.phone = "전화번호를 입력해주세요";
+            newErrors.phone = "?꾪솕踰덊샇瑜??낅젰?댁＜?몄슂";
         }
 
         setErrors(newErrors);
@@ -82,7 +91,7 @@ export const Register = () => {
             <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-sky-100/50 rounded-full blur-3xl opacity-50" />
 
             <div className="w-full max-w-md relative z-10 py-10">
-                {/* 로고 & 타이틀 */}
+                {/* 濡쒓퀬 & ??댄? */}
                 <div className="text-center mb-10">
                     <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-primary-600 to-primary-400 text-white mb-6 shadow-2xl shadow-primary-200 group hover:scale-110 transition-transform duration-500">
                         <span className="text-3xl font-black italic tracking-tighter">C</span>
@@ -93,10 +102,10 @@ export const Register = () => {
                     </p>
                 </div>
 
-                {/* 회원가입 폼 */}
+                {/* ?뚯썝媛????*/}
                 <div className="card p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50 shadow-2xl shadow-slate-200">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* 이메일 */}
+                        {/* ?대찓??*/}
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
                             <div className="relative group">
@@ -113,7 +122,7 @@ export const Register = () => {
                             {errors.email && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.email}</p>}
                         </div>
 
-                        {/* 비밀번호 */}
+                        {/* 鍮꾨?踰덊샇 */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
@@ -148,7 +157,7 @@ export const Register = () => {
                             <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.password || errors.confirmPassword}</p>
                         )}
 
-                        {/* 이름 */}
+                        {/* ?대쫫 */}
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
                             <div className="relative group">
@@ -165,7 +174,7 @@ export const Register = () => {
                             {errors.name && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.name}</p>}
                         </div>
 
-                        {/* 전화번호 */}
+                        {/* ?꾪솕踰덊샇 */}
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
                             <div className="relative group">
@@ -214,3 +223,4 @@ export const Register = () => {
         </div>
     );
 };
+

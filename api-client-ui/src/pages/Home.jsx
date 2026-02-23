@@ -13,7 +13,6 @@ import {
     Trophy,
     Dices,
     Newspaper,
-    Bot,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../utils/api";
@@ -415,13 +414,12 @@ export const Home = () => {
                         <p className="text-sm font-medium text-slate-400">자주 사용하는 기능을 바로 실행하세요.</p>
                     </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 sm:gap-6 lg:grid-cols-6">
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5">
                     <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" />
                     <QuickMenuLink to="/app/optimizer" icon={MapPin} title="중간장소" color="rose" />
                     <QuickMenuLink to="/app/ranks" icon={Trophy} title="랭킹" color="amber" />
                     <QuickMenuLink to="/app/plinko" icon={Dices} title="플링코" color="emerald" />
                     <QuickMenuLink to="/app/news" icon={Newspaper} title="뉴스" color="indigo" />
-                    <QuickMenuLink to="/app/gpt" icon={Bot} title="GPT 질문" color="slate" />
                 </div>
             </section>
 

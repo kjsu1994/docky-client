@@ -155,3 +155,6 @@ npm run dev
   - Fetches `/members/level/history` when level tab is active.
   - Shows XP history cards with granted XP, penalty, and timestamp.
   - Normalizes wrapped API payload shapes (`data/items/content`) for stable rendering.
+- Feature removal (`src/App.jsx`, `src/components/Header.jsx`, `src/pages/AllMenu.jsx`, `src/pages/Home.jsx`)
+  - Removed GPT question and electricity calculator routes/menu entry points.
+  - Deleted page modules: `src/pages/GptQuestion.jsx`, `src/pages/Calculators.jsx`.

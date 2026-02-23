@@ -7,8 +7,8 @@ import toast from "react-hot-toast";
 import api from "../utils/api";
 
 export const Login = () => {
-    const [email, setEmail] = useState("user@gmail.com");
-    const [password, setPassword] = useState("qwer1234");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [lockInfo, setLockInfo] = useState(null);
@@ -26,8 +26,8 @@ export const Login = () => {
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const accessToken = params.get("accessToken");
-        const refreshToken = params.get("refreshToken");
+        const accessToken = params.get("accessToken") || params.get("access_token");
+        const refreshToken = params.get("refreshToken") || params.get("refresh_token");
         const oauthError = params.get("error");
 
         if (oauthError) {
@@ -111,10 +111,10 @@ export const Login = () => {
                         <span className="text-3xl font-black italic tracking-tighter">C</span>
                     </div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">
-                        NEXT GEN
+                        Welcome
                     </h1>
                     <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">
-                        Experience the Future
+                        벌꿀오소리 커뮤니티
                     </p>
                 </div>
 
