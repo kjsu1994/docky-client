@@ -137,7 +137,7 @@ export const Header = () => {
                         <button
                             type="button"
                             onClick={() => setMenuOpen((prev) => !prev)}
-                            className={`hidden xl:inline-flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition-all ${
+                            className={`hidden lg:inline-flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition-all ${
                                 menuOpen
                                     ? "border-primary-300 bg-primary-50 text-primary-600"
                                     : "border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-600"
@@ -164,10 +164,10 @@ export const Header = () => {
                                 <button
                                     type="button"
                                     onClick={() => setMenuOpen(false)}
-                                    className="hidden xl:block fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[1px] transition-opacity duration-200"
+                                    className="hidden lg:block fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[1px] transition-opacity duration-200"
                                     aria-label="메뉴 닫기"
                                 />
-                                <div className="hidden xl:block absolute left-0 top-[calc(100%+12px)] z-50 w-[420px] max-h-[72vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ease-out opacity-100 translate-y-0 scale-100">
+                                <div className="hidden lg:block absolute left-0 top-[calc(100%+12px)] z-50 w-[420px] max-h-[72vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ease-out opacity-100 translate-y-0 scale-100">
                                     <div className="mb-3 flex items-center justify-between px-1">
                                         <div className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">All Menu</div>
                                         <span className="rounded-full bg-primary-50 px-2 py-1 text-[10px] font-black text-primary-600">Desktop</span>
