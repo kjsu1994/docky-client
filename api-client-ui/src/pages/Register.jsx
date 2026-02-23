@@ -27,7 +27,7 @@ export const Register = () => {
         const { name, value } = e.target;
         const nextValue = name === "phone" ? formatPhoneNumber(value) : value;
         setFormData((prev) => ({ ...prev, [name]: nextValue }));
-        // ?낅젰 ???대떦 ?꾨뱶 ?먮윭 ?쒓굅
+        // 입력 중 해당 필드 에러 제거 / Clear field error while typing.
         if (errors[name]) {
             setErrors((prev) => ({ ...prev, [name]: "" }));
         }
@@ -91,7 +91,7 @@ export const Register = () => {
             <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-sky-100/50 rounded-full blur-3xl opacity-50" />
 
             <div className="w-full max-w-md relative z-10 py-10">
-                {/* 濡쒓퀬 & ??댄? */}
+                {/* 로고 & 타이틀 */}
                 <div className="text-center mb-10">
                     <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-primary-600 to-primary-400 text-white mb-6 shadow-2xl shadow-primary-200 group hover:scale-110 transition-transform duration-500">
                         <span className="text-3xl font-black italic tracking-tighter">C</span>
@@ -102,10 +102,10 @@ export const Register = () => {
                     </p>
                 </div>
 
-                {/* ?뚯썝媛????*/}
+                {/* 회원가입 폼 */}
                 <div className="card p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50 shadow-2xl shadow-slate-200">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* ?대찓??*/}
+                        {/* 이메일 */}
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
                             <div className="relative group">
@@ -122,7 +122,7 @@ export const Register = () => {
                             {errors.email && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.email}</p>}
                         </div>
 
-                        {/* 鍮꾨?踰덊샇 */}
+                        {/* 비밀번호 */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
@@ -157,7 +157,7 @@ export const Register = () => {
                             <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.password || errors.confirmPassword}</p>
                         )}
 
-                        {/* ?대쫫 */}
+                        {/* 이름 */}
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
                             <div className="relative group">
@@ -174,7 +174,7 @@ export const Register = () => {
                             {errors.name && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.name}</p>}
                         </div>
 
-                        {/* ?꾪솕踰덊샇 */}
+                        {/* 전화번호 */}
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
                             <div className="relative group">
