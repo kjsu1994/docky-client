@@ -467,7 +467,7 @@ export const Home = () => {
             )}
 
             {adsConsent === null ? (
-                <div className="fixed inset-x-4 bottom-4 z-50 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[420px]">
+                <div className="fixed inset-x-4 top-4 z-50 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[420px]">
                     <div className="text-sm font-black text-slate-900">광고 개인화 설정</div>
                     <p className="mt-1 text-xs text-slate-600">
                         맞춤 광고 동의 여부를 선택해 주세요. 선택은 언제든 변경할 수 있습니다.
