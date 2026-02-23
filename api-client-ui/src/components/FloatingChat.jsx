@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 // SockJS/StompJS compatibility for Vite
 if (typeof global === 'undefined') {
     window.global = window;
@@ -64,9 +64,10 @@ export const FloatingChat = () => {
         const normalized = {
             id: msg.id || msg.messageId || `temp-${Math.random().toString(36).substr(2, 9)}`,
             senderId: msg.senderId || msg.sender_id,
-            senderName: msg.senderName || msg.sender_name || "익명",
+            senderName: msg.senderName || msg.sender_name || "?듬챸",
             message: msg.message || msg.content || "",
             type: msg.type || msg.messageType || "TALK",
+            roomId: msg.roomId || msg.chatRoomId || msg.room_id || msg.chat_room_id,
             createdAt: msg.createdAt || msg.created_at || new Date().toISOString()
         };
         normalized.key = getMsgKey(normalized);
@@ -96,6 +97,127 @@ export const FloatingChat = () => {
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
+    const lastReadMarkAtRef = useRef(0);
+    const roomSubscriptionsRef = useRef([]);
+
+    const getUnreadCount = (room) => {
+        const value = Number(room?.unread_count ?? room?.unreadCount ?? 0);
+        return Number.isFinite(value) && value > 0 ? value : 0;
+    };
+
+    const getLastMessagePreview = (msg) => {
+        if (!msg) return "";
+        if (msg.type === "FILE") return "?대?吏";
+        return String(msg.message || "").trim();
+    };
+
+    const getRoomPreviewText = (room) => {
+        const direct = room?.last_message || room?.lastMessage || room?.recent_message || room?.recentMessage || "";
+        return String(direct || "").trim();
+    };
+
+    const hasRoomPreview = (room) => getRoomPreviewText(room).length > 0;
+
+    const upsertRoomPreview = (roomId, previewText, createdAt, nextUnreadCount) => {
+        if (!roomId) return;
+        setRooms((prev) => {
+            const list = Array.isArray(prev) ? [...prev] : [];
+            const idx = list.findIndex((r) => String(getRoomId(r)) === String(roomId));
+            if (idx < 0) return list;
+
+            const current = list[idx];
+            const patched = {
+                ...current,
+                last_message: previewText,
+                lastMessage: previewText,
+                unread_count: nextUnreadCount,
+                unreadCount: nextUnreadCount,
+                updatedAt: createdAt || current.updatedAt || current.updated_at,
+                updated_at: createdAt || current.updated_at || current.updatedAt,
+            };
+            list.splice(idx, 1);
+            return [patched, ...list];
+        });
+    };
+
+    const markRoomAsRead = async (roomId) => {
+        if (!roomId) return;
+        const now = Date.now();
+        if (now - lastReadMarkAtRef.current < 1000) return;
+        lastReadMarkAtRef.current = now;
+        try {
+            await api.patch(`/chat/room/${roomId}/read`);
+            setRooms((prev) =>
+                (prev || []).map((r) =>
+                    String(getRoomId(r)) === String(roomId) ? { ...r, unread_count: 0, unreadCount: 0 } : r
+                )
+            );
+        } catch (err) {
+            console.error("Read mark failed:", err);
+        }
+    };
+
+    
+    const applyIncomingToRoom = (roomId, normalized, forceRead = false) => {
+        if (!roomId || !normalized) return;
+        setRooms((prev) => {
+            const list = Array.isArray(prev) ? [...prev] : [];
+            const idx = list.findIndex((r) => String(getRoomId(r)) === String(roomId));
+            if (idx < 0) return list;
+
+            const base = list[idx];
+            const currentUnread = getUnreadCount(base);
+            const nextUnread = forceRead ? 0 : Math.min(999, currentUnread + 1);
+            const preview = getLastMessagePreview(normalized);
+            const patched = {
+                ...base,
+                last_message: preview,
+                lastMessage: preview,
+                unread_count: nextUnread,
+                unreadCount: nextUnread,
+                updatedAt: normalized.createdAt || base.updatedAt || base.updated_at,
+                updated_at: normalized.createdAt || base.updated_at || base.updatedAt,
+            };
+
+            list.splice(idx, 1);
+            return [patched, ...list];
+        });
+    };
+    const enrichRoomsWithLatestMessage = async (roomList) => {
+        const source = Array.isArray(roomList) ? roomList : [];
+        const targets = source.filter((room) => getRoomId(room) && !hasRoomPreview(room));
+        if (!targets.length) return source;
+
+        const fetched = await Promise.all(
+            targets.map(async (room) => {
+                const roomId = getRoomId(room);
+                try {
+                    const response = await api.get(`/chat/room/${roomId}/messages`);
+                    const data = response.data?.data || response.data;
+                    const safeMessages = Array.isArray(data) ? data : (data?.content || []);
+                    const latest = safeMessages
+                        .map(normalizeMessage)
+                        .filter(Boolean)
+                        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                        .at(-1);
+                    const preview = getLastMessagePreview(latest);
+                    if (!preview) return room;
+                    return {
+                        ...room,
+                        last_message: preview,
+                        lastMessage: preview,
+                        updatedAt: latest?.createdAt || room?.updatedAt || room?.updated_at,
+                        updated_at: latest?.createdAt || room?.updated_at || room?.updatedAt,
+                    };
+                } catch {
+                    return room;
+                }
+            })
+        );
+
+        const byId = new Map(fetched.map((room) => [String(getRoomId(room)), room]));
+        return source.map((room) => byId.get(String(getRoomId(room))) || room);
+    };
 
     const scrollToBottom = () => {
         if (messagesEndRef.current) {
@@ -117,7 +239,7 @@ export const FloatingChat = () => {
             const rawData = response.data?.data || response.data;
             const safeData = Array.isArray(rawData) ? rawData : [];
             
-            // ── 채팅방 목록 정렬 (최신 생성순으로 위로 정렬) ──
+            // ?? 梨꾪똿諛?紐⑸줉 ?뺣젹 (理쒖떊 ?앹꽦?쒖쑝濡??꾨줈 ?뺣젹) ??
             const sortedData = [...safeData].sort((a, b) => {
                 const timeA = new Date(a.createdAt || a.created_at || 0).getTime();
                 const timeB = new Date(b.createdAt || b.created_at || 0).getTime();
@@ -128,8 +250,9 @@ export const FloatingChat = () => {
                 return idB - idA;
             });
 
-            setRooms(sortedData);
-            return sortedData;
+            const enriched = await enrichRoomsWithLatestMessage(sortedData);
+            setRooms(enriched);
+            return enriched;
         } catch (error) {
             return [];
         } finally {
@@ -160,7 +283,7 @@ export const FloatingChat = () => {
             const data = response.data?.data || response.data;
             const safeMessages = Array.isArray(data) ? data : (data?.content || []);
             
-            // 시간순 정렬 (과거 -> 최신)
+            // ?쒓컙???뺣젹 (怨쇨굅 -> 理쒖떊)
             const sortedMessages = safeMessages
                 .map(normalizeMessage)
                 .filter(Boolean)
@@ -181,6 +304,18 @@ export const FloatingChat = () => {
     }, [isOpen, isAuthenticated]);
 
     useEffect(() => {
+        if (!isAuthenticated || isConnected) return;
+        const runFallback = () => {
+            if (document.visibilityState === "visible") {
+                fetchRooms();
+            }
+        };
+        runFallback();
+        const timer = setInterval(runFallback, 60000);
+        return () => clearInterval(timer);
+    }, [isAuthenticated, isConnected]);
+
+    useEffect(() => {
         if (!isAuthenticated) return;
         const socket = new SockJS("/ws/chat");
         const client = new Client({
@@ -190,14 +325,60 @@ export const FloatingChat = () => {
             heartbeatIncoming: 4000,
             heartbeatOutgoing: 4000,
         });
-        client.onConnect = (frame) => {
+        client.onConnect = () => {
             stompClientRef.current = client;
             setIsConnected(true);
+            fetchRooms();
         };
-        client.onDisconnect = () => { setIsConnected(false); };
+        client.onDisconnect = () => {
+            setIsConnected(false);
+            roomSubscriptionsRef.current.forEach((sub) => sub.unsubscribe());
+            roomSubscriptionsRef.current = [];
+        };
         client.activate();
-        return () => { if (client) client.deactivate(); };
+        return () => {
+            roomSubscriptionsRef.current.forEach((sub) => sub.unsubscribe());
+            roomSubscriptionsRef.current = [];
+            if (client) client.deactivate();
+        };
     }, [isAuthenticated]);
+
+    useEffect(() => {
+        const client = stompClientRef.current;
+        if (!client || !isConnected) return;
+
+        roomSubscriptionsRef.current.forEach((sub) => sub.unsubscribe());
+        roomSubscriptionsRef.current = [];
+
+        const currentRoomId = getRoomId(currentRoom);
+        const targets = (rooms || [])
+            .map((room) => getRoomId(room))
+            .filter((roomId) => roomId && String(roomId) !== String(currentRoomId));
+
+        roomSubscriptionsRef.current = targets.map((roomId) =>
+            client.subscribe(`/sub/chat/room/${roomId}`, (message) => {
+                const receivedMessage = JSON.parse(message.body);
+                const normalized = normalizeMessage(receivedMessage);
+                if (!normalized) return;
+
+                const isVisibleCurrentRoom =
+                    isOpen &&
+                    !isMinimized &&
+                    document.visibilityState === "visible" &&
+                    String(getRoomId(currentRoom)) === String(roomId);
+
+                applyIncomingToRoom(roomId, normalized, isVisibleCurrentRoom);
+                if (isVisibleCurrentRoom) {
+                    markRoomAsRead(roomId);
+                }
+            })
+        );
+
+        return () => {
+            roomSubscriptionsRef.current.forEach((sub) => sub.unsubscribe());
+            roomSubscriptionsRef.current = [];
+        };
+    }, [isConnected, rooms, currentRoom, isOpen, isMinimized]);
 
     useEffect(() => {
         const client = stompClientRef.current;
@@ -207,28 +388,18 @@ export const FloatingChat = () => {
         fetchMessages(roomId);
         fetchCurrentMembers(roomId);
 
-        const markAsRead = async () => {
-            try {
-                await api.patch(`/chat/room/${roomId}/read`);
-                setRooms(prev => prev.map(r => 
-                    getRoomId(r) === roomId ? { ...r, unread_count: 0, unreadCount: 0 } : r
-                ));
-            } catch (err) {
-                console.error("Read mark failed:", err);
-            }
-        };
-        markAsRead();
+        markRoomAsRead(roomId);
 
         const subscription = client.subscribe(`/sub/chat/room/${roomId}`, (message) => {
             const receivedMessage = JSON.parse(message.body);
             const normalized = normalizeMessage(receivedMessage);
             if (normalized) {
                 setMessages((prev) => {
-                    // 1. 서버가 준 실제 ID로 이미 목록에 있는지 확인
+                    // 1. ?쒕쾭媛 以 ?ㅼ젣 ID濡??대? 紐⑸줉???덈뒗吏 ?뺤씤
                     const existsById = prev.find(m => m.id === normalized.id && !String(m.id).startsWith('temp-'));
                     if (existsById) return prev;
 
-                    // 2. 본인이 보낸 중복 메시지(낙관적 업데이트) 교체 로직
+                    // 2. 蹂몄씤??蹂대궦 以묐났 硫붿떆吏(?숆????낅뜲?댄듃) 援먯껜 濡쒖쭅
                     const myId = Number(user.member_id || user.memberId || user.id);
                     const isMyMessage = Number(normalized.senderId) === myId;
                     
@@ -242,17 +413,36 @@ export const FloatingChat = () => {
                         }
                     }
 
-                    // 3. 단순 중복 체크 (키 기준)
+                    // 3. ?⑥닚 以묐났 泥댄겕 (??湲곗?)
                     const isDuplicate = prev.some(m => m.key === normalized.key);
                     if (isDuplicate) return prev;
 
                     return [...prev, normalized];
                 });
+                upsertRoomPreview(roomId, getLastMessagePreview(normalized), normalized.createdAt, 0);
+                markRoomAsRead(roomId);
             }
         });
 
         return () => { subscription.unsubscribe(); };
     }, [isConnected, currentRoom, user]);
+
+    useEffect(() => {
+        const roomId = getRoomId(currentRoom);
+        if (!roomId || !isOpen || isMinimized) return;
+        const onVisible = () => {
+            if (document.visibilityState === "visible") {
+                markRoomAsRead(roomId);
+            }
+        };
+        const onFocus = () => markRoomAsRead(roomId);
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onVisible);
+        return () => {
+            window.removeEventListener("focus", onFocus);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, [currentRoom, isOpen, isMinimized]);
 
     const handleSendMessage = (e) => {
         if (e) e.preventDefault();
@@ -276,10 +466,11 @@ export const FloatingChat = () => {
             const optimisticMsg = normalizeMessage({ 
                 ...messagePayload, 
                 id: tempId,
-                senderName: user.name || "나", 
+                senderName: user.name || "익명", 
                 createdAt: new Date().toISOString() 
             });
             setMessages(prev => [...prev, optimisticMsg]);
+            upsertRoomPreview(roomId, text, optimisticMsg.createdAt, 0);
 
             client.publish({ 
                 destination: "/pub/chat/message", 
@@ -288,7 +479,7 @@ export const FloatingChat = () => {
             });
             setNewMessage("");
         } catch (err) {
-            toast.error("메시지 전송 실패");
+            toast.error("硫붿떆吏 ?꾩넚 ?ㅽ뙣");
             setMessages(prev => prev.filter(m => m.id !== tempId));
         }
     };
@@ -307,19 +498,19 @@ export const FloatingChat = () => {
             const messagePayload = { roomId: Number(roomId), senderId: myId, message: fileUrl, type: "FILE" };
             client.publish({ destination: "/pub/chat/message", body: JSON.stringify(messagePayload), headers: { "content-type": "application/json" } });
         } catch (error) {
-            toast.error("파일 업로드 실패");
+            toast.error("?뚯씪 ?낅줈???ㅽ뙣");
         }
     };
 
     const leaveRoom = async (roomId) => {
-        if (!roomId || !window.confirm("정말 이 채팅방에서 나가시겠습니까?")) return;
+        if (!roomId || !window.confirm("?뺣쭚 ??梨꾪똿諛⑹뿉???섍??쒓쿋?듬땲源?")) return;
         try {
             await api.delete(`/chat/room/${roomId}/leave`);
-            toast.success("채팅방에서 퇴장했습니다.");
+            toast.success("梨꾪똿諛⑹뿉???댁옣?덉뒿?덈떎.");
             if (getRoomId(currentRoom) === roomId) setCurrentRoom(null);
             fetchRooms();
         } catch (error) {
-            toast.error("채팅방 나가기 실패");
+            toast.error("梨꾪똿諛??섍?湲??ㅽ뙣");
         }
     };
 
@@ -335,9 +526,9 @@ export const FloatingChat = () => {
     }, [contextMenu]);
 
     const createRoom = async () => {
-        if (!newRoomTitle.trim()) { toast.error("방 제목을 입력하세요."); return; }
+        if (!newRoomTitle.trim()) { toast.error("諛??쒕ぉ???낅젰?섏꽭??"); return; }
         try {
-            // 방 생성 시 본인(방장)만 멤버로 포함하여 생성 프로세스 간소화
+            // 諛??앹꽦 ??蹂몄씤(諛⑹옣)留?硫ㅻ쾭濡??ы븿?섏뿬 ?앹꽦 ?꾨줈?몄뒪 媛꾩냼??
             const myId = Number(user.member_id || user.memberId || user.id);
             const memberIds = [myId];
 
@@ -352,7 +543,7 @@ export const FloatingChat = () => {
             const response = await api.post("/chat/room", payload);
             const createdData = response.data?.data || response.data;
             
-            toast.success("방이 생성되었습니다. 멤버를 초대해보세요!");
+            toast.success("諛⑹씠 ?앹꽦?섏뿀?듬땲?? 硫ㅻ쾭瑜?珥덈??대낫?몄슂!");
             setShowCreateModal(false);
             resetMemberSelection();
             
@@ -364,7 +555,7 @@ export const FloatingChat = () => {
             }
         } catch (error) {
             console.error("Room creation failed:", error);
-            toast.error(error.response?.data?.message || "방 생성 실패");
+            toast.error(error.response?.data?.message || "諛??앹꽦 ?ㅽ뙣");
         }
     };
 
@@ -379,14 +570,14 @@ export const FloatingChat = () => {
             if (memberIds.length === 0) return;
 
             await api.post(`/chat/room/${roomId}/invite`, memberIds);
-            toast.success("멤버를 초대했습니다.");
+            toast.success("硫ㅻ쾭瑜?珥덈??덉뒿?덈떎.");
             setShowInviteModal(false);
             resetMemberSelection();
             fetchRooms(); 
             fetchCurrentMembers(roomId);
         } catch (error) {
             console.error("Invitation failed:", error);
-            toast.error(error.response?.data?.message || "멤버 초대 실패");
+            toast.error(error.response?.data?.message || "硫ㅻ쾭 珥덈? ?ㅽ뙣");
         }
     };
 
@@ -432,6 +623,7 @@ export const FloatingChat = () => {
 
     const membersToList = currentMembers.length > 0 ? currentMembers : getMembers(currentRoom);
     const displayedMembers = memberSearch.trim().length > 0 ? foundMembers : recommendedMembers;
+    const totalUnreadCount = rooms.reduce((sum, room) => sum + getUnreadCount(room), 0);
 
     if (!isAuthenticated) return null;
 
@@ -459,7 +651,7 @@ export const FloatingChat = () => {
                                     </div>
                                     <div>
                                         <div className="font-black text-sm uppercase tracking-wider">Secure Chat</div>
-                                        <div className="text-[10px] font-bold text-primary-100 uppercase tracking-widest">회원 메신저</div>
+                                        <div className="text-[10px] font-bold text-primary-100 uppercase tracking-widest">?뚯썝 硫붿떊?</div>
                                     </div>
                                 </>
                             )}
@@ -487,7 +679,7 @@ export const FloatingChat = () => {
                                                 const roomId = getRoomId(room);
                                                 const isActive = getRoomId(currentRoom) === roomId;
                                                 return (
-                                                    <button key={roomId || Math.random()} onClick={() => { setCurrentRoom(room); setMessages([]); }}
+                                                    <button key={roomId || Math.random()} onClick={() => { setCurrentRoom(room); setMessages([]); upsertRoomPreview(roomId, room.last_message || room.lastMessage || "", room.updatedAt || room.updated_at, 0); }}
                                                         onContextMenu={(e) => handleContextMenu(e, roomId)}
                                                         className={`w-full flex items-center gap-4 p-4 rounded-[1.5rem] transition-all text-slate-700 hover:shadow-xl hover:-translate-y-0.5 ${isActive ? 'bg-white shadow-xl ring-2 ring-primary-100' : 'bg-white/50 border border-slate-100'}`}>
                                                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 text-primary-600 flex items-center justify-center font-black shrink-0 shadow-sm">
@@ -496,7 +688,7 @@ export const FloatingChat = () => {
                                                         <div className="flex-1 text-left min-w-0">
                                                             <div className="flex justify-between items-center mb-1">
                                                                 <span className="font-black text-sm truncate text-slate-900">{room.title}</span>
-                                                                {(room.unread_count > 0 || room.unreadCount > 0) && <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-primary-600 text-white shadow-lg shadow-primary-200">{room.unread_count || room.unreadCount}</span>}
+                                                                {getUnreadCount(room) > 0 && <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-primary-600 text-white shadow-lg shadow-primary-200">{getUnreadCount(room)}</span>}
                                                             </div>
                                                             <div className="text-[11px] font-medium text-slate-400 truncate line-clamp-1">{room.last_message || room.lastMessage || "No recent messages."}</div>
                                                         </div>
@@ -533,7 +725,7 @@ export const FloatingChat = () => {
                                                         <div className="flex flex-col">
                                                             {!isMe && <span className="text-[10px] font-bold text-slate-400 mb-1 ml-1 uppercase tracking-tighter">{normalized.senderName}</span>}
                                                             <div className={`px-4 py-2.5 rounded-2xl text-[13px] font-medium shadow-sm leading-relaxed ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-700 border border-slate-100 rounded-bl-none"}`}>
-                                                                {normalized.type === "FILE" ? <img src={normalized.message} alt="파일" className="max-w-[200px] rounded-xl cursor-pointer" onClick={() => window.open(normalized.message)} /> : normalized.message}
+                                                                {normalized.type === "FILE" ? <img src={normalized.message} alt="?뚯씪" className="max-w-[200px] rounded-xl cursor-pointer" onClick={() => window.open(normalized.message)} /> : normalized.message}
                                                             </div>
                                                         </div>
                                                         <span className="text-[9px] font-bold text-slate-300 pb-1 shrink-0 uppercase">{formatRelativeTime(new Date(normalized.createdAt))}</span>
@@ -585,7 +777,11 @@ export const FloatingChat = () => {
             <button onClick={() => { if (isMinimized) { setIsMinimized(false); } else { setIsOpen(!isOpen); } }}
                 className={`pointer-events-auto w-16 h-16 rounded-[2rem] shadow-2xl flex items-center justify-center transition-all duration-500 active:scale-90 ${isOpen && !isMinimized ? "bg-white text-primary-600 rotate-90 scale-90" : "bg-primary-600 text-white hover:scale-110 shadow-primary-200"}`}>
                 {isOpen && !isMinimized ? <X className="h-7 w-7" /> : <MessageCircle className="h-7 w-7" />}
-                {rooms.some(r => (r.unread_count || r.unreadCount) > 0) && <span className="absolute top-0 right-0 w-5 h-5 bg-rose-500 rounded-full border-4 border-white shadow-lg animate-bounce"></span>}
+                {totalUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-6 h-6 px-1 bg-rose-500 text-white rounded-full border-2 border-white shadow-lg text-[10px] font-black flex items-center justify-center">
+                        {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
+                    </span>
+                )}
             </button>
 
             {(showCreateModal || showInviteModal) && (
@@ -647,3 +843,10 @@ export const FloatingChat = () => {
         </div>
     );
 };
+
+
+
+
+
+
+

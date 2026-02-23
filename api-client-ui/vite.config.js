@@ -28,6 +28,9 @@ export default defineConfig({
     },
   },
   build: {
+    // 운영 배포 산출물 경로를 compose 기준 고정
+    outDir: "C:/compose/minio-data/client/dist",
+    emptyOutDir: true,
     sourcemap: false,
     rollupOptions: {
       output: {
