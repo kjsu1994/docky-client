@@ -19,7 +19,8 @@ import { Comments } from "../components/Comments"; // 댓글 컴포넌트 경로
 import {
     getBoardKindLabel,
     formatRelativeTime,
-    formatNumber
+    formatNumber,
+    normalizeContentImageUrls
 } from "../utils/helpers";
 import { canManageByOwnerOrAdmin } from "../utils/authorization";
 
@@ -185,7 +186,7 @@ export const BoardDetail = () => {
                     <div
                         className="prose prose-slate max-w-none min-h-[200px] board-contents"
                         dangerouslySetInnerHTML={{
-                            __html: board.contents || board.content || ""
+                            __html: normalizeContentImageUrls(board.contents || board.content || "")
                         }}
                     />
 

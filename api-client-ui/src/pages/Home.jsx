@@ -31,12 +31,19 @@ const normalizeBoards = (response) => {
     return [];
 };
 
+const toValidBannerId = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+};
+
 const normalizeBanners = (response, fallbackName) => {
     const data = unwrapData(response);
     const items = data?.items || data?.content || data || [];
     if (Array.isArray(items) && items.length) {
         return items.map((item, idx) => ({
             id: item.bannerId ?? item.banner_id ?? idx,
+            eventBannerId: toValidBannerId(item.bannerId ?? item.banner_id),
             type: item.bannerType ?? item.banner_type ?? "NOTICE",
             title: item.title || "",
             description: item.description || "",
@@ -53,6 +60,7 @@ const normalizeBanners = (response, fallbackName) => {
     return [
         {
             id: "fallback-1",
+            eventBannerId: null,
             type: "NOTICE",
             title: `안녕하세요, ${fallbackName || "유저"}님!`,
             description: "더 스마트하고 편리한 커뮤니티 생활을 시작해보세요. 새로운 소식과 유용한 도구들이 준비되어 있습니다.",
@@ -208,10 +216,11 @@ export const Home = () => {
     };
 
     const sendBannerEvent = async (banner, eventType) => {
-        if (!banner?.id) return;
+        const bannerId = toValidBannerId(banner?.eventBannerId ?? banner?.id);
+        if (!bannerId) return;
         try {
             await api.post("/banners/events", {
-                banner_id: banner.id,
+                banner_id: bannerId,
                 event_type: eventType,
                 placement: "HOME_HERO",
             });

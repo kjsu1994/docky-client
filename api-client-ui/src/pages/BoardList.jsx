@@ -24,15 +24,11 @@ import {
     truncateText,
     formatNumber,
     stripHtmlTags,
+    resolveAssetUrl,
 } from "../utils/helpers";
 import { canManageByOwnerOrAdmin, isAdminUser } from "../utils/authorization";
 
 // ── 유틸리티 함수 ──────────────────────────────────────────
-const toPublicUrl = (url) => {
-    if (!url) return null;
-    return url.replace("http://host.docker.internal:9000", "http://localhost:9000").replace("http://minio:9000", "http://localhost:9000");
-};
-
 const isBoardNotice = (board) => {
     const bKind = board.kind_of_board || board.kindOfBoard;
     // 주입된 kind_of_board 값을 기반으로 판별
@@ -234,7 +230,7 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
     const canManage = canManageByOwnerOrAdmin(user, board.member, { ownerName: board.board_creator || board.boardCreator, userName: user?.name });
     const contentHtml = board.contents || board.content || "";
     const imgMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
-    const thumbnailUrl = imgMatch ? toPublicUrl(imgMatch[1]) : null;
+    const thumbnailUrl = imgMatch ? resolveAssetUrl(imgMatch[1]) : null;
     const [imgError, setImgError] = useState(false);
 
     return (
