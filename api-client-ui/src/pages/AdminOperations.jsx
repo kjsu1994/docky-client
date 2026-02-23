@@ -630,7 +630,7 @@ export const AdminOperations = () => {
                             onChange={(e) => setMemberIdInput(e.target.value)}
                             placeholder="Enter member ID"
                         />
-                        <button className="btn-primary" disabled={memberLoading} onClick={fetchMemberDetail}>
+                        <button className="btn-primary" disabled={memberLoading} aria-busy={memberLoading} onClick={fetchMemberDetail}>
                             {memberLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UserSearch className="h-4 w-4" />}
                             <span className="ml-2">Search</span>
                         </button>
@@ -658,6 +658,8 @@ export const AdminOperations = () => {
                         className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200"
                         onClick={fetchAdminBanners}
                         disabled={bannerLoading}
+                        aria-busy={bannerLoading}
+                        data-busy-indicator="true"
                     >
                         {bannerLoading ? "Refreshing..." : "Refresh"}
                     </button>
@@ -696,7 +698,7 @@ export const AdminOperations = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <button className="btn-primary" type="button" onClick={submitBannerForm} disabled={bannerSaving}>
+                    <button className="btn-primary" type="button" onClick={submitBannerForm} disabled={bannerSaving} aria-busy={bannerSaving} data-busy-indicator="true">
                         {bannerSaving ? "Saving..." : editingBannerId ? "Update Banner" : "Create Banner"}
                     </button>
                     {editingBannerId ? (

@@ -5,6 +5,7 @@ import api from "../utils/api.js";
 import toast from "react-hot-toast";
 import { formatRelativeTime } from "../utils/helpers.js";
 import { canManageByOwnerOrAdmin } from "../utils/authorization.js";
+import { normalizeProfileImageUrl } from "../utils/profileImage.js";
 
 export const Comments = ({ boardId, onUpdate }) => {
     const { user } = useAuth();
@@ -192,6 +193,8 @@ export const Comments = ({ boardId, onUpdate }) => {
                         <button
                             type="submit"
                             disabled={loading || !newComment.trim()}
+                            aria-busy={loading}
+                            data-busy-indicator="true"
                             className="btn-primary flex items-center gap-2"
                         >
                             <Send className="h-4 w-4" />
@@ -212,6 +215,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                     comments.map((comment) => {
                         const commentId = comment.comment_id || comment.commentId;
                         const isEditing = editingId === commentId;
+                        const profileImageUrl = normalizeProfileImageUrl(comment.member?.profile_url || comment.member?.profileUrl || "");
 
                         const canManageComment = canManageByOwnerOrAdmin(user, comment.member);
 
@@ -219,9 +223,9 @@ export const Comments = ({ boardId, onUpdate }) => {
                             <div key={commentId} className="card p-6 hover:shadow-md transition-shadow">
                                 <div className="flex items-start gap-4 mb-4">
                                     <div className="flex-shrink-0">
-                                        {comment.member?.profile_url || comment.member?.profileUrl ? (
+                                        {profileImageUrl ? (
                                             <img
-                                                src={comment.member.profile_url || comment.member.profileUrl}
+                                                src={profileImageUrl}
                                                 alt="프로필"
                                                 className="w-10 h-10 rounded-full object-cover border"
                                             />

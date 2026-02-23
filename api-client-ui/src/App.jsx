@@ -24,6 +24,7 @@ import { AllMenu } from "./pages/AllMenu.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
+import { GlobalNetworkIndicator } from "./components/GlobalNetworkIndicator.jsx";
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -59,6 +60,7 @@ function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
+                <GlobalNetworkIndicator />
                 <Routes>
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
@@ -97,9 +99,11 @@ function App() {
                             boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                             borderRadius: "12px",
                             padding: "12px 16px",
+                            border: "1px solid #e2e8f0",
                         },
                         success: { iconTheme: { primary: "#16a34a", secondary: "#ffffff" } },
                         error: { iconTheme: { primary: "#dc2626", secondary: "#ffffff" } },
+                        loading: { iconTheme: { primary: "#0284c7", secondary: "#ffffff" } },
                     }}
                 />
             </AuthProvider>

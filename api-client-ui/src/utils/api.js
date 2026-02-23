@@ -1,5 +1,6 @@
 import axios from "axios";
 import toast from "react-hot-toast";
+import { beginNetworkActivity, endNetworkActivity } from "./networkActivity";
 
 const api = axios.create({
     baseURL: "/api",
@@ -11,6 +12,7 @@ const api = axios.create({
 // 요청 인터셉터 - Authorization 헤더 자동 추가
 api.interceptors.request.use(
     (config) => {
+        beginNetworkActivity();
         const token = localStorage.getItem("accessToken");
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -18,14 +20,19 @@ api.interceptors.request.use(
         return config;
     },
     (error) => {
+        endNetworkActivity();
         return Promise.reject(error);
     }
 );
 
 // 응답 인터셉터 - 에러 처리
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        endNetworkActivity();
+        return response;
+    },
     async (error) => {
+        endNetworkActivity();
         const originalRequest = error.config;
 
         // 401 에러 처리 (토큰 만료)
@@ -82,13 +89,18 @@ export default api;
 // Multipart 요청용 별도 함수
 export const uploadFiles = async (endpoint, formData, method = "post") => {
     const token = localStorage.getItem("accessToken");
-    return axios({
-        method,
-        url: `/api${endpoint}`,
-        data: formData,
-        headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: token ? `Bearer ${token}` : "",
-        },
-    });
+    beginNetworkActivity();
+    try {
+        return await axios({
+            method,
+            url: `/api${endpoint}`,
+            data: formData,
+            headers: {
+                "Content-Type": "multipart/form-data",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+    } finally {
+        endNetworkActivity();
+    }
 };

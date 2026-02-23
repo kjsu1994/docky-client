@@ -5,6 +5,7 @@ import api from "../utils/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { formatNumber } from "../utils/helpers";
+import { normalizeProfileImageUrl } from "../utils/profileImage";
 
 const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
 
@@ -219,7 +220,7 @@ const LevelRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
                     <div className="flex items-center gap-4">
                         <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
                         <div className="flex-shrink-0">
-                            {item.member?.profile_url ? <img src={item.member.profile_url} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold">{(item.member?.name || "U").charAt(0)}</div>}
+                            {normalizeProfileImageUrl(item.member?.profile_url || item.member?.profileUrl || "") ? <img src={normalizeProfileImageUrl(item.member?.profile_url || item.member?.profileUrl || "")} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold">{(item.member?.name || "U").charAt(0)}</div>}
                         </div>
                         <div className="flex-1">
                             <h3 className="font-bold text-slate-900 text-lg mb-1">{item.member?.name || "익명"}</h3>
@@ -241,7 +242,7 @@ const DonationRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
                     <div className="flex items-center gap-4">
                         <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
                         <div className="flex-shrink-0">
-                            {member.profile_url ? <img src={member.profile_url} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold">{(member.name || "U").charAt(0)}</div>}
+                            {normalizeProfileImageUrl(member.profile_url || member.profileUrl || "") ? <img src={normalizeProfileImageUrl(member.profile_url || member.profileUrl || "")} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold">{(member.name || "U").charAt(0)}</div>}
                         </div>
                         <div className="flex-1">
                             <h3 className="font-bold text-slate-900 text-lg mb-1">{member.name}</h3>

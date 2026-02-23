@@ -173,6 +173,8 @@ export const Register = () => {
                                 <button
                                     type="button"
                                     disabled={loading || checkingEmail}
+                                    aria-busy={checkingEmail}
+                                    data-busy-indicator="true"
                                     onClick={handleCheckDuplicate}
                                     className="btn-primary w-25 h-14 text-base tracking-tight shadow-xl shadow-primary-100 mt-0"
                                 >
@@ -265,6 +267,7 @@ export const Register = () => {
                         <button
                             type="submit"
                             disabled={loading}
+                            aria-busy={loading}
                             className="btn-primary w-full h-14 text-base tracking-tight shadow-xl shadow-primary-200 mt-4"
                         >
                             {loading ? (

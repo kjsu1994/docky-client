@@ -366,6 +366,7 @@ export const MeetingOptimizer = () => {
                             <button 
                                 type="submit" 
                                 disabled={loading}
+                                aria-busy={loading}
                                 className="w-full mt-6 py-4 bg-primary-600 text-white rounded-2xl font-black text-lg shadow-[0_8px_0_rgb(29,78,216)] active:translate-y-1 active:shadow-[0_4px_0_rgb(29,78,216)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
                             >
                                 {loading ? (

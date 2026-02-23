@@ -159,6 +159,7 @@ export const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
+                                aria-busy={loading}
                                 className="btn-primary w-full h-14 text-base tracking-tight shadow-xl shadow-primary-200"
                             >
                                 {loading ? (
@@ -175,6 +176,8 @@ export const Login = () => {
                                 type="button"
                                 onClick={handleGoogleLogin}
                                 disabled={googleLoading}
+                                aria-busy={googleLoading}
+                                data-busy-indicator="true"
                                 className="btn-secondary w-full h-14 flex items-center justify-center gap-3 border-slate-100 hover:border-slate-200"
                             >
                                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="h-5 w-5" />
@@ -234,6 +237,8 @@ export const Login = () => {
                                 className="btn-primary flex-1"
                                 onClick={handleReleaseRequest}
                                 disabled={releaseLoading}
+                                aria-busy={releaseLoading}
+                                data-busy-indicator="true"
                             >
                                 {releaseLoading ? "Submitting..." : "Request Release"}
                             </button>

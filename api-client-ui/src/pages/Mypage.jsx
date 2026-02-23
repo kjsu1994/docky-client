@@ -18,6 +18,7 @@ import api from "../utils/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { formatNumber, formatRelativeTime, stripHtmlTags } from "../utils/helpers";
+import { normalizeProfileImageUrl } from "../utils/profileImage";
 
 const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
 
@@ -158,7 +159,7 @@ export const Mypage = () => {
         () => memberData?.level_dto || memberData?.levelDto || {},
         [memberData]
     );
-    const profileImageUrl = memberData?.profile_url || memberData?.profileUrl || "";
+    const profileImageUrl = normalizeProfileImageUrl(memberData?.profile_url || memberData?.profileUrl || "");
     const memberActive = isActiveMember(memberData);
 
     const fetchMemberData = async () => {

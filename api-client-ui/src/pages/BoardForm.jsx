@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload, X, FileText, Image as ImageIcon } from "lucide-react";
 import api, { uploadFiles } from "../utils/api";
@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { isImageFile } from "../utils/helpers";
 import { canManageByOwnerOrAdmin } from "../utils/authorization";
 
-// ── Quill CDN 로드 ──────────────────────────────────────────────
+// ?? Quill CDN 濡쒕뱶 ??????????????????????????????????????????????
 const loadQuill = () =>
     new Promise((resolve) => {
         if (window.Quill) return resolve(window.Quill);
@@ -62,10 +62,10 @@ export const BoardForm = () => {
         hasRole(user?.role, "ROLE_ADMIN") ||
         hasRole(user?.member?.roles, "ROLE_ADMIN");
 
-    // 공지사항 권한 체크 (컴포넌트 진입 시)
+    // 怨듭??ы빆 沅뚰븳 泥댄겕 (而댄룷?뚰듃 吏꾩엯 ??
     useEffect(() => {
         if (kind === "ADMIN_NOTICE" && !isAdmin) {
-            toast.error("공지사항은 관리자만 작성할 수 있습니다.");
+            toast.error("怨듭??ы빆? 愿由ъ옄留??묒꽦?????덉뒿?덈떎.");
             navigate(`/app/boards/${kind}`, { replace: true });
         }
     }, [kind, isAdmin, navigate]);
@@ -80,14 +80,14 @@ export const BoardForm = () => {
     const editorRef = useRef(null);
     const quillRef = useRef(null);
 
-    // ── Quill 초기화 ────────────────────────────────────────────
+    // ?? Quill 珥덇린??????????????????????????????????????????????
     useEffect(() => {
         loadQuill().then((Quill) => {
             if (!editorRef.current || quillRef.current) return;
 
             const quill = new Quill(editorRef.current, {
                 theme: "snow",
-                placeholder: "내용을 입력하세요. 이미지는 복사-붙여넣기 또는 드래그앤드롭으로 바로 삽입 가능합니다.",
+                placeholder: "?댁슜???낅젰?섏꽭?? ?대?吏??蹂듭궗-遺숈뿬?ｊ린 ?먮뒗 ?쒕옒洹몄븻?쒕∼?쇰줈 諛붾줈 ?쎌엯 媛?ν빀?덈떎.",
                 modules: {
                     toolbar: [
                         [{ header: [1, 2, 3, false] }],
@@ -105,7 +105,7 @@ export const BoardForm = () => {
             quillRef.current = quill;
             setEditorReady(true);
 
-            // ── 툴바 이미지 버튼 → 파일 선택 ──────────────────
+            // ?? ?대컮 ?대?吏 踰꾪듉 ???뚯씪 ?좏깮 ??????????????????
             quill.getModule("toolbar").addHandler("image", () => {
                 const input = document.createElement("input");
                 input.type = "file";
@@ -119,7 +119,7 @@ export const BoardForm = () => {
                 input.click();
             });
 
-            // ── 붙여넣기 이미지 처리 ───────────────────────────
+            // ?? 遺숈뿬?ｊ린 ?대?吏 泥섎━ ???????????????????????????
             quill.root.addEventListener("paste", async (e) => {
                 const items = Array.from(e.clipboardData?.items || []);
                 const imageItems = items.filter((i) => i.type.startsWith("image/"));
@@ -132,7 +132,7 @@ export const BoardForm = () => {
                 }
             });
 
-            // ── 드래그앤드롭 이미지 처리 ──────────────────────
+            // ?? ?쒕옒洹몄븻?쒕∼ ?대?吏 泥섎━ ??????????????????????
             quill.root.addEventListener("drop", async (e) => {
                 e.preventDefault();
                 const files = Array.from(e.dataTransfer?.files || []).filter((f) =>
@@ -148,15 +148,15 @@ export const BoardForm = () => {
         return () => { quillRef.current = null; };
     }, []);
 
-    // ── 이미지 → /image/upload → MinIO URL → 에디터 삽입 ───────
+    // ?? ?대?吏 ??/image/upload ??MinIO URL ???먮뵒???쎌엯 ???????
     const uploadImageToServer = async (quill, file) => {
-        // 5MB 프론트 사전 검증
+        // 5MB ?꾨줎???ъ쟾 寃利?
         if (file.size > 5 * 1024 * 1024) {
-            toast.error("이미지 크기는 5MB 이하여야 합니다.");
+            toast.error("?대?吏 ?ш린??5MB ?댄븯?ъ빞 ?⑸땲??");
             return;
         }
 
-        const toastId = toast.loading("이미지 업로드 중...");
+        const toastId = toast.loading("?대?吏 ?낅줈??以?..");
         try {
             const formData = new FormData();
             formData.append("file", file);
@@ -166,21 +166,21 @@ export const BoardForm = () => {
             });
 
             const imageUrl = response.data?.url || response.data;
-            if (!imageUrl) throw new Error("URL 없음");
+            if (!imageUrl) throw new Error("URL ?놁쓬");
 
-            // 현재 커서 위치에 이미지 삽입
+            // ?꾩옱 而ㅼ꽌 ?꾩튂???대?吏 ?쎌엯
             const range = quill.getSelection(true);
             quill.insertEmbed(range.index, "image", imageUrl);
             quill.setSelection(range.index + 1);
 
-            toast.success("이미지 삽입 완료", { id: toastId });
+            toast.success("?대?吏 ?쎌엯 ?꾨즺", { id: toastId });
         } catch (err) {
-            console.error("이미지 업로드 실패:", err);
-            toast.error(err.response?.data?.message || "이미지 업로드 실패", { id: toastId });
+            console.error("?대?吏 ?낅줈???ㅽ뙣:", err);
+            toast.error(err.response?.data?.message || "?대?吏 ?낅줈???ㅽ뙣", { id: toastId });
         }
     };
 
-    // ── 수정 모드: 기존 내용 로드 ───────────────────────────────
+    // ?? ?섏젙 紐⑤뱶: 湲곗〈 ?댁슜 濡쒕뱶 ???????????????????????????????
     useEffect(() => {
         if (!isEdit || !editorReady) return;
 
@@ -192,7 +192,7 @@ export const BoardForm = () => {
                     userName: user?.name || "",
                 });
                 if (!canManage) {
-                    toast.error("수정 권한이 없습니다.");
+                    toast.error("?섏젙 沅뚰븳???놁뒿?덈떎.");
                     navigate(`/app/boards/${kind}/${boardId}`, { replace: true });
                     return;
                 }
@@ -204,10 +204,10 @@ export const BoardForm = () => {
                     quillRef.current.root.innerHTML = board.contents || board.content || "";
                 }
             })
-            .catch(() => toast.error("게시글 로딩 실패"));
+            .catch(() => toast.error("寃뚯떆湲 濡쒕뵫 ?ㅽ뙣"));
     }, [isEdit, boardId, editorReady, user, kind, navigate]);
 
-    // ── 첨부파일 처리 ───────────────────────────────────────────
+    // ?? 泥⑤??뚯씪 泥섎━ ???????????????????????????????????????????
     const handleFileChange = (e) => {
         setAttachFiles((prev) => [...prev, ...Array.from(e.target.files)]);
     };
@@ -247,22 +247,22 @@ export const BoardForm = () => {
         return formDataToSend;
     };
 
-    // ── 제출 ────────────────────────────────────────────────────
+    // ?? ?쒖텧 ????????????????????????????????????????????????????
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!title.trim()) { toast.error("제목을 입력해주세요"); return; }
+        if (!title.trim()) { toast.error("?쒕ぉ???낅젰?댁＜?몄슂"); return; }
 
         const quill = quillRef.current;
         if (!quill) return;
 
-        if (!quill.getText().trim()) { toast.error("내용을 입력해주세요"); return; }
+        if (!quill.getText().trim()) { toast.error("?댁슜???낅젰?댁＜?몄슂"); return; }
 
         setLoading(true);
         try {
             if (isEdit) {
                 if (deletedExistingFileIds.length > 0) {
-                    // API 명세: DELETE /boards/{board-id}/files/{file-id}
+                    // API 紐낆꽭: DELETE /boards/{board-id}/files/{file-id}
                     await Promise.all(
                         deletedExistingFileIds.map((fileId) =>
                             api.delete(`/boards/${boardId}/files/${fileId}`)
@@ -272,7 +272,7 @@ export const BoardForm = () => {
 
                 const formDataToSend = buildSubmitFormData({ includeNewFiles: true });
                 await uploadFiles(`/boards/${boardId}`, formDataToSend, "patch");
-                toast.success("게시글이 수정되었습니다");
+                toast.success("Post updated.");
             } else {
                 const formDataToSend = buildSubmitFormData({ includeNewFiles: true });
                 const createEndpoints = [
@@ -302,12 +302,12 @@ export const BoardForm = () => {
                 if (!createSuccess && lastError) {
                     throw lastError;
                 }
-                toast.success("게시글이 등록되었습니다");
+                toast.success("Post created.");
             }
 
             navigate(`/app/boards/${kind}`);
         } catch (error) {
-            toast.error(error.response?.data?.message || "저장 실패");
+            toast.error(error.response?.data?.message || "????ㅽ뙣");
         } finally {
             setLoading(false);
         }
@@ -315,44 +315,44 @@ export const BoardForm = () => {
 
     return (
         <div className="space-y-6">
-            {/* 헤더 */}
+            {/* ?ㅻ뜑 */}
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-slate-900">
-                    {isEdit ? "게시글 수정" : "게시글 작성"}
+                    {isEdit ? "寃뚯떆湲 ?섏젙" : "寃뚯떆湲 ?묒꽦"}
                 </h1>
                 <button type="button" onClick={() => navigate(`/app/boards/${kind}`)} className="btn-secondary">
-                    <ArrowLeft className="h-4 w-4 inline mr-2" />목록으로
+                    <ArrowLeft className="h-4 w-4 inline mr-2" />紐⑸줉?쇰줈
                 </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="card p-8 space-y-6">
 
-                    {/* 제목 */}
+                    {/* ?쒕ぉ */}
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">제목</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">?쒕ぉ</label>
                         <input
                             type="text"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             className="input-base"
-                            placeholder="제목을 입력하세요"
+                            placeholder="Enter title"
                             required
                         />
                     </div>
 
-                    {/* 에디터 */}
+                    {/* ?먮뵒??*/}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            내용
+                            ?댁슜
                             <span className="ml-2 text-xs font-normal text-slate-400">
-                                이미지 복사-붙여넣기 / 드래그앤드롭 지원 (최대 5MB)
+                                ?대?吏 蹂듭궗-遺숈뿬?ｊ린 / ?쒕옒洹몄븻?쒕∼ 吏??(理쒕? 5MB)
                             </span>
                         </label>
 
                         {!editorReady && (
                             <div className="border border-slate-200 rounded-xl h-64 flex items-center justify-center bg-slate-50 text-slate-400 text-sm">
-                                에디터 로딩 중...
+                                ?먮뵒??濡쒕뵫 以?..
                             </div>
                         )}
 
@@ -361,16 +361,16 @@ export const BoardForm = () => {
                         </div>
                     </div>
 
-                    {/* 첨부파일 */}
+                    {/* 泥⑤??뚯씪 */}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            첨부파일
-                            <span className="ml-2 text-xs font-normal text-slate-400">(본문 외 추가 첨부)</span>
+                            泥⑤??뚯씪
+                            <span className="ml-2 text-xs font-normal text-slate-400">(蹂몃Ц ??異붽? 泥⑤?)</span>
                         </label>
                         <div className="space-y-3">
                             {isEdit && existingFiles.length > 0 && (
                                 <div className="space-y-2">
-                                    <div className="text-sm font-semibold text-slate-700">기존 첨부파일</div>
+                                    <div className="text-sm font-semibold text-slate-700">湲곗〈 泥⑤??뚯씪</div>
                                     {existingFiles.map((file, index) => (
                                         <div key={`existing-${getFileIdValue(file) || index}`} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
                                             <div className="flex items-center gap-2 min-w-0">
@@ -379,7 +379,7 @@ export const BoardForm = () => {
                                                     : <FileText className="h-4 w-4 text-amber-600 flex-shrink-0" />
                                                 }
                                                 <span className="text-sm truncate">{file.file_name || file.fileName}</span>
-                                                <span className="text-xs text-amber-700 flex-shrink-0">기존 파일</span>
+                                                <span className="text-xs text-amber-700 flex-shrink-0">湲곗〈 ?뚯씪</span>
                                             </div>
                                             <button
                                                 type="button"
@@ -395,7 +395,7 @@ export const BoardForm = () => {
 
                             <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-xl hover:border-primary-500 hover:bg-primary-50 cursor-pointer transition-all">
                                 <Upload className="h-5 w-5 text-slate-400" />
-                                <span className="text-sm text-slate-500">클릭하여 파일 선택</span>
+                                <span className="text-sm text-slate-500">?대┃?섏뿬 ?뚯씪 ?좏깮</span>
                                 <input type="file" multiple onChange={handleFileChange} className="hidden" />
                             </label>
 
@@ -425,18 +425,18 @@ export const BoardForm = () => {
                     </div>
                 </div>
 
-                {/* 버튼 */}
+                {/* 踰꾪듉 */}
                 <div className="flex justify-end gap-3">
                     <button type="button" onClick={() => navigate(`/app/boards/${kind}`)}
-                            className="btn-secondary" disabled={loading}>취소</button>
+                            className="btn-secondary" disabled={loading} aria-busy={loading}>痍⑥냼</button>
                     <button type="submit" className="btn-primary min-w-[100px]"
-                            disabled={loading || !editorReady}>
-                        {loading ? "저장 중..." : isEdit ? "수정 완료" : "등록하기"}
+                            disabled={loading || !editorReady} aria-busy={loading}>
+                        {loading ? "???以?.." : isEdit ? "?섏젙 ?꾨즺" : "?깅줉?섍린"}
                     </button>
                 </div>
             </form>
 
-            {/* Quill 스타일 */}
+            {/* Quill ?ㅽ???*/}
             <style>{`
                 .quill-wrapper .ql-toolbar {
                     border-top-left-radius: 0.75rem;

@@ -5,6 +5,7 @@ import api from "../utils/api";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../contexts/AuthContext";
+import { normalizeProfileImageUrl } from "../utils/profileImage";
 
 const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
 
@@ -39,7 +40,7 @@ export const MypageEdit = () => {
         () => member?.member_id ?? member?.memberId ?? user?.member_id ?? user?.memberId ?? null,
         [member, user]
     );
-    const profileUrl = member?.profile_url || member?.profileUrl || "";
+    const profileUrl = normalizeProfileImageUrl(member?.profile_url || member?.profileUrl || "");
     const isDirty = useMemo(() => {
         if (!member) return false;
         const nameChanged = (form.name || "").trim() !== (member.name || "").trim();
@@ -232,6 +233,8 @@ export const MypageEdit = () => {
                         type="submit"
                         className="btn-primary w-full inline-flex items-center justify-center gap-2"
                         disabled={saving || !isDirty}
+                        aria-busy={saving}
+                        data-busy-indicator="true"
                     >
                         <Save className="h-4 w-4" />
                         {saving ? "저장 중..." : "수정 내용 저장"}
