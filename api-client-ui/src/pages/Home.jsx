@@ -159,12 +159,11 @@ export const Home = () => {
             setLoading(true);
             setError("");
             try {
-                const [summaryRes, compareRes, freeRes, noticeRes, qaRes, bannerRes] = await Promise.allSettled([
+                const [summaryRes, compareRes, freeRes, noticeRes, bannerRes] = await Promise.allSettled([
                     api.get("/stats/summary"),
                     api.get("/stats/visitors/compare"),
                     api.get("/boards", { params: { kind: "FREE_BOARD", page: 0, size: 3 } }),
                     api.get("/boards", { params: { kind: "ADMIN_NOTICE", page: 0, size: 3 } }),
-                    api.get("/boards", { params: { kind: "QUESTION_ANSWER", page: 0, size: 3 } }),
                     api.get("/banners", {
                         params: {
                             placement: "HOME_HERO",
@@ -182,7 +181,6 @@ export const Home = () => {
                 const boardItems = [
                     ...(freeRes.status === "fulfilled" ? normalizeBoards(freeRes.value) : []),
                     ...(noticeRes.status === "fulfilled" ? normalizeBoards(noticeRes.value) : []),
-                    ...(qaRes.status === "fulfilled" ? normalizeBoards(qaRes.value) : []),
                 ].filter(Boolean).sort((a, b) => {
                     const aDate = new Date(a?.created_at || a?.createdAt || 0).getTime();
                     const bDate = new Date(b?.created_at || b?.createdAt || 0).getTime();

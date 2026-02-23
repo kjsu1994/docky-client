@@ -1,4 +1,5 @@
-import { Link, NavLink } from "react-router-dom";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
     Home,
     BarChart,
@@ -11,11 +12,14 @@ import {
     LogOut,
     HelpCircle,
     ShieldAlert,
+    Menu,
+    ChevronRight,
+    Settings,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { isAdminUser } from "../utils/authorization";
 
-const NavItem = ({ to, icon: Icon, children, mobile = false, onClick }) => {
+const NavItem = ({ to, icon: Icon, children, onClick }) => {
     return (
         <NavLink
             to={to}
@@ -25,7 +29,7 @@ const NavItem = ({ to, icon: Icon, children, mobile = false, onClick }) => {
                     isActive
                         ? "scale-105 bg-primary-500 text-white shadow-lg shadow-primary-200"
                         : "text-slate-500 hover:bg-primary-50 hover:text-primary-600"
-                } ${mobile ? "w-full justify-start text-sm" : ""}`
+                }`
             }
         >
             <Icon className="h-4 w-4" />
@@ -34,35 +38,161 @@ const NavItem = ({ to, icon: Icon, children, mobile = false, onClick }) => {
     );
 };
 
+const MenuSection = ({ title, items, onSelect }) => (
+    <div className="space-y-2">
+        <h3 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{title}</h3>
+        <div className="space-y-1.5">
+            {items.map((item) => (
+                <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={onSelect}
+                    className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 transition-all hover:border-primary-100 hover:bg-primary-50/50 hover:text-primary-700"
+                >
+                    <span className="flex items-center gap-2.5">
+                        <item.icon className="h-4 w-4" />
+                        {item.title}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-300" />
+                </Link>
+            ))}
+        </div>
+    </div>
+);
+
 export const Header = () => {
     const { user, logout } = useAuth();
     const isAdmin = isAdminUser(user);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuWrapRef = useRef(null);
+    const location = useLocation();
+
+    const panelSections = useMemo(() => {
+        const sections = [
+            {
+                title: "Core",
+                items: [
+                    { title: "홈", to: "/app", icon: Home },
+                    { title: "통계", to: "/app/statistics", icon: BarChart },
+                    { title: "자유게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare },
+                    { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle },
+                ],
+            },
+            {
+                title: "Tools",
+                items: [
+                    { title: "중간취소", to: "/app/optimizer", icon: MapPin },
+                    { title: "순위", to: "/app/ranks", icon: Trophy },
+                    { title: "플린코", to: "/app/plinko", icon: Dices },
+                    { title: "뉴스", to: "/app/news", icon: Newspaper },
+                ],
+            },
+            {
+                title: "Account",
+                items: [
+                    { title: "내 정보", to: "/app/mypage", icon: User },
+                    { title: "정보 수정", to: "/app/mypage/edit", icon: Settings },
+                ],
+            },
+        ];
+        if (isAdmin) {
+            sections.push({
+                title: "Admin",
+                items: [
+                    { title: "관리자 콘솔", to: "/app/admin/anomalies", icon: ShieldAlert },
+                    { title: "운영 관리", to: "/app/admin/operations", icon: ShieldAlert },
+                ],
+            });
+        }
+        return sections;
+    }, [isAdmin]);
+
+    useEffect(() => {
+        setMenuOpen(false);
+    }, [location.pathname]);
+
+    useEffect(() => {
+        if (!menuOpen) return;
+        const onPointerDown = (e) => {
+            if (!menuWrapRef.current?.contains(e.target)) {
+                setMenuOpen(false);
+            }
+        };
+        const onKeyDown = (e) => {
+            if (e.key === "Escape") setMenuOpen(false);
+        };
+        window.addEventListener("mousedown", onPointerDown);
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            window.removeEventListener("mousedown", onPointerDown);
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, [menuOpen]);
 
     return (
         <header className="sticky top-0 z-50 border-b-white/20 glass transition-all duration-300">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-20 items-center justify-between">
-                    <Link to="/app" className="group flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-[1.25rem] bg-gradient-to-tr from-primary-600 to-primary-400 text-xl font-black text-white shadow-xl shadow-primary-200 transition-transform duration-500 group-hover:scale-110">
-                            C
-                        </div>
-                        <div className="leading-tight">
-                            <div className="text-lg font-black tracking-tight text-slate-900 transition-colors group-hover:text-primary-600">커뮤니티</div>
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-primary-400">ctfmon shop</div>
-                        </div>
-                    </Link>
+                    <div ref={menuWrapRef} className="relative flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setMenuOpen((prev) => !prev)}
+                            className={`hidden xl:inline-flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition-all ${
+                                menuOpen
+                                    ? "border-primary-300 bg-primary-50 text-primary-600"
+                                    : "border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-600"
+                            }`}
+                            title="전체 메뉴 펼치기"
+                            aria-label="전체 메뉴 펼치기"
+                            aria-expanded={menuOpen}
+                        >
+                            <Menu className={`h-5 w-5 transition-transform duration-300 ${menuOpen ? "rotate-90 scale-110" : ""}`} />
+                        </button>
+
+                        <Link to="/app" className="group flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-[1.25rem] bg-gradient-to-tr from-primary-600 to-primary-400 text-xl font-black text-white shadow-xl shadow-primary-200 transition-transform duration-500 group-hover:scale-110">
+                                C
+                            </div>
+                            <div className="leading-tight">
+                                <div className="text-lg font-black tracking-tight text-slate-900 transition-colors group-hover:text-primary-600">커뮤니티</div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-primary-400">ctfmon shop</div>
+                            </div>
+                        </Link>
+
+                        {menuOpen && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="hidden xl:block fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[1px] transition-opacity duration-200"
+                                    aria-label="메뉴 닫기"
+                                />
+                                <div className="hidden xl:block absolute left-0 top-[calc(100%+12px)] z-50 w-[420px] max-h-[72vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ease-out opacity-100 translate-y-0 scale-100">
+                                    <div className="mb-3 flex items-center justify-between px-1">
+                                        <div className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">All Menu</div>
+                                        <span className="rounded-full bg-primary-50 px-2 py-1 text-[10px] font-black text-primary-600">Desktop</span>
+                                    </div>
+                                    <div className="space-y-4 pr-1">
+                                        {panelSections.map((section) => (
+                                            <MenuSection key={section.title} title={section.title} items={section.items} onSelect={() => setMenuOpen(false)} />
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
 
                     <nav className="hidden items-center gap-1.5 xl:flex">
                         <NavItem to="/app" icon={Home}>홈</NavItem>
                         <NavItem to="/app/statistics" icon={BarChart}>통계</NavItem>
                         <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare}>자유게시판</NavItem>
                         <NavItem to="/app/boards/QUESTION_ANSWER" icon={HelpCircle}>Q&A</NavItem>
-                        <NavItem to="/app/optimizer" icon={MapPin}>중간장소</NavItem>
-                        <NavItem to="/app/ranks" icon={Trophy}>랭킹</NavItem>
-                        <NavItem to="/app/plinko" icon={Dices}>플링코</NavItem>
+                        <NavItem to="/app/optimizer" icon={MapPin}>중간취소</NavItem>
+                        <NavItem to="/app/ranks" icon={Trophy}>순위</NavItem>
+                        <NavItem to="/app/plinko" icon={Dices}>플린코</NavItem>
                         <NavItem to="/app/news" icon={Newspaper}>뉴스</NavItem>
                         {isAdmin && <NavItem to="/app/admin/anomalies" icon={ShieldAlert}>관리자 콘솔</NavItem>}
-                        {isAdmin && <NavItem to="/app/admin/operations" icon={ShieldAlert}>운영 툴</NavItem>}
+                        {isAdmin && <NavItem to="/app/admin/operations" icon={ShieldAlert}>운영 관리</NavItem>}
                     </nav>
 
                     <div className="flex items-center gap-2">
