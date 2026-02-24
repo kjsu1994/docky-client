@@ -76,7 +76,7 @@ export const ParkingFinder = () => {
     const [selectedLotId, setSelectedLotId] = useState(null);
 
     const [importing, setImporting] = useState(false);
-    const [csvPath, setCsvPath] = useState("C:/compose/minio-data/csv_data/Parking_Dataset.csv");
+    const [csvPath, setCsvPath] = useState("/data/csv_data/Parking_Dataset.csv");
 
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
@@ -453,4 +453,5 @@ export const ParkingFinder = () => {
         </div>
     );
 };
+
 
