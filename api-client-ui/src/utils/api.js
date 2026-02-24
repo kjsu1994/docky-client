@@ -4,15 +4,24 @@ import { beginNetworkActivity, endNetworkActivity } from "./networkActivity";
 
 const api = axios.create({
     baseURL: "/api",
-    headers: {
-        "Content-Type": "application/json",
-    },
 });
 
-// 요청 인터셉터 - Authorization 헤더 자동 추가
+// 요청 인터셉터 / Request interceptor
 api.interceptors.request.use(
     (config) => {
         beginNetworkActivity();
+
+        config.headers = config.headers || {};
+
+        // FormData는 브라우저가 boundary 포함 Content-Type을 자동 설정해야 함 / let browser set multipart boundary.
+        const isMultipart = typeof FormData !== "undefined" && config.data instanceof FormData;
+        if (isMultipart) {
+            delete config.headers["Content-Type"];
+            delete config.headers["content-type"];
+        } else if (!config.headers["Content-Type"] && !config.headers["content-type"]) {
+            config.headers["Content-Type"] = "application/json";
+        }
+
         const token = localStorage.getItem("accessToken");
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -25,7 +34,7 @@ api.interceptors.request.use(
     }
 );
 
-// 응답 인터셉터 - 에러 처리
+// 응답 인터셉터 - 에러 처리 / Response interceptor
 api.interceptors.response.use(
     (response) => {
         endNetworkActivity();
@@ -66,7 +75,7 @@ api.interceptors.response.use(
                     originalRequest.headers.Authorization = `Bearer ${accessToken}`;
                     return api(originalRequest);
                 } catch (refreshError) {
-                    // 리프레시 토큰도 만료된 경우
+                    // 리프레시 토큰 만료의 경우
                     localStorage.removeItem("accessToken");
                     localStorage.removeItem("refreshToken");
                     window.location.href = "/login";
@@ -74,7 +83,7 @@ api.interceptors.response.use(
                     return Promise.reject(refreshError);
                 }
             } else {
-                // 리프레시 토큰이 없는 경우
+                // 리프레시 토큰 없는 경우
                 localStorage.removeItem("accessToken");
                 window.location.href = "/login";
             }
@@ -86,18 +95,14 @@ api.interceptors.response.use(
 
 export default api;
 
-// Multipart 요청용 별도 함수
+// Multipart 요청 전용 함수 / Multipart helper
 export const uploadFiles = async (endpoint, formData, method = "post") => {
-    const token = localStorage.getItem("accessToken");
     beginNetworkActivity();
     try {
-        return await axios({
+        return await api.request({
             method,
-            url: `/api${endpoint}`,
+            url: endpoint,
             data: formData,
-            headers: {
-                Authorization: token ? `Bearer ${token}` : "",
-            },
         });
     } finally {
         endNetworkActivity();

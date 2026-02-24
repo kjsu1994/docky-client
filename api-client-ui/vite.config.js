@@ -1,4 +1,4 @@
-﻿import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
     build: {
       // 운영 배포 산출물 경로를 compose 기준으로 고정
       outDir: "C:/compose/minio-data/client/dist",
-      emptyOutDir: true,
+      emptyOutDir: false,
       sourcemap: false,
       rollupOptions: {
         output: {
