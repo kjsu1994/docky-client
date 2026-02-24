@@ -16,33 +16,15 @@ import {
     Menu,
     ChevronRight,
     Settings,
+    X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { isAdminUser } from "../utils/authorization";
 
-const NavItem = ({ to, icon: Icon, children, onClick }) => {
-    return (
-        <NavLink
-            to={to}
-            onClick={onClick}
-            className={({ isActive }) =>
-                `flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-bold transition-all duration-300 ${
-                    isActive
-                        ? "scale-105 bg-primary-500 text-white shadow-lg shadow-primary-200"
-                        : "text-slate-500 hover:bg-primary-50 hover:text-primary-600"
-                }`
-            }
-        >
-            <Icon className="h-4 w-4" />
-            <span>{children}</span>
-        </NavLink>
-    );
-};
-
 const MenuSection = ({ title, items, onSelect }) => (
-    <div className="space-y-2">
+    <section className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
         <h3 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{title}</h3>
-        <div className="space-y-1.5">
+        <div className="mt-3 space-y-1.5">
             {items.map((item) => (
                 <Link
                     key={item.to}
@@ -58,7 +40,7 @@ const MenuSection = ({ title, items, onSelect }) => (
                 </Link>
             ))}
         </div>
-    </div>
+    </section>
 );
 
 export const Header = () => {
@@ -66,6 +48,7 @@ export const Header = () => {
     const isAdmin = isAdminUser(user);
     const [menuOpen, setMenuOpen] = useState(false);
     const menuWrapRef = useRef(null);
+    const menuPanelRef = useRef(null);
     const location = useLocation();
 
     const panelSections = useMemo(() => {
@@ -116,9 +99,9 @@ export const Header = () => {
     useEffect(() => {
         if (!menuOpen) return;
         const onPointerDown = (e) => {
-            if (!menuWrapRef.current?.contains(e.target)) {
-                setMenuOpen(false);
-            }
+            if (menuWrapRef.current?.contains(e.target)) return;
+            if (menuPanelRef.current?.contains(e.target)) return;
+            setMenuOpen(false);
         };
         const onKeyDown = (e) => {
             if (e.key === "Escape") setMenuOpen(false);
@@ -166,15 +149,28 @@ export const Header = () => {
                                 <button
                                     type="button"
                                     onClick={() => setMenuOpen(false)}
-                                    className="hidden lg:block fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[1px] transition-opacity duration-200"
+                                    className="hidden lg:block fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-200"
                                     aria-label="메뉴 닫기"
                                 />
-                                <div className="hidden lg:block absolute left-0 top-[calc(100%+12px)] z-50 w-[min(420px,92vw)] max-h-[72vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ease-out opacity-100 translate-y-0 scale-100">
-                                    <div className="mb-3 flex items-center justify-between px-1">
-                                        <div className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">All Menu</div>
-                                        <span className="rounded-full bg-primary-50 px-2 py-1 text-[10px] font-black text-primary-600">Desktop</span>
+                                <div
+                                    ref={menuPanelRef}
+                                    className="hidden lg:block fixed inset-x-6 top-24 z-50 mx-auto w-full max-w-5xl max-h-[78vh] overflow-y-auto rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-2xl backdrop-blur"
+                                >
+                                    <div className="mb-5 flex items-center justify-between">
+                                        <div>
+                                            <div className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">All Menu</div>
+                                            <p className="mt-1 text-sm font-semibold text-slate-500">자주 쓰는 메뉴를 카테고리별로 모아봤어요.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors hover:border-primary-200 hover:text-primary-700"
+                                            aria-label="모달 닫기"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
                                     </div>
-                                    <div className="space-y-4 pr-1">
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                         {panelSections.map((section) => (
                                             <MenuSection key={section.title} title={section.title} items={section.items} onSelect={() => setMenuOpen(false)} />
                                         ))}
@@ -183,20 +179,6 @@ export const Header = () => {
                             </>
                         )}
                     </div>
-
-                    <nav className="hidden items-center gap-1.5 xl:flex">
-                        <NavItem to="/app" icon={Home}>홈</NavItem>
-                        <NavItem to="/app/statistics" icon={BarChart}>통계</NavItem>
-                        <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare}>자유게시판</NavItem>
-                        <NavItem to="/app/boards/QUESTION_ANSWER" icon={HelpCircle}>Q&A</NavItem>
-                        <NavItem to="/app/optimizer" icon={MapPin}>중간취소</NavItem>
-                        <NavItem to="/app/parking" icon={Car}>주차장</NavItem>
-                        <NavItem to="/app/ranks" icon={Trophy}>순위</NavItem>
-                        <NavItem to="/app/plinko" icon={Dices}>플린코</NavItem>
-                        <NavItem to="/app/news" icon={Newspaper}>뉴스</NavItem>
-                        {isAdmin && <NavItem to="/app/admin/anomalies" icon={ShieldAlert}>관리자 콘솔</NavItem>}
-                        {isAdmin && <NavItem to="/app/admin/operations" icon={ShieldAlert}>운영 관리</NavItem>}
-                    </nav>
 
                     <div className="flex items-center gap-2">
                         <div className="hidden items-center gap-2 sm:flex">

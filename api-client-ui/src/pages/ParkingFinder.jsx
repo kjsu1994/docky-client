@@ -1,5 +1,6 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { Car, LocateFixed, RefreshCw, Search, MapPin, CreditCard, Clock3, DatabaseZap } from "lucide-react";
+﻿
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Car, LocateFixed, RefreshCw, Search, MapPin, CreditCard, Clock3, DatabaseZap, X } from "lucide-react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../components/LoadingSpinner";
@@ -58,6 +59,7 @@ const getEstimate60mFee = (item) => {
 };
 
 const getLotId = (item) => item?.parking_lot_id ?? item?.parkingLotId ?? item?.management_no ?? item?.managementNo;
+const getFeeInfo = (item) => item?.fee_info ?? item?.feeInfo ?? "";
 
 export const ParkingFinder = () => {
     const { user } = useAuth();
@@ -66,14 +68,16 @@ export const ParkingFinder = () => {
     const [center, setCenter] = useState(INITIAL_CENTER);
     const [keyword, setKeyword] = useState("");
     const [radiusKm, setRadiusKm] = useState(3);
-    const [paidOnly, setPaidOnly] = useState(false);
+    const [feeFilter, setFeeFilter] = useState("all");
     const [sort, setSort] = useState("distance");
     const [limit, setLimit] = useState(50);
 
     const [loading, setLoading] = useState(false);
+    const [locatingByKeyword, setLocatingByKeyword] = useState(false);
     const [items, setItems] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
     const [selectedLotId, setSelectedLotId] = useState(null);
+    const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
     const [importing, setImporting] = useState(false);
     const [csvPath, setCsvPath] = useState("/data/csv_data/Parking_Dataset.csv");
@@ -82,6 +86,10 @@ export const ParkingFinder = () => {
     const mapRef = useRef(null);
     const markersRef = useRef([]);
     const selectedMarkerRef = useRef(null);
+    const pickedCenterMarkerRef = useRef(null);
+    const interactionListenersRef = useRef([]);
+    const longPressStateRef = useRef({ timerId: null, startX: 0, startY: 0, moved: false });
+    const recentPickRef = useRef({ ts: 0, latitude: null, longitude: null });
 
     const { isLoaded: mapLoaded, error: mapError } = useNaverMaps();
 
@@ -90,19 +98,117 @@ export const ParkingFinder = () => {
             if (entry?.marker) entry.marker.setMap(null);
         });
         markersRef.current = [];
-        selectedMarkerRef.current = null;
+        if (selectedMarkerRef.current) {
+            selectedMarkerRef.current.setMap(null);
+            selectedMarkerRef.current = null;
+        }
     };
+
+    const handleSelectLotFromList = (id) => {
+        setSelectedLotId(id);
+        setMobileDetailOpen(true);
+    };
+
+    const clearInteractionListeners = useCallback(() => {
+        if (!window.naver?.maps?.Event) return;
+        interactionListenersRef.current.forEach((listener) => {
+            window.naver.maps.Event.removeListener(listener);
+        });
+        interactionListenersRef.current = [];
+    }, []);
+
+    const normalizeCoord = useCallback((coord) => {
+        if (!coord) return null;
+        if (typeof coord.lat === "function" && typeof coord.lng === "function") {
+            return {
+                latitude: Number(coord.lat().toFixed(6)),
+                longitude: Number(coord.lng().toFixed(6)),
+            };
+        }
+        if (Number.isFinite(coord?.y) && Number.isFinite(coord?.x)) {
+            return {
+                latitude: Number(coord.y.toFixed(6)),
+                longitude: Number(coord.x.toFixed(6)),
+            };
+        }
+        if (Number.isFinite(coord?.lat) && Number.isFinite(coord?.lng)) {
+            return {
+                latitude: Number(coord.lat.toFixed(6)),
+                longitude: Number(coord.lng.toFixed(6)),
+            };
+        }
+        return null;
+    }, []);
+
+    const setPickedCenterMarker = useCallback((latitude, longitude) => {
+        if (!mapRef.current || !window.naver?.maps) return;
+
+        const pos = new window.naver.maps.LatLng(latitude, longitude);
+        if (pickedCenterMarkerRef.current) {
+            pickedCenterMarkerRef.current.setMap(null);
+        }
+        pickedCenterMarkerRef.current = new window.naver.maps.Marker({
+            position: pos,
+            map: mapRef.current,
+            icon: {
+                content: '<div style="width:16px;height:16px;border-radius:9999px;background:#10b981;border:3px solid #fff;box-shadow:0 2px 10px rgba(16,185,129,0.5)"></div>',
+                anchor: new window.naver.maps.Point(8, 8),
+            },
+            zIndex: 210,
+        });
+    }, []);
+
+    const applyPickedCenter = useCallback((coord, modeLabel) => {
+        const point = normalizeCoord(coord);
+        if (!point) return;
+        const now = Date.now();
+        const recent = recentPickRef.current;
+        if (
+            now - recent.ts < 700 &&
+            recent.latitude === point.latitude &&
+            recent.longitude === point.longitude
+        ) {
+            return;
+        }
+        recentPickRef.current = { ts: now, latitude: point.latitude, longitude: point.longitude };
+        setPickedCenterMarker(point.latitude, point.longitude);
+        setCenter(point);
+        toast.success(`${modeLabel} 위치를 기준점으로 설정했습니다.`);
+    }, [normalizeCoord, setPickedCenterMarker]);
+
+    const pickCenterByClientPoint = useCallback((clientX, clientY, modeLabel) => {
+        if (!mapRef.current || !window.naver?.maps || !mapContainerRef.current) return;
+        const rect = mapContainerRef.current.getBoundingClientRect();
+        const offsetX = clientX - rect.left;
+        const offsetY = clientY - rect.top;
+        if (!Number.isFinite(offsetX) || !Number.isFinite(offsetY)) return;
+        if (offsetX < 0 || offsetY < 0 || offsetX > rect.width || offsetY > rect.height) return;
+
+        const projection = mapRef.current.getProjection?.();
+        if (!projection) return;
+
+        const point = new window.naver.maps.Point(offsetX, offsetY);
+        let coord = null;
+        if (typeof projection.fromOffsetToCoord === "function") {
+            coord = projection.fromOffsetToCoord(point);
+        } else if (typeof projection.fromPointToCoord === "function") {
+            coord = projection.fromPointToCoord(point);
+        }
+        if (!coord) return;
+        applyPickedCenter(coord, modeLabel);
+    }, [applyPickedCenter]);
 
     const fetchLots = async () => {
         setLoading(true);
         try {
+            const keywordValue = keyword.trim();
             const response = await api.get("/parking/lots", {
                 params: {
                     latitude: center.latitude,
                     longitude: center.longitude,
                     radius_km: radiusKm,
-                    paid_only: paidOnly,
-                    keyword: keyword.trim() || undefined,
+                    paid_only: feeFilter === "paid",
+                    keyword: keywordValue || undefined,
                     sort,
                     limit,
                 },
@@ -110,9 +216,12 @@ export const ParkingFinder = () => {
             const payload = response?.data?.data ?? response?.data ?? {};
             const nextItems = payload?.items ?? [];
             const normalized = Array.isArray(nextItems) ? nextItems : [];
-            setItems(normalized);
-            setTotalCount(Number(payload?.total_count ?? payload?.totalCount ?? normalized.length));
-            setSelectedLotId(normalized.length ? getLotId(normalized[0]) : null);
+            const filtered = feeFilter === "free"
+                ? normalized.filter((item) => getFeeInfo(item) === "무료")
+                : normalized;
+            setItems(filtered);
+            setTotalCount(filtered.length);
+            setSelectedLotId(filtered.length ? getLotId(filtered[0]) : null);
         } catch (err) {
             setItems([]);
             setTotalCount(0);
@@ -121,6 +230,12 @@ export const ParkingFinder = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSearchEnter = (event) => {
+        if (event.key !== "Enter" || event.nativeEvent?.isComposing) return;
+        event.preventDefault();
+        fetchLots();
     };
 
     const handleLocate = () => {
@@ -144,6 +259,51 @@ export const ParkingFinder = () => {
             },
             { enableHighAccuracy: true, timeout: 7000 }
         );
+    };
+
+    const handleSetCenterByKeyword = () => {
+        const query = keyword.trim();
+        if (query.length < 2) {
+            toast.error("지역명/주소를 2글자 이상 입력해 주세요.");
+            return;
+        }
+        if (!window.naver?.maps?.Service) {
+            toast.error("지도 지오코더가 아직 준비되지 않았습니다.");
+            return;
+        }
+
+        setLocatingByKeyword(true);
+        // 주소/지명 키워드로 중심 좌표를 바꾸고 기존 반경 검색 플로우를 재사용.
+        // Resolve keyword to map center, then reuse existing radius-based search flow.
+        window.naver.maps.Service.geocode({ query }, (status, response) => {
+            setLocatingByKeyword(false);
+            if (status !== window.naver.maps.Service.Status.OK || !response?.v2?.addresses?.length) {
+                toast.error("해당 키워드의 위치를 찾지 못했습니다.");
+                return;
+            }
+            const item = response.v2.addresses[0];
+            const latitude = Number(item.y);
+            const longitude = Number(item.x);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                toast.error("좌표 변환에 실패했습니다.");
+                return;
+            }
+
+            const nextCenter = {
+                latitude: Number(latitude.toFixed(6)),
+                longitude: Number(longitude.toFixed(6)),
+            };
+            // 위치 키워드는 중심 이동에 사용하고, 이후 검색은 주변 목록 위주로 보이게 필터 문자열을 비운다.
+            // Use keyword for geocoding center, then clear text filter to show nearby lots broadly.
+            setKeyword("");
+            setCenter(nextCenter);
+            setPickedCenterMarker(nextCenter.latitude, nextCenter.longitude);
+            if (mapRef.current && window.naver?.maps) {
+                mapRef.current.setCenter(new window.naver.maps.LatLng(nextCenter.latitude, nextCenter.longitude));
+                mapRef.current.setZoom(14);
+            }
+            toast.success(`"${query}" 기준 위치로 이동했습니다. 주변 주차장을 불러옵니다.`);
+        });
     };
 
     const handleImport = async () => {
@@ -231,6 +391,83 @@ export const ParkingFinder = () => {
     }, [mapLoaded, center.latitude, center.longitude]);
 
     useEffect(() => {
+        if (!mapLoaded || !mapRef.current || !window.naver?.maps?.Event) return;
+
+        clearInteractionListeners();
+
+        const rightClickListener = window.naver.maps.Event.addListener(mapRef.current, "rightclick", (event) => {
+            applyPickedCenter(event?.coord, "우클릭");
+        });
+        interactionListenersRef.current.push(rightClickListener);
+
+        const longTapListener = window.naver.maps.Event.addListener(mapRef.current, "longtap", (event) => {
+            applyPickedCenter(event?.coord, "길게 누르기");
+        });
+        interactionListenersRef.current.push(longTapListener);
+
+        return () => {
+            clearInteractionListeners();
+        };
+    }, [applyPickedCenter, clearInteractionListeners, mapLoaded]);
+
+    useEffect(() => {
+        if (!mapLoaded || !mapRef.current || !mapContainerRef.current) return;
+        const container = mapContainerRef.current;
+
+        const clearLongPressTimer = () => {
+            if (longPressStateRef.current.timerId) {
+                clearTimeout(longPressStateRef.current.timerId);
+            }
+            longPressStateRef.current.timerId = null;
+        };
+
+        const onTouchStart = (event) => {
+            if (!event.touches || event.touches.length !== 1) {
+                clearLongPressTimer();
+                return;
+            }
+            const touch = event.touches[0];
+            longPressStateRef.current.startX = touch.clientX;
+            longPressStateRef.current.startY = touch.clientY;
+            longPressStateRef.current.moved = false;
+            clearLongPressTimer();
+            longPressStateRef.current.timerId = setTimeout(() => {
+                if (!longPressStateRef.current.moved) {
+                    pickCenterByClientPoint(touch.clientX, touch.clientY, "길게 누르기");
+                }
+                longPressStateRef.current.timerId = null;
+            }, 650);
+        };
+
+        const onTouchMove = (event) => {
+            if (!longPressStateRef.current.timerId || !event.touches || event.touches.length !== 1) return;
+            const touch = event.touches[0];
+            const dx = touch.clientX - longPressStateRef.current.startX;
+            const dy = touch.clientY - longPressStateRef.current.startY;
+            if (Math.hypot(dx, dy) > 12) {
+                longPressStateRef.current.moved = true;
+                clearLongPressTimer();
+            }
+        };
+
+        const onTouchEnd = () => clearLongPressTimer();
+        const onTouchCancel = () => clearLongPressTimer();
+
+        container.addEventListener("touchstart", onTouchStart, { passive: true });
+        container.addEventListener("touchmove", onTouchMove, { passive: true });
+        container.addEventListener("touchend", onTouchEnd, { passive: true });
+        container.addEventListener("touchcancel", onTouchCancel, { passive: true });
+
+        return () => {
+            clearLongPressTimer();
+            container.removeEventListener("touchstart", onTouchStart);
+            container.removeEventListener("touchmove", onTouchMove);
+            container.removeEventListener("touchend", onTouchEnd);
+            container.removeEventListener("touchcancel", onTouchCancel);
+        };
+    }, [mapLoaded, pickCenterByClientPoint]);
+
+    useEffect(() => {
         renderMarkers();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [items, mapLoaded]);
@@ -267,6 +504,16 @@ export const ParkingFinder = () => {
         const paidCount = items.filter((it) => (it?.fee_info ?? it?.feeInfo) === "유료").length;
         return { paidCount, freeCount: Math.max(0, items.length - paidCount) };
     }, [items]);
+    const selectedItem = useMemo(
+        () => items.find((item) => String(getLotId(item)) === String(selectedLotId)) ?? null,
+        [items, selectedLotId]
+    );
+
+    useEffect(() => {
+        if (!selectedItem && mobileDetailOpen) {
+            setMobileDetailOpen(false);
+        }
+    }, [mobileDetailOpen, selectedItem]);
 
     return (
         <div className="space-y-6 animate-fade-in pb-20">
@@ -301,19 +548,29 @@ export const ParkingFinder = () => {
                                 <input
                                     value={keyword}
                                     onChange={(e) => setKeyword(e.target.value)}
+                                    onKeyDown={handleSearchEnter}
                                     placeholder="주차장명/주소"
                                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm"
                                 />
                             </div>
+                            <button
+                                type="button"
+                                onClick={handleSetCenterByKeyword}
+                                disabled={locatingByKeyword}
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-primary-200 disabled:opacity-60"
+                            >
+                                <MapPin className="h-4 w-4" />
+                                {locatingByKeyword ? "위치 찾는 중..." : "검색"}
+                            </button>
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-slate-400">반경(km)</label>
-                                    <input type="number" min={0} max={30} value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
+                                    <input type="number" min={0} max={30} value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-slate-400">최대개수</label>
-                                    <input type="number" min={1} max={200} value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
+                                    <input type="number" min={1} max={200} value={limit} onChange={(e) => setLimit(Number(e.target.value))} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
                                 </div>
                             </div>
 
@@ -325,15 +582,15 @@ export const ParkingFinder = () => {
                                 </select>
                             </div>
 
-                            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700">
-                                <input type="checkbox" checked={paidOnly} onChange={(e) => setPaidOnly(e.target.checked)} />
-                                유료 주차장만 보기
-                            </label>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-400">요금구분</label>
+                                <select value={feeFilter} onChange={(e) => setFeeFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+                                    <option value="all">모두</option>
+                                    <option value="free">무료</option>
+                                    <option value="paid">유료</option>
+                                </select>
+                            </div>
 
-                            <button onClick={fetchLots} disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-primary-200 disabled:opacity-60">
-                                {loading ? <LoadingSpinner size="sm" text="" /> : <RefreshCw className="h-4 w-4" />}
-                                검색하기
-                            </button>
                         </div>
                     </div>
 
@@ -371,10 +628,24 @@ export const ParkingFinder = () => {
                     <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
                         <div className="mb-3 flex items-center justify-between">
                             <h2 className="text-lg font-black text-slate-900">네이버 지도</h2>
-                            <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-black text-primary-700">결과 {totalCount}건</span>
+                            <div className="flex items-center gap-2">
+                                <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-black text-primary-700">결과 {totalCount}건</span>
+                                <button
+                                    type="button"
+                                    onClick={fetchLots}
+                                    disabled={loading}
+                                    className="flex items-center gap-1 rounded-xl bg-primary-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-60"
+                                >
+                                    {loading ? <LoadingSpinner size="sm" text="" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                    검색하기
+                                </button>
+                            </div>
+                        </div>
+                        <div className="mb-3 text-xs font-semibold text-slate-500">
+                            PC는 우클릭, 모바일은 길게 눌러 기준 위치를 직접 선택할 수 있습니다.
                         </div>
                         <div className="relative h-[360px] overflow-hidden rounded-2xl bg-slate-100">
-                            <div ref={mapContainerRef} className="h-full w-full" />
+                            <div ref={mapContainerRef} className="h-full w-full" onContextMenu={(event) => event.preventDefault()} />
                             {!mapLoaded && !mapError && (
                                 <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 text-white">
                                     <LoadingSpinner text="지도를 준비하는 중..." />
@@ -387,6 +658,48 @@ export const ParkingFinder = () => {
                             )}
                         </div>
                     </div>
+
+                    {selectedItem && (
+                        <div className="hidden rounded-3xl border border-primary-100 bg-gradient-to-br from-primary-50/50 to-white p-5 shadow-sm lg:block">
+                            <div className="mb-3 flex items-center justify-between">
+                                <h2 className="text-lg font-black text-slate-900">선택 주차장 상세</h2>
+                                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-primary-700">ID {getLotId(selectedItem)}</span>
+                            </div>
+                            <div className="mb-3">
+                                <div className="text-base font-black text-slate-900">{selectedItem?.parking_name ?? selectedItem?.parkingName ?? "-"}</div>
+                                <div className="mt-1 text-sm text-slate-600">
+                                    {selectedItem?.road_address ?? selectedItem?.roadAddress ?? selectedItem?.lot_address ?? selectedItem?.lotAddress ?? "-"}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+                                <div className="rounded-xl bg-white p-3">
+                                    <div className="text-xs font-black text-slate-400">요금정책</div>
+                                    <div className="mt-1 font-bold text-slate-800">
+                                        {(selectedItem?.fee_info ?? selectedItem?.feeInfo ?? "-")} / 기본 {(selectedItem?.base_fee ?? selectedItem?.baseFee ?? 0).toLocaleString("ko-KR")}원
+                                    </div>
+                                    <div className="text-xs text-slate-500">
+                                        기본 {selectedItem?.base_time_minutes ?? selectedItem?.baseTimeMinutes ?? 0}분, 추가 {(selectedItem?.extra_time_minutes ?? selectedItem?.extraTimeMinutes ?? 0)}분/{(selectedItem?.extra_fee ?? selectedItem?.extraFee ?? 0).toLocaleString("ko-KR")}원
+                                    </div>
+                                </div>
+                                <div className="rounded-xl bg-white p-3">
+                                    <div className="text-xs font-black text-slate-400">운영시간</div>
+                                    <div className="mt-1 text-slate-800">평일 {selectedItem?.weekday_start ?? selectedItem?.weekdayStart ?? "-"} ~ {selectedItem?.weekday_end ?? selectedItem?.weekdayEnd ?? "-"}</div>
+                                    <div className="text-slate-800">토요일 {selectedItem?.saturday_start ?? selectedItem?.saturdayStart ?? "-"} ~ {selectedItem?.saturday_end ?? selectedItem?.saturdayEnd ?? "-"}</div>
+                                    <div className="text-slate-800">공휴일 {selectedItem?.holiday_start ?? selectedItem?.holidayStart ?? "-"} ~ {selectedItem?.holiday_end ?? selectedItem?.holidayEnd ?? "-"}</div>
+                                </div>
+                                <div className="rounded-xl bg-white p-3">
+                                    <div className="text-xs font-black text-slate-400">결제/연락</div>
+                                    <div className="mt-1 text-slate-800">결제: {selectedItem?.payment_method ?? selectedItem?.paymentMethod ?? "-"}</div>
+                                    <div className="text-slate-800">전화: {selectedItem?.phone_number ?? selectedItem?.phoneNumber ?? "-"}</div>
+                                </div>
+                                <div className="rounded-xl bg-white p-3">
+                                    <div className="text-xs font-black text-slate-400">부가 정보</div>
+                                    <div className="mt-1 text-slate-800">주차면수: {(selectedItem?.parking_spaces ?? selectedItem?.parkingSpaces ?? "-")}</div>
+                                    <div className="text-slate-800">장애인구역: {selectedItem?.accessible_yn ?? selectedItem?.accessibleYn ?? "-"}</div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="space-y-3">
                         {loading ? (
@@ -414,7 +727,7 @@ export const ParkingFinder = () => {
                                 return (
                                     <button
                                         key={id}
-                                        onClick={() => setSelectedLotId(id)}
+                                        onClick={() => handleSelectLotFromList(id)}
                                         className={`w-full rounded-3xl border p-5 text-left shadow-sm transition-all ${selected ? "border-primary-300 bg-primary-50/30" : "border-slate-100 bg-white hover:border-primary-100"}`}
                                     >
                                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -450,8 +763,51 @@ export const ParkingFinder = () => {
                     </div>
                 </div>
             </div>
+
+            {mobileDetailOpen && selectedItem && (
+                <div className="fixed inset-0 z-[70] bg-slate-900/55 p-3 lg:hidden">
+                    <div className="h-full w-full overflow-auto rounded-3xl bg-white p-5 shadow-2xl">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h2 className="text-lg font-black text-slate-900">주차장 상세</h2>
+                            <button
+                                type="button"
+                                className="rounded-xl bg-slate-100 p-2 text-slate-600"
+                                onClick={() => setMobileDetailOpen(false)}
+                                aria-label="상세 닫기"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="mb-3 text-base font-black text-slate-900">{selectedItem?.parking_name ?? selectedItem?.parkingName ?? "-"}</div>
+                        <div className="mb-4 text-sm text-slate-600">
+                            {selectedItem?.road_address ?? selectedItem?.roadAddress ?? selectedItem?.lot_address ?? selectedItem?.lotAddress ?? "-"}
+                        </div>
+                        <div className="space-y-2 text-sm">
+                            <div className="rounded-xl bg-slate-50 p-3">
+                                <div className="text-xs font-black text-slate-400">요금</div>
+                                <div className="mt-1 font-bold text-slate-800">
+                                    {(selectedItem?.fee_info ?? selectedItem?.feeInfo ?? "-")} / 기본 {(selectedItem?.base_fee ?? selectedItem?.baseFee ?? 0).toLocaleString("ko-KR")}원
+                                </div>
+                                <div className="text-slate-600">
+                                    기본 {selectedItem?.base_time_minutes ?? selectedItem?.baseTimeMinutes ?? 0}분, 추가 {selectedItem?.extra_time_minutes ?? selectedItem?.extraTimeMinutes ?? 0}분/{(selectedItem?.extra_fee ?? selectedItem?.extraFee ?? 0).toLocaleString("ko-KR")}원
+                                </div>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 p-3">
+                                <div className="text-xs font-black text-slate-400">운영시간</div>
+                                <div className="text-slate-700">평일 {selectedItem?.weekday_start ?? selectedItem?.weekdayStart ?? "-"} ~ {selectedItem?.weekday_end ?? selectedItem?.weekdayEnd ?? "-"}</div>
+                                <div className="text-slate-700">토요일 {selectedItem?.saturday_start ?? selectedItem?.saturdayStart ?? "-"} ~ {selectedItem?.saturday_end ?? selectedItem?.saturdayEnd ?? "-"}</div>
+                                <div className="text-slate-700">공휴일 {selectedItem?.holiday_start ?? selectedItem?.holidayStart ?? "-"} ~ {selectedItem?.holiday_end ?? selectedItem?.holidayEnd ?? "-"}</div>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 p-3">
+                                <div className="text-xs font-black text-slate-400">결제/연락</div>
+                                <div className="text-slate-700">결제: {selectedItem?.payment_method ?? selectedItem?.paymentMethod ?? "-"}</div>
+                                <div className="text-slate-700">전화: {selectedItem?.phone_number ?? selectedItem?.phoneNumber ?? "-"}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
-
 
