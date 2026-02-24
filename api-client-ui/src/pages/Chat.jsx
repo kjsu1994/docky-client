@@ -26,7 +26,7 @@ import SockJS from "sockjs-client";
 import { useAuth } from "../contexts/AuthContext";
 import api, { uploadFiles } from "../utils/api";
 import toast from "react-hot-toast";
-import { formatRelativeTime, debounce } from "../utils/helpers";
+import { formatRelativeTime, debounce, resolveAssetUrl } from "../utils/helpers";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 
 export const Chat = () => {
@@ -472,6 +472,7 @@ export const Chat = () => {
                                     ) : messages.map((msg, idx) => {
                                         const normalized = normalizeMessage(msg);
                                         const isMe = Number(normalized.senderId) === Number(user.member_id || user.memberId);
+                                        const messageImageUrl = normalized.type === "FILE" ? resolveAssetUrl(normalized.message) : "";
                                         return (
                                             <div key={idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                                                 <div className={`flex max-w-[80%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
@@ -479,7 +480,7 @@ export const Chat = () => {
                                                     <div className="flex flex-col">
                                                         {!isMe && <span className="text-[10px] text-slate-500 mb-1 ml-1">{normalized.senderName}</span>}
                                                         <div className={`px-4 py-2 rounded-2xl text-sm shadow-sm ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-800 border border-slate-100 rounded-bl-none"}`}>
-                                                            {normalized.type === "FILE" ? <img src={normalized.message} alt="파일" className="max-w-xs rounded-lg cursor-pointer" onClick={() => window.open(normalized.message)} /> : normalized.message}
+                                                            {normalized.type === "FILE" ? <img src={messageImageUrl} alt="파일" className="max-w-xs rounded-lg cursor-pointer" onClick={() => window.open(messageImageUrl, "_blank", "noopener,noreferrer")} /> : normalized.message}
                                                         </div>
                                                     </div>
                                                     <span className="text-[10px] text-slate-400 pb-1">{formatRelativeTime(new Date(normalized.createdAt))}</span>

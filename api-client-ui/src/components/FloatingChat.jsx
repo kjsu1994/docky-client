@@ -94,11 +94,18 @@ export const FloatingChat = () => {
     const [recommendedMembers, setRecommendedMembers] = useState([]);
     const [selectedMembers, setSelectedMembers] = useState([]);
     const [searching, setSearching] = useState(false);
+    const [fabPosition, setFabPosition] = useState({ x: 0, y: 0 });
+    const [dragReady, setDragReady] = useState(false);
+    const [isDraggingFab, setIsDraggingFab] = useState(false);
+    const [isDraggingPanel, setIsDraggingPanel] = useState(false);
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
     const lastReadMarkAtRef = useRef(0);
     const roomSubscriptionsRef = useRef([]);
+    const dragHoldTimerRef = useRef(null);
+    const dragStartRef = useRef({ pointerX: 0, pointerY: 0, x: 0, y: 0 });
+    const didDragRef = useRef(false);
 
     const getUnreadCount = (room) => {
         const value = Number(room?.unread_count ?? room?.unreadCount ?? 0);
@@ -625,13 +632,130 @@ export const FloatingChat = () => {
     const displayedMembers = memberSearch.trim().length > 0 ? foundMembers : recommendedMembers;
     const totalUnreadCount = rooms.reduce((sum, room) => sum + getUnreadCount(room), 0);
 
+    const getDefaultFabPosition = useCallback(() => {
+        const fabSize = 64;
+        const right = 24;
+        const bottom = window.innerWidth >= 1024 ? 24 : 112;
+        return {
+            x: Math.max(0, window.innerWidth - fabSize - right),
+            y: Math.max(0, window.innerHeight - fabSize - bottom),
+        };
+    }, []);
+
+    const clampFabPosition = useCallback((x, y) => {
+        const fabSize = 64;
+        const nextX = Math.min(Math.max(0, x), Math.max(0, window.innerWidth - fabSize));
+        const nextY = Math.min(Math.max(0, y), Math.max(0, window.innerHeight - fabSize));
+        return { x: nextX, y: nextY };
+    }, []);
+
+    useEffect(() => {
+        setFabPosition(getDefaultFabPosition());
+    }, [getDefaultFabPosition]);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setFabPosition((prev) => {
+                const clamped = clampFabPosition(prev.x, prev.y);
+                if (clamped.x === prev.x && clamped.y === prev.y) return prev;
+                return clamped;
+            });
+        };
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, [clampFabPosition]);
+
+    const clearHoldTimer = () => {
+        if (dragHoldTimerRef.current) {
+            clearTimeout(dragHoldTimerRef.current);
+            dragHoldTimerRef.current = null;
+        }
+    };
+
+    const handleFabPointerDown = (e) => {
+        if ((e.pointerType === "mouse" && e.button !== 0) || isOpen) return;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        didDragRef.current = false;
+        dragStartRef.current = {
+            pointerX: e.clientX,
+            pointerY: e.clientY,
+            x: fabPosition.x,
+            y: fabPosition.y,
+        };
+        clearHoldTimer();
+        dragHoldTimerRef.current = setTimeout(() => {
+            setDragReady(true);
+            setIsDraggingFab(true);
+        }, 260);
+    };
+
+    const handleFabPointerMove = (e) => {
+        if (!dragReady) return;
+        const dx = e.clientX - dragStartRef.current.pointerX;
+        const dy = e.clientY - dragStartRef.current.pointerY;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+            didDragRef.current = true;
+        }
+        const clamped = clampFabPosition(dragStartRef.current.x + dx, dragStartRef.current.y + dy);
+        setFabPosition(clamped);
+    };
+
+    const endFabDrag = (e) => {
+        e?.currentTarget?.releasePointerCapture?.(e.pointerId);
+        clearHoldTimer();
+        setDragReady(false);
+        setIsDraggingFab(false);
+    };
+
+    const toggleChat = () => {
+        if (didDragRef.current) {
+            didDragRef.current = false;
+            return;
+        }
+        if (isMinimized) {
+            setIsMinimized(false);
+            return;
+        }
+        setIsOpen(!isOpen);
+    };
+
+    const handlePanelPointerDown = (e) => {
+        if (e.target.closest("button, a, input, textarea, select")) return;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        setIsDraggingPanel(true);
+        dragStartRef.current = {
+            pointerX: e.clientX,
+            pointerY: e.clientY,
+            x: fabPosition.x,
+            y: fabPosition.y,
+        };
+    };
+
+    const handlePanelPointerMove = (e) => {
+        if (!isDraggingPanel) return;
+        const dx = e.clientX - dragStartRef.current.pointerX;
+        const dy = e.clientY - dragStartRef.current.pointerY;
+        const clamped = clampFabPosition(dragStartRef.current.x + dx, dragStartRef.current.y + dy);
+        setFabPosition(clamped);
+    };
+
+    const handlePanelPointerUp = (e) => {
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+        setIsDraggingPanel(false);
+    };
+
     if (!isAuthenticated) return null;
 
     return (
-        <div className="fixed bottom-28 right-6 lg:bottom-6 z-[100] flex flex-col items-end gap-4 pointer-events-none text-slate-900">
+        <div className="fixed z-[100] flex flex-col items-end gap-4 pointer-events-none text-slate-900" style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px` }}>
             {isOpen && (
                 <div className={`pointer-events-auto bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden transition-all duration-500 ${isMinimized ? "h-16 w-72" : "h-[600px] w-[400px] max-w-[calc(100vw-48px)]"}`}>
-                    <div className="bg-gradient-to-r from-primary-600 to-primary-500 p-4 flex items-center justify-between text-white shrink-0">
+                    <div
+                        onPointerDown={handlePanelPointerDown}
+                        onPointerMove={handlePanelPointerMove}
+                        onPointerUp={handlePanelPointerUp}
+                        onPointerCancel={handlePanelPointerUp}
+                        className={`bg-gradient-to-r from-primary-600 to-primary-500 p-4 flex items-center justify-between text-white shrink-0 touch-none select-none ${isDraggingPanel ? "cursor-grabbing" : "cursor-grab"}`}>
                         <div className="flex items-center gap-3 overflow-hidden">
                             {currentRoom ? (
                                 <>
@@ -658,7 +782,7 @@ export const FloatingChat = () => {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                             <button onClick={() => setIsMinimized(!isMinimized)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">{isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}</button>
-                            <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/20 rounded-xl transition-colors"><X className="h-4 w-4" /></button>
+                            <button onClick={() => setIsOpen(false)} className="p-2 rounded-xl text-rose-200 hover:text-rose-100 hover:bg-rose-500/20 transition-colors"><X className="h-4 w-4" /></button>
                         </div>
                     </div>
 
@@ -774,9 +898,15 @@ export const FloatingChat = () => {
                 </div>
             )}
 
-            <button onClick={() => { if (isMinimized) { setIsMinimized(false); } else { setIsOpen(!isOpen); } }}
-                className={`pointer-events-auto w-16 h-16 rounded-[2rem] shadow-2xl flex items-center justify-center transition-all duration-500 active:scale-90 ${isOpen && !isMinimized ? "bg-white text-primary-600 rotate-90 scale-90" : "bg-primary-600 text-white hover:scale-110 shadow-primary-200"}`}>
-                {isOpen && !isMinimized ? <X className="h-7 w-7" /> : <MessageCircle className="h-7 w-7" />}
+            <button
+                onClick={toggleChat}
+                onPointerDown={handleFabPointerDown}
+                onPointerMove={handleFabPointerMove}
+                onPointerUp={endFabDrag}
+                onPointerCancel={endFabDrag}
+                onPointerLeave={endFabDrag}
+                className={`pointer-events-auto w-16 h-16 rounded-[2rem] shadow-2xl flex items-center justify-center transition-all duration-500 active:scale-90 touch-none select-none ${isDraggingFab ? "cursor-grabbing" : "cursor-grab"} ${isOpen && !isMinimized ? "bg-white text-primary-600 rotate-90 scale-90" : "bg-primary-600 text-white hover:scale-110 shadow-primary-200"}`}>
+                {isOpen && !isMinimized ? <X className="h-7 w-7 text-rose-500" /> : <MessageCircle className="h-7 w-7" />}
                 {totalUnreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-6 h-6 px-1 bg-rose-500 text-white rounded-full border-2 border-white shadow-lg text-[10px] font-black flex items-center justify-center">
                         {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
