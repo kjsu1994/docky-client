@@ -30,7 +30,7 @@ import SockJS from "sockjs-client";
 import { useAuth } from "../contexts/AuthContext";
 import api, { uploadFiles } from "../utils/api";
 import toast from "react-hot-toast";
-import { formatRelativeTime, debounce } from "../utils/helpers";
+import { formatRelativeTime, debounce, normalizeChatTimestamp } from "../utils/helpers";
 import { LoadingSpinner } from "./LoadingSpinner";
 
 export const FloatingChat = () => {
@@ -68,7 +68,7 @@ export const FloatingChat = () => {
             message: msg.message || msg.content || "",
             type: msg.type || msg.messageType || "TALK",
             roomId: msg.roomId || msg.chatRoomId || msg.room_id || msg.chat_room_id,
-            createdAt: msg.createdAt || msg.created_at || new Date().toISOString()
+            createdAt: normalizeChatTimestamp(msg.createdAt || msg.created_at)
         };
         normalized.key = getMsgKey(normalized);
         return normalized;
@@ -1017,6 +1017,7 @@ export const FloatingChat = () => {
         </div>
     );
 };
+
 
 
 

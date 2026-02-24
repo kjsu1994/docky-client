@@ -26,7 +26,7 @@ import SockJS from "sockjs-client";
 import { useAuth } from "../contexts/AuthContext";
 import api, { uploadFiles } from "../utils/api";
 import toast from "react-hot-toast";
-import { formatRelativeTime, debounce, resolveAssetUrl } from "../utils/helpers";
+import { formatRelativeTime, debounce, normalizeChatTimestamp, resolveAssetUrl } from "../utils/helpers";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 
 export const Chat = () => {
@@ -47,7 +47,7 @@ export const Chat = () => {
             senderName: msg.senderName || msg.sender_name || "익명",
             message: msg.message || msg.content || "",
             type: msg.type || msg.messageType || "TALK",
-            createdAt: msg.createdAt || msg.created_at || new Date().toISOString()
+            createdAt: normalizeChatTimestamp(msg.createdAt || msg.created_at)
         };
     };
 
@@ -254,7 +254,7 @@ export const Chat = () => {
             // Optimistic Update
             const optimisticMsg = normalizeMessage({
                 ...messagePayload,
-                senderName: user.name || "나",
+                senderName: user.name || "익명",
                 createdAt: new Date().toISOString()
             });
             setMessages(prev => [...prev, optimisticMsg]);
@@ -448,7 +448,7 @@ export const Chat = () => {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-slate-900">{currentRoom.title}</h3>
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-500"><span className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}></span>{isConnected ? "실시간 연결됨" : "연결 끊김"}</div>
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-500"><span className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}></span>{isConnected ? "실시간 연결" : "연결 끊김"}</div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -511,7 +511,7 @@ export const Chat = () => {
                                                 <div key={m.member_id || m.memberId} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
                                                     <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs text-slate-600">{m.name?.charAt(0).toUpperCase()}</div>
                                                     <div className="min-w-0">
-                                                        <div className="text-xs font-bold truncate flex items-center gap-1">{m.name}{isMe && <span className="text-[9px] px-1 py-0.5 bg-primary-100 text-primary-600 rounded">나</span>}</div>
+                                                        <div className="text-xs font-bold truncate flex items-center gap-1">{m.name}{isMe && <span className="text-[9px] px-1 py-0.5 bg-primary-100 text-primary-600 rounded">ME</span>}</div>
                                                         <div className="text-[10px] text-slate-400 truncate">{m.email}</div>
                                                     </div>
                                                 </div>
@@ -541,7 +541,7 @@ export const Chat = () => {
                                         type="text" 
                                         value={newRoomTitle} 
                                         onChange={(e) => setNewRoomTitle(e.target.value)} 
-                                        placeholder="예: 우리들의 수다방" 
+                                        placeholder="예: 프로젝트 대화방" 
                                         className="input-base" 
                                         autoFocus
                                     />
@@ -579,3 +579,4 @@ export const Chat = () => {
         </div>
     );
 };
+

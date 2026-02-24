@@ -16,6 +16,28 @@ export const formatRelativeTime = (date) => {
     });
 };
 
+export const normalizeChatTimestamp = (value) => {
+    if (!value) return new Date().toISOString();
+    if (value instanceof Date) return value.toISOString();
+
+    const raw = String(value).trim();
+    if (!raw) return new Date().toISOString();
+
+    const spaceFormat = /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/;
+    if (spaceFormat.test(raw)) {
+        return `${raw.replace(" ", "T")}+09:00`;
+    }
+
+    const noZoneIso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+    if (noZoneIso.test(raw)) {
+        return `${raw}+09:00`;
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return new Date().toISOString();
+    return parsed.toISOString();
+};
+
 // text-fixed
 export const getBoardKindLabel = (kind) => {
     const labels = {
