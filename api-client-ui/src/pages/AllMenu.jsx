@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import {
     Home,
     BarChart,
@@ -7,6 +7,7 @@ import {
     Newspaper,
     Dices,
     MapPin,
+    Car,
     User,
     ShieldAlert,
     Settings,
@@ -53,8 +54,9 @@ export const AllMenu = () => {
 
     const tools = [
         { title: "중간장소 찾기", to: "/app/optimizer", icon: MapPin, color: "bg-rose-50 text-rose-600" },
-        { title: "랭킹", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
-        { title: "플링코", to: "/app/plinko", icon: Dices, color: "bg-violet-50 text-violet-600" },
+        { title: "주차장 찾기", to: "/app/parking", icon: Car, color: "bg-cyan-50 text-cyan-700" },
+        { title: "순위", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
+        { title: "플린코", to: "/app/plinko", icon: Dices, color: "bg-violet-50 text-violet-600" },
         { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
     ];
 
@@ -65,7 +67,7 @@ export const AllMenu = () => {
 
     const admin = [
         { title: "관리자 콘솔", to: "/app/admin/anomalies", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
-        { title: "운영 툴", to: "/app/admin/operations", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
+        { title: "운영 관리", to: "/app/admin/operations", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
     ];
 
     return (

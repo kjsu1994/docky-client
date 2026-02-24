@@ -8,6 +8,7 @@ import {
     Newspaper,
     Dices,
     MapPin,
+    Car,
     User,
     LogOut,
     HelpCircle,
@@ -82,6 +83,7 @@ export const Header = () => {
                 title: "Tools",
                 items: [
                     { title: "중간장소", to: "/app/optimizer", icon: MapPin },
+                    { title: "주차장 찾기", to: "/app/parking", icon: Car },
                     { title: "순위", to: "/app/ranks", icon: Trophy },
                     { title: "플린코", to: "/app/plinko", icon: Dices },
                     { title: "뉴스", to: "/app/news", icon: Newspaper },
@@ -188,6 +190,7 @@ export const Header = () => {
                         <NavItem to="/app/boards/FREE_BOARD" icon={MessageSquare}>자유게시판</NavItem>
                         <NavItem to="/app/boards/QUESTION_ANSWER" icon={HelpCircle}>Q&A</NavItem>
                         <NavItem to="/app/optimizer" icon={MapPin}>중간취소</NavItem>
+                        <NavItem to="/app/parking" icon={Car}>주차장</NavItem>
                         <NavItem to="/app/ranks" icon={Trophy}>순위</NavItem>
                         <NavItem to="/app/plinko" icon={Dices}>플린코</NavItem>
                         <NavItem to="/app/news" icon={Newspaper}>뉴스</NavItem>
