@@ -51,6 +51,12 @@ const getFileIdValue = (file) =>
     file?.id ??
     null;
 
+const isHeicLikeFile = (file) => {
+    const type = (file?.type || "").toLowerCase();
+    const name = (file?.name || "").toLowerCase();
+    return type.includes("heic") || type.includes("heif") || name.endsWith(".heic") || name.endsWith(".heif");
+};
+
 export const BoardForm = () => {
     const { kind, boardId } = useParams();
     const navigate = useNavigate();
@@ -150,6 +156,11 @@ export const BoardForm = () => {
 
     // text-fixed
     const uploadImageToServer = async (quill, file) => {
+        if (isHeicLikeFile(file)) {
+            toast.error("HEIC/HEIF 이미지는 지원되지 않습니다. JPG/PNG로 변경 후 업로드해주세요.");
+            return;
+        }
+
         // text-fixed
         if (file.size > 5 * 1024 * 1024) {
             toast.error("이미지 크기는 5MB 이하여야 합니다.");
@@ -161,9 +172,7 @@ export const BoardForm = () => {
             const formData = new FormData();
             formData.append("file", file);
 
-            const response = await api.post("/image/upload", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
-            });
+            const response = await api.post("/image/upload", formData);
 
             const imageUrl = response.data?.url || response.data;
             if (!imageUrl) throw new Error("URL 없음");

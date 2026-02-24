@@ -96,7 +96,6 @@ export const uploadFiles = async (endpoint, formData, method = "post") => {
             url: `/api${endpoint}`,
             data: formData,
             headers: {
-                "Content-Type": "multipart/form-data",
                 Authorization: token ? `Bearer ${token}` : "",
             },
         });

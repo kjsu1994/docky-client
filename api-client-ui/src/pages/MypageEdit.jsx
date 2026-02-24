@@ -9,6 +9,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { normalizeProfileImageUrl } from "../utils/profileImage";
 
 const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
+const isHeicLikeFile = (file) => {
+    const type = (file?.type || "").toLowerCase();
+    const name = (file?.name || "").toLowerCase();
+    return type.includes("heic") || type.includes("heif") || name.endsWith(".heic") || name.endsWith(".heif");
+};
 
 const extractErrorMessage = (error, fallback) => {
     const data = error?.response?.data;
@@ -132,15 +137,18 @@ export const MypageEdit = () => {
             e.target.value = "";
             return;
         }
+        if (isHeicLikeFile(file)) {
+            toast.error("HEIC/HEIF 이미지는 지원되지 않습니다. JPG/PNG로 변경 후 업로드해주세요.");
+            e.target.value = "";
+            return;
+        }
 
         const formData = new FormData();
         formData.append("file", file);
 
         setUploading(true);
         try {
-            await api.post("/members/uploadProfile", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
-            });
+            await api.post("/members/uploadProfile", formData);
             await fetchMember();
             toast.success("프로필 이미지가 업데이트되었습니다.");
         } catch (error) {
