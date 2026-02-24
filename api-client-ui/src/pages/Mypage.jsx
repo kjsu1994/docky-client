@@ -13,7 +13,9 @@ import {
     BarChart3,
     TreePine,
 } from "lucide-react";
+import axios from "axios";
 import { useAuth } from "../contexts/AuthContext";
+import toast from "react-hot-toast";
 import api from "../utils/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -50,7 +52,9 @@ const isActiveMember = (member) => {
     const status = normalizeMemberStatus(member);
     return status === "ACTIVE" || status === "MEMBER_ACTIVE";
 };
-const getMemberStatusLabel = (member) => (isActiveMember(member) ? "비활성" : "활성");
+const getMemberStatusLabel = (member) => (isActiveMember(member) ? "ACTIVE" : "INACTIVE");
+const getAuthProvider = (member) => String(member?.auth_provider || member?.authProvider || "LOCAL").toUpperCase();
+const isGoogleAuthMember = (member) => getAuthProvider(member) === "GOOGLE";
 
 const toSafeNumber = (value) => {
     const num = Number(value);
@@ -152,6 +156,12 @@ export const Mypage = () => {
     const [boardsLoading, setBoardsLoading] = useState(false);
     const [levelHistoryLoading, setLevelHistoryLoading] = useState(false);
     const [levelHistory, setLevelHistory] = useState([]);
+    const [deletingAccount, setDeletingAccount] = useState(false);
+    const [deletePassword, setDeletePassword] = useState("");
+    const [deletePasswordChecking, setDeletePasswordChecking] = useState(false);
+    const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+    const [oauthWithdrawVerified, setOauthWithdrawVerified] = useState(false);
+    const [oauthReauthLoading, setOauthReauthLoading] = useState(false);
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState("profile");
 
@@ -161,6 +171,7 @@ export const Mypage = () => {
     );
     const profileImageUrl = normalizeProfileImageUrl(memberData?.profile_url || memberData?.profileUrl || "");
     const memberActive = isActiveMember(memberData);
+    const googleAuthMember = isGoogleAuthMember(memberData);
 
     const fetchMemberData = async () => {
         setLoading(true);
@@ -177,21 +188,110 @@ export const Mypage = () => {
         }
     };
 
+    const openDeleteConfirmModal = () => {
+        if (deletingAccount || deletePasswordChecking || oauthReauthLoading) return;
+        setDeletePassword("");
+        setShowDeleteConfirmModal(true);
+    };
+
+    const closeDeleteConfirmModal = () => {
+        if (deletingAccount || deletePasswordChecking || oauthReauthLoading) return;
+        setShowDeleteConfirmModal(false);
+        setDeletePassword("");
+    };
+
+    const startGoogleWithdrawReauth = () => {
+        if (oauthReauthLoading || deletingAccount) return;
+        setOauthReauthLoading(true);
+        setOauthWithdrawVerified(false);
+        localStorage.setItem("postOauthRedirect", "/app/mypage?withdraw_reauth=1");
+        window.location.href = "/api/oauth2/authorization/google?prompt=select_account";
+    };
+
     const handleDeleteAccount = async () => {
-        const confirmed = window.confirm("정말 회원 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.");
-        if (!confirmed) return;
+        if (deletingAccount || deletePasswordChecking || oauthReauthLoading) return;
+
+        if (googleAuthMember) {
+            if (!oauthWithdrawVerified) {
+                toast.error("구글 계정은 재인증이 필요합니다. 먼저 진행해주세요.");
+                return;
+            }
+        } else {
+            const email = memberData?.email || user?.email || "";
+            const password = deletePassword;
+
+            if (!email) {
+                toast.error("이메일 정보를 찾을 수 없습니다.");
+                return;
+            }
+            if (!password.trim()) {
+                toast.error("비밀번호를 입력해주세요.");
+                return;
+            }
+
+            try {
+                setDeletePasswordChecking(true);
+                await axios.post("/api/members/login", {
+                    email,
+                    password,
+                });
+            } catch (err) {
+                toast.error(err?.response?.data?.message || "비밀번호가 일치하지 않습니다.");
+                return;
+            } finally {
+                setDeletePasswordChecking(false);
+            }
+        }
 
         try {
+            setDeletingAccount(true);
             await api.delete("/members");
+            toast.success("회원 탈퇴 처리되었습니다.");
+            setShowDeleteConfirmModal(false);
+            setDeletePassword("");
+            setOauthWithdrawVerified(false);
             await logout({ skipApi: true, silent: true });
         } catch (err) {
             console.error("Failed to delete member:", err);
+            const code = err?.response?.data?.code;
+            if (code === "ACCOUNT_REAUTH_REQUIRED") {
+                setOauthWithdrawVerified(false);
+                toast.error("구글 재인증이 만료되어 탈퇴를 진행할 수 없습니다.");
+                return;
+            }
             setError(err.response?.data?.message || "회원 탈퇴에 실패했습니다.");
+            toast.error(err.response?.data?.message || "회원 탈퇴에 실패했습니다.");
+        } finally {
+            setDeletingAccount(false);
         }
     };
 
     useEffect(() => {
         fetchMemberData();
+    }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const shouldVerify = params.get("withdraw_reauth") === "1";
+        if (!shouldVerify) return;
+
+        const verify = async () => {
+            try {
+                await api.post("/members/withdraw/reauth");
+                setOauthWithdrawVerified(true);
+                toast.success("구글 재인증 확인이 완료되었습니다. 이제 탈퇴를 진행할 수 있습니다.");
+            } catch (err) {
+                setOauthWithdrawVerified(false);
+                toast.error(err?.response?.data?.message || "구글 재인증에 실패했습니다.");
+            } finally {
+                params.delete("withdraw_reauth");
+                const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+                window.history.replaceState({}, document.title, next);
+                setOauthReauthLoading(false);
+            }
+        };
+
+        verify();
     }, []);
 
     useEffect(() => {
@@ -263,7 +363,7 @@ export const Mypage = () => {
                             {profileImageUrl ? (
                                 <img
                                     src={profileImageUrl}
-                                    alt={memberData.name || "프로필"}
+                                    alt={memberData.name || "profile"}
                                     className="w-32 h-32 rounded-2xl border-4 border-white shadow-xl object-cover"
                                 />
                             ) : (
@@ -278,7 +378,7 @@ export const Mypage = () => {
                         <div className="flex-1 pt-4">
                             <div className="flex flex-wrap items-center gap-3 mb-2">
                                 <h1 className="text-2xl font-bold text-slate-900">
-                                    {memberData.name || user?.name || "익명"}
+                                    {memberData.name || user?.name || "Anonymous"}
                                 </h1>
                                 <div className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm font-semibold">
                                     Lv. {levelData.level || 1}
@@ -315,20 +415,20 @@ export const Mypage = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
                         <StatCard
                             icon={Award}
-                            label="총 경험치"
+                            label="Total EXP"
                             value={formatNumber(levelData.total_exp || levelData.totalExp || 0)}
                             color="purple"
                         />
                         <StatCard
                             icon={TrendingUp}
-                            label="포인트"
+                            label="Points"
                             value={formatNumber(memberData.point || 0)}
                             color="blue"
                         />
                         <StatCard
                             icon={TreePine}
-                            label="나무"
-                            value={`${formatNumber(memberData.tree_count || memberData.treeCount || 0)}그루`}
+                            label="Trees"
+                            value={`${formatNumber(memberData.tree_count || memberData.treeCount || 0)} trees`}
                             color="green"
                         />
                         <StatCard
@@ -344,14 +444,12 @@ export const Mypage = () => {
             <div className="card p-2">
                 <div className="flex gap-2">
                     <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>
-                        프로필 정보
-                    </TabButton>
+                        프로필 정보                    </TabButton>
                     <TabButton active={activeTab === "posts"} onClick={() => setActiveTab("posts")}>
                         작성한 글
                     </TabButton>
                     <TabButton active={activeTab === "stats"} onClick={() => setActiveTab("stats")}>
-                        활동 통계
-                    </TabButton>
+                        활동 통계                    </TabButton>
                 </div>
             </div>
 
@@ -361,7 +459,8 @@ export const Mypage = () => {
                     levelData={levelData}
                     levelHistory={levelHistory}
                     levelHistoryLoading={levelHistoryLoading}
-                    onDeleteAccount={handleDeleteAccount}
+                    onDeleteAccount={openDeleteConfirmModal}
+                    deletingAccount={deletingAccount}
                 />
             )}
             {activeTab === "posts" && (
@@ -375,10 +474,88 @@ export const Mypage = () => {
                     levelHistoryLoading={levelHistoryLoading}
                 />
             )}
+
+            {showDeleteConfirmModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <button
+                        type="button"
+                        className="absolute inset-0 bg-slate-900/55"
+                        onClick={closeDeleteConfirmModal}
+                        aria-label="닫기"
+                    />
+                    <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                        <h3 className="text-lg font-bold text-slate-900">회원 탈퇴 확인</h3>
+                        <p className="mt-2 text-sm text-slate-600">
+                            {googleAuthMember
+                                ? "Google 계정은 재인증 후 최종 탈퇴가 가능합니다."
+                                : "탈퇴를 진행하려면 현재 비밀번호를 입력해주세요."}
+                        </p>
+
+                        {!googleAuthMember && (
+                            <div className="mt-4 space-y-2">
+                                <label htmlFor="delete-account-password" className="block text-sm font-semibold text-slate-700">
+                                    비밀번호
+                                </label>
+                                <input
+                                    id="delete-account-password"
+                                    type="password"
+                                    className="input-base"
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    placeholder="현재 비밀번호 입력"
+                                    disabled={deletingAccount || deletePasswordChecking}
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+
+                        {googleAuthMember && (
+                            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                {oauthWithdrawVerified
+                                    ? "재인증 확인이 완료되었습니다. 최종 탈퇴를 진행하세요."
+                                    : "먼저 Google 재인증을 진행한 뒤 최종 탈퇴를 진행하세요."}
+                            </div>
+                        )}
+
+                        <div className="mt-6 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={closeDeleteConfirmModal}
+                                disabled={deletingAccount || deletePasswordChecking || oauthReauthLoading}
+                            >
+                                취소
+                            </button>
+                            {googleAuthMember ? (
+                                <button
+                                    type="button"
+                                    className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-60"
+                                    onClick={oauthWithdrawVerified ? handleDeleteAccount : startGoogleWithdrawReauth}
+                                    disabled={deletingAccount || oauthReauthLoading}
+                                >
+                                    {oauthReauthLoading
+                                        ? "Google 재인증 이동 중.."
+                                        : oauthWithdrawVerified
+                                            ? (deletingAccount ? "탈퇴 처리 중.." : "최종 탈퇴")
+                                            : "Google 재인증 시작"}
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-60"
+                                    onClick={handleDeleteAccount}
+                                    disabled={deletingAccount || deletePasswordChecking || !deletePassword.trim()}
+                                >
+                                    {deletePasswordChecking ? "비밀번호 확인 중.." : deletingAccount ? "탈퇴 처리 중.." : "최종 탈퇴"}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
-
 const StatCard = ({ icon: Icon, label, value, color }) => {
     const colorClasses = {
         purple: "from-purple-500 to-purple-600",
@@ -411,7 +588,7 @@ const TabButton = ({ active, onClick, children }) => (
     </button>
 );
 
-const ProfileTab = ({ memberData, levelData, levelHistory, levelHistoryLoading, onDeleteAccount }) => {
+const ProfileTab = ({ memberData, levelData, levelHistory, levelHistoryLoading, onDeleteAccount, deletingAccount }) => {
     const levelProgress = resolveLevelProgressInfo(levelData);
     const progress = levelProgress.progress;
     const currentExp = levelProgress.currentExp;
@@ -425,10 +602,10 @@ const ProfileTab = ({ memberData, levelData, levelHistory, levelHistoryLoading, 
                     기본 정보
                 </h3>
                 <div className="space-y-3">
-                    <InfoRow label="이름" value={memberData.name || "-"} />
-                    <InfoRow label="이메일" value={memberData.email || "-"} />
-                    <InfoRow label="전화번호" value={memberData.phone || "-"} />
-                    <InfoRow label="회원 상태" value={getMemberStatusLabel(memberData)} />
+                    <InfoRow label="Name" value={memberData.name || "-"} />
+                    <InfoRow label="Email" value={memberData.email || "-"} />
+                    <InfoRow label="Phone" value={memberData.phone || "-"} />
+                    <InfoRow label="Member Status" value={getMemberStatusLabel(memberData)} />
                 </div>
             </div>
 
@@ -477,20 +654,21 @@ const ProfileTab = ({ memberData, levelData, levelHistory, levelHistoryLoading, 
                     환경 활동
                 </h3>
                 <div className="space-y-3">
-                    <InfoRow label="포인트" value={`${formatNumber(memberData.point || 0)}P`} />
-                    <InfoRow label="기부한 나무" value={`${formatNumber(memberData.tree_count || memberData.treeCount || 0)}그루`} />
-                    <InfoRow label="작성 게시글" value={`${formatNumber(memberData.board_count || memberData.boardCount || 0)}개`} />
+                    <InfoRow label="Points" value={`${formatNumber(memberData.point || 0)}P`} />
+                    <InfoRow label="Trees Planted" value={`${formatNumber(memberData.tree_count || memberData.treeCount || 0)} trees`} />
+                    <InfoRow label="Posts" value={`${formatNumber(memberData.board_count || memberData.boardCount || 0)} posts`} />
                 </div>
             </div>
 
             <div className="card p-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">계정 관리</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">Account Management</h3>
                 <div className="space-y-3">
                     <button
                         onClick={onDeleteAccount}
-                        className="w-full px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-left font-semibold"
+                        disabled={deletingAccount}
+                        className="w-full px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-left font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        회원 탈퇴
+                        {deletingAccount ? "탈퇴 처리 중.." : "회원 탈퇴"}
                     </button>
                 </div>
             </div>
@@ -595,12 +773,12 @@ const StatsTab = ({ memberData, levelData, levelHistory, levelHistoryLoading }) 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <StatsCard label="레벨" value={levelData.level || 1} color="purple" icon={Award} />
                     <StatsCard
-                        label="총 경험치"
+                        label="Total EXP"
                         value={formatNumber(levelData.total_exp || levelData.totalExp || 0)}
                         color="blue"
                         icon={TrendingUp}
                     />
-                    <StatsCard label="포인트" value={formatNumber(memberData.point || 0)} color="green" icon={TrendingUp} />
+                    <StatsCard label="Points" value={formatNumber(memberData.point || 0)} color="green" icon={TrendingUp} />
                     <StatsCard
                         label="작성 게시글"
                         value={formatNumber(memberData.board_count || memberData.boardCount || 0)}
@@ -608,8 +786,8 @@ const StatsTab = ({ memberData, levelData, levelHistory, levelHistoryLoading }) 
                         icon={MessageSquare}
                     />
                     <StatsCard
-                        label="기부 나무"
-                        value={`${formatNumber(memberData.tree_count || memberData.treeCount || 0)}그루`}
+                        label="Trees Planted"
+                        value={`${formatNumber(memberData.tree_count || memberData.treeCount || 0)} trees`}
                         color="green"
                         icon={TreePine}
                     />
@@ -617,7 +795,7 @@ const StatsTab = ({ memberData, levelData, levelHistory, levelHistoryLoading }) 
             </div>
 
             <div className="card p-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">레벨 진행도</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">Level Progress</h3>
                 <div className="space-y-4">
                     <div>
                         <div className="flex items-center justify-between mb-2">
@@ -673,3 +851,5 @@ const StatsCard = ({ label, value, color, icon: Icon }) => {
         </div>
     );
 };
+
+

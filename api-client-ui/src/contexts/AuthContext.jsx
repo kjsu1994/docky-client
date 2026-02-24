@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import toast from "react-hot-toast";
@@ -129,13 +129,16 @@ export const AuthProvider = ({ children }) => {
         const userData = userResponse.data.data || userResponse.data;
         setUser(withRolesFallback(userData, parseStoredRoles()));
 
-        // text-fixed
+        const postOauthRedirect = localStorage.getItem("postOauthRedirect");
+        if (postOauthRedirect) {
+            localStorage.removeItem("postOauthRedirect");
+            navigate(postOauthRedirect, { replace: true });
+            return;
+        }
+
         try {
-            // text-fixed
             const queueResponse = await api.post("/api/queue/join");
             const queueData = queueResponse.data?.data || queueResponse.data;
-            
-            // text-fixed
             if (queueData.status === "WAITING") {
                 navigate("/queue", { replace: true });
                 return;
@@ -144,7 +147,6 @@ export const AuthProvider = ({ children }) => {
             console.error("Queue join failed, proceeding anyway:", err);
         }
 
-        // text-fixed
         navigate("/app", { replace: true });
     }, [navigate]);
 
