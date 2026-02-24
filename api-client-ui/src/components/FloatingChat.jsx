@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 // SockJS/StompJS compatibility for Vite
 if (typeof global === 'undefined') {
     window.global = window;
@@ -101,6 +101,7 @@ export const FloatingChat = () => {
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
+    const chatRootRef = useRef(null);
     const lastReadMarkAtRef = useRef(0);
     const roomSubscriptionsRef = useRef([]);
     const dragHoldTimerRef = useRef(null);
@@ -631,6 +632,36 @@ export const FloatingChat = () => {
     const membersToList = currentMembers.length > 0 ? currentMembers : getMembers(currentRoom);
     const displayedMembers = memberSearch.trim().length > 0 ? foundMembers : recommendedMembers;
     const totalUnreadCount = rooms.reduce((sum, room) => sum + getUnreadCount(room), 0);
+    const panelMetrics = useMemo(() => {
+        const width = isMinimized ? 288 : Math.min(400, Math.max(280, window.innerWidth - 48));
+        const height = isMinimized ? 64 : 600;
+        return { width, height };
+    }, [isMinimized]);
+    const panelStyle = useMemo(() => {
+        const fabSize = 64;
+        const gap = 16;
+        const viewportPadding = 24;
+        const { width, height } = panelMetrics;
+
+        // 기본은 버튼 위/우측 정렬이며, 화면 경계를 넘으면 뷰포트 내부로 자동 보정한다.
+        const preferredLeft = fabPosition.x + (fabSize - width);
+        const preferredTop = fabPosition.y - gap - height;
+        const clampedLeft = Math.min(
+            Math.max(viewportPadding, preferredLeft),
+            Math.max(viewportPadding, window.innerWidth - width - viewportPadding)
+        );
+        const clampedTop = Math.min(
+            Math.max(viewportPadding, preferredTop),
+            Math.max(viewportPadding, window.innerHeight - height - viewportPadding)
+        );
+
+        return {
+            left: `${clampedLeft - fabPosition.x}px`,
+            top: `${clampedTop - fabPosition.y}px`,
+            width: `${width}px`,
+            height: `${height}px`,
+        };
+    }, [panelMetrics, fabPosition.x, fabPosition.y]);
 
     const getDefaultFabPosition = useCallback(() => {
         const fabSize = 64;
@@ -744,12 +775,25 @@ export const FloatingChat = () => {
         setIsDraggingPanel(false);
     };
 
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleOutsidePointerDown = (e) => {
+            const root = chatRootRef.current;
+            if (!root) return;
+            if (root.contains(e.target)) return;
+            setIsOpen(false);
+        };
+
+        window.addEventListener("pointerdown", handleOutsidePointerDown, true);
+        return () => window.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+    }, [isOpen]);
+
     if (!isAuthenticated) return null;
 
     return (
-        <div className="fixed z-[100] flex flex-col items-end gap-4 pointer-events-none text-slate-900" style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px` }}>
+        <div ref={chatRootRef} className="fixed z-[100] pointer-events-none text-slate-900" style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px` }}>
             {isOpen && (
-                <div className={`pointer-events-auto bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden transition-all duration-500 ${isMinimized ? "h-16 w-72" : "h-[600px] w-[400px] max-w-[calc(100vw-48px)]"}`}>
+                <div style={panelStyle} className="pointer-events-auto absolute rounded-3xl shadow-2xl border border-slate-100 bg-white flex flex-col overflow-hidden transition-all duration-500">
                     <div
                         onPointerDown={handlePanelPointerDown}
                         onPointerMove={handlePanelPointerMove}
@@ -973,6 +1017,7 @@ export const FloatingChat = () => {
         </div>
     );
 };
+
 
 
 
