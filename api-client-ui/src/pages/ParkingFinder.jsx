@@ -90,6 +90,8 @@ export const ParkingFinder = () => {
     const interactionListenersRef = useRef([]);
     const longPressStateRef = useRef({ timerId: null, startX: 0, startY: 0, moved: false });
     const recentPickRef = useRef({ ts: 0, latitude: null, longitude: null });
+    const skipFitBoundsOnceRef = useRef(false);
+    const skipAutoPanOnceRef = useRef(false);
 
     const { isLoaded: mapLoaded, error: mapError } = useNaverMaps();
 
@@ -247,17 +249,35 @@ export const ParkingFinder = () => {
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 toast.dismiss(tid);
-                setCenter({
+                const nextCenter = {
                     latitude: Number(position.coords.latitude.toFixed(6)),
                     longitude: Number(position.coords.longitude.toFixed(6)),
-                });
-                toast.success("현재 위치로 기준점을 변경했습니다.");
+                };
+                const accuracy = Number(position?.coords?.accuracy);
+
+                // 현재 위치 기반 검색 직후 자동 지도 이동(fitBounds/first pan)을 1회 차단.
+                // Prevent one-time auto map move right after current-location update.
+                skipFitBoundsOnceRef.current = true;
+                skipAutoPanOnceRef.current = true;
+
+                setCenter(nextCenter);
+                setPickedCenterMarker(nextCenter.latitude, nextCenter.longitude);
+                if (mapRef.current && window.naver?.maps) {
+                    mapRef.current.setCenter(new window.naver.maps.LatLng(nextCenter.latitude, nextCenter.longitude));
+                    mapRef.current.setZoom(15);
+                }
+
+                if (Number.isFinite(accuracy)) {
+                    toast.success(`현재 위치로 기준점을 변경했습니다. (정확도 ±${Math.round(accuracy)}m)`);
+                } else {
+                    toast.success("현재 위치로 기준점을 변경했습니다.");
+                }
             },
             () => {
                 toast.dismiss(tid);
                 toast.error("위치 권한이 없어 기본 위치(서울시청)를 사용합니다.");
             },
-            { enableHighAccuracy: true, timeout: 7000 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     };
 
@@ -371,6 +391,10 @@ export const ParkingFinder = () => {
         });
 
         if (hasBoundsPoint) {
+            if (skipFitBoundsOnceRef.current) {
+                skipFitBoundsOnceRef.current = false;
+                return;
+            }
             mapRef.current.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
         }
     };
@@ -474,6 +498,11 @@ export const ParkingFinder = () => {
 
     useEffect(() => {
         if (!selectedLotId || !mapRef.current || !window.naver?.maps) return;
+
+        if (skipAutoPanOnceRef.current) {
+            skipAutoPanOnceRef.current = false;
+            return;
+        }
 
         const selected = markersRef.current.find((entry) => String(entry.id) === String(selectedLotId));
         if (!selected) return;
@@ -810,4 +839,3 @@ export const ParkingFinder = () => {
         </div>
     );
 };
-
