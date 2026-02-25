@@ -74,6 +74,7 @@ export const ParkingFinder = () => {
 
     const [loading, setLoading] = useState(false);
     const [locatingByKeyword, setLocatingByKeyword] = useState(false);
+    const [locatingCurrent, setLocatingCurrent] = useState(false);
     const [items, setItems] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
     const [selectedLotId, setSelectedLotId] = useState(null);
@@ -241,10 +242,12 @@ export const ParkingFinder = () => {
     };
 
     const handleLocate = () => {
+        if (locatingCurrent) return;
         if (!navigator.geolocation) {
             toast.error("브라우저 위치 기능을 사용할 수 없습니다.");
             return;
         }
+        setLocatingCurrent(true);
         const tid = toast.loading("현재 위치 확인 중...");
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -272,10 +275,12 @@ export const ParkingFinder = () => {
                 } else {
                     toast.success("현재 위치로 기준점을 변경했습니다.");
                 }
+                setLocatingCurrent(false);
             },
             () => {
                 toast.dismiss(tid);
                 toast.error("위치 권한이 없어 기본 위치(서울시청)를 사용합니다.");
+                setLocatingCurrent(false);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
@@ -565,9 +570,24 @@ export const ParkingFinder = () => {
                     <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
                         <div className="mb-4 flex items-center justify-between">
                             <h2 className="text-lg font-black text-slate-900">검색 조건</h2>
-                            <button onClick={handleLocate} className="rounded-xl bg-primary-50 p-2 text-primary-600 hover:bg-primary-100" title="현재 위치">
-                                <LocateFixed className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleLocate}
+                                    disabled={locatingCurrent}
+                                    className="rounded-xl bg-primary-50 p-2 text-primary-600 hover:bg-primary-100 disabled:opacity-60"
+                                    title="현재 위치"
+                                >
+                                    <LocateFixed className="h-4 w-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleLocate}
+                                    disabled={locatingCurrent}
+                                    className="rounded-xl border border-primary-200 bg-white px-2.5 py-1.5 text-xs font-black text-primary-700 hover:bg-primary-50 disabled:opacity-60"
+                                >
+                                    {locatingCurrent ? "재시도 중..." : "현재 위치 재시도"}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="space-y-3">
