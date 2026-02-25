@@ -241,6 +241,39 @@ export const ParkingFinder = () => {
         });
     }, [keyword]);
 
+    const applyFeeFilter = useCallback((sourceItems) => {
+        if (feeFilter === "all") return sourceItems;
+        if (feeFilter === "free") {
+            return sourceItems.filter((item) => getFeeInfo(item) === "무료");
+        }
+        if (feeFilter === "paid") {
+            return sourceItems.filter((item) => getFeeInfo(item) === "유료");
+        }
+        return sourceItems;
+    }, [feeFilter]);
+
+    const applySort = useCallback((sourceItems) => {
+        const sorted = [...sourceItems];
+        if (sort === "base_fee") {
+            sorted.sort((a, b) => {
+                const aFee = Number(a?.base_fee ?? a?.baseFee);
+                const bFee = Number(b?.base_fee ?? b?.baseFee);
+                const aValue = Number.isFinite(aFee) ? aFee : Number.MAX_SAFE_INTEGER;
+                const bValue = Number.isFinite(bFee) ? bFee : Number.MAX_SAFE_INTEGER;
+                return aValue - bValue;
+            });
+            return sorted;
+        }
+        sorted.sort((a, b) => {
+            const aDistance = Number(a?.distance_km ?? a?.distanceKm);
+            const bDistance = Number(b?.distance_km ?? b?.distanceKm);
+            const aValue = Number.isFinite(aDistance) ? aDistance : Number.MAX_SAFE_INTEGER;
+            const bValue = Number.isFinite(bDistance) ? bDistance : Number.MAX_SAFE_INTEGER;
+            return aValue - bValue;
+        });
+        return sorted;
+    }, [sort]);
+
     const fetchLots = async () => {
         setLoading(true);
         try {
@@ -251,22 +284,13 @@ export const ParkingFinder = () => {
                     latitude: center.latitude,
                     longitude: center.longitude,
                     radius_km: radiusKm,
-                    paid_only: feeFilter === "paid",
-                    sort,
                     limit,
                 },
             });
             const payload = response?.data?.data ?? response?.data ?? {};
             const nextItems = payload?.items ?? [];
             const normalized = Array.isArray(nextItems) ? nextItems : [];
-            const filtered = feeFilter === "free"
-                ? normalized.filter((item) => getFeeInfo(item) === "무료")
-                : normalized;
-            const keywordFiltered = applyKeywordFilter(filtered);
-            setFetchedItems(filtered);
-            setItems(keywordFiltered);
-            setTotalCount(keywordFiltered.length);
-            setSelectedLotId(keywordFiltered.length ? getLotId(keywordFiltered[0]) : null);
+            setFetchedItems(normalized);
         } catch (err) {
             setFetchedItems([]);
             setItems([]);
@@ -453,12 +477,14 @@ export const ParkingFinder = () => {
 
     useEffect(() => {
         fetchLots();
-        // 위치/정렬/요금구분 변경 시 즉시 재조회하여 결과를 바로 반영한다.
+        // 위치 변경 시에만 원본 데이터를 재조회한다.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [center.latitude, center.longitude, sort, feeFilter]);
+    }, [center.latitude, center.longitude]);
 
     useEffect(() => {
-        const keywordFiltered = applyKeywordFilter(fetchedItems);
+        const feeFiltered = applyFeeFilter(fetchedItems);
+        const sorted = applySort(feeFiltered);
+        const keywordFiltered = applyKeywordFilter(sorted);
         setItems(keywordFiltered);
         setTotalCount(keywordFiltered.length);
         setSelectedLotId((prevSelectedLotId) => {
@@ -469,7 +495,7 @@ export const ParkingFinder = () => {
             if (exists) return prevSelectedLotId;
             return keywordFiltered.length ? getLotId(keywordFiltered[0]) : null;
         });
-    }, [applyKeywordFilter, fetchedItems]);
+    }, [applyFeeFilter, applyKeywordFilter, applySort, fetchedItems]);
 
     useEffect(() => {
         if (!mapLoaded || mapRef.current || !mapContainerRef.current || !window.naver?.maps) return;
