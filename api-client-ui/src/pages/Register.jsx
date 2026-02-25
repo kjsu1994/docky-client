@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, Lock, User, Phone } from "lucide-react";
+import { Mail, Lock, User, Phone, MapPin, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../utils/api";
 import toast from "react-hot-toast";
+import { AddressSearchBox } from "../common/AddressSearchBox";
 
 export const Register = () => {
     const [formData, setFormData] = useState({
@@ -12,12 +13,15 @@ export const Register = () => {
         confirmPassword: "",
         name: "",
         phone: "",
+        address: "",
+        addressDetail: "",
     });
     const [loading, setLoading] = useState(false);
     const [checkingEmail, setCheckingEmail] = useState(false);
     const [emailAvailable, setEmailAvailable] = useState(null);
     const [checkedEmail, setCheckedEmail] = useState("");
     const [errors, setErrors] = useState({});
+    const [addressModalOpen, setAddressModalOpen] = useState(false);
     const { register } = useAuth();
     const hasConfirmValue = formData.confirmPassword.length > 0;
     const passwordsMatch = hasConfirmValue && formData.password === formData.confirmPassword;
@@ -161,17 +165,31 @@ export const Register = () => {
 
         setLoading(true);
         try {
+            // 기본주소+상세주소를 하나의 저장 주소로 합쳐서 전송.
+            // Merge base address and detail into a single persisted address field.
+            const mergedAddress = [formData.address, formData.addressDetail]
+                .map((v) => (v || "").trim())
+                .filter(Boolean)
+                .join(" ");
             await register({
                 email: formData.email,
                 password: formData.password,
                 name: formData.name,
                 phone: formData.phone,
+                address: mergedAddress || undefined,
             });
         } catch (error) {
             console.error("Register error:", error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleAddressResolved = ({ address }) => {
+        if (!address) return;
+        setFormData((prev) => ({ ...prev, address }));
+        setAddressModalOpen(false);
+        toast.success("주소가 입력되었습니다.");
     };
 
     return (
@@ -304,6 +322,45 @@ export const Register = () => {
                             {errors.phone && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.phone}</p>}
                         </div>
 
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Address (Optional)</label>
+                            <div className="flex gap-2">
+                                <div className="relative group flex-1">
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <input
+                                        type="text"
+                                        name="address"
+                                        value={formData.address}
+                                        onChange={handleChange}
+                                        className="input-base pl-12 h-14 bg-white font-bold"
+                                        placeholder="주소 검색으로 입력"
+                                        readOnly
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setAddressModalOpen(true)}
+                                    className="h-14 rounded-xl bg-slate-900 px-4 text-xs font-black text-white hover:bg-slate-800"
+                                >
+                                    주소 검색
+                                </button>
+                            </div>
+                            <div className="relative group">
+                                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                <input
+                                    type="text"
+                                    name="addressDetail"
+                                    value={formData.addressDetail}
+                                    onChange={handleChange}
+                                    className="input-base pl-12 h-14 bg-white font-bold"
+                                    placeholder="상세주소 (동/호수/층수 등)"
+                                />
+                            </div>
+                            <p className="mt-1 ml-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                선택 입력 항목입니다.
+                            </p>
+                        </div>
+
                         <button
                             type="submit"
                             disabled={!canSubmit}
@@ -339,6 +396,31 @@ export const Register = () => {
                     </div>
                 </div>
             </div>
+
+            {addressModalOpen && (
+                <div className="fixed inset-0 z-[90] bg-slate-900/45 p-4">
+                    <div className="mx-auto mt-20 w-full max-w-xl rounded-3xl bg-white p-5 shadow-2xl">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-lg font-black text-slate-900">주소 검색</h3>
+                            <button
+                                type="button"
+                                onClick={() => setAddressModalOpen(false)}
+                                className="rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+                                aria-label="주소 검색 닫기"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <AddressSearchBox
+                            onResolved={handleAddressResolved}
+                            placeholder="예: 서울시청, 판교역, 부산역"
+                        />
+                        <div className="mt-3 text-xs font-semibold text-slate-500">
+                            검색 결과를 선택하면 회원가입 주소 입력칸에 자동 반영됩니다.
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

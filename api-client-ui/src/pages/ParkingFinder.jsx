@@ -1,11 +1,12 @@
 ﻿
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Car, LocateFixed, RefreshCw, Search, MapPin, CreditCard, Clock3, DatabaseZap, X } from "lucide-react";
+import { Car, LocateFixed, RefreshCw, Search, CreditCard, Clock3, DatabaseZap, X } from "lucide-react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdminUser } from "../utils/authorization";
+import { AddressSearchBox } from "../common/AddressSearchBox";
 
 const INITIAL_CENTER = { latitude: 37.5665, longitude: 126.9780 };
 
@@ -73,7 +74,6 @@ export const ParkingFinder = () => {
     const [limit, setLimit] = useState(50);
 
     const [loading, setLoading] = useState(false);
-    const [locatingByKeyword, setLocatingByKeyword] = useState(false);
     const [locatingCurrent, setLocatingCurrent] = useState(false);
     const [items, setItems] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
@@ -286,49 +286,22 @@ export const ParkingFinder = () => {
         );
     };
 
-    const handleSetCenterByKeyword = () => {
-        const query = keyword.trim();
-        if (query.length < 2) {
-            toast.error("지역명/주소를 2글자 이상 입력해 주세요.");
-            return;
+    const handleAddressResolved = ({ address, latitude, longitude }) => {
+        const nextCenter = {
+            latitude: Number(latitude.toFixed(6)),
+            longitude: Number(longitude.toFixed(6)),
+        };
+        // 주소 기준 검색 직후 자동 지도 이동(fitBounds/first pan)을 1회 차단.
+        // Prevent one-time auto move after address-based center update.
+        skipFitBoundsOnceRef.current = true;
+        skipAutoPanOnceRef.current = true;
+        setCenter(nextCenter);
+        setPickedCenterMarker(nextCenter.latitude, nextCenter.longitude);
+        if (mapRef.current && window.naver?.maps) {
+            mapRef.current.setCenter(new window.naver.maps.LatLng(nextCenter.latitude, nextCenter.longitude));
+            mapRef.current.setZoom(14);
         }
-        if (!window.naver?.maps?.Service) {
-            toast.error("지도 지오코더가 아직 준비되지 않았습니다.");
-            return;
-        }
-
-        setLocatingByKeyword(true);
-        // 주소/지명 키워드로 중심 좌표를 바꾸고 기존 반경 검색 플로우를 재사용.
-        // Resolve keyword to map center, then reuse existing radius-based search flow.
-        window.naver.maps.Service.geocode({ query }, (status, response) => {
-            setLocatingByKeyword(false);
-            if (status !== window.naver.maps.Service.Status.OK || !response?.v2?.addresses?.length) {
-                toast.error("해당 키워드의 위치를 찾지 못했습니다.");
-                return;
-            }
-            const item = response.v2.addresses[0];
-            const latitude = Number(item.y);
-            const longitude = Number(item.x);
-            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-                toast.error("좌표 변환에 실패했습니다.");
-                return;
-            }
-
-            const nextCenter = {
-                latitude: Number(latitude.toFixed(6)),
-                longitude: Number(longitude.toFixed(6)),
-            };
-            // 위치 키워드는 중심 이동에 사용하고, 이후 검색은 주변 목록 위주로 보이게 필터 문자열을 비운다.
-            // Use keyword for geocoding center, then clear text filter to show nearby lots broadly.
-            setKeyword("");
-            setCenter(nextCenter);
-            setPickedCenterMarker(nextCenter.latitude, nextCenter.longitude);
-            if (mapRef.current && window.naver?.maps) {
-                mapRef.current.setCenter(new window.naver.maps.LatLng(nextCenter.latitude, nextCenter.longitude));
-                mapRef.current.setZoom(14);
-            }
-            toast.success(`"${query}" 기준 위치로 이동했습니다. 주변 주차장을 불러옵니다.`);
-        });
+        toast.success(`"${address}" 기준 위치로 이동했습니다.`);
     };
 
     const handleImport = async () => {
@@ -557,9 +530,9 @@ export const ParkingFinder = () => {
                         <Car className="h-7 w-7" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black tracking-tight">주차장 찾기 + 요금비교</h1>
+                        <h1 className="text-3xl font-black tracking-tight">주차장 요금비교</h1>
                         <p className="text-sm font-semibold text-slate-200">
-                            현재 위치 반경 검색, 요금비교, 지도 마커 연동을 제공합니다.
+                            현재 위치 반경 검색, 요금비교, 지도 마커 연동을 제공합니다. [우클릭 또는 길게 터치하여 위치를 선택하세요]
                         </p>
                     </div>
                 </div>
@@ -591,7 +564,11 @@ export const ParkingFinder = () => {
                         </div>
 
                         <div className="space-y-3">
-                            <label className="block text-xs font-black uppercase tracking-wider text-slate-400">키워드</label>
+                            <AddressSearchBox
+                                onResolved={handleAddressResolved}
+                                placeholder="예: 서울시청, 강남역, 판교역"
+                            />
+                            <label className="block text-xs font-black uppercase tracking-wider text-slate-400">주차장 키워드</label>
                             <div className="relative">
                                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                                 <input
@@ -602,15 +579,6 @@ export const ParkingFinder = () => {
                                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm"
                                 />
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleSetCenterByKeyword}
-                                disabled={locatingByKeyword}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-primary-200 disabled:opacity-60"
-                            >
-                                <MapPin className="h-4 w-4" />
-                                {locatingByKeyword ? "위치 찾는 중..." : "검색"}
-                            </button>
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
