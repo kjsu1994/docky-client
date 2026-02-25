@@ -97,8 +97,19 @@ export const ParkingFinder = () => {
 
     const { isLoaded: mapLoaded, error: mapError } = useNaverMaps();
 
+    useEffect(() => {
+        window.__parkingFinderOpenLotDetail = (lotId) => {
+            setSelectedLotId(lotId);
+            setMobileDetailOpen(true);
+        };
+        return () => {
+            delete window.__parkingFinderOpenLotDetail;
+        };
+    }, []);
+
     const clearMarkers = () => {
         markersRef.current.forEach((entry) => {
+            if (entry?.infoWindow) entry.infoWindow.close();
             if (entry?.marker) entry.marker.setMap(null);
         });
         markersRef.current = [];
@@ -107,6 +118,12 @@ export const ParkingFinder = () => {
             selectedMarkerRef.current = null;
         }
     };
+
+    const closeAllInfoWindows = useCallback(() => {
+        markersRef.current.forEach((entry) => {
+            if (entry?.infoWindow) entry.infoWindow.close();
+        });
+    }, []);
 
     const handleSelectLotFromList = (id) => {
         setSelectedLotId(id);
@@ -407,10 +424,11 @@ export const ParkingFinder = () => {
 
             const infoWindow = new window.naver.maps.InfoWindow({
                 content: `
-                    <div style="padding:10px;min-width:200px;font-family:Arial,sans-serif;">
+                    <button type="button" onclick="window.__parkingFinderOpenLotDetail && window.__parkingFinderOpenLotDetail('${id}')" style="padding:10px;min-width:200px;border:0;background:#fff;text-align:left;cursor:pointer;font-family:Arial,sans-serif;">
                       <div style="font-weight:800;font-size:13px;color:#0f172a;">${item?.parking_name ?? item?.parkingName ?? "주차장"}</div>
                       <div style="font-size:11px;color:#64748b;margin-top:4px;">${item?.road_address ?? item?.roadAddress ?? item?.lot_address ?? item?.lotAddress ?? "주소 없음"}</div>
-                    </div>
+                      <div style="font-size:10px;color:#2563eb;margin-top:6px;font-weight:700;">터치해서 상세 보기</div>
+                    </button>
                 `,
             });
 
@@ -435,8 +453,9 @@ export const ParkingFinder = () => {
 
     useEffect(() => {
         fetchLots();
+        // 위치/정렬/요금구분 변경 시 즉시 재조회하여 결과를 바로 반영한다.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [center.latitude, center.longitude]);
+    }, [center.latitude, center.longitude, sort, feeFilter]);
 
     useEffect(() => {
         const keywordFiltered = applyKeywordFilter(fetchedItems);
@@ -472,6 +491,11 @@ export const ParkingFinder = () => {
         });
         interactionListenersRef.current.push(rightClickListener);
 
+        const clickListener = window.naver.maps.Event.addListener(mapRef.current, "click", () => {
+            closeAllInfoWindows();
+        });
+        interactionListenersRef.current.push(clickListener);
+
         const longTapListener = window.naver.maps.Event.addListener(mapRef.current, "longtap", (event) => {
             applyPickedCenter(event?.coord, "길게 누르기");
         });
@@ -480,7 +504,7 @@ export const ParkingFinder = () => {
         return () => {
             clearInteractionListeners();
         };
-    }, [applyPickedCenter, clearInteractionListeners, mapLoaded]);
+    }, [applyPickedCenter, closeAllInfoWindows, clearInteractionListeners, mapLoaded]);
 
     useEffect(() => {
         if (!mapLoaded || !mapRef.current || !mapContainerRef.current) return;
@@ -642,7 +666,6 @@ export const ParkingFinder = () => {
                                 primaryAction="postcode"
                                 secondaryAction="resolve"
                             />
-                            <label className="block text-xs font-black uppercase tracking-wider text-slate-400">검색 옵션</label>
                             <div className="relative">
                                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                                 <input
@@ -856,7 +879,7 @@ export const ParkingFinder = () => {
             </div>
 
             {mobileDetailOpen && selectedItem && (
-                <div className="fixed inset-0 z-[70] bg-slate-900/55 p-3 lg:hidden">
+                <div className="fixed inset-0 z-[9999] bg-slate-900/55 p-3 lg:hidden">
                     <div className="h-full w-full overflow-auto rounded-3xl bg-white p-5 shadow-2xl">
                         <div className="mb-4 flex items-center justify-between">
                             <h2 className="text-lg font-black text-slate-900">주차장 상세</h2>
