@@ -68,13 +68,14 @@ export const ParkingFinder = () => {
 
     const [center, setCenter] = useState(INITIAL_CENTER);
     const [keyword, setKeyword] = useState("");
-    const [radiusKm, setRadiusKm] = useState(3);
+    const [radiusKmInput, setRadiusKmInput] = useState("3");
     const [feeFilter, setFeeFilter] = useState("all");
     const [sort, setSort] = useState("distance");
-    const [limit, setLimit] = useState(50);
+    const [limitInput, setLimitInput] = useState("50");
 
     const [loading, setLoading] = useState(false);
     const [locatingCurrent, setLocatingCurrent] = useState(false);
+    const [fetchedItems, setFetchedItems] = useState([]);
     const [items, setItems] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
     const [selectedLotId, setSelectedLotId] = useState(null);
@@ -201,17 +202,39 @@ export const ParkingFinder = () => {
         applyPickedCenter(coord, modeLabel);
     }, [applyPickedCenter]);
 
+    const parseRadiusKm = useCallback(() => {
+        const numeric = Number(radiusKmInput);
+        if (!Number.isFinite(numeric)) return 3;
+        return Math.max(0, Math.min(30, numeric));
+    }, [radiusKmInput]);
+
+    const parseLimit = useCallback(() => {
+        const numeric = Number(limitInput);
+        if (!Number.isFinite(numeric)) return 50;
+        const integer = Math.trunc(numeric);
+        return Math.max(1, Math.min(200, integer));
+    }, [limitInput]);
+
+    const applyKeywordFilter = useCallback((sourceItems) => {
+        const keywordValue = keyword.trim().toLowerCase();
+        if (!keywordValue) return sourceItems;
+        return sourceItems.filter((item) => {
+            const parkingName = (item?.parking_name ?? item?.parkingName ?? "").toLowerCase();
+            return parkingName.includes(keywordValue);
+        });
+    }, [keyword]);
+
     const fetchLots = async () => {
         setLoading(true);
         try {
-            const keywordValue = keyword.trim();
+            const radiusKm = parseRadiusKm();
+            const limit = parseLimit();
             const response = await api.get("/parking/lots", {
                 params: {
                     latitude: center.latitude,
                     longitude: center.longitude,
                     radius_km: radiusKm,
                     paid_only: feeFilter === "paid",
-                    keyword: keywordValue || undefined,
                     sort,
                     limit,
                 },
@@ -222,10 +245,13 @@ export const ParkingFinder = () => {
             const filtered = feeFilter === "free"
                 ? normalized.filter((item) => getFeeInfo(item) === "무료")
                 : normalized;
-            setItems(filtered);
-            setTotalCount(filtered.length);
-            setSelectedLotId(filtered.length ? getLotId(filtered[0]) : null);
+            const keywordFiltered = applyKeywordFilter(filtered);
+            setFetchedItems(filtered);
+            setItems(keywordFiltered);
+            setTotalCount(keywordFiltered.length);
+            setSelectedLotId(keywordFiltered.length ? getLotId(keywordFiltered[0]) : null);
         } catch (err) {
+            setFetchedItems([]);
             setItems([]);
             setTotalCount(0);
             setSelectedLotId(null);
@@ -239,6 +265,36 @@ export const ParkingFinder = () => {
         if (event.key !== "Enter" || event.nativeEvent?.isComposing) return;
         event.preventDefault();
         fetchLots();
+    };
+
+    const handleRadiusInputChange = (event) => {
+        const nextValue = event.target.value;
+        if (/^\d*\.?\d*$/.test(nextValue)) {
+            setRadiusKmInput(nextValue);
+        }
+    };
+
+    const handleRadiusInputBlur = () => {
+        if (!radiusKmInput.trim()) {
+            setRadiusKmInput("3");
+            return;
+        }
+        setRadiusKmInput(String(parseRadiusKm()));
+    };
+
+    const handleLimitInputChange = (event) => {
+        const nextValue = event.target.value;
+        if (/^\d*$/.test(nextValue)) {
+            setLimitInput(nextValue);
+        }
+    };
+
+    const handleLimitInputBlur = () => {
+        if (!limitInput.trim()) {
+            setLimitInput("50");
+            return;
+        }
+        setLimitInput(String(parseLimit()));
     };
 
     const handleLocate = () => {
@@ -381,6 +437,20 @@ export const ParkingFinder = () => {
         fetchLots();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [center.latitude, center.longitude]);
+
+    useEffect(() => {
+        const keywordFiltered = applyKeywordFilter(fetchedItems);
+        setItems(keywordFiltered);
+        setTotalCount(keywordFiltered.length);
+        setSelectedLotId((prevSelectedLotId) => {
+            if (prevSelectedLotId == null) {
+                return keywordFiltered.length ? getLotId(keywordFiltered[0]) : null;
+            }
+            const exists = keywordFiltered.some((item) => String(getLotId(item)) === String(prevSelectedLotId));
+            if (exists) return prevSelectedLotId;
+            return keywordFiltered.length ? getLotId(keywordFiltered[0]) : null;
+        });
+    }, [applyKeywordFilter, fetchedItems]);
 
     useEffect(() => {
         if (!mapLoaded || mapRef.current || !mapContainerRef.current || !window.naver?.maps) return;
@@ -567,6 +637,10 @@ export const ParkingFinder = () => {
                             <AddressSearchBox
                                 onResolved={handleAddressResolved}
                                 placeholder="예: 서울시청, 강남역, 판교역"
+                                primaryButtonLabel="주소찾기"
+                                secondaryButtonLabel="조회"
+                                primaryAction="postcode"
+                                secondaryAction="resolve"
                             />
                             <label className="block text-xs font-black uppercase tracking-wider text-slate-400">주차장 키워드</label>
                             <div className="relative">
@@ -575,7 +649,7 @@ export const ParkingFinder = () => {
                                     value={keyword}
                                     onChange={(e) => setKeyword(e.target.value)}
                                     onKeyDown={handleSearchEnter}
-                                    placeholder="주차장명/주소"
+                                    placeholder="주차장명"
                                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm"
                                 />
                             </div>
@@ -583,11 +657,11 @@ export const ParkingFinder = () => {
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-slate-400">반경(km)</label>
-                                    <input type="number" min={0} max={30} value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
+                                    <input type="text" inputMode="decimal" value={radiusKmInput} onChange={handleRadiusInputChange} onBlur={handleRadiusInputBlur} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-slate-400">최대개수</label>
-                                    <input type="number" min={1} max={200} value={limit} onChange={(e) => setLimit(Number(e.target.value))} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
+                                    <input type="text" inputMode="numeric" value={limitInput} onChange={handleLimitInputChange} onBlur={handleLimitInputBlur} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
                                 </div>
                             </div>
 

@@ -3,14 +3,42 @@ import { MapPin, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 
+const loadDaumPostcodeScript = () =>
+    new Promise((resolve, reject) => {
+        if (window?.daum?.Postcode) {
+            resolve();
+            return;
+        }
+
+        const existing = document.querySelector('script[data-daum-postcode="true"]');
+        if (existing) {
+            existing.addEventListener("load", () => resolve(), { once: true });
+            existing.addEventListener("error", () => reject(new Error("Daum postcode load failed")), { once: true });
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+        script.async = true;
+        script.dataset.daumPostcode = "true";
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Daum postcode load failed"));
+        document.body.appendChild(script);
+    });
+
 export const AddressSearchBox = ({
     onResolved,
-    placeholder = "주소/지역명 입력",
+    placeholder = "주소/지명 입력",
     className = "",
+    primaryButtonLabel = "주소찾기",
+    secondaryButtonLabel = "우편번호 검색",
+    primaryAction = "resolve",
+    secondaryAction = "postcode",
 }) => {
     const [query, setQuery] = useState("");
     const [loadingSuggest, setLoadingSuggest] = useState(false);
     const [loadingResolve, setLoadingResolve] = useState(false);
+    const [loadingPostcode, setLoadingPostcode] = useState(false);
     const [suggestions, setSuggestions] = useState([]);
     const [open, setOpen] = useState(false);
     const rootRef = useRef(null);
@@ -60,8 +88,10 @@ export const AddressSearchBox = ({
     }, [query]);
 
     const canSearch = useMemo(() => query.trim().length >= 2, [query]);
+    const primaryIsResolve = primaryAction === "resolve";
+    const secondaryIsResolve = secondaryAction === "resolve";
 
-    const resolveAddress = async (address) => {
+    const resolveAddress = async (address, additional = {}) => {
         if (!address || loadingResolve) return;
         setLoadingResolve(true);
         try {
@@ -74,12 +104,14 @@ export const AddressSearchBox = ({
             if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
                 throw new Error("Invalid coordinates");
             }
-            setQuery(payload?.address || address);
+            const normalizedAddress = payload?.address || address;
+            setQuery(normalizedAddress);
             setOpen(false);
             onResolved?.({
-                address: payload?.address || address,
-                roadAddress: payload?.road_address ?? payload?.roadAddress ?? null,
-                jibunAddress: payload?.jibun_address ?? payload?.jibunAddress ?? null,
+                address: normalizedAddress,
+                roadAddress: payload?.road_address ?? payload?.roadAddress ?? additional.roadAddress ?? null,
+                jibunAddress: payload?.jibun_address ?? payload?.jibunAddress ?? additional.jibunAddress ?? null,
+                zonecode: additional.zonecode ?? null,
                 latitude,
                 longitude,
             });
@@ -89,6 +121,61 @@ export const AddressSearchBox = ({
             setLoadingResolve(false);
         }
     };
+
+    const openDaumPostcode = async () => {
+        if (loadingPostcode || loadingResolve) return;
+        setLoadingPostcode(true);
+        try {
+            await loadDaumPostcodeScript();
+            new window.daum.Postcode({
+                oncomplete: (data) => {
+                    const selectedAddress = data?.roadAddress || data?.jibunAddress || data?.address || "";
+                    if (!selectedAddress) {
+                        toast.error("주소를 선택하지 못했습니다.");
+                        return;
+                    }
+                    setQuery(selectedAddress);
+                    setOpen(false);
+                    resolveAddress(selectedAddress, {
+                        roadAddress: data?.roadAddress || null,
+                        jibunAddress: data?.jibunAddress || null,
+                        zonecode: data?.zonecode || null,
+                    });
+                },
+            }).open();
+        } catch (err) {
+            toast.error("우편번호 서비스를 불러오지 못했습니다.");
+        } finally {
+            setLoadingPostcode(false);
+        }
+    };
+
+    const runPrimaryAction = () => {
+        if (primaryIsResolve) {
+            resolveAddress(query.trim());
+            return;
+        }
+        openDaumPostcode();
+    };
+
+    const runSecondaryAction = () => {
+        if (secondaryIsResolve) {
+            resolveAddress(query.trim());
+            return;
+        }
+        openDaumPostcode();
+    };
+
+    const primaryDisabled = primaryIsResolve
+        ? (!canSearch || loadingResolve)
+        : (loadingPostcode || loadingResolve);
+    const secondaryDisabled = secondaryIsResolve
+        ? (!canSearch || loadingResolve)
+        : (loadingPostcode || loadingResolve);
+    const primaryLoadingText = primaryIsResolve ? "검색중..." : "LOADING...";
+    const secondaryLoadingText = secondaryIsResolve ? "조회중..." : "LOADING...";
+    const primaryLoading = primaryIsResolve ? loadingResolve : loadingPostcode;
+    const secondaryLoading = secondaryIsResolve ? loadingResolve : loadingPostcode;
 
     return (
         <div ref={rootRef} className={`relative ${className}`}>
@@ -106,11 +193,22 @@ export const AddressSearchBox = ({
                 />
                 <button
                     type="button"
-                    onClick={() => resolveAddress(query.trim())}
-                    disabled={!canSearch || loadingResolve}
+                    onClick={runPrimaryAction}
+                    disabled={primaryDisabled}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-60"
                 >
-                    {loadingResolve ? "검색중..." : "주소찾기"}
+                    {primaryLoading ? primaryLoadingText : primaryButtonLabel}
+                </button>
+            </div>
+
+            <div className="mt-2 flex justify-end">
+                <button
+                    type="button"
+                    onClick={runSecondaryAction}
+                    disabled={secondaryDisabled}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                    {secondaryLoading ? secondaryLoadingText : secondaryButtonLabel}
                 </button>
             </div>
 
@@ -134,9 +232,9 @@ export const AddressSearchBox = ({
                                 >
                                     <div className="text-sm font-bold text-slate-800">{address}</div>
                                     <div className="mt-0.5 text-xs text-slate-500">
-                                        {road && `도로명: ${road}`}
+                                        {road && `도로명 ${road}`}
                                         {road && jibun && " | "}
-                                        {jibun && `지번: ${jibun}`}
+                                        {jibun && `지번 ${jibun}`}
                                     </div>
                                 </button>
                             );
