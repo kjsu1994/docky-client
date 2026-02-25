@@ -245,7 +245,7 @@ export const AddressSearchBox = ({
 
             <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-400">
                 <Search className="h-3 w-3" />
-                2글자 이상 입력하면 추천 주소를 제공합니다.
+                검색 옵션
             </div>
         </div>
     );
