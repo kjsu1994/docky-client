@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LoadingPage } from "./components/LoadingSpinner";
@@ -17,7 +17,7 @@ import { Statistics } from "./pages/Statistics.jsx";
 import { LuckyPlinko } from "./pages/LuckyPlinko.jsx";
 import { Queue } from "./pages/Queue.jsx";
 import { MeetingOptimizer } from "./pages/MeetingOptimizer.jsx";
-import { ParkingFinder } from "./pages/ParkingFinder.jsx";
+import { FacilityFinder } from "./pages/FacilityFinder.jsx";
 import { AdminAnomalies } from "./pages/AdminAnomalies.jsx";
 import { AdminOperations } from "./pages/AdminOperations.jsx";
 import { Chat } from "./pages/Chat.jsx";
@@ -83,7 +83,7 @@ function App() {
                     <Route path="/app/mypage/edit" element={<ProtectedRoute><AppLayout><MypageEdit /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/plinko" element={<ProtectedRoute><AppLayout><LuckyPlinko /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/optimizer" element={<ProtectedRoute><AppLayout><MeetingOptimizer /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/parking" element={<ProtectedRoute><AppLayout><ParkingFinder /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/facility" element={<ProtectedRoute><AppLayout><FacilityFinder /></AppLayout></ProtectedRoute>} />                    <Route path="/app/parking" element={<Navigate to="/app/facility" replace />} />
                     <Route path="/app/admin/anomalies" element={<ProtectedRoute><AppLayout><AdminAnomalies /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/admin/operations" element={<ProtectedRoute><AppLayout><AdminOperations /></AppLayout></ProtectedRoute>} />
 
@@ -114,5 +114,7 @@ function App() {
 }
 
 export default App;
+
+
 
 

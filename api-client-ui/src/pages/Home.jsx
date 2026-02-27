@@ -423,7 +423,7 @@ export const Home = () => {
                 </div>
                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5">
                     <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" />
-                    <QuickMenuLink to="/app/parking" icon={Car} title="주차장 찾기" color="sky" />
+                    <QuickMenuLink to="/app/facility" icon={Car} title="편의시설 찾기" color="sky" />
                     <QuickMenuLink to="/app/ranks" icon={Trophy} title="랭킹" color="amber" />
                     <QuickMenuLink to="/app/plinko" icon={Dices} title="플링코" color="emerald" />
                     <QuickMenuLink to="/app/news" icon={Newspaper} title="뉴스" color="indigo" />
@@ -547,4 +547,5 @@ const QuickMenuLink = ({ to, icon: Icon, title, color }) => {
 };
 
 export default Home;
+
 

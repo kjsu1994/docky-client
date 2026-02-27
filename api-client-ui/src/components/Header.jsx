@@ -66,7 +66,7 @@ export const Header = () => {
                 title: "Tools",
                 items: [
                     { title: "중간장소", to: "/app/optimizer", icon: MapPin },
-                    { title: "주차장 찾기", to: "/app/parking", icon: Car },
+                    { title: "편의시설 찾기", to: "/app/facility", icon: Car },
                     { title: "순위", to: "/app/ranks", icon: Trophy },
                     { title: "플린코", to: "/app/plinko", icon: Dices },
                     { title: "뉴스", to: "/app/news", icon: Newspaper },
@@ -210,3 +210,4 @@ export const Header = () => {
         </header>
     );
 };
+
