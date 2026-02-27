@@ -260,6 +260,7 @@ export const RestroomFinder = () => {
         mapRef.current = new window.naver.maps.Map(mapContainerRef.current, {
             center: new window.naver.maps.LatLng(center.latitude, center.longitude),
             zoom: 14,
+            mapTypeControl: true,
         });
         setPickedCenterMarker(center.latitude, center.longitude);
 
@@ -338,6 +339,7 @@ export const RestroomFinder = () => {
             const lat = Number(item?.latitude);
             const lng = Number(item?.longitude);
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            const safeId = String(id ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
             const position = new window.naver.maps.LatLng(lat, lng);
             const marker = new window.naver.maps.Marker({
@@ -352,7 +354,10 @@ export const RestroomFinder = () => {
 
             const infoWindow = new window.naver.maps.InfoWindow({
                 content: `
-                    <button type="button" onclick="window.__restroomFinderOpenLotDetail && window.__restroomFinderOpenLotDetail('${id}')" style="padding:10px;min-width:210px;border:0;background:#fff;text-align:left;cursor:pointer;font-family:Arial,sans-serif;">
+                    <button type="button"
+                      onclick="window.__restroomFinderOpenLotDetail && window.__restroomFinderOpenLotDetail('${safeId}')"
+                      ontouchend="window.__restroomFinderOpenLotDetail && window.__restroomFinderOpenLotDetail('${safeId}')"
+                      style="padding:10px;min-width:210px;border:0;background:#fff;text-align:left;cursor:pointer;font-family:Arial,sans-serif;">
                       <div style="font-weight:800;font-size:13px;color:#0f172a;">${item?.restroom_name ?? item?.restroomName ?? "화장실"}</div>
                       <div style="font-size:11px;color:#64748b;margin-top:4px;">${item?.road_address ?? item?.roadAddress ?? item?.lot_address ?? item?.lotAddress ?? "주소 없음"}</div>
                       <div style="font-size:10px;color:#0891b2;margin-top:6px;font-weight:700;">터치해서 상세 보기</div>

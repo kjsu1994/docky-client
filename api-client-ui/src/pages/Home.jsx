@@ -101,6 +101,7 @@ export const Home = () => {
 
     const impressionSentRef = useRef(new Set());
     const adsenseInitializedRef = useRef(false);
+    const touchStartRef = useRef({ x: 0, y: 0 });
 
     const bannerCount = heroBanners.length;
     
@@ -131,12 +132,29 @@ export const Home = () => {
     const handleNext = () => {
         if (bannerCount <= 1) return;
         setIsTransitioning(true);
-        setCurrentIndex((prev) => prev + 1);
+        setCurrentIndex((prev) => {
+            // 복제 슬라이드(마지막 index)에서 transition reset 전에 추가 이동이 겹치면
+            // index overflow로 빈 화면이 보일 수 있어 상한을 고정한다.
+            if (prev >= bannerCount) return prev;
+            return prev + 1;
+        });
+    };
+
+    const handlePrev = () => {
+        if (bannerCount <= 1) return;
+        // 첫 배너에서 이전 스와이프 시 끝 배너로 자연스럽게 이동시키기 위한 보정.
+        if (currentIndex === 0) {
+            setIsTransitioning(false);
+            setCurrentIndex(bannerCount - 1);
+            return;
+        }
+        setIsTransitioning(true);
+        setCurrentIndex((prev) => prev - 1);
     };
 
     const handleTransitionEnd = () => {
         if (bannerCount <= 1) return;
-        if (currentIndex === bannerCount) {
+        if (currentIndex >= bannerCount) {
             setIsTransitioning(false);
             setCurrentIndex(0);
         }
@@ -296,7 +314,25 @@ export const Home = () => {
 
     return (
         <div className="space-y-10 animate-fade-in pb-10">
-            <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white shadow-2xl shadow-slate-200/70">
+            <section
+                className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white shadow-2xl shadow-slate-200/70"
+                onTouchStart={(e) => {
+                    const touch = e.touches?.[0];
+                    if (!touch) return;
+                    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+                }}
+                onTouchEnd={(e) => {
+                    const touch = e.changedTouches?.[0];
+                    if (!touch || bannerCount <= 1) return;
+                    const deltaX = touch.clientX - touchStartRef.current.x;
+                    const deltaY = touch.clientY - touchStartRef.current.y;
+                    const minSwipeDistance = 40;
+                    const isHorizontalSwipe = Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > Math.abs(deltaY);
+                    if (!isHorizontalSwipe) return;
+                    if (deltaX < 0) handleNext();
+                    if (deltaX > 0) handlePrev();
+                }}
+            >
                 <div
                     className={`flex flex-nowrap min-w-full ${isTransitioning ? "transition-transform duration-700 ease-in-out" : ""}`}
                     style={{ 
