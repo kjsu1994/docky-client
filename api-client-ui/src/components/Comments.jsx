@@ -16,6 +16,7 @@ export const Comments = ({ boardId, onUpdate }) => {
     const [editContent, setEditContent] = useState("");
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
+    const [likingCommentIds, setLikingCommentIds] = useState({});
     const lastFetchedIdRef = useRef(null);
 
     // [추가] 해당 게시글의 댓글 목록을 서버에서 불러오는 함수
@@ -156,21 +157,55 @@ export const Comments = ({ boardId, onUpdate }) => {
 
     // 댓글 좋아요
     const handleLikeComment = async (commentId) => {
-        try {
-            await api.post(`/comments/${commentId}/Like`);
+        if (!commentId) return;
+        if (likingCommentIds[commentId]) return;
 
-            // 로컬 상태 즉시 반영 (낙관적 업데이트)
-            setComments(prev =>
-                prev.map(c =>
+        const target = comments.find((c) => (c.comment_id || c.commentId) === commentId);
+        if (!target) return;
+        const prevLikeCount = target.like_count ?? target.likeCount ?? 0;
+
+        setLikingCommentIds((prev) => ({ ...prev, [commentId]: true }));
+        setComments((prev) =>
+            prev.map((c) =>
+                (c.comment_id || c.commentId) === commentId
+                    ? { ...c, like_count: prevLikeCount + 1, likeCount: prevLikeCount + 1 }
+                    : c
+            )
+        );
+
+        try {
+            const response = await api.post(`/comments/${commentId}/Like`);
+            const updatedData = response.data?.data || response.data || {};
+            const nextLikeCount = updatedData.like_count !== undefined ? updatedData.like_count : updatedData.likeCount;
+
+            setComments((prev) =>
+                prev.map((c) =>
                     (c.comment_id || c.commentId) === commentId
-                        ? { ...c, like_count: (c.like_count || c.likeCount || 0) + 1 }
+                        ? {
+                            ...c,
+                            like_count: nextLikeCount !== undefined ? nextLikeCount : prevLikeCount + 1,
+                            likeCount: nextLikeCount !== undefined ? nextLikeCount : prevLikeCount + 1,
+                        }
                         : c
                 )
             );
-            toast.success("좋아요를 눌렀습니다.");
+            toast.success("좋아요 상태가 반영되었습니다.");
         } catch (error) {
+            setComments((prev) =>
+                prev.map((c) =>
+                    (c.comment_id || c.commentId) === commentId
+                        ? { ...c, like_count: prevLikeCount, likeCount: prevLikeCount }
+                        : c
+                )
+            );
             console.error("Failed to like comment:", error);
-            toast.error(error.response?.data?.message || "좋아요에 실패했습니다.");
+            toast.error(error.response?.data?.message || "좋아요 처리에 실패했습니다.");
+        } finally {
+            setLikingCommentIds((prev) => {
+                const next = { ...prev };
+                delete next[commentId];
+                return next;
+            });
         }
     };
 
@@ -306,6 +341,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                     <div className="flex items-center gap-4 ml-14">
                                         <button
                                             onClick={() => handleLikeComment(commentId)}
+                                            disabled={Boolean(likingCommentIds[commentId])}
                                             className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-500 transition-colors group"
                                         >
                                             <Heart className={`h-4 w-4 group-hover:fill-red-500`} />

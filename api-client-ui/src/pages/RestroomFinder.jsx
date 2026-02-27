@@ -498,7 +498,14 @@ export const RestroomFinder = () => {
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
                 <div className="lg:col-span-4 space-y-4">
                     <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm space-y-3">
-                        <AddressSearchBox onResolved={handleAddressResolved} placeholder="주소를 검색해 기준 위치 설정" compact />
+                        <AddressSearchBox
+                            onResolved={handleAddressResolved}
+                            placeholder="예: 서울시청, 강남역, 판교역"
+                            primaryButtonLabel="주소찾기"
+                            secondaryButtonLabel="조회"
+                            primaryAction="postcode"
+                            secondaryAction="resolve"
+                        />
                         <div className="grid grid-cols-2 gap-2">
                             <button onClick={handleLocate} disabled={locatingCurrent} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-black text-slate-700 disabled:opacity-60"><LocateFixed className="h-3.5 w-3.5" />내 위치</button>
                             <button onClick={fetchLots} disabled={loading} className="flex items-center justify-center gap-1 rounded-xl bg-primary-600 px-3 py-2.5 text-xs font-black text-white disabled:opacity-60">{loading ? <LoadingSpinner size="sm" text="" /> : <Search className="h-3.5 w-3.5" />}검색</button>

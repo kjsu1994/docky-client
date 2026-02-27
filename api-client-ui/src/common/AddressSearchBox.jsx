@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
@@ -41,7 +41,10 @@ export const AddressSearchBox = ({
     const [loadingPostcode, setLoadingPostcode] = useState(false);
     const [suggestions, setSuggestions] = useState([]);
     const [open, setOpen] = useState(false);
+    const [isComposing, setIsComposing] = useState(false);
+
     const rootRef = useRef(null);
+    const lastSuggestedKeywordRef = useRef("");
 
     useEffect(() => {
         const onClickOutside = (event) => {
@@ -55,19 +58,28 @@ export const AddressSearchBox = ({
 
     useEffect(() => {
         const keyword = query.trim();
+
         if (keyword.length < 2) {
             setSuggestions([]);
+            lastSuggestedKeywordRef.current = "";
+            return;
+        }
+
+        if (lastSuggestedKeywordRef.current === keyword) {
             return;
         }
 
         let cancelled = false;
         const tid = setTimeout(async () => {
             setLoadingSuggest(true);
+            lastSuggestedKeywordRef.current = keyword;
+
             try {
                 const response = await api.get("/addresses/suggest", {
-                    params: { query: keyword, limit: 8 },
+                    params: { query: keyword, limit: 5 },
                 });
                 if (cancelled) return;
+
                 const payload = response?.data?.data ?? response?.data ?? {};
                 const items = Array.isArray(payload?.items) ? payload.items : [];
                 setSuggestions(items);
@@ -77,15 +89,17 @@ export const AddressSearchBox = ({
                     setSuggestions([]);
                 }
             } finally {
-                if (!cancelled) setLoadingSuggest(false);
+                if (!cancelled) {
+                    setLoadingSuggest(false);
+                }
             }
-        }, 250);
+        }, 350);
 
         return () => {
             cancelled = true;
             clearTimeout(tid);
         };
-    }, [query]);
+    }, [query, isComposing]);
 
     const canSearch = useMemo(() => query.trim().length >= 2, [query]);
     const primaryIsResolve = primaryAction === "resolve";
@@ -93,6 +107,7 @@ export const AddressSearchBox = ({
 
     const resolveAddress = async (address, additional = {}) => {
         if (!address || loadingResolve) return;
+
         setLoadingResolve(true);
         try {
             const response = await api.get("/addresses/geocode", {
@@ -101,12 +116,17 @@ export const AddressSearchBox = ({
             const payload = response?.data?.data ?? response?.data ?? {};
             const latitude = Number(payload?.latitude);
             const longitude = Number(payload?.longitude);
+
             if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
                 throw new Error("Invalid coordinates");
             }
+
             const normalizedAddress = payload?.address || address;
             setQuery(normalizedAddress);
+            setSuggestions([]);
             setOpen(false);
+            lastSuggestedKeywordRef.current = normalizedAddress;
+
             onResolved?.({
                 address: normalizedAddress,
                 roadAddress: payload?.road_address ?? payload?.roadAddress ?? additional.roadAddress ?? null,
@@ -124,6 +144,7 @@ export const AddressSearchBox = ({
 
     const openDaumPostcode = async () => {
         if (loadingPostcode || loadingResolve) return;
+
         setLoadingPostcode(true);
         try {
             await loadDaumPostcodeScript();
@@ -134,6 +155,7 @@ export const AddressSearchBox = ({
                         toast.error("주소를 선택하지 못했습니다.");
                         return;
                     }
+
                     setQuery(selectedAddress);
                     setOpen(false);
                     resolveAddress(selectedAddress, {
@@ -169,9 +191,11 @@ export const AddressSearchBox = ({
     const primaryDisabled = primaryIsResolve
         ? (!canSearch || loadingResolve)
         : (loadingPostcode || loadingResolve);
+
     const secondaryDisabled = secondaryIsResolve
         ? (!canSearch || loadingResolve)
         : (loadingPostcode || loadingResolve);
+
     const primaryLoadingText = primaryIsResolve ? "검색중..." : "LOADING...";
     const secondaryLoadingText = secondaryIsResolve ? "조회중..." : "LOADING...";
     const primaryLoading = primaryIsResolve ? loadingResolve : loadingPostcode;
@@ -180,11 +204,17 @@ export const AddressSearchBox = ({
     return (
         <div ref={rootRef} className={`relative ${className}`}>
             <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">주소 검색</label>
+
             <div className="relative">
                 <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                 <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={(e) => {
+                        setIsComposing(false);
+                        setQuery(e.currentTarget.value);
+                    }}
                     onFocus={() => {
                         if (suggestions.length) setOpen(true);
                     }}
@@ -223,6 +253,7 @@ export const AddressSearchBox = ({
                             const address = item?.address ?? item?.road_address ?? item?.roadAddress ?? item?.jibun_address ?? item?.jibunAddress;
                             const road = item?.road_address ?? item?.roadAddress;
                             const jibun = item?.jibun_address ?? item?.jibunAddress;
+
                             return (
                                 <button
                                     key={`${address}-${index}`}
