@@ -314,6 +314,19 @@ export const Home = () => {
 
     return (
         <div className="space-y-10 animate-fade-in pb-10">
+            <section className="inline-flex max-w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                    <HeaderStat label="전체 회원" value={formatNumber(stats.summary?.total_members || stats.summary?.totalMembers || 0)} />
+                    <HeaderStat label="전체 게시글" value={formatNumber(stats.summary?.total_boards || stats.summary?.totalBoards || 0)} />
+                    <HeaderStat
+                        label="오늘 방문자"
+                        value={formatNumber(stats.summary?.today_visitors || stats.summary?.todayVisitors || 0)}
+                        trend={stats.compare ? { isGrowth: changeRate >= 0, label: toPercentLabel(changeRate) } : null}
+                    />
+                    <HeaderStat label="활성 사용자" value={formatNumber(stats.summary?.active_members || stats.summary?.activeMembers || 0)} />
+                </div>
+            </section>
+
             <section
                 className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white shadow-2xl shadow-slate-200/70"
                 onTouchStart={(e) => {
@@ -437,19 +450,6 @@ export const Home = () => {
                 )}
             </section>
 
-            <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-                <StatMiniCard icon={Users} label="전체 회원" value={formatNumber(stats.summary?.total_members || stats.summary?.totalMembers || 0)} color="blue" />
-                <StatMiniCard icon={MessageSquare} label="전체 게시글" value={formatNumber(stats.summary?.total_boards || stats.summary?.totalBoards || 0)} color="indigo" />
-                <StatMiniCard
-                    icon={Eye}
-                    label="오늘 방문자"
-                    value={formatNumber(stats.summary?.today_visitors || stats.summary?.todayVisitors || 0)}
-                    color="sky"
-                    trend={stats.compare ? { isGrowth: changeRate >= 0, label: toPercentLabel(changeRate) } : null}
-                />
-                <StatMiniCard icon={Activity} label="활성 사용자" value={formatNumber(stats.summary?.active_members || stats.summary?.activeMembers || 0)} color="slate" />
-            </div>
-
             <section className="space-y-6">
                 <div className="flex items-end justify-between px-2">
                     <div className="space-y-1">
@@ -558,6 +558,21 @@ const StatMiniCard = ({ icon: Icon, label, value, color, trend }) => {
                     {trend.label}
                 </div>
             )}
+        </div>
+    );
+};
+
+const HeaderStat = ({ label, value, trend }) => {
+    return (
+        <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-400">{label}</span>
+            <span className="text-sm font-black text-slate-900">{value}</span>
+            {trend ? (
+                <span className={`inline-flex items-center gap-1 text-[11px] font-black ${trend.isGrowth ? "text-primary-600" : "text-rose-600"}`}>
+                    {trend.isGrowth ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    {trend.label}
+                </span>
+            ) : null}
         </div>
     );
 };
