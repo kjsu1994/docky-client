@@ -30,6 +30,14 @@ const extractErrorMessage = (error, fallback) => {
     return data.message || fallback;
 };
 
+const getAuthProvider = (member) => String(member?.auth_provider || member?.authProvider || "LOCAL").toUpperCase();
+const formatPhoneNumber = (rawValue) => {
+    const digits = rawValue.replace(/\D/g, "").slice(0, 11);
+    if (digits.length < 4) return digits;
+    if (digits.length < 8) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
+
 export const MypageEdit = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -55,6 +63,8 @@ export const MypageEdit = () => {
     );
 
     const profileUrl = normalizeProfileImageUrl(member?.profile_url || member?.profileUrl || "");
+    const authProvider = useMemo(() => getAuthProvider(member || user), [member, user]);
+    const oauthMember = authProvider !== "LOCAL";
 
     const isDirty = useMemo(() => {
         if (!member) return false;
@@ -95,13 +105,19 @@ export const MypageEdit = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        const nextValue = name === "phone" ? formatPhoneNumber(value) : value;
         if (name === "currentPassword") {
             setPasswordVerified(false);
         }
-        setForm((prev) => ({ ...prev, [name]: value }));
+        setForm((prev) => ({ ...prev, [name]: nextValue }));
     };
 
     const handleVerifyCurrentPassword = async () => {
+        if (oauthMember) {
+            setPasswordVerified(true);
+            return;
+        }
+
         const email = member?.email || user?.email || "";
         const currentPassword = form.currentPassword.trim();
 
@@ -182,12 +198,18 @@ export const MypageEdit = () => {
 
         const nextPassword = form.password.trim();
         const currentPassword = form.currentPassword.trim();
+        const nextPhone = form.phone.trim();
 
-        if (nextPassword && !currentPassword) {
+        if (!nextPhone) {
+            toast.error("전화번호를 입력해 주세요.");
+            return;
+        }
+
+        if (nextPassword && !oauthMember && !currentPassword) {
             toast.error("새 비밀번호를 변경하려면 현재 비밀번호를 입력해주세요.");
             return;
         }
-        if (nextPassword && !passwordVerified) {
+        if (nextPassword && !oauthMember && !passwordVerified) {
             toast.error("비밀번호 확인을 완료해주세요.");
             return;
         }
@@ -205,12 +227,14 @@ export const MypageEdit = () => {
 
             const payload = {
                 name: (form.name || "").trim(),
-                phone: (form.phone || "").trim(),
+                phone: nextPhone,
                 address: mergedAddress || null,
             };
 
             if (nextPassword) {
-                payload.currentPassword = currentPassword;
+                if (!oauthMember) {
+                    payload.currentPassword = currentPassword;
+                }
                 payload.password = nextPassword;
             }
 
@@ -289,6 +313,7 @@ export const MypageEdit = () => {
                         />
                     </div>
 
+                    <div className={oauthMember ? "hidden" : ""}>
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">이름</label>
                         <input
@@ -299,6 +324,7 @@ export const MypageEdit = () => {
                             required
                         />
                     </div>
+                    </div>
 
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">전화번호</label>
@@ -307,6 +333,7 @@ export const MypageEdit = () => {
                             value={form.phone}
                             onChange={handleChange}
                             className="input-base"
+                            required
                         />
                     </div>
 
@@ -348,7 +375,7 @@ export const MypageEdit = () => {
 
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">현재 비밀번호 (새 비밀번호 변경 시 필수)</label>
-                        <div className="flex items-center gap-2">
+                        <div className={oauthMember ? "hidden" : "flex items-center gap-2"}>
                             <input
                                 type="password"
                                 name="currentPassword"
@@ -374,6 +401,11 @@ export const MypageEdit = () => {
 
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">새 비밀번호 (선택)</label>
+                        {oauthMember && (
+                            <p className="mb-2 text-xs font-semibold text-slate-500">
+                                {"\uC18C\uC15C \uB85C\uADF8\uC778 \uACC4\uC815\uC740 \uD604\uC7AC \uBE44\uBC00\uBC88\uD638 \uC785\uB825 \uC5C6\uC774 \uC0C8 \uBE44\uBC00\uBC88\uD638\uB97C \uC124\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."}
+                            </p>
+                        )}
                         <input
                             type="password"
                             name="password"
