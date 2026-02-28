@@ -230,10 +230,26 @@ export const LibraryFinder = () => {
         const clickListener = window.naver.maps.Event.addListener(mapRef.current, "click", () => {
             closeAllInfoWindows();
         });
+        const rightClickListener = window.naver.maps.Event.addListener(mapRef.current, "rightclick", () => {
+            closeAllInfoWindows();
+        });
+        const container = mapContainerRef.current;
+        const handlePointerDown = () => {
+            closeAllInfoWindows();
+        };
+        if (container) {
+            container.addEventListener("touchstart", handlePointerDown, { passive: true });
+            container.addEventListener("mousedown", handlePointerDown);
+        }
         return () => {
             window.naver.maps.Event.removeListener(clickListener);
+            window.naver.maps.Event.removeListener(rightClickListener);
+            if (container) {
+                container.removeEventListener("touchstart", handlePointerDown);
+                container.removeEventListener("mousedown", handlePointerDown);
+            }
         };
-    }, [closeAllInfoWindows]);
+    }, [closeAllInfoWindows, mapLoaded]);
 
     const selectedItem = useMemo(() => {
         if (!items.length) return null;

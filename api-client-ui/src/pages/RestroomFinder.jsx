@@ -367,6 +367,7 @@ export const RestroomFinder = () => {
 
             window.naver.maps.Event.addListener(marker, "click", () => {
                 setSelectedLotId(id);
+                closeAllInfoWindows();
                 infoWindow.open(mapRef.current, marker);
             });
 
@@ -383,6 +384,32 @@ export const RestroomFinder = () => {
             mapRef.current.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
         }
     }, [items, clearMarkers, closeAllInfoWindows]);
+
+    useEffect(() => {
+        if (!mapRef.current || !window.naver?.maps?.Event) return;
+        const clickListener = window.naver.maps.Event.addListener(mapRef.current, "click", () => {
+            closeAllInfoWindows();
+        });
+        const rightClickListener = window.naver.maps.Event.addListener(mapRef.current, "rightclick", () => {
+            closeAllInfoWindows();
+        });
+        const container = mapContainerRef.current;
+        const handlePointerDown = () => {
+            closeAllInfoWindows();
+        };
+        if (container) {
+            container.addEventListener("touchstart", handlePointerDown, { passive: true });
+            container.addEventListener("mousedown", handlePointerDown);
+        }
+        return () => {
+            window.naver.maps.Event.removeListener(clickListener);
+            window.naver.maps.Event.removeListener(rightClickListener);
+            if (container) {
+                container.removeEventListener("touchstart", handlePointerDown);
+                container.removeEventListener("mousedown", handlePointerDown);
+            }
+        };
+    }, [closeAllInfoWindows, mapLoaded]);
 
     const selectedItem = useMemo(() => {
         if (!items.length) return null;
