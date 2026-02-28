@@ -1,10 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Lock, User, Phone, MapPin, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../utils/api";
 import toast from "react-hot-toast";
 import { AddressSearchBox } from "../common/AddressSearchBox";
+
+const RESEND_COOLDOWN_SECONDS = 60;
+const MAX_CONFIRM_FAILURES = 5;
+
+const parseRetrySeconds = (message, fallbackSeconds = RESEND_COOLDOWN_SECONDS) => {
+    const match = String(message || "").match(/(\d+)\s*seconds?/i);
+    if (!match) {
+        return fallbackSeconds;
+    }
+    return Number(match[1]);
+};
 
 export const Register = () => {
     const [formData, setFormData] = useState({
@@ -24,10 +35,26 @@ export const Register = () => {
     const [emailAvailable, setEmailAvailable] = useState(null);
     const [checkedEmail, setCheckedEmail] = useState("");
     const [verifiedEmail, setVerifiedEmail] = useState("");
+    const [verificationStatus, setVerificationStatus] = useState("");
+    const [resendCooldown, setResendCooldown] = useState(0);
+    const [remainingAttempts, setRemainingAttempts] = useState(null);
     const [errors, setErrors] = useState({});
     const [addressModalOpen, setAddressModalOpen] = useState(false);
     const { register } = useAuth();
 
+    useEffect(() => {
+        if (resendCooldown <= 0) {
+            return undefined;
+        }
+
+        const timer = window.setInterval(() => {
+            setResendCooldown((current) => (current > 0 ? current - 1 : 0));
+        }, 1000);
+
+        return () => window.clearInterval(timer);
+    }, [resendCooldown]);
+
+    const normalizedEmail = formData.email.trim();
     const hasConfirmValue = formData.confirmPassword.length > 0;
     const passwordsMatch = hasConfirmValue && formData.password === formData.confirmPassword;
     const passwordsMismatch = hasConfirmValue && !passwordsMatch;
@@ -35,7 +62,6 @@ export const Register = () => {
     const passwordValid = formData.password.length >= 8;
     const nameValid = formData.name.trim().length > 0;
     const phoneValid = formData.phone.trim().length > 0;
-    const normalizedEmail = formData.email.trim();
     const emailChecked = checkedEmail === normalizedEmail && emailAvailable === true;
     const emailVerified = verifiedEmail === normalizedEmail;
     const codeReady = /^\d{6}$/.test(verificationCode.trim());
@@ -43,7 +69,7 @@ export const Register = () => {
     const submitBlockMessage = !formData.email
         ? "이메일을 입력해 주세요."
         : !emailFormatValid
-          ? "올바른 이메일 형식을 입력해 주세요."
+          ? "올바른 이메일 주소를 입력해 주세요."
           : !emailChecked
             ? "이메일 중복 확인을 먼저 완료해 주세요."
             : !emailVerified
@@ -66,6 +92,14 @@ export const Register = () => {
         return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
     };
 
+    const resetVerificationState = () => {
+        setVerifiedEmail("");
+        setVerificationCode("");
+        setVerificationStatus("");
+        setResendCooldown(0);
+        setRemainingAttempts(null);
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         const nextValue = name === "phone" ? formatPhoneNumber(value) : value;
@@ -74,8 +108,7 @@ export const Register = () => {
         if (name === "email") {
             setCheckedEmail("");
             setEmailAvailable(null);
-            setVerifiedEmail("");
-            setVerificationCode("");
+            resetVerificationState();
         }
 
         if (errors[name]) {
@@ -88,8 +121,7 @@ export const Register = () => {
     };
 
     const handleCheckDuplicate = async () => {
-        const email = normalizedEmail;
-        if (!email) {
+        if (!normalizedEmail) {
             setErrors((prev) => ({ ...prev, email: "이메일을 먼저 입력해 주세요." }));
             return;
         }
@@ -101,30 +133,28 @@ export const Register = () => {
 
         setCheckingEmail(true);
         try {
-            const response = await api.get("/members/check-email", { params: { email } });
+            const response = await api.get("/members/check-email", { params: { email: normalizedEmail } });
             const payload = response.data?.data || response.data;
             const available = !!payload?.available;
 
-            setCheckedEmail(email);
+            setCheckedEmail(normalizedEmail);
             setEmailAvailable(available);
-            setVerifiedEmail("");
-            setVerificationCode("");
+            resetVerificationState();
 
             if (available) {
                 setErrors((prev) => ({ ...prev, email: "" }));
                 toast.success("사용 가능한 이메일입니다.");
-                return;
+            } else {
+                setErrors((prev) => ({ ...prev, email: "이미 사용 중인 이메일입니다." }));
+                toast.error("이미 사용 중인 이메일입니다.");
             }
-
-            setErrors((prev) => ({ ...prev, email: "이미 사용 중인 이메일입니다." }));
-            toast.error("이미 사용 중인 이메일입니다.");
         } catch (error) {
             setCheckedEmail("");
             setEmailAvailable(null);
-            setVerifiedEmail("");
-            setVerificationCode("");
-            setErrors((prev) => ({ ...prev, email: error?.response?.data?.message || "이메일 확인에 실패했습니다." }));
-            toast.error(error?.response?.data?.message || "이메일 확인에 실패했습니다.");
+            resetVerificationState();
+            const message = error?.response?.data?.message || "이메일 확인에 실패했습니다.";
+            setErrors((prev) => ({ ...prev, email: message }));
+            toast.error(message);
         } finally {
             setCheckingEmail(false);
         }
@@ -136,13 +166,28 @@ export const Register = () => {
             return;
         }
 
+        if (resendCooldown > 0) {
+            toast.error(`${resendCooldown}초 후에 다시 보낼 수 있습니다.`);
+            return;
+        }
+
         setSendingVerification(true);
         try {
             await api.post("/members/email-verification/send", { email: normalizedEmail });
             setVerifiedEmail("");
-            toast.success("인증번호를 전송했습니다.");
+            setRemainingAttempts(MAX_CONFIRM_FAILURES);
+            setResendCooldown(RESEND_COOLDOWN_SECONDS);
+            setVerificationStatus("인증번호를 보냈습니다. 받은 편지함과 스팸함을 확인해 주세요.");
+            setErrors((prev) => ({ ...prev, verificationCode: "" }));
+            toast.success("인증번호를 보냈습니다.");
         } catch (error) {
-            toast.error(error?.response?.data?.message || "인증번호 전송에 실패했습니다.");
+            const message = error?.response?.data?.message || "인증번호 전송에 실패했습니다.";
+            if (error?.response?.data?.code === "EMAIL_VERIFICATION_REQUEST_RATE_LIMITED") {
+                const waitSeconds = parseRetrySeconds(message);
+                setResendCooldown(waitSeconds);
+            }
+            setVerificationStatus(message);
+            toast.error(message);
         } finally {
             setSendingVerification(false);
         }
@@ -166,51 +211,68 @@ export const Register = () => {
                 code,
             });
             setVerifiedEmail(normalizedEmail);
+            setRemainingAttempts(MAX_CONFIRM_FAILURES);
+            setVerificationStatus("이메일 인증이 완료되었습니다.");
             setErrors((prev) => ({ ...prev, verificationCode: "" }));
             toast.success("이메일 인증이 완료되었습니다.");
         } catch (error) {
+            const codeValue = error?.response?.data?.code;
+            const message = error?.response?.data?.message || "인증번호 확인에 실패했습니다.";
             setVerifiedEmail("");
-            setErrors((prev) => ({ ...prev, verificationCode: error?.response?.data?.message || "인증번호가 올바르지 않습니다." }));
-            toast.error(error?.response?.data?.message || "인증번호 확인에 실패했습니다.");
+
+            if (codeValue === "EMAIL_VERIFICATION_CODE_INVALID") {
+                setRemainingAttempts((current) => {
+                    const next = (current ?? MAX_CONFIRM_FAILURES) - 1;
+                    return Math.max(0, next);
+                });
+            }
+
+            if (codeValue === "EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED") {
+                setRemainingAttempts(0);
+            }
+
+            setVerificationStatus(message);
+            setErrors((prev) => ({ ...prev, verificationCode: message }));
+            toast.error(message);
         } finally {
             setConfirmingVerification(false);
         }
     };
 
     const validate = () => {
-        const newErrors = {};
+        const nextErrors = {};
 
         if (!normalizedEmail) {
-            newErrors.email = "이메일을 입력해 주세요.";
+            nextErrors.email = "이메일을 입력해 주세요.";
         } else if (!emailFormatValid) {
-            newErrors.email = "이메일 형식이 올바르지 않습니다.";
+            nextErrors.email = "이메일 형식이 올바르지 않습니다.";
         } else if (!emailChecked) {
-            newErrors.email = "이메일 중복 확인을 완료해 주세요.";
+            nextErrors.email = "이메일 중복 확인을 완료해 주세요.";
         } else if (!emailVerified) {
-            newErrors.verificationCode = "이메일 인증을 완료해 주세요.";
+            nextErrors.verificationCode = "이메일 인증을 완료해 주세요.";
         }
 
         if (!formData.password) {
-            newErrors.password = "비밀번호를 입력해 주세요.";
+            nextErrors.password = "비밀번호를 입력해 주세요.";
         } else if (!passwordValid) {
-            newErrors.password = "비밀번호는 8자 이상이어야 합니다.";
+            nextErrors.password = "비밀번호는 8자 이상이어야 합니다.";
         }
 
         if (formData.password !== formData.confirmPassword) {
-            newErrors.confirmPassword = "비밀번호가 일치하지 않습니다.";
+            nextErrors.confirmPassword = "비밀번호가 일치하지 않습니다.";
         }
 
         if (!nameValid) {
-            newErrors.name = "이름을 입력해 주세요.";
+            nextErrors.name = "이름을 입력해 주세요.";
         }
 
         if (!phoneValid) {
-            newErrors.phone = "전화번호를 입력해 주세요.";
+            nextErrors.phone = "전화번호를 입력해 주세요.";
         }
 
-        setErrors(newErrors);
-        const firstErrorField = Object.keys(newErrors)[0] || null;
-        return { ok: Object.keys(newErrors).length === 0, firstErrorField };
+        setErrors(nextErrors);
+        const firstErrorField = Object.keys(nextErrors)[0] || null;
+        return { ok: Object.keys(nextErrors).length === 0, firstErrorField };
     };
 
     const handleSubmit = async (e) => {
@@ -227,8 +289,6 @@ export const Register = () => {
 
         setLoading(true);
         try {
-            // 기본주소와 상세주소를 하나의 저장용 주소 문자열로 합친다.
-            // Merge base address and detail so the backend keeps one canonical address field.
             const mergedAddress = [formData.address, formData.addressDetail]
                 .map((value) => (value || "").trim())
                 .filter(Boolean)
@@ -252,8 +312,16 @@ export const Register = () => {
         if (!address) return;
         setFormData((prev) => ({ ...prev, address }));
         setAddressModalOpen(false);
-        toast.success("주소를 선택했습니다.");
+        toast.success("주소가 입력되었습니다.");
     };
+
+    const confirmHelpText = emailVerified
+        ? "이메일 인증이 완료되었습니다."
+        : remainingAttempts === 0
+          ? "인증 시도 횟수를 모두 사용했습니다. 새 인증번호를 요청해 주세요."
+          : remainingAttempts != null
+            ? `인증 가능 횟수 ${remainingAttempts}회 남음`
+            : "인증번호를 요청해 이메일 인증을 시작해 주세요.";
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
@@ -266,13 +334,13 @@ export const Register = () => {
                         <span className="text-3xl font-black italic tracking-tighter">C</span>
                     </div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">회원가입</h1>
-                    <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">이메일 인증 가입</p>
+                    <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">이메일 인증 회원가입</p>
                 </div>
 
                 <div className="card p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50 shadow-2xl shadow-slate-200">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">이메일 주소</label>
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">이메일</label>
                             <div className="flex gap-2">
                                 <div className="relative group flex-1">
                                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
@@ -282,26 +350,22 @@ export const Register = () => {
                                         value={formData.email}
                                         onChange={handleChange}
                                         className={`input-base pl-12 h-14 bg-white font-bold ${errors.email ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
-                                        placeholder="example@email.com"
+                                        placeholder="your@email.com"
                                     />
                                 </div>
                                 <button
                                     type="button"
                                     disabled={loading || checkingEmail}
                                     aria-busy={checkingEmail}
-                                    data-busy-indicator="true"
                                     onClick={handleCheckDuplicate}
                                     className="btn-primary h-14 px-4 text-xs tracking-tight shadow-xl shadow-primary-100 mt-0"
                                 >
-                                    {checkingEmail ? "확인 중..." : "중복확인"}
+                                    {checkingEmail ? "확인 중..." : "중복 확인"}
                                 </button>
                             </div>
                             {errors.email && <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">{errors.email}</p>}
                             {!errors.email && emailChecked && (
                                 <p className="mt-1 ml-1 text-[10px] font-black text-emerald-600 uppercase tracking-wider">사용 가능한 이메일입니다.</p>
-                            )}
-                            {!errors.email && formData.email && !emailFormatValid && (
-                                <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">이메일 형식이 올바르지 않습니다.</p>
                             )}
                         </div>
 
@@ -312,17 +376,17 @@ export const Register = () => {
                                     <div>
                                         <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">이메일 인증</p>
                                         <p className="text-sm font-bold text-slate-700">
-                                            {emailVerified ? "인증이 완료되었습니다." : "회원가입 완료를 위해 6자리 인증번호를 입력해 주세요."}
+                                            {emailVerified ? "인증이 완료되었습니다." : "회원가입을 완료하려면 6자리 인증번호를 입력해 주세요."}
                                         </p>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={handleSendVerification}
-                                    disabled={loading || sendingVerification || !emailChecked}
+                                    disabled={loading || sendingVerification || !emailChecked || resendCooldown > 0}
                                     className="rounded-xl bg-slate-900 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white disabled:bg-slate-300"
                                 >
-                                    {sendingVerification ? "전송 중..." : "인증번호 전송"}
+                                    {sendingVerification ? "전송 중..." : resendCooldown > 0 ? `${resendCooldown}초` : "인증번호 전송"}
                                 </button>
                             </div>
 
@@ -347,7 +411,7 @@ export const Register = () => {
                                 <button
                                     type="button"
                                     onClick={handleConfirmVerification}
-                                    disabled={loading || confirmingVerification || !emailChecked || !codeReady}
+                                    disabled={loading || confirmingVerification || !emailChecked || !codeReady || remainingAttempts === 0}
                                     className="rounded-xl bg-primary-600 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white disabled:bg-primary-200"
                                 >
                                     {confirmingVerification ? "확인 중..." : "인증 확인"}
@@ -356,13 +420,11 @@ export const Register = () => {
                             {errors.verificationCode && (
                                 <p className="text-[10px] font-black uppercase tracking-wider text-rose-500">{errors.verificationCode}</p>
                             )}
-                            {!errors.verificationCode && emailVerified && (
-                                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600">이메일 인증이 완료되었습니다.</p>
-                            )}
-                            {!errors.verificationCode && !emailVerified && emailChecked && (
-                                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                                    중복 확인이 완료되었습니다. 이메일로 받은 인증번호를 입력해 주세요.
-                                </p>
+                            <p className={`text-[10px] font-black uppercase tracking-wider ${emailVerified ? "text-emerald-600" : "text-slate-500"}`}>
+                                {confirmHelpText}
+                            </p>
+                            {!!verificationStatus && (
+                                <p className="text-[10px] font-bold text-slate-500">{verificationStatus}</p>
                             )}
                         </div>
 
@@ -410,9 +472,6 @@ export const Register = () => {
                         )}
                         {!errors.password && !errors.confirmPassword && passwordsMatch && (
                             <p className="mt-1 ml-1 text-[10px] font-black text-sky-600 uppercase tracking-wider">비밀번호가 일치합니다.</p>
-                        )}
-                        {!errors.password && formData.password && !passwordValid && (
-                            <p className="mt-1 ml-1 text-[10px] font-black text-rose-500 uppercase tracking-wider">비밀번호는 8자 이상이어야 합니다.</p>
                         )}
 
                         <div className="space-y-2">
@@ -467,7 +526,7 @@ export const Register = () => {
                                     onClick={() => setAddressModalOpen(true)}
                                     className="h-14 rounded-xl bg-slate-900 px-4 text-xs font-black text-white hover:bg-slate-800"
                                 >
-                                    주소찾기
+                                    주소 검색
                                 </button>
                             </div>
                             <div className="relative group">
@@ -478,12 +537,10 @@ export const Register = () => {
                                     value={formData.addressDetail}
                                     onChange={handleChange}
                                     className="input-base pl-12 h-14 bg-white font-bold"
-                                    placeholder="상세 주소를 입력해 주세요"
+                                    placeholder="상세 주소 입력"
                                 />
                             </div>
-                            <p className="mt-1 ml-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                                선택 입력 항목입니다.
-                            </p>
+                            <p className="mt-1 ml-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">선택 입력 항목입니다.</p>
                         </div>
 
                         <button
@@ -541,7 +598,7 @@ export const Register = () => {
                             placeholder="예: 서울시청, 서울역, 강남역"
                         />
                         <div className="mt-3 text-xs font-semibold text-slate-500">
-                            결과를 선택하면 회원가입 주소 입력란이 자동으로 채워집니다.
+                            검색 결과를 선택하면 회원가입 주소 입력칸에 자동으로 반영됩니다.
                         </div>
                     </div>
                 </div>
