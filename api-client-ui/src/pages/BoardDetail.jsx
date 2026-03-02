@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
@@ -15,7 +15,7 @@ import api from "../utils/api";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { Comments } from "../components/Comments"; // Comments component import
+import { Comments } from "../components/Comments";
 import {
     getBoardKindLabel,
     formatRelativeTime,
@@ -24,6 +24,39 @@ import {
 } from "../utils/helpers";
 import { canManageByOwnerOrAdmin } from "../utils/authorization";
 import { normalizeProfileImageUrl } from "../utils/profileImage";
+import { getBoardLikeCount, normalizeBoardDetail } from "../adapters/boardAdapter";
+
+const BoardBody = memo(({ html, files, onDownload }) => (
+    <div className="p-6">
+        <div
+            className="prose prose-slate max-w-none min-h-[200px] board-contents"
+            dangerouslySetInnerHTML={{ __html: html }}
+        />
+
+        {files.length > 0 && (
+            <div className="mt-8 pt-6 border-t">
+                <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> 첨부파일 ({files.length})
+                </h3>
+                <div className="grid gap-2">
+                    {files.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+                            <span className="text-sm truncate mr-4">{file.file_name || file.fileName}</span>
+                            <button
+                                onClick={() => onDownload(file.file_id || file.fileId, file.file_name || file.fileName)}
+                                className="btn-primary py-1 px-3 text-xs"
+                            >
+                                <Download className="h-3 w-3 mr-1" /> 다운로드
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+    </div>
+));
+
+BoardBody.displayName = "BoardBody";
 
 export const BoardDetail = () => {
     const { kind, boardId } = useParams();
@@ -39,10 +72,8 @@ export const BoardDetail = () => {
         setLoading(true);
         setError("");
         try {
-            // text-fixed
             const response = await api.get(`/boards/${boardId}`);
-            const data = response.data?.data || response.data;
-            setBoard(data);
+            setBoard(normalizeBoardDetail(response));
         } catch (err) {
             console.error("Failed to fetch board:", err);
             setError(err.response?.data?.message || "게시글을 불러오는데 실패했습니다.");
@@ -59,9 +90,10 @@ export const BoardDetail = () => {
     }, [boardId]);
 
     const handleLike = async () => {
-        if (liking) return;
+        if (liking || !board) return;
         setLiking(true);
-        const prevLikeCount = board.like_count ?? board.likeCount ?? 0;
+        const prevLikeCount = getBoardLikeCount(board);
+
         setBoard((prev) => ({
             ...prev,
             like_count: prevLikeCount + 1,
@@ -69,23 +101,27 @@ export const BoardDetail = () => {
         }));
 
         try {
-            const response = await api.post(`/boards/${boardId}/Like`);
-            const updatedData = response.data?.data || response.data;
+            const response = await api.post(`/boards/${boardId}/Like`, null, {
+                meta: {
+                    trackNetwork: false,
+                },
+            });
+            const updatedData = normalizeBoardDetail(response) || {};
+            const nextLikeCount = getBoardLikeCount(updatedData);
 
-            setBoard(prev => ({
+            setBoard((prev) => ({
                 ...prev,
-                // text-fixed
-                like_count: updatedData.like_count !== undefined ? updatedData.like_count : updatedData.likeCount,
-                likeCount: updatedData.like_count !== undefined ? updatedData.like_count : updatedData.likeCount
+                like_count: nextLikeCount,
+                likeCount: nextLikeCount,
             }));
             toast.success("좋아요 상태가 반영되었습니다.");
-        } catch (error) {
+        } catch (likeError) {
             setBoard((prev) => ({
                 ...prev,
                 like_count: prevLikeCount,
                 likeCount: prevLikeCount,
             }));
-            toast.error(error.response?.data?.message || "좋아요 처리에 실패했습니다.");
+            toast.error(likeError.response?.data?.message || "좋아요 처리에 실패했습니다.");
         } finally {
             setLiking(false);
         }
@@ -97,12 +133,12 @@ export const BoardDetail = () => {
             await api.delete(`/boards/${boardId}`);
             toast.success("게시글이 삭제되었습니다.");
             navigate(`/app/boards/${kind}`);
-        } catch (error) {
+        } catch {
             toast.error("게시글 삭제에 실패했습니다.");
         }
     };
 
-    const handleDownload = async (fileId, fileName) => {
+    const handleDownload = useCallback(async (fileId, fileName) => {
         try {
             const response = await api.get(`/file/${fileId}`, { responseType: "blob" });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -113,10 +149,10 @@ export const BoardDetail = () => {
             link.click();
             link.remove();
             window.URL.revokeObjectURL(url);
-        } catch (error) {
+        } catch {
             toast.error("파일 다운로드에 실패했습니다.");
         }
-    };
+    }, []);
 
     const handleReportBoard = async () => {
         const reason = window.prompt("신고 사유를 입력해주세요", "부적절한 게시물");
@@ -148,8 +184,8 @@ export const BoardDetail = () => {
     });
 
     const files = board.uploadDto || board.upload_dto || [];
-    // text-fixed
-    const currentLikeCount = board.like_count ?? board.likeCount ?? 0;
+    const boardBodyHtml = normalizeContentImageUrls(board.contents || board.content || "");
+    const currentLikeCount = getBoardLikeCount(board);
     const currentViewCount = board.view_count ?? board.viewCount ?? 0;
     const authorProfileImageUrl = normalizeProfileImageUrl(board.member?.profile_url || board.member?.profileUrl || "");
 
@@ -179,8 +215,8 @@ export const BoardDetail = () => {
                             {getBoardKindLabel(board.kind_of_board || board.kindOfBoard || kind)}
                         </span>
                         <div className="flex items-center gap-3 text-sm text-slate-500 ml-2">
-                            <span className="flex items-center gap-1"><Eye className="h-4 w-4"/> {formatNumber(currentViewCount)}</span>
-                            <span className="flex items-center gap-1"><Heart className="h-4 w-4"/> {formatNumber(currentLikeCount)}</span>
+                            <span className="flex items-center gap-1"><Eye className="h-4 w-4" /> {formatNumber(currentViewCount)}</span>
+                            <span className="flex items-center gap-1"><Heart className="h-4 w-4" /> {formatNumber(currentLikeCount)}</span>
                         </div>
                     </div>
                     <h1 className="text-2xl font-bold text-slate-900">{board.title}</h1>
@@ -204,40 +240,12 @@ export const BoardDetail = () => {
                     </div>
                 </div>
 
-                <div className="p-6">
-                    <div
-                        className="prose prose-slate max-w-none min-h-[200px] board-contents"
-                        dangerouslySetInnerHTML={{
-                            __html: normalizeContentImageUrls(board.contents || board.content || "")
-                        }}
-                    />
-
-                    {files.length > 0 && (
-                        <div className="mt-8 pt-6 border-t">
-                            <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-                                <FileText className="h-4 w-4" /> 첨부파일 ({files.length})
-                            </h3>
-                            <div className="grid gap-2">
-                                {files.map((file, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
-                                        <span className="text-sm truncate mr-4">{file.file_name || file.fileName}</span>
-                                        <button
-                                            onClick={() => handleDownload(file.file_id || file.fileId, file.file_name || file.fileName)}
-                                            className="btn-primary py-1 px-3 text-xs"
-                                        >
-                                            <Download className="h-3 w-3 mr-1" /> 다운로드
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                <BoardBody html={boardBodyHtml} files={files} onDownload={handleDownload} />
 
                 <div className="p-6 border-t bg-slate-50/30">
                     <div className="flex flex-wrap gap-2">
                         <button onClick={handleLike} disabled={liking} className="btn-secondary text-red-600 border-red-100 hover:bg-red-50">
-                            <Heart className={`h-4 w-4 mr-2 ${liking ? 'animate-ping' : ''}`} />
+                            <Heart className={`h-4 w-4 mr-2 ${liking ? "animate-ping" : ""}`} />
                             좋아요 {formatNumber(currentLikeCount)}
                         </button>
                         <button onClick={handleReportBoard} className="btn-secondary text-amber-700 border-amber-200 hover:bg-amber-50">
@@ -247,7 +255,6 @@ export const BoardDetail = () => {
                 </div>
             </div>
 
-            {/* text-fixed */}
             <Comments
                 boardId={boardId}
                 onUpdate={fetchBoard}
@@ -255,5 +262,3 @@ export const BoardDetail = () => {
         </div>
     );
 };
-
-

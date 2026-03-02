@@ -6,10 +6,14 @@ const api = axios.create({
     baseURL: "/api",
 });
 
+const shouldTrackNetworkActivity = (config) => config?.meta?.trackNetwork !== false;
+
 // 요청 인터셉터 / Request interceptor
 api.interceptors.request.use(
     (config) => {
-        beginNetworkActivity();
+        if (shouldTrackNetworkActivity(config)) {
+            beginNetworkActivity();
+        }
 
         config.headers = config.headers || {};
 
@@ -29,7 +33,9 @@ api.interceptors.request.use(
         return config;
     },
     (error) => {
-        endNetworkActivity();
+        if (shouldTrackNetworkActivity(error?.config)) {
+            endNetworkActivity();
+        }
         return Promise.reject(error);
     }
 );
@@ -37,11 +43,15 @@ api.interceptors.request.use(
 // 응답 인터셉터 - 에러 처리 / Response interceptor
 api.interceptors.response.use(
     (response) => {
-        endNetworkActivity();
+        if (shouldTrackNetworkActivity(response?.config)) {
+            endNetworkActivity();
+        }
         return response;
     },
     async (error) => {
-        endNetworkActivity();
+        if (shouldTrackNetworkActivity(error?.config)) {
+            endNetworkActivity();
+        }
         const originalRequest = error.config;
 
         // 401 에러 처리 (토큰 만료)
