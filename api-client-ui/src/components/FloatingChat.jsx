@@ -16,6 +16,7 @@ import {
     MessageCircle,
     Image as ImageIcon,
     File as FileIcon,
+    Download,
     ArrowLeft,
     X,
     Check,
@@ -30,7 +31,7 @@ import SockJS from "sockjs-client";
 import { useAuth } from "../contexts/AuthContext";
 import api, { uploadFiles } from "../utils/api";
 import toast from "react-hot-toast";
-import { formatRelativeTime, debounce, normalizeChatTimestamp } from "../utils/helpers";
+import { formatRelativeTime, debounce, normalizeChatTimestamp, resolveAssetUrl, formatFileSize, isImageFile } from "../utils/helpers";
 import { LoadingSpinner } from "./LoadingSpinner";
 
 export const FloatingChat = () => {
@@ -61,17 +62,40 @@ export const FloatingChat = () => {
 
     const normalizeMessage = (msg) => {
         if (!msg) return null;
+
+        const type = msg.type || msg.messageType || "TALK";
+        const fileName = msg.fileName || msg.file_name || "";
+        const fileUrl = msg.fileUrl || msg.file_url || (type === "FILE" ? (msg.message || msg.content || "") : "");
+        const fileContentType = msg.fileContentType || msg.file_content_type || "";
+        const fileSize = Number(msg.fileSize || msg.file_size || 0);
+
         const normalized = {
             id: msg.id || msg.messageId || `temp-${Math.random().toString(36).substr(2, 9)}`,
             senderId: msg.senderId || msg.sender_id,
             senderName: msg.senderName || msg.sender_name || "?듬챸",
             message: msg.message || msg.content || "",
-            type: msg.type || msg.messageType || "TALK",
+            type,
             roomId: msg.roomId || msg.chatRoomId || msg.room_id || msg.chat_room_id,
+            fileUrl,
+            fileName,
+            fileContentType,
+            fileSize: Number.isFinite(fileSize) ? fileSize : 0,
+            fileImage: msg.fileImage ?? msg.file_image ?? isImageFile(fileName || fileContentType || fileUrl),
             createdAt: normalizeChatTimestamp(msg.createdAt || msg.created_at)
         };
-        normalized.key = getMsgKey(normalized);
+        normalized.key = getMsgKey({ ...normalized, message: normalized.fileUrl || normalized.message });
         return normalized;
+    };
+
+    const getAttachmentTypeLabel = (fileName = "", contentType = "") => {
+        const lowerName = String(fileName).toLowerCase();
+        const lowerType = String(contentType).toLowerCase();
+
+        if (lowerType.includes("pdf") || lowerName.endsWith(".pdf")) return "PDF";
+        if (lowerType.includes("zip") || lowerName.endsWith(".zip") || lowerName.endsWith(".rar") || lowerName.endsWith(".7z")) return "압축";
+        if (lowerType.includes("word") || lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) return "문서";
+        if (lowerType.includes("sheet") || lowerName.endsWith(".xls") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".csv")) return "시트";
+        return "파일";
     };
 
     const [rooms, setRooms] = useState([]);
@@ -98,6 +122,8 @@ export const FloatingChat = () => {
     const [dragReady, setDragReady] = useState(false);
     const [isDraggingFab, setIsDraggingFab] = useState(false);
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
+    const [uploadingFileName, setUploadingFileName] = useState("");
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -500,13 +526,42 @@ export const FloatingChat = () => {
         const myId = Number(user.member_id || user.memberId || user.id);
         const formData = new FormData();
         formData.append("file", file);
+        const tempId = `temp-file-${Date.now()}`;
         try {
-            const response = await uploadFiles(`/chat/room/${roomId}/file`, formData);
-            const fileUrl = response.data?.url || response.data;
-            const messagePayload = { roomId: Number(roomId), senderId: myId, message: fileUrl, type: "FILE" };
+            setUploadingFileName(file.name);
+            setUploadProgress(0);
+
+            const response = await uploadFiles(`/chat/room/${roomId}/file`, formData, "post", {
+                onUploadProgress: (event) => {
+                    if (!event?.total) return;
+                    setUploadProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+                },
+            });
+
+            const payload = response.data?.data || response.data || {};
+            const fileUrl = payload.url || payload.file_url || "";
+            const fileName = payload.file_name || payload.fileName || file.name;
+            const fileContentType = payload.file_content_type || payload.fileContentType || file.type || "application/octet-stream";
+            const fileSize = Number(payload.file_size || payload.fileSize || file.size || 0);
+            const fileImage = payload.file_image ?? payload.fileImage ?? isImageFile(fileName || fileContentType);
+            const messagePayload = { roomId: Number(roomId), senderId: myId, message: fileName, type: "FILE", fileUrl, fileName, fileContentType, fileSize, fileImage };
+
+            const optimisticMsg = normalizeMessage({
+                ...messagePayload,
+                id: tempId,
+                senderName: user.name || "익명",
+                createdAt: new Date().toISOString()
+            });
+            setMessages((prev) => [...prev, optimisticMsg]);
+            upsertRoomPreview(roomId, fileName, optimisticMsg.createdAt, 0);
+
             client.publish({ destination: "/pub/chat/message", body: JSON.stringify(messagePayload), headers: { "content-type": "application/json" } });
         } catch (error) {
-            toast.error("?뚯씪 ?낅줈???ㅽ뙣");
+            toast.error(error.response?.data?.message || "파일 업로드에 실패했습니다.");
+        } finally {
+            setUploadingFileName("");
+            setUploadProgress(0);
+            e.target.value = "";
         }
     };
 
@@ -893,7 +948,44 @@ export const FloatingChat = () => {
                                                         <div className="flex flex-col">
                                                             {!isMe && <span className="text-[10px] font-bold text-slate-400 mb-1 ml-1 uppercase tracking-tighter">{normalized.senderName}</span>}
                                                             <div className={`px-4 py-2.5 rounded-2xl text-[13px] font-medium shadow-sm leading-relaxed ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-700 border border-slate-100 rounded-bl-none"}`}>
-                                                                {normalized.type === "FILE" ? <img src={normalized.message} alt="?뚯씪" className="max-w-[200px] rounded-xl cursor-pointer" onClick={() => window.open(normalized.message)} /> : normalized.message}
+                                                                {normalized.type === "FILE" ? (
+                                                                    normalized.fileImage ? (
+                                                                        <div className="space-y-2">
+                                                                            <img
+                                                                                src={resolveAssetUrl(normalized.fileUrl || normalized.message)}
+                                                                                alt={normalized.fileName || "이미지"}
+                                                                                className="max-w-[200px] rounded-xl cursor-pointer"
+                                                                                onClick={() => window.open(resolveAssetUrl(normalized.fileUrl || normalized.message), "_blank", "noopener,noreferrer")}
+                                                                            />
+                                                                            {!!(normalized.fileName || normalized.message) && (
+                                                                                <div className={`text-[10px] font-bold ${isMe ? "text-white/80" : "text-slate-400"}`}>
+                                                                                    {normalized.fileName || normalized.message}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <a
+                                                                            href={resolveAssetUrl(normalized.fileUrl || normalized.message)}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className={`flex min-w-[180px] items-center gap-2 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-2.5`}
+                                                                            download={normalized.fileName || undefined}
+                                                                        >
+                                                                            <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-primary-50 text-primary-600"}`}>
+                                                                                <Download className="h-4 w-4" />
+                                                                            </div>
+                                                                            <div className="min-w-0">
+                                                                                <div className="truncate text-[12px] font-bold">{normalized.fileName || normalized.message || "첨부파일"}</div>
+                                                                                <div className={`mt-1 flex items-center gap-2 text-[10px] font-bold ${isMe ? "text-white/80" : "text-slate-400"}`}>
+                                                                                    <span>{formatFileSize(Number(normalized.fileSize || 0))}</span>
+                                                                                    <span className={`rounded-full px-2 py-0.5 ${isMe ? "bg-white/10 text-white" : "bg-white text-primary-600"}`}>
+                                                                                        {getAttachmentTypeLabel(normalized.fileName, normalized.fileContentType)}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </a>
+                                                                    )
+                                                                ) : normalized.message}
                                                             </div>
                                                         </div>
                                                         <span className="text-[9px] font-bold text-slate-300 pb-1 shrink-0 uppercase">{formatRelativeTime(new Date(normalized.createdAt))}</span>
@@ -904,9 +996,15 @@ export const FloatingChat = () => {
                                         <div ref={messagesEndRef} />
                                     </div>
                                     <div className="p-3 border-t shrink-0 bg-white">
+                                        {uploadingFileName && (
+                                            <div className="mb-2 flex items-center justify-between gap-2 rounded-2xl bg-primary-50 px-3 py-2 text-[10px] font-black text-primary-700">
+                                                <span className="truncate">업로드 중: {uploadingFileName}</span>
+                                                <span>{uploadProgress}%</span>
+                                            </div>
+                                        )}
                                         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                                            <button type="button" onClick={() => fileInputRef.current.click()} className="p-2.5 text-slate-300 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"><ImageIcon className="h-5 w-5" /></button>
-                                            <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" />
+                                            <button type="button" onClick={() => fileInputRef.current.click()} className="p-2.5 text-slate-300 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"><FileIcon className="h-5 w-5" /></button>
+                                            <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.7z" />
                                             <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="Type a message..." className="input-base h-11 border-0 bg-slate-50 font-medium" />
                                             <button type="submit" disabled={!newMessage.trim() || !isConnected} className="p-2.5 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-100 disabled:opacity-20 transition-all active:scale-90"><Send className="h-5 w-5" /></button>
                                         </form>
@@ -1017,6 +1115,9 @@ export const FloatingChat = () => {
         </div>
     );
 };
+
+
+
 
 
 

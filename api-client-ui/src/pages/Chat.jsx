@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 // SockJS/StompJS compatibility for Vite
 if (typeof global === 'undefined') {
     window.global = window;
@@ -15,6 +15,7 @@ import {
     MessageSquare,
     Image as ImageIcon,
     File as FileIcon,
+    Download,
     ArrowLeft,
     X,
     Check,
@@ -26,7 +27,7 @@ import SockJS from "sockjs-client";
 import { useAuth } from "../contexts/AuthContext";
 import api, { uploadFiles } from "../utils/api";
 import toast from "react-hot-toast";
-import { formatRelativeTime, debounce, normalizeChatTimestamp, resolveAssetUrl } from "../utils/helpers";
+import { formatRelativeTime, debounce, normalizeChatTimestamp, resolveAssetUrl, formatFileSize, isImageFile } from "../utils/helpers";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 
 export const Chat = () => {
@@ -41,14 +42,37 @@ export const Chat = () => {
     // 메시지 데이터 정규화
     const normalizeMessage = (msg) => {
         if (!msg) return null;
+
+        const type = msg.type || msg.messageType || "TALK";
+        const fileName = msg.fileName || msg.file_name || "";
+        const fileUrl = msg.fileUrl || msg.file_url || (type === "FILE" ? (msg.message || msg.content || "") : "");
+        const fileContentType = msg.fileContentType || msg.file_content_type || "";
+        const fileSize = Number(msg.fileSize || msg.file_size || 0);
+
         return {
             id: msg.id || msg.messageId || Math.random().toString(36).substr(2, 9),
             senderId: msg.senderId || msg.sender_id,
             senderName: msg.senderName || msg.sender_name || "익명",
             message: msg.message || msg.content || "",
-            type: msg.type || msg.messageType || "TALK",
+            type,
+            fileUrl,
+            fileName,
+            fileContentType,
+            fileSize: Number.isFinite(fileSize) ? fileSize : 0,
+            fileImage: msg.fileImage ?? msg.file_image ?? isImageFile(fileName || fileContentType || fileUrl),
             createdAt: normalizeChatTimestamp(msg.createdAt || msg.created_at)
         };
+    };
+
+    const getAttachmentTypeLabel = (fileName = "", contentType = "") => {
+        const lowerName = String(fileName).toLowerCase();
+        const lowerType = String(contentType).toLowerCase();
+
+        if (lowerType.includes("pdf") || lowerName.endsWith(".pdf")) return "PDF";
+        if (lowerType.includes("zip") || lowerName.endsWith(".zip") || lowerName.endsWith(".rar") || lowerName.endsWith(".7z")) return "압축";
+        if (lowerType.includes("word") || lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) return "문서";
+        if (lowerType.includes("sheet") || lowerName.endsWith(".xls") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".csv")) return "시트";
+        return "파일";
     };
 
     const [rooms, setRooms] = useState([]);
@@ -65,6 +89,8 @@ export const Chat = () => {
     const [showMemberList, setShowMemberList] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showInviteModal, setShowInviteModal] = useState(false);
+    const [uploadingFileName, setUploadingFileName] = useState("");
+    const [uploadProgress, setUploadProgress] = useState(0);
     
     const [newRoomTitle, setNewRoomTitle] = useState("");
     const [newRoomType, setNewRoomType] = useState("GROUP");
@@ -98,14 +124,14 @@ export const Chat = () => {
             const rawData = response.data?.data || response.data;
             const safeData = Array.isArray(rawData) ? rawData : [];
             
-            // ── 채팅방 목록 정렬 (최신 생성순으로 위로 정렬) ──
+            // 채팅방 목록 정렬 (최신 생성순 우선)
             const sortedData = [...safeData].sort((a, b) => {
                 // 1. 생성일시(createdAt) 기준 비교
                 const timeA = new Date(a.createdAt || a.created_at || 0).getTime();
                 const timeB = new Date(b.createdAt || b.created_at || 0).getTime();
                 if (timeA !== timeB) return timeB - timeA; // 날짜가 다르면 최신순
 
-                // 2. 일시가 같거나 없을 경우 ID 기준 비교 (ID가 클수록 최근 방으로 간주)
+                // 2. 생성일시가 같으면 ID 기준 비교
                 const idA = Number(getRoomId(a) || 0);
                 const idB = Number(getRoomId(b) || 0);
                 return idB - idA;
@@ -121,7 +147,7 @@ export const Chat = () => {
         }
     };
 
-    // 특정 방의 멤버 조회 (새로 추가된 API 반영)
+    // 현재 방의 멤버 조회
     const fetchCurrentMembers = async (roomId) => {
         if (!roomId) return;
         setLoadingMembers(true);
@@ -221,7 +247,15 @@ export const Chat = () => {
             const normalized = normalizeMessage(receivedMessage);
             if (normalized) {
                 setMessages((prev) => {
-                    if (prev.find(m => m.id === normalized.id)) return prev;
+                    if (prev.find((m) => m.id === normalized.id)) return prev;
+
+                    const hasSameFile = normalized.type === "FILE" && prev.find((m) =>
+                        m.type === "FILE" &&
+                        Number(m.senderId) === Number(normalized.senderId) &&
+                        String(m.fileUrl || m.message) === String(normalized.fileUrl || normalized.message)
+                    );
+                    if (hasSameFile) return prev;
+
                     return [...prev, normalized];
                 });
             }
@@ -277,32 +311,67 @@ export const Chat = () => {
         const roomId = getRoomId(currentRoom);
         if (!file || !roomId || !client || !isConnected) return;
 
-        const myId = user.member_id || user.memberId;
+        const myId = user.member_id || user.memberId || user.id;
         const formData = new FormData();
         formData.append("file", file);
+        const tempId = `temp-file-${Date.now()}`;
 
         try {
-            const response = await uploadFiles(`/chat/room/${roomId}/file`, formData);
-            const fileUrl = response.data?.url || response.data;
+            setUploadingFileName(file.name);
+            setUploadProgress(0);
+
+            const response = await uploadFiles(`/chat/room/${roomId}/file`, formData, "post", {
+                onUploadProgress: (event) => {
+                    if (!event?.total) return;
+                    setUploadProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+                },
+            });
+
+            const payload = response.data?.data || response.data || {};
+            const fileUrl = payload.url || payload.file_url || "";
+            const fileName = payload.file_name || payload.fileName || file.name;
+            const fileContentType = payload.file_content_type || payload.fileContentType || file.type || "application/octet-stream";
+            const fileSize = Number(payload.file_size || payload.fileSize || file.size || 0);
+            const fileImage = payload.file_image ?? payload.fileImage ?? isImageFile(fileName || fileContentType);
+
             const messagePayload = {
                 roomId: Number(roomId),
                 senderId: Number(myId),
-                message: fileUrl,
-                type: "FILE"
+                message: fileName,
+                type: "FILE",
+                fileUrl,
+                fileName,
+                fileContentType,
+                fileSize,
+                fileImage
             };
+
+            const optimisticMsg = normalizeMessage({
+                ...messagePayload,
+                id: tempId,
+                senderName: user.name || "익명",
+                createdAt: new Date().toISOString()
+            });
+            setMessages((prev) => [...prev, optimisticMsg]);
+
             client.publish({
                 destination: "/pub/chat/message",
-                body: JSON.stringify(messagePayload)
+                body: JSON.stringify(messagePayload),
+                headers: { "content-type": "application/json" }
             });
         } catch (error) {
-            toast.error("파일 업로드 실패");
+            toast.error(error.response?.data?.message || "파일 업로드에 실패했습니다.");
+        } finally {
+            setUploadingFileName("");
+            setUploadProgress(0);
+            e.target.value = "";
         }
     };
 
     const createRoom = async () => {
-        if (!newRoomTitle.trim()) { toast.error("방 제목을 입력하세요."); return; }
+        if (!newRoomTitle.trim()) { toast.error("방 제목을 입력해주세요."); return; }
         try {
-            // 방 생성 시에는 본인(방장)만 멤버로 등록하여 생성 (프로세스 간소화)
+            // 방 생성 시에는 본인만 멤버로 등록해 생성한다.
             const myId = Number(user.member_id || user.memberId || user.id);
             const memberIds = [myId];
 
@@ -472,7 +541,7 @@ export const Chat = () => {
                                     ) : messages.map((msg, idx) => {
                                         const normalized = normalizeMessage(msg);
                                         const isMe = Number(normalized.senderId) === Number(user.member_id || user.memberId);
-                                        const messageImageUrl = normalized.type === "FILE" ? resolveAssetUrl(normalized.message) : "";
+                                        const messageFileUrl = normalized.type === "FILE" ? resolveAssetUrl(normalized.fileUrl || normalized.message) : "";
                                         return (
                                             <div key={idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                                                 <div className={`flex max-w-[80%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
@@ -480,7 +549,44 @@ export const Chat = () => {
                                                     <div className="flex flex-col">
                                                         {!isMe && <span className="text-[10px] text-slate-500 mb-1 ml-1">{normalized.senderName}</span>}
                                                         <div className={`px-4 py-2 rounded-2xl text-sm shadow-sm ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-800 border border-slate-100 rounded-bl-none"}`}>
-                                                            {normalized.type === "FILE" ? <img src={messageImageUrl} alt="파일" className="max-w-xs rounded-lg cursor-pointer" onClick={() => window.open(messageImageUrl, "_blank", "noopener,noreferrer")} /> : normalized.message}
+                                                            {normalized.type === "FILE" ? (
+                                                                normalized.fileImage ? (
+                                                                    <div className="space-y-2">
+                                                                        <img
+                                                                            src={messageFileUrl}
+                                                                            alt={normalized.fileName || "이미지"}
+                                                                            className="max-w-xs rounded-xl cursor-pointer"
+                                                                            onClick={() => window.open(messageFileUrl, "_blank", "noopener,noreferrer")}
+                                                                        />
+                                                                        {!!(normalized.fileName || normalized.message) && (
+                                                                            <div className={`text-[11px] ${isMe ? "text-white/80" : "text-slate-500"}`}>
+                                                                                {normalized.fileName || normalized.message}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <a
+                                                                        href={messageFileUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className={`flex min-w-[220px] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3 transition-colors hover:opacity-90`}
+                                                                        download={normalized.fileName || undefined}
+                                                                    >
+                                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-primary-50 text-primary-600"}`}>
+                                                                            <Download className="h-5 w-5" />
+                                                                        </div>
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="truncate text-sm font-bold">{normalized.fileName || normalized.message || "첨부파일"}</div>
+                                                                            <div className={`mt-1 flex items-center gap-2 text-[11px] ${isMe ? "text-white/80" : "text-slate-500"}`}>
+                                                                                <span>{formatFileSize(Number(normalized.fileSize || 0))}</span>
+                                                                                <span className={`rounded-full px-2 py-0.5 font-bold ${isMe ? "bg-white/10 text-white" : "bg-white text-primary-600"}`}>
+                                                                                    {getAttachmentTypeLabel(normalized.fileName, normalized.fileContentType)}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </a>
+                                                                )
+                                                            ) : normalized.message}
                                                         </div>
                                                     </div>
                                                     <span className="text-[10px] text-slate-400 pb-1">{formatRelativeTime(new Date(normalized.createdAt))}</span>
@@ -491,11 +597,17 @@ export const Chat = () => {
                                     <div ref={messagesEndRef} />
                                 </div>
                                 <div className="p-4 border-t bg-white">
+                                    {uploadingFileName && (
+                                        <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-primary-50 px-4 py-2 text-xs font-bold text-primary-700">
+                                            <span className="truncate">업로드 중: {uploadingFileName}</span>
+                                            <span>{uploadProgress}%</span>
+                                        </div>
+                                    )}
                                     <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-                                        <button type="button" onClick={() => fileInputRef.current.click()} className="p-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"><ImageIcon className="h-5 w-5" /></button>
-                                        <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" />
+                                        <button type="button" onClick={() => fileInputRef.current.click()} className="p-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"><FileIcon className="h-5 w-5" /></button>
+                                        <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.7z" />
                                         <div className="flex-1 relative">
-                                            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="메시지를 입력하세요..." className="w-full pl-4 pr-12 py-3 bg-slate-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-primary-500 resize-none max-h-32" rows="1" />
+                                            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="메시지를 입력해주세요..." className="w-full pl-4 pr-12 py-3 bg-slate-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-primary-500 resize-none max-h-32" rows="1" />
                                             <button type="submit" disabled={!newMessage.trim() || !isConnected} className={`absolute right-2 bottom-2 p-1.5 rounded-lg transition-all ${ (newMessage.trim() && isConnected) ? "bg-primary-600 text-white shadow-md" : "bg-slate-200 text-slate-400" }`}><Send className="h-4 w-4" /></button>
                                         </div>
                                     </form>
@@ -545,7 +657,7 @@ export const Chat = () => {
                                         className="input-base" 
                                         autoFocus
                                     />
-                                    <p className="mt-2 text-xs text-slate-400 font-medium">* 방 생성 후 우측 참여자 목록에서 멤버를 초대할 수 있습니다.</p>
+                                    <p className="mt-2 text-xs text-slate-400 font-medium">* 방 생성 후 참여자 목록에서 멤버를 초대할 수 있습니다.</p>
                                 </div>
                             ) : (
                                 <>
@@ -579,4 +691,8 @@ export const Chat = () => {
         </div>
     );
 };
+
+
+
+
 

@@ -19,27 +19,24 @@ export const Comments = ({ boardId, onUpdate }) => {
     const [likingCommentIds, setLikingCommentIds] = useState({});
     const lastFetchedIdRef = useRef(null);
 
-    // [추가] 해당 게시글의 댓글 목록을 서버에서 불러오는 함수
+    // 해당 게시글의 댓글 목록을 서버에서 불러온다.
     const fetchComments = useCallback(async (force = false) => {
         if (!boardId) return;
-        
-        // StrictMode 중복 호출 방지 (force가 true인 경우는 수동 갱신)
         if (!force && lastFetchedIdRef.current === boardId) return;
-        
+
         try {
             setFetching(true);
             setFetchError("");
-            const response = await api.get(`/comments`, {
+            const response = await api.get("/comments", {
                 params: {
-                    boardId: boardId,
+                    boardId,
                     page: 1,
-                    size: 100 // 일단 넉넉하게 가져오거나 페이징 로직 추가 가능
-                }
+                    size: 100,
+                },
             });
-            
+
             lastFetchedIdRef.current = boardId;
 
-            // MultiResponseDto 구조 대응: response.data.data 또는 response.data
             const data = response.data?.data || response.data;
             const content = Array.isArray(data)
                 ? data
@@ -55,12 +52,10 @@ export const Comments = ({ boardId, onUpdate }) => {
         }
     }, [boardId]);
 
-    // [추가] 컴포넌트 마운트 시 댓글 로드
     useEffect(() => {
         fetchComments();
     }, [fetchComments]);
 
-    // 댓글 작성
     const handleSubmitComment = async (e) => {
         e.preventDefault();
         const content = newComment.trim();
@@ -76,7 +71,7 @@ export const Comments = ({ boardId, onUpdate }) => {
             created_at: new Date().toISOString(),
             like_count: 0,
             member: {
-                name: user?.name || "나",
+                name: user?.name || "익명",
                 profile_url: user?.profile_url || user?.profileUrl || "",
                 profileUrl: user?.profileUrl || user?.profile_url || "",
             },
@@ -85,14 +80,15 @@ export const Comments = ({ boardId, onUpdate }) => {
         setComments((prev) => [optimisticComment, ...prev]);
         setNewComment("");
         setLoading(true);
+
         try {
-            await api.post(`/comments`, {
-                boardId: boardId,
-                contents: content
+            await api.post("/comments", {
+                boardId,
+                contents: content,
             });
             toast.success("댓글이 작성되었습니다.");
-            fetchComments(true); // 목록 수동 새로고침 (force=true)
-            if (onUpdate) onUpdate(); // 부모(BoardDetail)의 게시글 정보(댓글 수 등) 갱신
+            fetchComments(true);
+            if (onUpdate) onUpdate();
         } catch (error) {
             setComments((prev) => prev.filter((comment) => (comment.comment_id || comment.commentId) !== tempId));
             console.error("Failed to create comment:", error);
@@ -102,46 +98,51 @@ export const Comments = ({ boardId, onUpdate }) => {
         }
     };
 
-    // 댓글 수정 시작
     const startEdit = (comment) => {
         setEditingId(comment.comment_id || comment.commentId);
         setEditContent(comment.contents);
     };
 
-    // 댓글 수정 취소
     const cancelEdit = () => {
         setEditingId(null);
         setEditContent("");
     };
 
-    // 댓글 수정 저장
     const handleUpdateComment = async (commentId) => {
-        if (!editContent.trim()) {
+        const nextContent = editContent.trim();
+        if (!nextContent) {
             toast.error("댓글 내용을 입력해주세요.");
             return;
         }
 
         try {
             await api.patch(`/comments/${commentId}`, {
-                contents: editContent
+                contents: nextContent,
             });
 
+            setComments((prev) =>
+                prev.map((comment) =>
+                    (comment.comment_id || comment.commentId) === commentId
+                        ? { ...comment, contents: nextContent }
+                        : comment
+                )
+            );
             setEditingId(null);
             setEditContent("");
             toast.success("댓글이 수정되었습니다.");
-            fetchComments(); // 목록 새로고침
+            fetchComments(true);
         } catch (error) {
             console.error("Failed to update comment:", error);
             toast.error(error.response?.data?.message || "댓글 수정에 실패했습니다.");
         }
     };
 
-    // 댓글 삭제
     const handleDeleteComment = async (commentId) => {
         if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
 
         const existing = comments.find((comment) => (comment.comment_id || comment.commentId) === commentId);
         if (!existing) return;
+
         setComments((prev) => prev.filter((comment) => (comment.comment_id || comment.commentId) !== commentId));
 
         try {
@@ -155,21 +156,21 @@ export const Comments = ({ boardId, onUpdate }) => {
         }
     };
 
-    // 댓글 좋아요
     const handleLikeComment = async (commentId) => {
         if (!commentId) return;
         if (likingCommentIds[commentId]) return;
 
-        const target = comments.find((c) => (c.comment_id || c.commentId) === commentId);
+        const target = comments.find((comment) => (comment.comment_id || comment.commentId) === commentId);
         if (!target) return;
+
         const prevLikeCount = target.like_count ?? target.likeCount ?? 0;
 
         setLikingCommentIds((prev) => ({ ...prev, [commentId]: true }));
         setComments((prev) =>
-            prev.map((c) =>
-                (c.comment_id || c.commentId) === commentId
-                    ? { ...c, like_count: prevLikeCount + 1, likeCount: prevLikeCount + 1 }
-                    : c
+            prev.map((comment) =>
+                (comment.comment_id || comment.commentId) === commentId
+                    ? { ...comment, like_count: prevLikeCount + 1, likeCount: prevLikeCount + 1 }
+                    : comment
             )
         );
 
@@ -179,23 +180,23 @@ export const Comments = ({ boardId, onUpdate }) => {
             const nextLikeCount = updatedData.like_count !== undefined ? updatedData.like_count : updatedData.likeCount;
 
             setComments((prev) =>
-                prev.map((c) =>
-                    (c.comment_id || c.commentId) === commentId
+                prev.map((comment) =>
+                    (comment.comment_id || comment.commentId) === commentId
                         ? {
-                            ...c,
+                            ...comment,
                             like_count: nextLikeCount !== undefined ? nextLikeCount : prevLikeCount + 1,
                             likeCount: nextLikeCount !== undefined ? nextLikeCount : prevLikeCount + 1,
                         }
-                        : c
+                        : comment
                 )
             );
             toast.success("좋아요 상태가 반영되었습니다.");
         } catch (error) {
             setComments((prev) =>
-                prev.map((c) =>
-                    (c.comment_id || c.commentId) === commentId
-                        ? { ...c, like_count: prevLikeCount, likeCount: prevLikeCount }
-                        : c
+                prev.map((comment) =>
+                    (comment.comment_id || comment.commentId) === commentId
+                        ? { ...comment, like_count: prevLikeCount, likeCount: prevLikeCount }
+                        : comment
                 )
             );
             console.error("Failed to like comment:", error);
@@ -210,9 +211,9 @@ export const Comments = ({ boardId, onUpdate }) => {
     };
 
     const handleReportComment = async (commentId) => {
-        const reason = window.prompt("신고 사유를 입력하세요.", "부적절한 댓글");
+        const reason = window.prompt("신고 사유를 입력해주세요", "부적절한 댓글");
         if (!reason) return;
-        const detail = window.prompt("상세 내용을 입력하세요. (선택)", "") || "";
+        const detail = window.prompt("상세 내용을 입력해주세요 (선택)", "") || "";
 
         try {
             await api.post("/reports", {
@@ -240,7 +241,6 @@ export const Comments = ({ boardId, onUpdate }) => {
                 </div>
             )}
 
-            {/* 댓글 작성 폼 */}
             <div className="card p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                     <MessageCircle className="h-5 w-5 text-blue-600" />
@@ -251,7 +251,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                     <textarea
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="댓글을 입력하세요..."
+                        placeholder="댓글을 입력해주세요..."
                         className="input-base w-full min-h-[100px] resize-none focus:ring-2 focus:ring-blue-500"
                         disabled={loading}
                     />
@@ -270,19 +270,17 @@ export const Comments = ({ boardId, onUpdate }) => {
                 </form>
             </div>
 
-            {/* 댓글 리스트 */}
             <div className="space-y-4">
                 {comments.length === 0 ? (
                     <div className="card p-12 text-center border-dashed border-2">
                         <MessageCircle className="h-12 w-12 mx-auto text-slate-300 mb-3" />
-                        <p className="text-slate-600">첫 댓글을 작성해보세요!</p>
+                        <p className="text-slate-600">첫 댓글을 작성해보세요.</p>
                     </div>
                 ) : (
                     comments.map((comment) => {
                         const commentId = comment.comment_id || comment.commentId;
                         const isEditing = editingId === commentId;
                         const profileImageUrl = normalizeProfileImageUrl(comment.member?.profile_url || comment.member?.profileUrl || "");
-
                         const canManageComment = canManageByOwnerOrAdmin(user, comment.member);
 
                         return (
@@ -325,8 +323,12 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                     className="input-base w-full min-h-[80px] resize-none"
                                                 />
                                                 <div className="flex gap-2">
-                                                    <button onClick={() => handleUpdateComment(commentId)} className="btn-primary text-sm px-4 py-2">저장</button>
-                                                    <button onClick={cancelEdit} className="btn-secondary text-sm px-4 py-2">취소</button>
+                                                    <button type="button" onClick={() => handleUpdateComment(commentId)} className="btn-primary text-sm px-4 py-2">
+                                                        저장
+                                                    </button>
+                                                    <button type="button" onClick={cancelEdit} className="btn-secondary text-sm px-4 py-2">
+                                                        취소
+                                                    </button>
                                                 </div>
                                             </div>
                                         ) : (
@@ -340,16 +342,18 @@ export const Comments = ({ boardId, onUpdate }) => {
                                 {!isEditing && (
                                     <div className="flex items-center gap-4 ml-14">
                                         <button
+                                            type="button"
                                             onClick={() => handleLikeComment(commentId)}
                                             disabled={Boolean(likingCommentIds[commentId])}
                                             className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-500 transition-colors group"
                                         >
-                                            <Heart className={`h-4 w-4 group-hover:fill-red-500`} />
+                                            <Heart className="h-4 w-4 group-hover:fill-red-500" />
                                             <span>{comment.like_count ?? comment.likeCount ?? 0}</span>
                                         </button>
 
                                         {user && (
                                             <button
+                                                type="button"
                                                 onClick={() => handleReportComment(commentId)}
                                                 className="flex items-center gap-1 text-sm text-slate-500 hover:text-amber-600"
                                             >
@@ -359,10 +363,10 @@ export const Comments = ({ boardId, onUpdate }) => {
 
                                         {canManageComment && (
                                             <div className="flex gap-3 border-l pl-4">
-                                                <button onClick={() => startEdit(comment)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-blue-600">
+                                                <button type="button" onClick={() => startEdit(comment)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-blue-600">
                                                     <Edit2 className="h-3.5 w-3.5" /> 수정
                                                 </button>
-                                                <button onClick={() => handleDeleteComment(commentId)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-red-600">
+                                                <button type="button" onClick={() => handleDeleteComment(commentId)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-red-600">
                                                     <Trash2 className="h-3.5 w-3.5" /> 삭제
                                                 </button>
                                             </div>

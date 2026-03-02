@@ -106,13 +106,14 @@ api.interceptors.response.use(
 export default api;
 
 // Multipart 요청 전용 함수 / Multipart helper
-export const uploadFiles = async (endpoint, formData, method = "post") => {
+export const uploadFiles = async (endpoint, formData, method = "post", config = {}) => {
     beginNetworkActivity();
     try {
         return await api.request({
             method,
             url: endpoint,
             data: formData,
+            ...config,
         });
     } finally {
         endNetworkActivity();
