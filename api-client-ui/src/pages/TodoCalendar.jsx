@@ -384,6 +384,10 @@ export const TodoCalendar = () => {
         const items = todosByDate.get(toDateOnly(date)) || [];
         return items.length ? (
             <div className={variant === "week" ? "space-y-2.5" : "space-y-3"}>{items.map((todo) => renderTodoRow(todo, variant))}</div>
+        ) : variant === "week" ? (
+            <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3 text-center text-xs font-semibold text-slate-400">
+                등록된 할 일이 없습니다.
+            </div>
         ) : (
             <EmptyState
                 message="이 날짜에는 할 일이 없습니다."
@@ -556,14 +560,16 @@ export const TodoCalendar = () => {
                 <section className="grid grid-cols-1 gap-4 xl:grid-cols-7 xl:items-start">
                     {weekDays.map((date) => {
                         const isCurrentDay = isToday(date);
+                        const items = todosByDate.get(toDateOnly(date)) || [];
+                        const isEmptyDay = items.length === 0;
                         return (
                             <div
                                 key={date.toISOString()}
-                                className={`h-full min-w-0 rounded-[2rem] border bg-white p-4 shadow-sm transition-all ${
+                                className={`min-w-0 rounded-[2rem] border bg-white p-4 shadow-sm transition-all ${
                                     isCurrentDay
                                         ? "border-primary-400 ring-2 ring-primary-200 shadow-lg shadow-primary-100/60"
                                         : "border-slate-200"
-                                }`}
+                                } ${isEmptyDay ? "xl:self-start" : "h-full"}`}
                             >
                                 <div className="mb-3 flex items-start justify-between gap-2">
                                     <div className="min-w-0 flex-1">
@@ -633,6 +639,10 @@ export const TodoCalendar = () => {
                                 const items = todosByDate.get(key) || [];
                                 const incompleteCount = items.filter((todo) => todo.status !== "DONE").length;
                                 const hasDone = items.some((todo) => todo.status === "DONE");
+                                const dayOfWeek = date.getDay();
+                                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                                const isSunday = dayOfWeek === 0;
+                                const isSaturday = dayOfWeek === 6;
                                 return (
                                     <button
                                         key={key}
@@ -641,14 +651,24 @@ export const TodoCalendar = () => {
                                             setAnchorDate(date);
                                             setViewMode(VIEW_MODE.DAY);
                                         }}
-                                        className={`min-h-[94px] rounded-[1.5rem] border p-3 text-left transition-all ${
+                                        className={`aspect-square rounded-[1.25rem] border p-2.5 text-left transition-all sm:min-h-[94px] sm:aspect-auto sm:rounded-[1.5rem] sm:p-3 ${
                                             isSameMonth(date, anchorDate)
                                                 ? "border-slate-200 bg-white hover:border-primary-300 hover:shadow-sm"
                                                 : "border-transparent bg-slate-50/70 text-slate-300"
                                         } ${isToday(date) ? "ring-2 ring-primary-300" : ""}`}
                                     >
                                         <div className="flex items-center justify-between">
-                                            <span className={`text-sm font-black ${isSameDay(date, anchorDate) ? "text-primary-700" : "text-slate-700"}`}>
+                                            <span className={`text-sm font-black ${
+                                                isSameDay(date, anchorDate)
+                                                    ? "text-primary-700"
+                                                    : isSunday
+                                                        ? "text-rose-500"
+                                                        : isSaturday
+                                                            ? "text-red-400"
+                                                            : isWeekend
+                                                                ? "text-rose-400"
+                                                                : "text-slate-700"
+                                            }`}>
                                                 {format(date, "d")}
                                             </span>
                                             {incompleteCount > 0 && (
