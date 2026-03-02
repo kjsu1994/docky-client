@@ -18,6 +18,7 @@ import {
     ChevronRight,
     Settings,
     X,
+    Film,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { isAdminUser } from "../utils/authorization";
@@ -72,6 +73,7 @@ export const Header = () => {
                     { title: "순위", to: "/app/ranks", icon: Trophy },
                     { title: "플린코", to: "/app/plinko", icon: Dices },
                     { title: "뉴스", to: "/app/news", icon: Newspaper },
+                    { title: "스트리밍", to: "/app/streaming", icon: Film },
                 ],
             },
             {
@@ -88,6 +90,7 @@ export const Header = () => {
                 items: [
                     { title: "관리자 콘솔", to: "/app/admin/anomalies", icon: ShieldAlert },
                     { title: "운영 관리", to: "/app/admin/operations", icon: ShieldAlert },
+                    { title: "스트리밍 스튜디오", to: "/app/admin/streaming", icon: ShieldAlert },
                 ],
             });
         }
@@ -228,5 +231,7 @@ export const Header = () => {
         </header>
     );
 };
+
+
 
 

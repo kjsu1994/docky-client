@@ -23,6 +23,8 @@ import { AdminOperations } from "./pages/AdminOperations.jsx";
 import { Chat } from "./pages/Chat.jsx";
 import { AllMenu } from "./pages/AllMenu.jsx";
 import { TodoCalendar } from "./pages/TodoCalendar.jsx";
+import { StreamingHub } from "./pages/StreamingHub.jsx";
+import { AdminStreamingStudio } from "./pages/AdminStreamingStudio.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
@@ -76,6 +78,7 @@ function App() {
 
                     <Route path="/app/chat" element={<ProtectedRoute><AppLayout><Chat /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/todos" element={<ProtectedRoute><AppLayout><TodoCalendar /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/streaming" element={<ProtectedRoute><AppLayout><StreamingHub /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/all-menu" element={<ProtectedRoute><AppLayout><AllMenu /></AppLayout></ProtectedRoute>} />
 
                     <Route path="/app/statistics" element={<ProtectedRoute><AppLayout><Statistics /></AppLayout></ProtectedRoute>} />
@@ -89,6 +92,7 @@ function App() {
                     <Route path="/app/parking" element={<Navigate to="/app/facility" replace />} />
                     <Route path="/app/admin/anomalies" element={<ProtectedRoute><AppLayout><AdminAnomalies /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/admin/operations" element={<ProtectedRoute><AppLayout><AdminOperations /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/admin/streaming" element={<ProtectedRoute><AppLayout><AdminStreamingStudio /></AppLayout></ProtectedRoute>} />
 
                     <Route path="/" element={<Navigate to="/app" replace />} />
                     <Route path="*" element={<Navigate to="/app" replace />} />
@@ -117,6 +121,8 @@ function App() {
 }
 
 export default App;
+
+
 
 
 

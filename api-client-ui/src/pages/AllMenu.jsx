@@ -15,6 +15,7 @@ import {
     LogOut,
     ChevronRight,
     HelpCircle,
+    Film,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdminUser } from "../utils/authorization";
@@ -50,6 +51,7 @@ export const AllMenu = () => {
         { title: "홈", to: "/app", icon: Home, color: "bg-blue-50 text-blue-600" },
         { title: "Todo", to: "/app/todos", icon: CalendarDays, color: "bg-emerald-50 text-emerald-700" },
         { title: "통계", to: "/app/statistics", icon: BarChart, color: "bg-indigo-50 text-indigo-600" },
+        { title: "스트리밍", to: "/app/streaming", icon: Film, color: "bg-fuchsia-50 text-fuchsia-700" },
         { title: "자유게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare, color: "bg-sky-50 text-sky-600" },
         { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle, color: "bg-emerald-50 text-emerald-600" },
     ];
@@ -70,6 +72,7 @@ export const AllMenu = () => {
     const admin = [
         { title: "관리자 콘솔", to: "/app/admin/anomalies", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
         { title: "운영 관리", to: "/app/admin/operations", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
+        { title: "스트리밍 스튜디오", to: "/app/admin/streaming", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
     ];
 
     return (
@@ -105,4 +108,6 @@ export const AllMenu = () => {
         </div>
     );
 };
+
+
 
