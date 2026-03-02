@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import {
     Home,
     BarChart,
+    CalendarDays,
     MessageSquare,
     Trophy,
     Newspaper,
@@ -57,6 +58,7 @@ export const Header = () => {
                 title: "Core",
                 items: [
                     { title: "홈", to: "/app", icon: Home },
+                    { title: "Todo", to: "/app/todos", icon: CalendarDays },
                     { title: "통계", to: "/app/statistics", icon: BarChart },
                     { title: "자유게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare },
                     { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle },
@@ -181,7 +183,23 @@ export const Header = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <NavLink
+                            to="/app/todos"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 sm:hidden"
+                            title="투두"
+                            aria-label="투두로 이동"
+                        >
+                            <CalendarDays className="h-5 w-5" />
+                        </NavLink>
                         <div className="hidden items-center gap-2 sm:flex">
+                            <NavLink
+                                to="/app/todos"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+                                title="투두"
+                                aria-label="투두로 이동"
+                            >
+                                <CalendarDays className="h-5 w-5" />
+                            </NavLink>
                             <NavLink
                                 to="/app/mypage"
                                 className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-bold text-slate-600 transition-all hover:bg-slate-50"
@@ -210,4 +228,5 @@ export const Header = () => {
         </header>
     );
 };
+
 

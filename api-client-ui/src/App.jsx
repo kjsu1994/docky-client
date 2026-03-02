@@ -22,6 +22,7 @@ import { AdminAnomalies } from "./pages/AdminAnomalies.jsx";
 import { AdminOperations } from "./pages/AdminOperations.jsx";
 import { Chat } from "./pages/Chat.jsx";
 import { AllMenu } from "./pages/AllMenu.jsx";
+import { TodoCalendar } from "./pages/TodoCalendar.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
@@ -74,6 +75,7 @@ function App() {
                     <Route path="/app/boards/:kind/:boardId" element={<ProtectedRoute><AppLayout><BoardDetail /></AppLayout></ProtectedRoute>} />
 
                     <Route path="/app/chat" element={<ProtectedRoute><AppLayout><Chat /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/todos" element={<ProtectedRoute><AppLayout><TodoCalendar /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/all-menu" element={<ProtectedRoute><AppLayout><AllMenu /></AppLayout></ProtectedRoute>} />
 
                     <Route path="/app/statistics" element={<ProtectedRoute><AppLayout><Statistics /></AppLayout></ProtectedRoute>} />
@@ -83,7 +85,8 @@ function App() {
                     <Route path="/app/mypage/edit" element={<ProtectedRoute><AppLayout><MypageEdit /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/plinko" element={<ProtectedRoute><AppLayout><LuckyPlinko /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/optimizer" element={<ProtectedRoute><AppLayout><MeetingOptimizer /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/facility" element={<ProtectedRoute><AppLayout><FacilityFinder /></AppLayout></ProtectedRoute>} />                    <Route path="/app/parking" element={<Navigate to="/app/facility" replace />} />
+                    <Route path="/app/facility" element={<ProtectedRoute><AppLayout><FacilityFinder /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/parking" element={<Navigate to="/app/facility" replace />} />
                     <Route path="/app/admin/anomalies" element={<ProtectedRoute><AppLayout><AdminAnomalies /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/admin/operations" element={<ProtectedRoute><AppLayout><AdminOperations /></AppLayout></ProtectedRoute>} />
 

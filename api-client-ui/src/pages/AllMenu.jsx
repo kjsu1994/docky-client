@@ -2,6 +2,7 @@
 import {
     Home,
     BarChart,
+    CalendarDays,
     MessageSquare,
     Trophy,
     Newspaper,
@@ -47,6 +48,7 @@ export const AllMenu = () => {
 
     const mainServices = [
         { title: "홈", to: "/app", icon: Home, color: "bg-blue-50 text-blue-600" },
+        { title: "Todo", to: "/app/todos", icon: CalendarDays, color: "bg-emerald-50 text-emerald-700" },
         { title: "통계", to: "/app/statistics", icon: BarChart, color: "bg-indigo-50 text-indigo-600" },
         { title: "자유게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare, color: "bg-sky-50 text-sky-600" },
         { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle, color: "bg-emerald-50 text-emerald-600" },

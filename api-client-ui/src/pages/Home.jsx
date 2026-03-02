@@ -3,12 +3,10 @@ import { Link } from "react-router-dom";
 import {
     ArrowRight,
     Sparkles,
-    Users,
     MessageSquare,
     Eye,
     TrendingUp,
     TrendingDown,
-    Activity,
     Car,
     Trophy,
     Dices,
@@ -457,7 +455,7 @@ export const Home = () => {
                         <p className="text-sm font-medium text-slate-400">자주 사용하는 기능을 바로 실행하세요.</p>
                     </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5">
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 sm:gap-6 lg:grid-cols-6">
                     <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" />
                     <QuickMenuLink to="/app/facility" icon={Car} title="편의시설 찾기" color="sky" />
                     <QuickMenuLink to="/app/ranks" icon={Trophy} title="랭킹" color="amber" />
@@ -598,5 +596,6 @@ const QuickMenuLink = ({ to, icon: Icon, title, color }) => {
 };
 
 export default Home;
+
 
 
