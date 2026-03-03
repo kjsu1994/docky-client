@@ -126,29 +126,51 @@ const EmptySlot = ({ message }) => (
 const CandlestickChart = ({ points, currency }) => {
     const [hoveredIndex, setHoveredIndex] = useState(null);
 
-    const candles = useMemo(
-        () => (Array.isArray(points) ? points : [])
-            .map((item) => ({
-                ...item,
-                open: Number(item.open),
-                high: Number(item.high),
-                low: Number(item.low),
-                close: Number(item.close),
-            }))
-            .filter((item) => [item.open, item.high, item.low, item.close].every((value) => Number.isFinite(value))),
-        [points],
-    );
+    const candles = useMemo(() => {
+        const source = Array.isArray(points) ? points : [];
+        return source
+            .map((item, index) => {
+                const open = Number(item.open);
+                const high = Number(item.high);
+                const low = Number(item.low);
+                const close = Number(item.close);
+                const volume = Number(item.volume);
+                if (![open, high, low, close].every((value) => Number.isFinite(value))) {
+                    return null;
+                }
+                const previousClose = Number(item.previous_close);
+                const fallbackPreviousClose = index > 0 ? Number(source[index - 1]?.close) : open;
+                const referenceClose = Number.isFinite(previousClose)
+                    ? previousClose
+                    : (Number.isFinite(fallbackPreviousClose) ? fallbackPreviousClose : open);
+                return {
+                    ...item,
+                    open,
+                    high,
+                    low,
+                    close,
+                    volume: Number.isFinite(volume) ? volume : null,
+                    referenceClose,
+                };
+            })
+            .filter(Boolean);
+    }, [points]);
 
     if (!candles.length) {
         return <EmptySlot message="차트 OHLC 데이터가 없습니다." />;
     }
 
     const width = 820;
-    const height = 320;
+    const height = 360;
     const paddingX = 28;
-    const paddingY = 18;
+    const paddingTop = 18;
+    const volumeGap = 14;
+    const candleAreaHeight = 238;
+    const volumeAreaHeight = 66;
+    const candleBottom = paddingTop + candleAreaHeight;
+    const volumeTop = candleBottom + volumeGap;
+    const volumeBottom = volumeTop + volumeAreaHeight;
     const plotWidth = width - paddingX * 2;
-    const plotHeight = height - paddingY * 2;
     const min = Math.min(...candles.map((item) => item.low));
     const max = Math.max(...candles.map((item) => item.high));
     const spread = Math.max(max - min, 1);
@@ -158,7 +180,24 @@ const CandlestickChart = ({ points, currency }) => {
     const first = candles[0];
     const hovered = hoveredIndex == null ? latest : candles[hoveredIndex];
     const trendUp = latest.close >= first.close;
-    const toY = (value) => height - paddingY - (((value - min) / spread) * plotHeight);
+    const maxVolume = Math.max(...candles.map((item) => item.volume || 0), 0);
+    const hasVolume = maxVolume > 0;
+    const toY = (value) => candleBottom - (((value - min) / spread) * candleAreaHeight);
+    const toVolumeY = (value) => {
+        if (!hasVolume) return volumeBottom;
+        const safeValue = Number.isFinite(value) ? value : 0;
+        return volumeBottom - ((safeValue / maxVolume) * volumeAreaHeight);
+    };
+    const changeRate = (priceValue) => {
+        const num = Number(priceValue);
+        const reference = Number(hovered?.referenceClose);
+        if (!Number.isFinite(num) || !Number.isFinite(reference) || reference === 0) return null;
+        return ((num - reference) / reference) * 100;
+    };
+    const renderPriceLine = (label, value) => {
+        const rate = changeRate(value);
+        return `${label} ${formatCurrency(value, currency)}${rate == null ? "" : ` (${formatPercent(rate)})`}`;
+    };
 
     return (
         <div className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
@@ -166,27 +205,31 @@ const CandlestickChart = ({ points, currency }) => {
                 <div>
                     <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Candlestick</div>
                     <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
-                        국내와 미국 모두 동일한 캔들 차트를 사용하며, 봉에 마우스를 올리면 시가, 고가, 저가, 종가를 확인할 수 있습니다.
+                        국내와 미국 모두 동일한 캔들 차트를 사용하며, 봉에 마우스를 올리면 시가, 고가, 저가, 종가와 등락률을 함께 확인할 수 있습니다.
                     </p>
                 </div>
-                <div className="min-w-[220px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600 shadow-sm">
+                <div className="min-w-[280px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600 shadow-sm">
                     <div className="text-sm font-black text-slate-900">{hovered?.trading_date || "-"}</div>
-                    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                        <span>시가 {formatCurrency(hovered?.open, currency)}</span>
-                        <span>고가 {formatCurrency(hovered?.high, currency)}</span>
-                        <span>저가 {formatCurrency(hovered?.low, currency)}</span>
-                        <span>종가 {formatCurrency(hovered?.close, currency)}</span>
+                    <div className="mt-2 grid grid-cols-1 gap-y-1.5">
+                        <span>{renderPriceLine("시가", hovered?.open)}</span>
+                        <span>{renderPriceLine("고가", hovered?.high)}</span>
+                        <span>{renderPriceLine("저가", hovered?.low)}</span>
+                        <span>{renderPriceLine("종가", hovered?.close)}</span>
+                    </div>
+                    <div className="mt-3 border-t border-slate-100 pt-2 text-[11px] font-bold text-slate-500">
+                        거래량 {hovered?.volume != null ? formatCompact(hovered.volume) : "-"}
                     </div>
                 </div>
             </div>
 
             <div className="overflow-x-auto rounded-[1.4rem] bg-white/70 p-2">
-                <svg viewBox={`0 0 ${width} ${height}`} className="h-72 min-w-[760px] w-full">
+                <svg viewBox={`0 0 ${width} ${height}`} className="h-80 min-w-[760px] w-full">
                     {[0, 1, 2, 3].map((step) => {
-                        const y = paddingY + (plotHeight * step) / 3;
-                        return <line key={step} x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#e2e8f0" strokeWidth="1" />;
+                        const y = paddingTop + (candleAreaHeight * step) / 3;
+                        return <line key={`price-grid-${step}`} x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#e2e8f0" strokeWidth="1" />;
                     })}
-                    <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} stroke="#cbd5e1" strokeWidth="1" />
+                    <line x1={paddingX} y1={candleBottom} x2={width - paddingX} y2={candleBottom} stroke="#cbd5e1" strokeWidth="1" />
+                    <line x1={paddingX} y1={volumeBottom} x2={width - paddingX} y2={volumeBottom} stroke="#e2e8f0" strokeWidth="1" />
 
                     {candles.map((item, index) => {
                         const centerX = paddingX + slotWidth * index + slotWidth / 2;
@@ -200,12 +243,17 @@ const CandlestickChart = ({ points, currency }) => {
                         const stroke = rising ? "#059669" : "#dc2626";
                         const fill = rising ? "#10b981" : "#ef4444";
                         const active = hoveredIndex === index;
+                        const volumeHeight = hasVolume && item.volume != null ? Math.max(volumeBottom - toVolumeY(item.volume), 2) : 0;
+                        const volumeY = hasVolume && item.volume != null ? volumeBottom - volumeHeight : volumeBottom;
 
                         return (
                             <g key={`${item.trading_date || "point"}-${index}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
-                                <rect x={paddingX + slotWidth * index} y={paddingY} width={slotWidth} height={plotHeight} fill="transparent" />
+                                <rect x={paddingX + slotWidth * index} y={paddingTop} width={slotWidth} height={volumeBottom - paddingTop} fill="transparent" />
                                 <line x1={centerX} y1={highY} x2={centerX} y2={lowY} stroke={stroke} strokeWidth={active ? 2.4 : 1.6} strokeLinecap="round" />
                                 <rect x={centerX - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} rx="1.5" fill={fill} stroke={active ? "#0f172a" : stroke} strokeWidth={active ? 1.5 : 1} opacity={active ? 1 : 0.92} />
+                                {hasVolume ? (
+                                    <rect x={centerX - candleWidth / 2} y={volumeY} width={candleWidth} height={volumeHeight} rx="1.5" fill={rising ? "#86efac" : "#fca5a5"} opacity={active ? 0.95 : 0.75} />
+                                ) : null}
                             </g>
                         );
                     })}
@@ -218,6 +266,89 @@ const CandlestickChart = ({ points, currency }) => {
                 <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">최신 날짜</div><div className="mt-1 text-sm font-black text-slate-900">{latest?.trading_date || "-"}</div></div>
                 <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">추세</div><div className={`mt-1 text-sm font-black ${trendUp ? "text-emerald-600" : "text-rose-600"}`}>{trendUp ? "상승" : "하락"}</div></div>
             </div>
+        </div>
+    );
+};
+
+const FinancialTrendBars = ({ history }) => {
+    const items = Array.isArray(history) ? history : [];
+
+    if (!items.length) {
+        return <EmptySlot message="최근 3개년 재무 추이 데이터가 없습니다." />;
+    }
+
+    const amountMax = Math.max(...items.flatMap((item) => [Number(item.revenue) || 0, Number(item.operating_income) || 0, Number(item.net_income) || 0]), 1);
+
+    return (
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
+                <div className="text-sm font-black text-slate-900">금액 추이</div>
+                <div className="mt-4 space-y-4">
+                    {items.map((item) => (
+                        <div key={item.business_year} className="space-y-2">
+                            <div className="flex items-center justify-between text-xs font-black text-slate-500">
+                                <span>{item.business_year}년</span>
+                                <span>매출 {formatCompact(item.revenue)}</span>
+                            </div>
+                            <div className="space-y-2">
+                                <div>
+                                    <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500"><span>매출</span><span>{formatCompact(item.revenue)}</span></div>
+                                    <div className="h-2 rounded-full bg-slate-200"><div className="h-2 rounded-full bg-slate-900" style={{ width: `${Math.max(((Number(item.revenue) || 0) / amountMax) * 100, 3)}%` }} /></div>
+                                </div>
+                                <div>
+                                    <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500"><span>영업이익</span><span>{formatCompact(item.operating_income)}</span></div>
+                                    <div className="h-2 rounded-full bg-slate-200"><div className="h-2 rounded-full bg-emerald-500" style={{ width: `${Math.max(((Math.abs(Number(item.operating_income)) || 0) / amountMax) * 100, 3)}%` }} /></div>
+                                </div>
+                                <div>
+                                    <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500"><span>순이익</span><span>{formatCompact(item.net_income)}</span></div>
+                                    <div className="h-2 rounded-full bg-slate-200"><div className="h-2 rounded-full bg-sky-500" style={{ width: `${Math.max(((Math.abs(Number(item.net_income)) || 0) / amountMax) * 100, 3)}%` }} /></div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="rounded-[1.6rem] border border-slate-100 bg-white p-4">
+                <div className="text-sm font-black text-slate-900">비율 추이</div>
+                <div className="mt-4 space-y-3">
+                    {items.map((item) => (
+                        <div key={`${item.business_year}-ratio`} className="rounded-2xl bg-slate-50 p-4">
+                            <div className="text-xs font-black text-slate-400">{item.business_year}년</div>
+                            <div className="mt-3 grid grid-cols-2 gap-3 text-sm font-bold text-slate-700">
+                                <div>영업이익률 <span className={toneByValue(item.profit_margin)}>{formatPercent(item.profit_margin)}</span></div>
+                                <div>ROE <span className={toneByValue(item.return_on_equity)}>{formatPercent(item.return_on_equity)}</span></div>
+                                <div>부채비율 <span className="text-slate-900">{formatPercent(item.debt_ratio)}</span></div>
+                                <div>유동비율 <span className={toneByValue(item.current_ratio)}>{formatPercent(item.current_ratio)}</span></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const QuarterlyEarningsGrid = ({ items }) => {
+    const quarters = Array.isArray(items) ? items : [];
+
+    if (!quarters.length) {
+        return <EmptySlot message="최근 분기 실적 데이터가 없습니다." />;
+    }
+
+    return (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {quarters.map((item) => (
+                <article key={item.period_label || `${item.business_year}-${item.quarter}`} className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{item.period_label || `${item.business_year} ${item.quarter}`}</div>
+                    <div className="mt-4 space-y-3 text-sm font-bold text-slate-700">
+                        <div className="flex items-center justify-between gap-3"><span>매출</span><span className="text-slate-900">{formatCompact(item.revenue)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span>영업이익</span><span className={toneByValue(item.operating_income)}>{formatCompact(item.operating_income)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span>순이익</span><span className={toneByValue(item.net_income)}>{formatCompact(item.net_income)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span>영업이익률</span><span className={toneByValue(item.operating_margin)}>{formatPercent(item.operating_margin)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span>순이익률</span><span className={toneByValue(item.net_margin)}>{formatPercent(item.net_margin)}</span></div>
+                    </div>
+                </article>
+            ))}
         </div>
     );
 };
@@ -318,6 +449,11 @@ export const InvestAssistant = () => {
     const currency = chartData?.currency || summary?.currency || (market === "US" ? "USD" : "KRW");
     const newsIssues = v3?.news_issues || v2?.news_issues || [];
     const limitations = [...(v3?.limitations || v2?.limitations || v1?.limitations || []), ...(chartData?.limitations || [])];
+    const isKr = market === "KR";
+    const krFinancial = v3?.kr_financial_snapshot;
+    const krFinancialHistory = v3?.kr_financial_history || [];
+    const krQuarterlyEarnings = v3?.kr_quarterly_earnings || [];
+    const dividend = v3?.dividend_snapshot;
 
     const fetchChart = async (nextMarket, symbol, interval, fallbackSource = {}) => {
         setChartLoading(true);
@@ -455,8 +591,8 @@ export const InvestAssistant = () => {
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">현재가</div><div className="mt-1 text-lg font-black text-slate-900">{price?.price != null ? formatCurrency(price.price, currency) : "-"}</div></div>
                             <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">등락률</div><div className={`mt-1 text-lg font-black ${toneByValue(price?.change_percent)}`}>{price?.change_percent != null ? formatPercent(price.change_percent) : "-"}</div></div>
-                            <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">시가총액</div><div className="mt-1 text-lg font-black text-slate-900">{summary?.market_cap != null ? formatCompact(summary.market_cap) : "-"}</div></div>
-                            <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">매출 성장률</div><div className={`mt-1 text-lg font-black ${toneByValue(summary?.revenue_growth_rate)}`}>{summary?.revenue_growth_rate != null ? formatPercent(summary.revenue_growth_rate) : "-"}</div></div>
+                            <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "현재 배당수익률" : "시가총액"}</div><div className="mt-1 text-lg font-black text-slate-900">{isKr ? (dividend?.dividend_yield != null ? formatPercent(dividend.dividend_yield) : "-") : (summary?.market_cap != null ? formatCompact(summary.market_cap) : "-")}</div></div>
+                            <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "배당금" : "매출 성장률"}</div><div className={`mt-1 text-lg font-black ${isKr ? "text-slate-900" : toneByValue(summary?.revenue_growth_rate)}`}>{isKr ? (dividend?.dividend_per_share != null ? formatCurrency(dividend.dividend_per_share, "KRW") : "-") : (summary?.revenue_growth_rate != null ? formatPercent(summary.revenue_growth_rate) : "-")}</div></div>
                         </div>
                     </Card>
 
@@ -469,14 +605,84 @@ export const InvestAssistant = () => {
                         {chartLoading ? <LoadingSpinner text="차트 데이터를 불러오는 중입니다..." /> : <CandlestickChart points={chartData?.points} currency={currency} />}
                     </Card>
 
-                    <div className="grid gap-5 xl:grid-cols-3">
-                        <Card title="기본 의견" subtitle="v1/v2 기본 분석 결과">
+                    {isKr ? (
+                        <Card title="최근 3개년 재무 추이" subtitle="DART 최근 연간 결산 기준 매출, 영업이익, 순이익과 비율 흐름">
+                            <FinancialTrendBars history={krFinancialHistory} />
+                        </Card>
+                    ) : null}
+
+                    {isKr ? (
+                        <Card title="최근 분기 실적" subtitle="DART 최근 4개 분기 기준 매출, 영업이익, 순이익">
+                            <QuarterlyEarningsGrid items={krQuarterlyEarnings} />
+                        </Card>
+                    ) : null}
+
+                    <div className={`grid gap-5 ${isKr ? "xl:grid-cols-2" : "xl:grid-cols-3"}`}>
+                        <Card title="기본 의견" subtitle="수익성, 안정성, 배당 해석을 함께 반영한 의견">
                             <div className="flex flex-wrap gap-2">
                                 {opinion?.signal ? <Badge className={toneBySignal(opinion.signal)}>{opinion.signal}</Badge> : null}
                                 {opinion?.score != null ? <Badge className="bg-slate-100 text-slate-700">점수 {opinion.score}</Badge> : null}
+                                {dividend?.dividend_label && isKr ? <Badge className="bg-emerald-100 text-emerald-700">{dividend.dividend_label}</Badge> : null}
                             </div>
                             <p className="mt-4 text-sm leading-relaxed text-slate-600">{opinion?.summary || "의견 정보가 없습니다."}</p>
                         </Card>
+
+                        {isKr ? (
+                            <Card title="핵심 재무 지표" subtitle="최근 결산 기준 수익성, 안정성, 성장성 요약">
+                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">매출</div><div className="mt-1 text-base font-black text-slate-900">{krFinancial?.revenue != null ? formatCompact(krFinancial.revenue) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익</div><div className="mt-1 text-base font-black text-slate-900">{krFinancial?.operating_income != null ? formatCompact(krFinancial.operating_income) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">순이익</div><div className="mt-1 text-base font-black text-slate-900">{krFinancial?.net_income != null ? formatCompact(krFinancial.net_income) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익률</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.profit_margin)}`}>{krFinancial?.profit_margin != null ? formatPercent(krFinancial.profit_margin) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">ROE</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.return_on_equity)}`}>{krFinancial?.return_on_equity != null ? formatPercent(krFinancial.return_on_equity) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">부채비율</div><div className="mt-1 text-base font-black text-slate-900">{krFinancial?.debt_ratio != null ? formatPercent(krFinancial.debt_ratio) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">유동비율</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.current_ratio)}`}>{krFinancial?.current_ratio != null ? formatPercent(krFinancial.current_ratio) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">매출 성장률</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.revenue_growth_rate)}`}>{krFinancial?.revenue_growth_rate != null ? formatPercent(krFinancial.revenue_growth_rate) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익 성장률</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.operating_income_growth_rate)}`}>{krFinancial?.operating_income_growth_rate != null ? formatPercent(krFinancial.operating_income_growth_rate) : "-"}</div></div>
+                                </div>
+                            </Card>
+                        ) : null}
+
+                        {isKr ? (
+                            <Card title="강점과 주의 포인트" subtitle="기본 의견에서 읽어낸 핵심 포인트">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="rounded-[1.6rem] border border-emerald-100 bg-emerald-50/70 p-4">
+                                        <div className="text-sm font-black text-emerald-700">강점</div>
+                                        <div className="mt-3 space-y-2">
+                                            {opinion?.positives?.length ? opinion.positives.map((item, index) => <p key={`${item}-${index}`} className="text-sm font-medium leading-relaxed text-emerald-900">• {item}</p>) : <p className="text-sm font-medium text-emerald-900">표시할 강점이 없습니다.</p>}
+                                        </div>
+                                    </div>
+                                    <div className="rounded-[1.6rem] border border-rose-100 bg-rose-50/70 p-4">
+                                        <div className="text-sm font-black text-rose-700">주의 포인트</div>
+                                        <div className="mt-3 space-y-2">
+                                            {opinion?.risks?.length ? opinion.risks.map((item, index) => <p key={`${item}-${index}`} className="text-sm font-medium leading-relaxed text-rose-900">• {item}</p>) : <p className="text-sm font-medium text-rose-900">표시할 주의 포인트가 없습니다.</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+                        ) : null}
+
+                        {isKr ? (
+                            <Card title="배당 정보" subtitle="DART 배당 + KIS 현재가 기준">
+                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">주당 배당금</div><div className="mt-1 text-base font-black text-slate-900">{dividend?.dividend_per_share != null ? formatCurrency(dividend.dividend_per_share, "KRW") : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">현재 배당수익률</div><div className="mt-1 text-base font-black text-slate-900">{dividend?.dividend_yield != null ? formatPercent(dividend.dividend_yield) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">배당 성장률</div><div className={`mt-1 text-base font-black ${toneByValue(dividend?.dividend_growth_rate)}`}>{dividend?.dividend_growth_rate != null ? formatPercent(dividend.dividend_growth_rate) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">현금배당성향</div><div className="mt-1 text-base font-black text-slate-900">{dividend?.dividend_payout_ratio != null ? formatPercent(dividend.dividend_payout_ratio) : "-"}</div></div>
+                                </div>
+                                {dividend?.history?.length ? (
+                                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                        {dividend.history.map((item) => (
+                                            <div key={`${item.business_year}-${item.dividend_per_share || 0}`} className="rounded-2xl border border-slate-100 bg-white p-4">
+                                                <div className="text-xs font-black text-slate-400">{item.business_year}년 DPS</div>
+                                                <div className="mt-1 text-base font-black text-slate-900">{item.dividend_per_share != null ? formatCurrency(item.dividend_per_share, "KRW") : "-"}</div>
+                                                <div className="mt-2 text-xs font-medium text-slate-500">공시 배당수익률 {item.reported_dividend_yield != null ? formatPercent(item.reported_dividend_yield) : "-"}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : <EmptySlot message="배당 이력 데이터가 없습니다." />}
+                            </Card>
+                        ) : null}
 
                         <Card title="추천 레이어" subtitle="v3 recommendation">
                             {recommendation ? (
@@ -491,7 +697,7 @@ export const InvestAssistant = () => {
                             ) : <EmptySlot message="v3 추천 데이터가 없습니다." />}
                         </Card>
 
-                        <Card title="v3 진단값" subtitle="valuation / sentiment / ETF 힌트">
+                        <Card title={isKr ? "보조 진단값" : "v3 진단값"} subtitle={isKr ? "재무, 배당, 뉴스 기반 보조 해석" : "valuation / sentiment / ETF 힌트"}>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">밸류 레이블</div><div className="mt-1 text-base font-black text-slate-900">{v3?.valuation?.valuation_label || "-"}</div></div>
                                 <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">평균 감성</div><div className="mt-1 text-base font-black text-slate-900">{v3?.sentiment_snapshot?.average_sentiment_score != null ? formatCompact(v3.sentiment_snapshot.average_sentiment_score, 3) : "-"}</div></div>
@@ -534,4 +740,11 @@ export const InvestAssistant = () => {
         </div>
     );
 };
+
+
+
+
+
+
+
 
