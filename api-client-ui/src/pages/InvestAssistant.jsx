@@ -123,70 +123,306 @@ const EmptySlot = ({ message }) => (
     </div>
 );
 
-const CandlestickChart = ({ points, currency }) => {
-    const [hoveredIndex, setHoveredIndex] = useState(null);
+const DEFAULT_VISIBLE_INDICATORS = {
+    sma: true,
+    bollinger: true,
+    rsi: true,
+    macd: true,
+};
 
-    const candles = useMemo(() => {
-        const source = Array.isArray(points) ? points : [];
-        return source
-            .map((item, index) => {
-                const open = Number(item.open);
-                const high = Number(item.high);
-                const low = Number(item.low);
-                const close = Number(item.close);
-                const volume = Number(item.volume);
-                if (![open, high, low, close].every((value) => Number.isFinite(value))) {
-                    return null;
-                }
-                const previousClose = Number(item.previous_close);
-                const fallbackPreviousClose = index > 0 ? Number(source[index - 1]?.close) : open;
-                const referenceClose = Number.isFinite(previousClose)
-                    ? previousClose
-                    : (Number.isFinite(fallbackPreviousClose) ? fallbackPreviousClose : open);
-                return {
-                    ...item,
-                    open,
-                    high,
-                    low,
-                    close,
-                    volume: Number.isFinite(volume) ? volume : null,
-                    referenceClose,
-                };
-            })
-            .filter(Boolean);
-    }, [points]);
+const INDICATOR_STORAGE_KEY = "invest-chart-indicators-v1";
 
-    if (!candles.length) {
-        return <EmptySlot message="차트 OHLC 데이터가 없습니다." />;
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const buildIndicatorSeries = (points) => {
+    const source = Array.isArray(points) ? points : [];
+    const toEmaSeries = (values, period) => {
+        const multiplier = 2 / (period + 1);
+        let ema = null;
+        return values.map((value, index) => {
+            if (!Number.isFinite(value)) return null;
+            if (index + 1 < period) return null;
+            if (index + 1 === period) {
+                ema = values.slice(0, period).reduce((acc, current) => acc + current, 0) / period;
+                return ema;
+            }
+            ema = ((value - ema) * multiplier) + ema;
+            return ema;
+        });
+    };
+
+    const base = source
+        .map((item, index) => {
+            const open = Number(item.open);
+            const high = Number(item.high);
+            const low = Number(item.low);
+            const close = Number(item.close);
+            const volume = Number(item.volume);
+            if (![open, high, low, close].every((value) => Number.isFinite(value))) {
+                return null;
+            }
+            const previousClose = Number(item.previous_close);
+            const fallbackPreviousClose = index > 0 ? Number(source[index - 1]?.close) : open;
+            const referenceClose = Number.isFinite(previousClose)
+                ? previousClose
+                : (Number.isFinite(fallbackPreviousClose) ? fallbackPreviousClose : open);
+            return {
+                ...item,
+                open,
+                high,
+                low,
+                close,
+                volume: Number.isFinite(volume) ? volume : null,
+                referenceClose,
+            };
+        })
+        .filter(Boolean);
+
+    const closes = base.map((item) => item.close);
+    const ema12Series = toEmaSeries(closes, 12);
+    const ema26Series = toEmaSeries(closes, 26);
+    const macdSeries = closes.map((_, index) => {
+        const ema12 = ema12Series[index];
+        const ema26 = ema26Series[index];
+        return Number.isFinite(ema12) && Number.isFinite(ema26) ? ema12 - ema26 : null;
+    });
+    const signalBase = toEmaSeries(macdSeries.map((value) => Number.isFinite(value) ? value : 0), 9);
+    const signalSeries = signalBase.map((value, index) => Number.isFinite(macdSeries[index]) ? value : null);
+
+    const gains = [null];
+    const losses = [null];
+    for (let index = 1; index < closes.length; index += 1) {
+        const delta = closes[index] - closes[index - 1];
+        gains.push(Math.max(delta, 0));
+        losses.push(Math.max(-delta, 0));
     }
 
+    return base.map((item, index) => {
+        const average = (period) => {
+            if (index + 1 < period) return null;
+            const slice = base.slice(index - period + 1, index + 1);
+            return slice.reduce((acc, current) => acc + current.close, 0) / period;
+        };
+        const standardDeviation = (period, mean) => {
+            if (index + 1 < period || !Number.isFinite(mean)) return null;
+            const slice = base.slice(index - period + 1, index + 1);
+            const variance = slice.reduce((acc, current) => acc + ((current.close - mean) ** 2), 0) / period;
+            return Math.sqrt(variance);
+        };
+        const computeRsi = (period) => {
+            if (index < period) return null;
+            const avgGain = gains.slice(index - period + 1, index + 1).reduce((acc, current) => acc + current, 0) / period;
+            const avgLoss = losses.slice(index - period + 1, index + 1).reduce((acc, current) => acc + current, 0) / period;
+            if (avgLoss === 0) return 100;
+            const rs = avgGain / avgLoss;
+            return 100 - (100 / (1 + rs));
+        };
+
+        const sma5 = average(5);
+        const sma20 = average(20);
+        const deviation20 = standardDeviation(20, sma20);
+        const bollingerUpper = Number.isFinite(sma20) && Number.isFinite(deviation20) ? sma20 + (deviation20 * 2) : null;
+        const bollingerLower = Number.isFinite(sma20) && Number.isFinite(deviation20) ? sma20 - (deviation20 * 2) : null;
+        const macd = macdSeries[index];
+        const signal = signalSeries[index];
+        const histogram = Number.isFinite(macd) && Number.isFinite(signal) ? macd - signal : null;
+
+        return {
+            ...item,
+            sma5,
+            sma20,
+            bollingerUpper,
+            bollingerLower,
+            rsi14: computeRsi(14),
+            macd,
+            macdSignal: signal,
+            macdHistogram: histogram,
+        };
+    });
+};
+
+const analyzeIndicatorState = (points) => {
+    const series = buildIndicatorSeries(points);
+    const latest = series[series.length - 1];
+    const previous = series.length > 1 ? series[series.length - 2] : null;
+
+    if (!latest) {
+        return { messages: [], score: null, label: "", details: [] };
+    }
+
+    let scoreDelta = 0;
+    const messages = [];
+    const details = [];
+
+    if (Number.isFinite(latest.rsi14)) {
+        if (latest.rsi14 >= 70) {
+            scoreDelta -= 8;
+            messages.push(`RSI 14가 ${latest.rsi14.toFixed(1)}로 과열 구간입니다. 기준선 70 상단입니다.`);
+            details.push(`RSI ${latest.rsi14.toFixed(1)} > 70: -8점`);
+        } else if (latest.rsi14 <= 30) {
+            scoreDelta += 8;
+            messages.push(`RSI 14가 ${latest.rsi14.toFixed(1)}로 과매도 구간입니다. 기준선 30 하단입니다.`);
+            details.push(`RSI ${latest.rsi14.toFixed(1)} < 30: +8점`);
+        } else if (latest.rsi14 >= 55) {
+            scoreDelta += 3;
+            messages.push(`RSI 14는 ${latest.rsi14.toFixed(1)}로 기준선 50 위 강세권입니다.`);
+            details.push(`RSI ${latest.rsi14.toFixed(1)} >= 55: +3점`);
+        } else if (latest.rsi14 <= 45) {
+            scoreDelta -= 3;
+            messages.push(`RSI 14는 ${latest.rsi14.toFixed(1)}로 기준선 50 아래 약세권입니다.`);
+            details.push(`RSI ${latest.rsi14.toFixed(1)} <= 45: -3점`);
+        } else {
+            messages.push(`RSI 14는 ${latest.rsi14.toFixed(1)}로 30~70 중립 구간입니다.`);
+            details.push(`RSI ${latest.rsi14.toFixed(1)} 중립: 0점`);
+        }
+    }
+
+    if (
+        previous
+        && Number.isFinite(previous.macd)
+        && Number.isFinite(previous.macdSignal)
+        && Number.isFinite(latest.macd)
+        && Number.isFinite(latest.macdSignal)
+    ) {
+        const prevSpread = previous.macd - previous.macdSignal;
+        const latestSpread = latest.macd - latest.macdSignal;
+
+        if (prevSpread <= 0 && latestSpread > 0) {
+            scoreDelta += 10;
+            messages.push("MACD가 시그널선을 상향 돌파했습니다. 0선 기준 단기 골든크로스 신호입니다.");
+            details.push("MACD 골든크로스: +10점");
+        } else if (prevSpread >= 0 && latestSpread < 0) {
+            scoreDelta -= 10;
+            messages.push("MACD가 시그널선을 하향 이탈했습니다. 0선 기준 단기 데드크로스 신호입니다.");
+            details.push("MACD 데드크로스: -10점");
+        } else if (latest.macd > latest.macdSignal && latest.macd >= 0) {
+            scoreDelta += 6;
+            messages.push("MACD와 시그널이 0선 위에서 움직여 상대적으로 강한 모멘텀입니다.");
+            details.push("MACD > Signal and > 0: +6점");
+        } else if (latest.macd < latest.macdSignal && latest.macd <= 0) {
+            scoreDelta -= 6;
+            messages.push("MACD와 시그널이 0선 아래에 머물러 약한 모멘텀입니다.");
+            details.push("MACD < Signal and < 0: -6점");
+        } else {
+            messages.push(`MACD 중심선은 0이며 현재 히스토그램은 ${formatCompact(latest.macdHistogram, 3)} 수준입니다.`);
+            details.push("MACD 중립 구간: 0점");
+        }
+    }
+
+    if (Number.isFinite(latest.close) && Number.isFinite(latest.bollingerUpper) && Number.isFinite(latest.bollingerLower)) {
+        if (latest.close >= latest.bollingerUpper) {
+            scoreDelta -= 6;
+            messages.push("종가가 볼린저 상단 밴드에 닿아 단기 과열 여부를 점검할 구간입니다.");
+            details.push("종가 >= 볼린저 상단: -6점");
+        } else if (latest.close <= latest.bollingerLower) {
+            scoreDelta += 6;
+            messages.push("종가가 볼린저 하단 밴드에 닿아 기술적 반등 가능성을 볼 수 있습니다.");
+            details.push("종가 <= 볼린저 하단: +6점");
+        } else if (latest.close >= latest.sma20) {
+            scoreDelta += 2;
+            messages.push("종가가 볼린저 중심선인 20일선 위에 있어 밴드 기준 강한 편입니다.");
+            details.push("종가 >= 20일선: +2점");
+        } else {
+            scoreDelta -= 2;
+            messages.push("종가가 볼린저 중심선인 20일선 아래에 있어 밴드 기준 약한 편입니다.");
+            details.push("종가 < 20일선: -2점");
+        }
+    }
+
+    const score = clamp(Math.round(50 + scoreDelta), 0, 100);
+    const label = score >= 60 ? "기술 우세" : score <= 40 ? "기술 경계" : "기술 중립";
+    return { messages, score, label, details };
+};
+const CandlestickChart = ({ points, currency, interval }) => {
+    const [hoveredIndex, setHoveredIndex] = useState(null);
+    const [visibleIndicators, setVisibleIndicators] = useState(() => {
+        if (typeof window === "undefined") {
+            return DEFAULT_VISIBLE_INDICATORS;
+        }
+        try {
+            const saved = window.localStorage.getItem(INDICATOR_STORAGE_KEY);
+            const parsed = saved ? JSON.parse(saved) : null;
+            return parsed ? { ...DEFAULT_VISIBLE_INDICATORS, ...parsed } : DEFAULT_VISIBLE_INDICATORS;
+        } catch {
+            return DEFAULT_VISIBLE_INDICATORS;
+        }
+    });
+
+    const candles = useMemo(() => buildIndicatorSeries(points), [points]);
+    const visibleCount = interval === "DAY" ? 60 : 52;
+    const visibleCandles = useMemo(() => candles.slice(-visibleCount), [candles, visibleCount]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        window.localStorage.setItem(INDICATOR_STORAGE_KEY, JSON.stringify(visibleIndicators));
+    }, [visibleIndicators]);
+
+    useEffect(() => {
+        setHoveredIndex(null);
+    }, [points, interval]);
+
+    if (!visibleCandles.length) {
+        return <EmptySlot message="차트 데이터가 없습니다." />;
+    }
+
+    const toggleIndicator = (key) => {
+        setVisibleIndicators((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
+
     const width = 820;
-    const height = 360;
+    const height = 520;
     const paddingX = 28;
     const paddingTop = 18;
-    const volumeGap = 14;
-    const candleAreaHeight = 238;
-    const volumeAreaHeight = 66;
-    const candleBottom = paddingTop + candleAreaHeight;
-    const volumeTop = candleBottom + volumeGap;
+    const gap = 14;
+    const candleAreaHeight = 220;
+    const volumeAreaHeight = 54;
+    const rsiAreaHeight = 74;
+    const macdAreaHeight = 86;
+    const candleTop = paddingTop;
+    const candleBottom = candleTop + candleAreaHeight;
+    const volumeTop = candleBottom + gap;
     const volumeBottom = volumeTop + volumeAreaHeight;
+    const rsiTop = volumeBottom + gap;
+    const rsiBottom = rsiTop + rsiAreaHeight;
+    const macdTop = rsiBottom + gap;
+    const macdBottom = macdTop + macdAreaHeight;
     const plotWidth = width - paddingX * 2;
-    const min = Math.min(...candles.map((item) => item.low));
-    const max = Math.max(...candles.map((item) => item.high));
+    const priceCandidates = visibleCandles.flatMap((item) => [
+        item.low,
+        item.high,
+        visibleIndicators.sma ? item.sma5 : null,
+        visibleIndicators.sma ? item.sma20 : null,
+        visibleIndicators.bollinger ? item.bollingerUpper : null,
+        visibleIndicators.bollinger ? item.bollingerLower : null,
+    ]).filter((value) => Number.isFinite(value));
+    const min = Math.min(...priceCandidates);
+    const max = Math.max(...priceCandidates);
     const spread = Math.max(max - min, 1);
-    const slotWidth = plotWidth / candles.length;
+    const slotWidth = plotWidth / visibleCandles.length;
     const candleWidth = Math.max(Math.min(slotWidth * 0.58, 18), 6);
-    const latest = candles[candles.length - 1];
-    const first = candles[0];
-    const hovered = hoveredIndex == null ? latest : candles[hoveredIndex];
-    const trendUp = latest.close >= first.close;
-    const maxVolume = Math.max(...candles.map((item) => item.volume || 0), 0);
+    const latest = visibleCandles[visibleCandles.length - 1];
+    const first = visibleCandles[0];
+    const hovered = hoveredIndex == null ? latest : visibleCandles[hoveredIndex];
+    const trendUp = (latest?.close ?? 0) >= (first?.close ?? 0);
+    const maxVolume = Math.max(...visibleCandles.map((item) => item.volume || 0), 0);
     const hasVolume = maxVolume > 0;
-    const toY = (value) => candleBottom - (((value - min) / spread) * candleAreaHeight);
+    const macdValues = visibleCandles.flatMap((item) => [item.macd, item.macdSignal, item.macdHistogram]).filter((value) => Number.isFinite(value));
+    const macdExtent = macdValues.length ? Math.max(...macdValues.map((value) => Math.abs(value)), 0.0001) : 1;
+    const toPriceY = (value) => candleBottom - (((value - min) / spread) * candleAreaHeight);
     const toVolumeY = (value) => {
         if (!hasVolume) return volumeBottom;
         const safeValue = Number.isFinite(value) ? value : 0;
         return volumeBottom - ((safeValue / maxVolume) * volumeAreaHeight);
+    };
+    const toRsiY = (value) => {
+        const safeValue = Number.isFinite(value) ? value : 50;
+        return rsiBottom - ((safeValue / 100) * rsiAreaHeight);
+    };
+    const toMacdY = (value) => {
+        const safeValue = Number.isFinite(value) ? value : 0;
+        return macdTop + ((macdExtent - safeValue) / (macdExtent * 2)) * macdAreaHeight;
     };
     const changeRate = (priceValue) => {
         const num = Number(priceValue);
@@ -196,8 +432,27 @@ const CandlestickChart = ({ points, currency }) => {
     };
     const renderPriceLine = (label, value) => {
         const rate = changeRate(value);
-        return `${label} ${formatCurrency(value, currency)}${rate == null ? "" : ` (${formatPercent(rate)})`}`;
+        return `${label} ${formatCurrency(value, currency)}${rate == null ? '' : ` (${formatPercent(rate)})`}`;
     };
+    const buildPath = (field, toY) => {
+        const coordinates = visibleCandles
+            .map((item, index) => {
+                const value = Number(item[field]);
+                if (!Number.isFinite(value)) return null;
+                const x = paddingX + slotWidth * index + slotWidth / 2;
+                const y = toY(value);
+                return `${x},${y}`;
+            })
+            .filter(Boolean);
+        return coordinates.length >= 2 ? `M ${coordinates.join(' L ')}` : null;
+    };
+    const sma5Path = buildPath('sma5', toPriceY);
+    const sma20Path = buildPath('sma20', toPriceY);
+    const bollingerUpperPath = buildPath('bollingerUpper', toPriceY);
+    const bollingerLowerPath = buildPath('bollingerLower', toPriceY);
+    const rsiPath = buildPath('rsi14', toRsiY);
+    const macdPath = buildPath('macd', toMacdY);
+    const macdSignalPath = buildPath('macdSignal', toMacdY);
 
     return (
         <div className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
@@ -205,54 +460,98 @@ const CandlestickChart = ({ points, currency }) => {
                 <div>
                     <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Candlestick</div>
                     <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
-                        국내와 미국 모두 동일한 캔들 차트를 사용하며, 봉에 마우스를 올리면 시가, 고가, 저가, 종가와 등락률을 함께 확인할 수 있습니다.
+                        국내와 미국 모두 동일한 캔들 차트를 사용하며, 볼린저 밴드와 RSI, MACD를 함께 확인할 수 있습니다.
                     </p>
-                </div>
-                <div className="min-w-[280px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600 shadow-sm">
-                    <div className="text-sm font-black text-slate-900">{hovered?.trading_date || "-"}</div>
-                    <div className="mt-2 grid grid-cols-1 gap-y-1.5">
-                        <span>{renderPriceLine("시가", hovered?.open)}</span>
-                        <span>{renderPriceLine("고가", hovered?.high)}</span>
-                        <span>{renderPriceLine("저가", hovered?.low)}</span>
-                        <span>{renderPriceLine("종가", hovered?.close)}</span>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {[
+                            { key: 'sma', label: '이동평균' },
+                            { key: 'bollinger', label: '볼린저 밴드' },
+                            { key: 'rsi', label: 'RSI' },
+                            { key: 'macd', label: 'MACD' },
+                        ].map((item) => (
+                            <button
+                                key={item.key}
+                                type="button"
+                                className={`rounded-full px-3 py-1.5 text-[11px] font-black ${visibleIndicators[item.key] ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}
+                                onClick={() => toggleIndicator(item.key)}
+                            >
+                                {item.label}
+                            </button>
+                        ))}
                     </div>
-                    <div className="mt-3 border-t border-slate-100 pt-2 text-[11px] font-bold text-slate-500">
-                        거래량 {hovered?.volume != null ? formatCompact(hovered.volume) : "-"}
+                </div>
+                <div className="min-w-[300px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600 shadow-sm">
+                    <div className="text-sm font-black text-slate-900">{hovered?.trading_date || '-'}</div>
+                    <div className="mt-2 grid grid-cols-1 gap-y-1.5">
+                        <span>{renderPriceLine('시가', hovered?.open)}</span>
+                        <span>{renderPriceLine('고가', hovered?.high)}</span>
+                        <span>{renderPriceLine('저가', hovered?.low)}</span>
+                        <span>{renderPriceLine('종가', hovered?.close)}</span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-y-1 border-t border-slate-100 pt-2 text-[11px] font-bold text-slate-500">
+                        {visibleIndicators.sma ? <span>SMA 5 {hovered?.sma5 != null ? formatCurrency(hovered.sma5, currency) : '-'}</span> : null}
+                        {visibleIndicators.sma ? <span>SMA 20 {hovered?.sma20 != null ? formatCurrency(hovered.sma20, currency) : '-'}</span> : null}
+                        {visibleIndicators.bollinger ? <span>볼린저 밴드 {hovered?.bollingerUpper != null && hovered?.bollingerLower != null ? `${formatCurrency(hovered.bollingerLower, currency)} ~ ${formatCurrency(hovered.bollingerUpper, currency)}` : '-'}</span> : null}
+                        {visibleIndicators.rsi ? <span>RSI 14 {hovered?.rsi14 != null ? formatCompact(hovered.rsi14, 2) : '-'}</span> : null}
+                        {visibleIndicators.macd ? <span>MACD {hovered?.macd != null ? formatCompact(hovered.macd, 3) : '-'}</span> : null}
+                        {visibleIndicators.macd ? <span>Signal {hovered?.macdSignal != null ? formatCompact(hovered.macdSignal, 3) : '-'}</span> : null}
+                        {visibleIndicators.macd ? <span>Histogram {hovered?.macdHistogram != null ? formatCompact(hovered.macdHistogram, 3) : '-'}</span> : null}
+                        <span>거래량 {hovered?.volume != null ? formatCompact(hovered.volume) : '-'}</span>
                     </div>
                 </div>
             </div>
 
             <div className="overflow-x-auto rounded-[1.4rem] bg-white/70 p-2">
-                <svg viewBox={`0 0 ${width} ${height}`} className="h-80 min-w-[760px] w-full">
+                <svg viewBox={`0 0 ${width} ${height}`} className="h-[32rem] min-w-[760px] w-full">
+                    <text x={paddingX} y={rsiTop - 4} fill="#7c3aed" fontSize="11" fontWeight="800">RSI (기준 30 / 50 / 70)</text>
+                    <text x={paddingX} y={macdTop - 4} fill="#2563eb" fontSize="11" fontWeight="800">MACD (중심선 0 / Signal / Histogram)</text>
                     {[0, 1, 2, 3].map((step) => {
-                        const y = paddingTop + (candleAreaHeight * step) / 3;
+                        const y = candleTop + (candleAreaHeight * step) / 3;
                         return <line key={`price-grid-${step}`} x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#e2e8f0" strokeWidth="1" />;
                     })}
                     <line x1={paddingX} y1={candleBottom} x2={width - paddingX} y2={candleBottom} stroke="#cbd5e1" strokeWidth="1" />
                     <line x1={paddingX} y1={volumeBottom} x2={width - paddingX} y2={volumeBottom} stroke="#e2e8f0" strokeWidth="1" />
+                    {visibleIndicators.rsi ? <line x1={paddingX} y1={toRsiY(70)} x2={width - paddingX} y2={toRsiY(70)} stroke="#f59e0b" strokeDasharray="4 4" strokeWidth="1" /> : null}
+                    {visibleIndicators.rsi ? <line x1={paddingX} y1={toRsiY(50)} x2={width - paddingX} y2={toRsiY(50)} stroke="#cbd5e1" strokeDasharray="4 4" strokeWidth="1" /> : null}
+                    {visibleIndicators.rsi ? <line x1={paddingX} y1={toRsiY(30)} x2={width - paddingX} y2={toRsiY(30)} stroke="#f59e0b" strokeDasharray="4 4" strokeWidth="1" /> : null}
+                    {visibleIndicators.rsi ? <line x1={paddingX} y1={rsiBottom} x2={width - paddingX} y2={rsiBottom} stroke="#e2e8f0" strokeWidth="1" /> : null}
+                    {visibleIndicators.macd ? <line x1={paddingX} y1={toMacdY(0)} x2={width - paddingX} y2={toMacdY(0)} stroke="#cbd5e1" strokeWidth="1" /> : null}
+                    {visibleIndicators.macd ? <line x1={paddingX} y1={macdBottom} x2={width - paddingX} y2={macdBottom} stroke="#e2e8f0" strokeWidth="1" /> : null}
 
-                    {candles.map((item, index) => {
+                    {visibleIndicators.bollinger && bollingerUpperPath ? <path d={bollingerUpperPath} fill="none" stroke="#d946ef" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" /> : null}
+                    {visibleIndicators.bollinger && bollingerLowerPath ? <path d={bollingerLowerPath} fill="none" stroke="#f5d0fe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" /> : null}
+                    {visibleIndicators.sma && sma20Path ? <path d={sma20Path} fill="none" stroke="#0ea5e9" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" /> : null}
+                    {visibleIndicators.sma && sma5Path ? <path d={sma5Path} fill="none" stroke="#f59e0b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" /> : null}
+                    {visibleIndicators.rsi && rsiPath ? <path d={rsiPath} fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /> : null}
+                    {visibleIndicators.macd && macdSignalPath ? <path d={macdSignalPath} fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /> : null}
+                    {visibleIndicators.macd && macdPath ? <path d={macdPath} fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /> : null}
+
+                    {visibleCandles.map((item, index) => {
                         const centerX = paddingX + slotWidth * index + slotWidth / 2;
-                        const openY = toY(item.open);
-                        const closeY = toY(item.close);
-                        const highY = toY(item.high);
-                        const lowY = toY(item.low);
+                        const openY = toPriceY(item.open);
+                        const closeY = toPriceY(item.close);
+                        const highY = toPriceY(item.high);
+                        const lowY = toPriceY(item.low);
                         const bodyTop = Math.min(openY, closeY);
                         const bodyHeight = Math.max(Math.abs(openY - closeY), 2);
                         const rising = item.close >= item.open;
-                        const stroke = rising ? "#059669" : "#dc2626";
-                        const fill = rising ? "#10b981" : "#ef4444";
+                        const stroke = rising ? '#059669' : '#dc2626';
+                        const fill = rising ? '#10b981' : '#ef4444';
                         const active = hoveredIndex === index;
                         const volumeHeight = hasVolume && item.volume != null ? Math.max(volumeBottom - toVolumeY(item.volume), 2) : 0;
                         const volumeY = hasVolume && item.volume != null ? volumeBottom - volumeHeight : volumeBottom;
+                        const histogramY = toMacdY(item.macdHistogram || 0);
+                        const zeroY = toMacdY(0);
+                        const histogramHeight = Math.max(Math.abs(histogramY - zeroY), 1.5);
 
                         return (
-                            <g key={`${item.trading_date || "point"}-${index}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
-                                <rect x={paddingX + slotWidth * index} y={paddingTop} width={slotWidth} height={volumeBottom - paddingTop} fill="transparent" />
+                            <g key={`${item.trading_date || 'point'}-${index}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+                                <rect x={paddingX + slotWidth * index} y={candleTop} width={slotWidth} height={macdBottom - candleTop} fill="transparent" />
                                 <line x1={centerX} y1={highY} x2={centerX} y2={lowY} stroke={stroke} strokeWidth={active ? 2.4 : 1.6} strokeLinecap="round" />
-                                <rect x={centerX - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} rx="1.5" fill={fill} stroke={active ? "#0f172a" : stroke} strokeWidth={active ? 1.5 : 1} opacity={active ? 1 : 0.92} />
-                                {hasVolume ? (
-                                    <rect x={centerX - candleWidth / 2} y={volumeY} width={candleWidth} height={volumeHeight} rx="1.5" fill={rising ? "#86efac" : "#fca5a5"} opacity={active ? 0.95 : 0.75} />
+                                <rect x={centerX - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} rx="1.5" fill={fill} stroke={active ? '#0f172a' : stroke} strokeWidth={active ? 1.5 : 1} opacity={active ? 1 : 0.92} />
+                                {hasVolume ? <rect x={centerX - candleWidth / 2} y={volumeY} width={candleWidth} height={volumeHeight} rx="1.5" fill={rising ? '#86efac' : '#fca5a5'} opacity={active ? 0.95 : 0.75} /> : null}
+                                {visibleIndicators.macd && Number.isFinite(item.macdHistogram) ? (
+                                    <rect x={centerX - candleWidth / 2} y={Math.min(histogramY, zeroY)} width={candleWidth} height={histogramHeight} rx="1.5" fill={item.macdHistogram >= 0 ? '#93c5fd' : '#fdba74'} opacity={active ? 1 : 0.85} />
                                 ) : null}
                             </g>
                         );
@@ -260,16 +559,15 @@ const CandlestickChart = ({ points, currency }) => {
                 </svg>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-4">
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">첫 종가</div><div className="mt-1 text-sm font-black text-slate-900">{formatCurrency(first?.close, currency)}</div></div>
                 <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">최신 종가</div><div className="mt-1 text-sm font-black text-slate-900">{formatCurrency(latest?.close, currency)}</div></div>
-                <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">최신 날짜</div><div className="mt-1 text-sm font-black text-slate-900">{latest?.trading_date || "-"}</div></div>
-                <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">추세</div><div className={`mt-1 text-sm font-black ${trendUp ? "text-emerald-600" : "text-rose-600"}`}>{trendUp ? "상승" : "하락"}</div></div>
+                <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">RSI 14</div><div className={`mt-1 text-sm font-black ${toneByValue((hovered?.rsi14 || 0) - 50)}`}>{visibleIndicators.rsi && hovered?.rsi14 != null ? formatCompact(hovered.rsi14, 2) : '-'}</div></div>
+                <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">MACD Histogram</div><div className={`mt-1 text-sm font-black ${toneByValue(hovered?.macdHistogram)}`}>{visibleIndicators.macd && hovered?.macdHistogram != null ? formatCompact(hovered.macdHistogram, 3) : '-'}</div></div>
             </div>
         </div>
     );
 };
-
 const FinancialTrendBars = ({ history }) => {
     const items = Array.isArray(history) ? history : [];
 
@@ -342,8 +640,11 @@ const QuarterlyEarningsGrid = ({ items }) => {
                     <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{item.period_label || `${item.business_year} ${item.quarter}`}</div>
                     <div className="mt-4 space-y-3 text-sm font-bold text-slate-700">
                         <div className="flex items-center justify-between gap-3"><span>매출</span><span className="text-slate-900">{formatCompact(item.revenue)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span>매출 QoQ</span><span className={toneByValue(item.revenue_qoq)}>{formatPercent(item.revenue_qoq)}</span></div>
                         <div className="flex items-center justify-between gap-3"><span>영업이익</span><span className={toneByValue(item.operating_income)}>{formatCompact(item.operating_income)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span>영업이익 QoQ</span><span className={toneByValue(item.operating_income_qoq)}>{formatPercent(item.operating_income_qoq)}</span></div>
                         <div className="flex items-center justify-between gap-3"><span>순이익</span><span className={toneByValue(item.net_income)}>{formatCompact(item.net_income)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span>순이익 QoQ</span><span className={toneByValue(item.net_income_qoq)}>{formatPercent(item.net_income_qoq)}</span></div>
                         <div className="flex items-center justify-between gap-3"><span>영업이익률</span><span className={toneByValue(item.operating_margin)}>{formatPercent(item.operating_margin)}</span></div>
                         <div className="flex items-center justify-between gap-3"><span>순이익률</span><span className={toneByValue(item.net_margin)}>{formatPercent(item.net_margin)}</span></div>
                     </div>
@@ -352,7 +653,6 @@ const QuarterlyEarningsGrid = ({ items }) => {
         </div>
     );
 };
-
 const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
@@ -454,6 +754,8 @@ export const InvestAssistant = () => {
     const krFinancialHistory = v3?.kr_financial_history || [];
     const krQuarterlyEarnings = v3?.kr_quarterly_earnings || [];
     const dividend = v3?.dividend_snapshot;
+    const indicatorAnalysis = useMemo(() => analyzeIndicatorState(chartData?.points), [chartData?.points]);
+    const indicatorMessages = indicatorAnalysis.messages || [];
 
     const fetchChart = async (nextMarket, symbol, interval, fallbackSource = {}) => {
         setChartLoading(true);
@@ -602,7 +904,7 @@ export const InvestAssistant = () => {
                                 <button key={item.value} type="button" className={`rounded-full px-4 py-2 text-sm font-black ${chartInterval === item.value ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`} onClick={() => { setChartInterval(item.value); if (selectedSymbol) { fetchChart(market, selectedSymbol, item.value, { priceSnapshot: price, currency: summary?.currency || (market === "US" ? "USD" : "KRW"), source: price?.source }); } }} disabled={chartLoading}>{item.label}</button>
                             ))}
                         </div>
-                        {chartLoading ? <LoadingSpinner text="차트 데이터를 불러오는 중입니다..." /> : <CandlestickChart points={chartData?.points} currency={currency} />}
+                        {chartLoading ? <LoadingSpinner text="차트 데이터를 불러오는 중입니다..." /> : <CandlestickChart points={chartData?.points} currency={currency} interval={chartData?.interval} />}
                     </Card>
 
                     {isKr ? (
@@ -618,13 +920,21 @@ export const InvestAssistant = () => {
                     ) : null}
 
                     <div className={`grid gap-5 ${isKr ? "xl:grid-cols-2" : "xl:grid-cols-3"}`}>
-                        <Card title="기본 의견" subtitle="수익성, 안정성, 배당 해석을 함께 반영한 의견">
+                        <Card title="기본 의견" subtitle="수익성, 안정성, 배당 해석과 보조지표 신호를 함께 반영한 의견">
                             <div className="flex flex-wrap gap-2">
                                 {opinion?.signal ? <Badge className={toneBySignal(opinion.signal)}>{opinion.signal}</Badge> : null}
-                                {opinion?.score != null ? <Badge className="bg-slate-100 text-slate-700">점수 {opinion.score}</Badge> : null}
+                                {opinion?.score != null ? <Badge className="bg-slate-100 text-slate-700">의견 점수 {opinion.score}</Badge> : null}
+                                {indicatorAnalysis.score != null ? <Badge className="bg-sky-100 text-sky-700" title={indicatorAnalysis.details?.join(" | ")}>기술 점수 {indicatorAnalysis.score}</Badge> : null}
+                                {indicatorAnalysis.label ? <Badge className="bg-indigo-100 text-indigo-700" title={indicatorAnalysis.details?.join(" | ")}>{indicatorAnalysis.label}</Badge> : null}
                                 {dividend?.dividend_label && isKr ? <Badge className="bg-emerald-100 text-emerald-700">{dividend.dividend_label}</Badge> : null}
                             </div>
                             <p className="mt-4 text-sm leading-relaxed text-slate-600">{opinion?.summary || "의견 정보가 없습니다."}</p>
+                            {indicatorMessages.length ? (
+                                <div className="mt-4 space-y-2 rounded-[1.4rem] border border-sky-100 bg-sky-50/70 p-4">
+                                    <div className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">보조지표 해석</div>
+                                    {indicatorMessages.map((item, index) => <p key={`${item}-${index}`} className="text-sm font-medium leading-relaxed text-sky-900">• {item}</p>)}
+                                </div>
+                            ) : null}
                         </Card>
 
                         {isKr ? (
@@ -740,6 +1050,20 @@ export const InvestAssistant = () => {
         </div>
     );
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
