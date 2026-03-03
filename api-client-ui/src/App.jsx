@@ -25,6 +25,7 @@ import { AllMenu } from "./pages/AllMenu.jsx";
 import { TodoCalendar } from "./pages/TodoCalendar.jsx";
 import { StreamingHub } from "./pages/StreamingHub.jsx";
 import { AdminStreamingStudio } from "./pages/AdminStreamingStudio.jsx";
+import { InvestAssistant } from "./pages/InvestAssistant.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
@@ -79,6 +80,7 @@ function App() {
                     <Route path="/app/chat" element={<ProtectedRoute><AppLayout><Chat /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/todos" element={<ProtectedRoute><AppLayout><TodoCalendar /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/streaming" element={<ProtectedRoute><AppLayout><StreamingHub /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/invest" element={<ProtectedRoute><AppLayout><InvestAssistant /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/all-menu" element={<ProtectedRoute><AppLayout><AllMenu /></AppLayout></ProtectedRoute>} />
 
                     <Route path="/app/statistics" element={<ProtectedRoute><AppLayout><Statistics /></AppLayout></ProtectedRoute>} />

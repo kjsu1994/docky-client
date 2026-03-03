@@ -16,6 +16,7 @@ import {
     ChevronRight,
     HelpCircle,
     Film,
+    Bot,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdminUser } from "../utils/authorization";
@@ -54,6 +55,7 @@ export const AllMenu = () => {
         { title: "스트리밍", to: "/app/streaming", icon: Film, color: "bg-fuchsia-50 text-fuchsia-700" },
         { title: "자유게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare, color: "bg-sky-50 text-sky-600" },
         { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle, color: "bg-emerald-50 text-emerald-600" },
+        { title: "Invest", to: "/app/invest", icon: Bot, color: "bg-sky-50 text-sky-700" },
     ];
 
     const tools = [
