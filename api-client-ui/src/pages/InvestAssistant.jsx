@@ -349,7 +349,7 @@ const CandlestickChart = ({ points, currency, interval }) => {
     });
 
     const candles = useMemo(() => buildIndicatorSeries(points), [points]);
-    const visibleCount = interval === "DAY" ? 60 : 52;
+    const visibleCount = interval === "DAY" ? 60 : interval === "WEEK" ? 78 : 36;
     const visibleCandles = useMemo(() => candles.slice(-visibleCount), [candles, visibleCount]);
 
     useEffect(() => {
@@ -841,7 +841,7 @@ export const InvestAssistant = () => {
         <div className="space-y-8 animate-fade-in pb-10">
             <section className="card bg-white p-6 sm:p-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-sky-700"><Bot className="h-3.5 w-3.5" />Invest Workspace</div>
-                <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-5xl">회사명이나 ETF명으로 검색해 국내와 미국 종목을 한 화면에서 분석합니다.</h1>
+                <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-5xl">투자 도우미.</h1>
                 <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">종목 검색 후 현재가, 일봉/주봉/월봉 차트, 기본 분석, 뉴스, 추천 레이어까지 한 번에 확인할 수 있습니다.</p>
 
                 <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -1050,6 +1050,7 @@ export const InvestAssistant = () => {
         </div>
     );
 };
+
 
 
 
