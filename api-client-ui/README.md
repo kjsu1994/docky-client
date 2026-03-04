@@ -151,6 +151,21 @@ npm run dev
   - `CONTENT` + `image_url`: render banner background image with readable overlay.
   - `ADSENSE`: switch whole banner frame to ad-first layout (not inner card-only).
   - Keep gradient fallback when `image_url` is empty.
+- Invest assistant localization update (`src/pages/InvestAssistant.jsx`)
+  - Localized the bottom `limitations` and `available_sections` values on `/app/invest`.
+  - Applied translation only at render time to keep API payloads and behavior unchanged.
+- Invest assistant US finance/dividend update (`src/pages/InvestAssistant.jsx`)
+  - `/app/invest` now also exposes US annual financial metrics and dividend snapshot/history when v3 returns supplemental data.
+  - Reused the KR card layout for US so the added data does not change symbol search or chart behavior.
+- Invest assistant US provider warning update (`src/pages/InvestAssistant.jsx`)
+  - If US quote is available but SEC EDGAR fundamentals are unavailable, `/app/invest` now shows the provider cause near the summary card instead of leaving only blank finance/dividend slots.
+  - SEC EDGAR provider failure details are localized for the limitation area and top warning copy.
+- Invest assistant US news card update (`src/pages/InvestAssistant.jsx`)
+  - `/app/invest` no longer renders the empty `뉴스 / 이슈` card for US symbols because the current US pipeline does not provide news items.
+  - SEC/KIS limitation strings shown under `제약사항 / 섹션 상태` are localized in Korean.
+- Invest assistant symbol suggest update (`src/pages/InvestAssistant.jsx`)
+  - The frontend now shows only the top 2 symbol suggestions ranked by `match_score` so the dropdown does not cover the screen.
+  - The backend suggest API still returns up to 5 items by the current request parameter, and the frontend trims the visible list.
 - Mypage level experience UX update (`src/pages/Mypage.jsx`)
   - Fetches `/members/level/history` when level tab is active.
   - Shows XP history cards with granted XP, penalty, and timestamp.

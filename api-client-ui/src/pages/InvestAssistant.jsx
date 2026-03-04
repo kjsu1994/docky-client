@@ -10,12 +10,24 @@ const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
 
 const MARKETS = [
     { value: "KR", label: "국내", helper: "KIS 시세, DART 재무, 네이버 뉴스", icon: Landmark },
-    { value: "US", label: "미국", helper: "KIS 시세, Alpha Vantage 재무/뉴스/기술지표", icon: Globe2 },
+    { value: "US", label: "미국", helper: "KIS 시세, SEC EDGAR 재무/배당, KIS 기술지표", icon: Globe2 },
 ];
 
 const PRESETS = {
     KR: ["005930", "000660", "035420"],
     US: ["AAPL", "MSFT", "NVDA"],
+};
+
+const AVAILABLE_SECTION_LABELS = {
+    overview: "기업 개요",
+    financial_summary: "재무 요약",
+    price_snapshot: "시세 스냅샷",
+    dividend_snapshot: "배당 스냅샷",
+    kr_financial_history: "국내 재무 추이",
+    kr_quarterly_earnings: "국내 분기 실적",
+    technical_indicators: "기술 지표",
+    news_issues: "뉴스 / 이슈",
+    comparisons: "비교 종목",
 };
 
 const CHART_INTERVALS = [
@@ -51,6 +63,96 @@ const formatPercent = (value) => {
     const num = Number(value);
     if (!Number.isFinite(num)) return String(value);
     return `${num > 0 ? "+" : ""}${num.toFixed(2)}%`;
+};
+
+const formatAvailableSection = (value) => AVAILABLE_SECTION_LABELS[value] || value;
+
+const formatProviderDetail = (value) => {
+    if (!value) return "-";
+
+    const exactMatches = {
+        "SEC EDGAR request failed": "SEC EDGAR 요청이 실패했습니다.",
+        "SEC EDGAR returned empty response": "SEC EDGAR 응답이 비어 있습니다.",
+        "unexpected provider error": "예기치 않은 제공자 오류",
+    };
+
+    return exactMatches[value] || value;
+};
+
+const formatLimitation = (value) => {
+    if (!value) return "-";
+
+    const replacements = [
+        {
+            pattern: /^KR KIS quote issue:\s*(.+)$/i,
+            format: (_, detail) => `국내 KIS 시세 제공자 오류: ${formatProviderDetail(detail)}`,
+        },
+        {
+            pattern: /^US KIS quote issue:\s*(.+)$/i,
+            format: (_, detail) => `미국 KIS 시세 제공자 오류: ${formatProviderDetail(detail)}`,
+        },
+        {
+            pattern: /^US SEC fundamentals\/overview provider issue:\s*(.+)$/i,
+            format: (_, detail) => `미국 SEC 재무/기업개요 제공자 오류: ${formatProviderDetail(detail)}`,
+        },
+        {
+            pattern: /^US overview\/fundamentals provider issue:\s*(.+)$/i,
+            format: (_, detail) => `미국 기업 개요/기초지표 제공자 오류: ${formatProviderDetail(detail)}`,
+        },
+        {
+            pattern: /^US technical-indicator provider issue:\s*(.+)$/i,
+            format: (_, detail) => `미국 기술지표 제공자 오류: ${formatProviderDetail(detail)}`,
+        },
+        {
+            pattern: /^US news provider issue:\s*(.+)$/i,
+            format: (_, detail) => `미국 뉴스 제공자 오류: ${formatProviderDetail(detail)}`,
+        },
+        {
+            pattern: /^US dividends\/financial statements provider issue:\s*(.+)$/i,
+            format: (_, detail) => `미국 배당/재무제표 제공자 오류: ${formatProviderDetail(detail)}`,
+        },
+        {
+            pattern: /^KR news provider issue:\s*(.+)$/i,
+            format: (_, detail) => `국내 뉴스 제공자 오류: ${formatProviderDetail(detail)}`,
+        },
+        {
+            pattern: /^KR comparison skipped for\s+(.+?):\s*(.+)$/i,
+            format: (_, symbol, detail) => `국내 비교 종목 ${symbol} 조회를 건너뜀: ${detail}`,
+        },
+        {
+            pattern: /^US comparison skipped for\s+(.+?):\s*(.+)$/i,
+            format: (_, symbol, detail) => `미국 비교 종목 ${symbol} 조회를 건너뜀: ${detail}`,
+        },
+    ];
+
+    for (const replacement of replacements) {
+        const match = value.match(replacement.pattern);
+        if (match) {
+            return replacement.format(...match);
+        }
+    }
+
+    const exactMatches = {
+        "KR analysis uses annual DART financial statements for fundamentals.": "국내 분석은 연간 DART 재무제표를 기준으로 기초지표를 계산합니다.",
+        "KR technical indicators and issue scoring are not integrated yet.": "국내 기술 지표와 이슈 점수는 아직 연동되지 않았습니다.",
+        "KR v2 uses DART annual financial summary and Naver news search results.": "국내 v2 분석은 DART 연간 재무 요약과 네이버 뉴스 검색 결과를 사용합니다.",
+        "KR technical indicators still need a historical market-data provider.": "국내 기술 지표는 과거 시세 데이터 제공자 연동이 추가로 필요합니다.",
+        "KR real-time quote is empty until KIS app key/app secret are configured.": "국내 실시간 시세는 KIS 앱 키/시크릿 설정 전까지 비어 있습니다.",
+        "KR technical indicators, ETF holdings, and analyst consensus are not integrated yet.": "국내 기술 지표, ETF 보유내역, 애널리스트 컨센서스는 아직 연동되지 않았습니다.",
+        "KR chart uses KIS daily history.": "국내 차트는 KIS 일봉 이력을 사용합니다.",
+        "US chart uses KIS daily history.": "미국 차트는 KIS 일봉 이력을 사용합니다.",
+        "US chart fell back to a single KIS snapshot candle because KIS daily history was unavailable.": "미국 차트는 KIS 일봉 이력을 사용할 수 없어 단일 KIS 스냅샷 봉으로 대체되었습니다.",
+        "US fundamentals/overview provider issue: unexpected provider error": "미국 기초지표/기업 개요 제공자 오류: 예기치 않은 제공자 오류",
+        "US real-time quote is using fallback data until KIS credentials are configured.": "미국 실시간 시세는 KIS 인증정보 설정 전까지 대체 데이터를 사용합니다.",
+        "US v3 uses SEC EDGAR annual filing data and KIS market data.": "미국 v3 분석은 SEC EDGAR 연간 공시 데이터와 KIS 시세 데이터를 사용합니다.",
+        "US news sentiment, fund flows, options activity, and analyst consensus are not integrated yet.": "미국 뉴스 감성, 자금 유입, 옵션 활동, 애널리스트 컨센서스는 아직 연동되지 않았습니다.",
+        "Intraday depth, earnings calendar, analyst revisions, and ETF holdings are not integrated yet.": "장중 호가, 실적 캘린더, 애널리스트 리비전, ETF 보유내역은 아직 연동되지 않았습니다.",
+        "Provider rate limits can affect burst traffic; server caching and fallback tiers are the next step.": "제공자 호출 제한으로 순간 트래픽 영향이 있을 수 있으며, 다음 단계는 서버 캐시와 대체 계층 강화입니다.",
+        "ETF holdings, analyst estimates, and earnings-calendar signals are not integrated yet.": "ETF 보유내역, 애널리스트 추정치, 실적 캘린더 신호는 아직 연동되지 않았습니다.",
+        "ETF holdings, fund flows, options activity, and analyst consensus are not integrated yet.": "ETF 보유내역, 자금 유입, 옵션 활동, 애널리스트 컨센서스는 아직 연동되지 않았습니다.",
+    };
+
+    return exactMatches[value] || value;
 };
 
 const toneBySignal = (signal) => {
@@ -110,10 +212,10 @@ const buildFallbackChart = ({ market, symbol, interval, priceSnapshot, currency,
 const Badge = ({ children, className = "" }) => <span className={`badge ${className}`}>{children}</span>;
 
 const Card = ({ title, subtitle, children }) => (
-    <section className="card bg-white p-6">
+    <section className="card bg-white p-4 sm:p-6">
         <h2 className="text-xl font-black text-slate-900">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm font-medium text-slate-500">{subtitle}</p> : null}
-        <div className="mt-5">{children}</div>
+        <div className="mt-4 sm:mt-5">{children}</div>
     </section>
 );
 
@@ -133,6 +235,7 @@ const DEFAULT_VISIBLE_INDICATORS = {
 const INDICATOR_STORAGE_KEY = "invest-chart-indicators-v1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const SYMBOL_SUGGEST_DISPLAY_LIMIT = 2;
 
 const buildIndicatorSeries = (points) => {
     const source = Array.isArray(points) ? points : [];
@@ -333,6 +436,17 @@ const analyzeIndicatorState = (points) => {
     const label = score >= 60 ? "기술 우세" : score <= 40 ? "기술 경계" : "기술 중립";
     return { messages, score, label, details };
 };
+
+const formatChartTickLabel = (tradingDate, interval) => {
+    if (!tradingDate) return "";
+    const [year, month] = String(tradingDate).split("-");
+    if (!year || !month) return tradingDate;
+    if (interval === "MONTH") {
+        return `${year}년`;
+    }
+    return `${year}년 ${Number(month)}월`;
+};
+
 const CandlestickChart = ({ points, currency, interval }) => {
     const [hoveredIndex, setHoveredIndex] = useState(null);
     const [visibleIndicators, setVisibleIndicators] = useState(() => {
@@ -434,6 +548,15 @@ const CandlestickChart = ({ points, currency, interval }) => {
         const rate = changeRate(value);
         return `${label} ${formatCurrency(value, currency)}${rate == null ? '' : ` (${formatPercent(rate)})`}`;
     };
+    const tickIndexes = visibleCandles.length <= 1
+        ? [0]
+        : Array.from(new Set([
+            0,
+            Math.max(0, Math.floor((visibleCandles.length - 1) * 0.25)),
+            Math.max(0, Math.floor((visibleCandles.length - 1) * 0.5)),
+            Math.max(0, Math.floor((visibleCandles.length - 1) * 0.75)),
+            visibleCandles.length - 1,
+        ]));
     const buildPath = (field, toY) => {
         const coordinates = visibleCandles
             .map((item, index) => {
@@ -482,21 +605,23 @@ const CandlestickChart = ({ points, currency, interval }) => {
                 </div>
                 <div className="min-w-[300px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600 shadow-sm">
                     <div className="text-sm font-black text-slate-900">{hovered?.trading_date || '-'}</div>
-                    <div className="mt-2 grid grid-cols-1 gap-y-1.5">
-                        <span>{renderPriceLine('시가', hovered?.open)}</span>
-                        <span>{renderPriceLine('고가', hovered?.high)}</span>
-                        <span>{renderPriceLine('저가', hovered?.low)}</span>
-                        <span>{renderPriceLine('종가', hovered?.close)}</span>
-                    </div>
-                    <div className="mt-3 grid grid-cols-1 gap-y-1 border-t border-slate-100 pt-2 text-[11px] font-bold text-slate-500">
-                        {visibleIndicators.sma ? <span>SMA 5 {hovered?.sma5 != null ? formatCurrency(hovered.sma5, currency) : '-'}</span> : null}
-                        {visibleIndicators.sma ? <span>SMA 20 {hovered?.sma20 != null ? formatCurrency(hovered.sma20, currency) : '-'}</span> : null}
-                        {visibleIndicators.bollinger ? <span>볼린저 밴드 {hovered?.bollingerUpper != null && hovered?.bollingerLower != null ? `${formatCurrency(hovered.bollingerLower, currency)} ~ ${formatCurrency(hovered.bollingerUpper, currency)}` : '-'}</span> : null}
-                        {visibleIndicators.rsi ? <span>RSI 14 {hovered?.rsi14 != null ? formatCompact(hovered.rsi14, 2) : '-'}</span> : null}
-                        {visibleIndicators.macd ? <span>MACD {hovered?.macd != null ? formatCompact(hovered.macd, 3) : '-'}</span> : null}
-                        {visibleIndicators.macd ? <span>Signal {hovered?.macdSignal != null ? formatCompact(hovered.macdSignal, 3) : '-'}</span> : null}
-                        {visibleIndicators.macd ? <span>Histogram {hovered?.macdHistogram != null ? formatCompact(hovered.macdHistogram, 3) : '-'}</span> : null}
-                        <span>거래량 {hovered?.volume != null ? formatCompact(hovered.volume) : '-'}</span>
+                    <div className="mt-2 grid gap-4 grid-cols-[0.95fr_1.05fr] items-start">
+                        <div className="grid grid-cols-1 gap-y-1.5">
+                            <span>{renderPriceLine('시가', hovered?.open)}</span>
+                            <span>{renderPriceLine('고가', hovered?.high)}</span>
+                            <span>{renderPriceLine('저가', hovered?.low)}</span>
+                            <span>{renderPriceLine('종가', hovered?.close)}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-y-1 border-l border-slate-100 pl-4 text-[11px] font-bold text-slate-500">
+                            {visibleIndicators.sma ? <span>SMA 5 {hovered?.sma5 != null ? formatCurrency(hovered.sma5, currency) : '-'}</span> : null}
+                            {visibleIndicators.sma ? <span>SMA 20 {hovered?.sma20 != null ? formatCurrency(hovered.sma20, currency) : '-'}</span> : null}
+                            {visibleIndicators.bollinger ? <span>볼린저 밴드 {hovered?.bollingerUpper != null && hovered?.bollingerLower != null ? `${formatCurrency(hovered.bollingerLower, currency)} ~ ${formatCurrency(hovered.bollingerUpper, currency)}` : '-'}</span> : null}
+                            {visibleIndicators.rsi ? <span>RSI 14 {hovered?.rsi14 != null ? formatCompact(hovered.rsi14, 2) : '-'}</span> : null}
+                            {visibleIndicators.macd ? <span>MACD {hovered?.macd != null ? formatCompact(hovered.macd, 3) : '-'}</span> : null}
+                            {visibleIndicators.macd ? <span>Signal {hovered?.macdSignal != null ? formatCompact(hovered.macdSignal, 3) : '-'}</span> : null}
+                            {visibleIndicators.macd ? <span>Histogram {hovered?.macdHistogram != null ? formatCompact(hovered.macdHistogram, 3) : '-'}</span> : null}
+                            <span>거래량 {hovered?.volume != null ? formatCompact(hovered.volume) : '-'}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -554,6 +679,24 @@ const CandlestickChart = ({ points, currency, interval }) => {
                                     <rect x={centerX - candleWidth / 2} y={Math.min(histogramY, zeroY)} width={candleWidth} height={histogramHeight} rx="1.5" fill={item.macdHistogram >= 0 ? '#93c5fd' : '#fdba74'} opacity={active ? 1 : 0.85} />
                                 ) : null}
                             </g>
+                        );
+                    })}
+                    {tickIndexes.map((index) => {
+                        const item = visibleCandles[index];
+                        if (!item) return null;
+                        const centerX = paddingX + slotWidth * index + slotWidth / 2;
+                        return (
+                            <text
+                                key={`tick-label-${item.trading_date || index}`}
+                                x={centerX}
+                                y={height - 6}
+                                textAnchor="middle"
+                                fill="#64748b"
+                                fontSize="11"
+                                fontWeight="800"
+                            >
+                                {formatChartTickLabel(item.trading_date, interval)}
+                            </text>
                         );
                     })}
                 </svg>
@@ -683,7 +826,16 @@ const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
                     params: { market, query: keyword, limit: 5 },
                 });
                 if (!cancelled) {
-                    setItems(Array.isArray(unwrapData(response)?.items) ? unwrapData(response).items : []);
+                    const responseItems = Array.isArray(unwrapData(response)?.items) ? unwrapData(response).items : [];
+                    const rankedItems = [...responseItems].sort((left, right) => {
+                        const leftScore = Number(left?.match_score);
+                        const rightScore = Number(right?.match_score);
+                        if (Number.isFinite(leftScore) && Number.isFinite(rightScore) && leftScore !== rightScore) {
+                            return rightScore - leftScore;
+                        }
+                        return 0;
+                    });
+                    setItems(rankedItems.slice(0, SYMBOL_SUGGEST_DISPLAY_LIMIT));
                     setOpen(true);
                 }
             } catch {
@@ -754,6 +906,10 @@ export const InvestAssistant = () => {
     const krFinancialHistory = v3?.kr_financial_history || [];
     const krQuarterlyEarnings = v3?.kr_quarterly_earnings || [];
     const dividend = v3?.dividend_snapshot;
+    const dividendCurrency = market === "US" ? "USD" : "KRW";
+    const usProviderWarning = !isKr && !summary
+        ? limitations.find((item) => /alpha vantage|provider issue|api key/i.test(item))
+        : "";
     const indicatorAnalysis = useMemo(() => analyzeIndicatorState(chartData?.points), [chartData?.points]);
     const indicatorMessages = indicatorAnalysis.messages || [];
 
@@ -838,8 +994,8 @@ export const InvestAssistant = () => {
     };
 
     return (
-        <div className="space-y-8 animate-fade-in pb-10">
-            <section className="card bg-white p-6 sm:p-8">
+        <div className="-mx-4 space-y-6 px-1 animate-fade-in pb-10 sm:mx-0 sm:space-y-8 sm:px-0">
+            <section className="card bg-white p-4 sm:p-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-sky-700"><Bot className="h-3.5 w-3.5" />Invest Workspace</div>
                 <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-5xl">투자 도우미.</h1>
                 <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">종목 검색 후 현재가, 일봉/주봉/월봉 차트, 기본 분석, 뉴스, 추천 레이어까지 한 번에 확인할 수 있습니다.</p>
@@ -859,7 +1015,7 @@ export const InvestAssistant = () => {
                         })}
                     </div>
 
-                    <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-5">
+                    <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-4 sm:p-5">
                         <div className="text-sm font-black text-slate-900">{currentMarket.label} 시장</div>
                         <div className="mt-1 text-xs font-medium text-slate-500">{price?.source === "KIS" ? "KIS 실시간 시세 응답을 사용 중입니다." : "가용 provider 기준 응답을 사용 중입니다."}</div>
                         <div className="mt-4 space-y-4">
@@ -879,7 +1035,7 @@ export const InvestAssistant = () => {
 
             {loading ? <LoadingSpinner size="lg" text="투자 분석 데이터를 불러오는 중입니다..." /> : null}
             {error ? <ErrorMessage message={error} onRetry={() => fetchAnalysis()} /> : null}
-            {!loading && !error && !v1 ? <section className="card bg-white p-8 text-center"><Sparkles className="mx-auto h-10 w-10 text-primary-500" /><h2 className="mt-3 text-2xl font-black text-slate-900">종목을 검색하고 분석을 시작해 주세요.</h2></section> : null}
+            {!loading && !error && !v1 ? <section className="card bg-white p-5 sm:p-8 text-center"><Sparkles className="mx-auto h-10 w-10 text-primary-500" /><h2 className="mt-3 text-2xl font-black text-slate-900">종목을 검색하고 분석을 시작해 주세요.</h2></section> : null}
 
             {v1 ? (
                 <>
@@ -890,11 +1046,16 @@ export const InvestAssistant = () => {
                             {chartData?.source ? <Badge className="bg-indigo-100 text-indigo-700">차트 {chartData.source}</Badge> : null}
                             {v3 ? <Badge className="bg-violet-100 text-violet-700">추천 V3</Badge> : null}
                         </div>
+                        {usProviderWarning ? (
+                            <div className="mb-4 rounded-[1.4rem] border border-amber-100 bg-amber-50/70 p-4 text-sm font-medium leading-relaxed text-amber-900">
+                                미국 재무/배당 provider 상태: {formatLimitation(usProviderWarning)}
+                            </div>
+                        ) : null}
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">현재가</div><div className="mt-1 text-lg font-black text-slate-900">{price?.price != null ? formatCurrency(price.price, currency) : "-"}</div></div>
                             <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">등락률</div><div className={`mt-1 text-lg font-black ${toneByValue(price?.change_percent)}`}>{price?.change_percent != null ? formatPercent(price.change_percent) : "-"}</div></div>
-                            <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "현재 배당수익률" : "시가총액"}</div><div className="mt-1 text-lg font-black text-slate-900">{isKr ? (dividend?.dividend_yield != null ? formatPercent(dividend.dividend_yield) : "-") : (summary?.market_cap != null ? formatCompact(summary.market_cap) : "-")}</div></div>
-                            <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "배당금" : "매출 성장률"}</div><div className={`mt-1 text-lg font-black ${isKr ? "text-slate-900" : toneByValue(summary?.revenue_growth_rate)}`}>{isKr ? (dividend?.dividend_per_share != null ? formatCurrency(dividend.dividend_per_share, "KRW") : "-") : (summary?.revenue_growth_rate != null ? formatPercent(summary.revenue_growth_rate) : "-")}</div></div>
+                            <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{dividend?.dividend_yield != null ? "현재 배당수익률" : "시가총액"}</div><div className="mt-1 text-lg font-black text-slate-900">{dividend?.dividend_yield != null ? formatPercent(dividend.dividend_yield) : (summary?.market_cap != null ? formatCompact(summary.market_cap) : "-")}</div></div>
+                            <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{dividend?.dividend_per_share != null ? "연간 DPS" : "매출 성장률"}</div><div className={`mt-1 text-lg font-black ${dividend?.dividend_per_share != null ? "text-slate-900" : toneByValue(summary?.revenue_growth_rate)}`}>{dividend?.dividend_per_share != null ? formatCurrency(dividend.dividend_per_share, dividendCurrency) : (summary?.revenue_growth_rate != null ? formatPercent(summary.revenue_growth_rate) : "-")}</div></div>
                         </div>
                     </Card>
 
@@ -926,7 +1087,7 @@ export const InvestAssistant = () => {
                                 {opinion?.score != null ? <Badge className="bg-slate-100 text-slate-700">의견 점수 {opinion.score}</Badge> : null}
                                 {indicatorAnalysis.score != null ? <Badge className="bg-sky-100 text-sky-700" title={indicatorAnalysis.details?.join(" | ")}>기술 점수 {indicatorAnalysis.score}</Badge> : null}
                                 {indicatorAnalysis.label ? <Badge className="bg-indigo-100 text-indigo-700" title={indicatorAnalysis.details?.join(" | ")}>{indicatorAnalysis.label}</Badge> : null}
-                                {dividend?.dividend_label && isKr ? <Badge className="bg-emerald-100 text-emerald-700">{dividend.dividend_label}</Badge> : null}
+                                {dividend?.dividend_label ? <Badge className="bg-emerald-100 text-emerald-700">{dividend.dividend_label}</Badge> : null}
                             </div>
                             <p className="mt-4 text-sm leading-relaxed text-slate-600">{opinion?.summary || "의견 정보가 없습니다."}</p>
                             {indicatorMessages.length ? (
@@ -937,21 +1098,19 @@ export const InvestAssistant = () => {
                             ) : null}
                         </Card>
 
-                        {isKr ? (
-                            <Card title="핵심 재무 지표" subtitle="최근 결산 기준 수익성, 안정성, 성장성 요약">
+                        <Card title="핵심 재무 지표" subtitle={isKr ? "최근 결산 기준 수익성, 안정성, 성장성 요약" : "최근 연간 보고서와 overview 기준 수익성, 안정성, 성장성 요약"}>
                                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">매출</div><div className="mt-1 text-base font-black text-slate-900">{krFinancial?.revenue != null ? formatCompact(krFinancial.revenue) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익</div><div className="mt-1 text-base font-black text-slate-900">{krFinancial?.operating_income != null ? formatCompact(krFinancial.operating_income) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">순이익</div><div className="mt-1 text-base font-black text-slate-900">{krFinancial?.net_income != null ? formatCompact(krFinancial.net_income) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익률</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.profit_margin)}`}>{krFinancial?.profit_margin != null ? formatPercent(krFinancial.profit_margin) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">ROE</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.return_on_equity)}`}>{krFinancial?.return_on_equity != null ? formatPercent(krFinancial.return_on_equity) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">부채비율</div><div className="mt-1 text-base font-black text-slate-900">{krFinancial?.debt_ratio != null ? formatPercent(krFinancial.debt_ratio) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">유동비율</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.current_ratio)}`}>{krFinancial?.current_ratio != null ? formatPercent(krFinancial.current_ratio) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">매출 성장률</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.revenue_growth_rate)}`}>{krFinancial?.revenue_growth_rate != null ? formatPercent(krFinancial.revenue_growth_rate) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익 성장률</div><div className={`mt-1 text-base font-black ${toneByValue(krFinancial?.operating_income_growth_rate)}`}>{krFinancial?.operating_income_growth_rate != null ? formatPercent(krFinancial.operating_income_growth_rate) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">매출</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (krFinancial?.revenue != null ? formatCompact(krFinancial.revenue) : "-") : (summary?.revenue != null ? formatCompact(summary.revenue) : "-")}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (krFinancial?.operating_income != null ? formatCompact(krFinancial.operating_income) : "-") : (summary?.operating_income != null ? formatCompact(summary.operating_income) : "-")}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">순이익</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (krFinancial?.net_income != null ? formatCompact(krFinancial.net_income) : "-") : (summary?.net_income != null ? formatCompact(summary.net_income) : "-")}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익률</div><div className={`mt-1 text-base font-black ${toneByValue(isKr ? krFinancial?.profit_margin : summary?.profit_margin)}`}>{isKr ? (krFinancial?.profit_margin != null ? formatPercent(krFinancial.profit_margin) : "-") : (summary?.profit_margin != null ? formatPercent(summary.profit_margin) : "-")}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">ROE</div><div className={`mt-1 text-base font-black ${toneByValue(isKr ? krFinancial?.return_on_equity : summary?.return_on_equity)}`}>{isKr ? (krFinancial?.return_on_equity != null ? formatPercent(krFinancial.return_on_equity) : "-") : (summary?.return_on_equity != null ? formatPercent(summary.return_on_equity) : "-")}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">부채비율</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (krFinancial?.debt_ratio != null ? formatPercent(krFinancial.debt_ratio) : "-") : (summary?.debt_ratio != null ? formatPercent(summary.debt_ratio) : "-")}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">유동비율</div><div className={`mt-1 text-base font-black ${toneByValue(isKr ? krFinancial?.current_ratio : summary?.current_ratio)}`}>{isKr ? (krFinancial?.current_ratio != null ? formatPercent(krFinancial.current_ratio) : "-") : (summary?.current_ratio != null ? formatPercent(summary.current_ratio) : "-")}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">매출 성장률</div><div className={`mt-1 text-base font-black ${toneByValue(isKr ? krFinancial?.revenue_growth_rate : summary?.revenue_growth_rate)}`}>{isKr ? (krFinancial?.revenue_growth_rate != null ? formatPercent(krFinancial.revenue_growth_rate) : "-") : (summary?.revenue_growth_rate != null ? formatPercent(summary.revenue_growth_rate) : "-")}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">영업이익 성장률</div><div className={`mt-1 text-base font-black ${toneByValue(isKr ? krFinancial?.operating_income_growth_rate : summary?.operating_income_growth_rate)}`}>{isKr ? (krFinancial?.operating_income_growth_rate != null ? formatPercent(krFinancial.operating_income_growth_rate) : "-") : (summary?.operating_income_growth_rate != null ? formatPercent(summary.operating_income_growth_rate) : "-")}</div></div>
                                 </div>
                             </Card>
-                        ) : null}
 
                         {isKr ? (
                             <Card title="강점과 주의 포인트" subtitle="기본 의견에서 읽어낸 핵심 포인트">
@@ -972,21 +1131,21 @@ export const InvestAssistant = () => {
                             </Card>
                         ) : null}
 
-                        {isKr ? (
-                            <Card title="배당 정보" subtitle="DART 배당 + KIS 현재가 기준">
+                        {dividend ? (
+                            <Card title="배당 정보" subtitle={isKr ? "DART 배당 + KIS 현재가 기준" : "SEC EDGAR 연간 배당 + KIS 현재가 기준"}>
                                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">주당 배당금</div><div className="mt-1 text-base font-black text-slate-900">{dividend?.dividend_per_share != null ? formatCurrency(dividend.dividend_per_share, "KRW") : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "주당 배당금" : "연간 DPS"}</div><div className="mt-1 text-base font-black text-slate-900">{dividend?.dividend_per_share != null ? formatCurrency(dividend.dividend_per_share, dividendCurrency) : "-"}</div></div>
                                     <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">현재 배당수익률</div><div className="mt-1 text-base font-black text-slate-900">{dividend?.dividend_yield != null ? formatPercent(dividend.dividend_yield) : "-"}</div></div>
                                     <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">배당 성장률</div><div className={`mt-1 text-base font-black ${toneByValue(dividend?.dividend_growth_rate)}`}>{dividend?.dividend_growth_rate != null ? formatPercent(dividend.dividend_growth_rate) : "-"}</div></div>
-                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">현금배당성향</div><div className="mt-1 text-base font-black text-slate-900">{dividend?.dividend_payout_ratio != null ? formatPercent(dividend.dividend_payout_ratio) : "-"}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "현금배당성향" : "배당성향"}</div><div className="mt-1 text-base font-black text-slate-900">{dividend?.dividend_payout_ratio != null ? formatPercent(dividend.dividend_payout_ratio) : "-"}</div></div>
                                 </div>
                                 {dividend?.history?.length ? (
                                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
                                         {dividend.history.map((item) => (
                                             <div key={`${item.business_year}-${item.dividend_per_share || 0}`} className="rounded-2xl border border-slate-100 bg-white p-4">
-                                                <div className="text-xs font-black text-slate-400">{item.business_year}년 DPS</div>
-                                                <div className="mt-1 text-base font-black text-slate-900">{item.dividend_per_share != null ? formatCurrency(item.dividend_per_share, "KRW") : "-"}</div>
-                                                <div className="mt-2 text-xs font-medium text-slate-500">공시 배당수익률 {item.reported_dividend_yield != null ? formatPercent(item.reported_dividend_yield) : "-"}</div>
+                                                <div className="text-xs font-black text-slate-400">{item.business_year}년 {isKr ? "DPS" : "연간 DPS"}</div>
+                                                <div className="mt-1 text-base font-black text-slate-900">{item.dividend_per_share != null ? formatCurrency(item.dividend_per_share, dividendCurrency) : "-"}</div>
+                                                <div className="mt-2 text-xs font-medium text-slate-500">{isKr ? "공시 배당수익률" : "기준 배당수익률"} {item.reported_dividend_yield != null ? formatPercent(item.reported_dividend_yield) : "-"}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -1017,32 +1176,34 @@ export const InvestAssistant = () => {
                         </Card>
                     </div>
 
-                    <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-                        <Card title="뉴스 / 이슈" subtitle="v2/v3 issue 카드">
-                            <div className="space-y-3">
-                                {newsIssues.length ? newsIssues.map((item, index) => (
-                                    <article key={`${item.url || item.title || "news"}-${index}`} className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <div className="text-sm font-black leading-snug text-slate-900">{item.title}</div>
-                                                <div className="mt-1 text-xs font-medium text-slate-400">{item.source || "SOURCE"}{item.published_at ? ` · ${formatDate(item.published_at)}` : ""}</div>
+                    <div className={`grid gap-5 ${isKr ? "xl:grid-cols-[1.05fr_0.95fr]" : ""}`}>
+                        {isKr ? (
+                            <Card title="뉴스 / 이슈" subtitle="v2/v3 issue 카드">
+                                <div className="space-y-3">
+                                    {newsIssues.length ? newsIssues.map((item, index) => (
+                                        <article key={`${item.url || item.title || "news"}-${index}`} className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-black leading-snug text-slate-900">{item.title}</div>
+                                                    <div className="mt-1 text-xs font-medium text-slate-400">{item.source || "SOURCE"}{item.published_at ? ` · ${formatDate(item.published_at)}` : ""}</div>
+                                                </div>
+                                                {item.sentiment_label ? <Badge className="bg-slate-900 text-white">{item.sentiment_label}</Badge> : null}
                                             </div>
-                                            {item.sentiment_label ? <Badge className="bg-slate-900 text-white">{item.sentiment_label}</Badge> : null}
-                                        </div>
-                                        <p className="mt-3 text-sm leading-relaxed text-slate-600">{item.summary || "요약 정보가 제공되지 않았습니다."}</p>
-                                        {item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-primary-600">원문 보기<ArrowUpRight className="h-4 w-4" /></a> : null}
-                                    </article>
-                                )) : <EmptySlot message="뉴스 또는 이슈 데이터가 없습니다." />}
-                            </div>
-                        </Card>
+                                            <p className="mt-3 text-sm leading-relaxed text-slate-600">{item.summary || "요약 정보가 제공되지 않았습니다."}</p>
+                                            {item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-primary-600">원문 보기<ArrowUpRight className="h-4 w-4" /></a> : null}
+                                        </article>
+                                    )) : <EmptySlot message="뉴스 또는 이슈 데이터가 없습니다." />}
+                                </div>
+                            </Card>
+                        ) : null}
 
                         <Card title="제약사항 / 섹션 상태" subtitle="provider 상태와 available sections">
                             <div className="space-y-3">
                                 {limitations.length ? limitations.map((item, index) => (
-                                    <div key={`${item}-${index}`} className="flex gap-3 rounded-[1.4rem] border border-amber-100 bg-amber-50/70 p-4"><CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" /><p className="text-sm font-medium leading-relaxed text-amber-900">{item}</p></div>
+                                    <div key={`${item}-${index}`} className="flex gap-3 rounded-[1.4rem] border border-amber-100 bg-amber-50/70 p-4"><CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" /><p className="text-sm font-medium leading-relaxed text-amber-900">{formatLimitation(item)}</p></div>
                                 )) : <EmptySlot message="현재 표시할 limitation 정보가 없습니다." />}
                             </div>
-                            {v3?.available_sections?.length ? <div className="mt-5 flex flex-wrap gap-2">{v3.available_sections.map((item) => <Badge key={item} className="bg-slate-900 text-white">{item}</Badge>)}</div> : null}
+                            {v3?.available_sections?.length ? <div className="mt-5 flex flex-wrap gap-2">{v3.available_sections.map((item) => <Badge key={item} className="bg-slate-900 text-white">{formatAvailableSection(item)}</Badge>)}</div> : null}
                         </Card>
                     </div>
                 </>
