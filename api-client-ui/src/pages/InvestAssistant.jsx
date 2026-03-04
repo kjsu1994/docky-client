@@ -27,7 +27,6 @@ const AVAILABLE_SECTION_LABELS = {
     kr_quarterly_earnings: "국내 분기 실적",
     technical_indicators: "기술 지표",
     news_issues: "뉴스 / 이슈",
-    comparisons: "비교 종목",
 };
 
 const CHART_INTERVALS = [
@@ -66,6 +65,17 @@ const formatPercent = (value) => {
 };
 
 const formatAvailableSection = (value) => AVAILABLE_SECTION_LABELS[value] || value;
+
+const formatValuationLabel = (value) => {
+    const labels = {
+        VALUE_ZONE: "저평가 구간",
+        FAIR_VALUE: "적정 가치",
+        PREMIUM: "프리미엄 구간",
+        LOSS_MAKING: "적자 구간",
+        UNAVAILABLE: "산출 불가",
+    };
+    return labels[value] || value || "-";
+};
 
 const formatProviderDetail = (value) => {
     if (!value) return "-";
@@ -883,7 +893,6 @@ export const InvestAssistant = () => {
     const [market, setMarket] = useState("KR");
     const [symbolInput, setSymbolInput] = useState("삼성전자(005930)");
     const [selectedSymbol, setSelectedSymbol] = useState("005930");
-    const [compareInput, setCompareInput] = useState("");
     const [v1, setV1] = useState(null);
     const [v2, setV2] = useState(null);
     const [v3, setV3] = useState(null);
@@ -944,16 +953,14 @@ export const InvestAssistant = () => {
             return;
         }
 
-        const compareSymbols = compareInput.split(",").map((item) => normalizeSymbol(item)).filter(Boolean).slice(0, 3);
-
         setLoading(true);
         setError("");
 
         try {
             const [r1, r2, r3] = await Promise.all([
                 api.get("/invest/analysis", { params: { market, symbol } }),
-                api.get("/invest/analysis/v2", { params: { market, symbol, compare_symbols: compareSymbols } }),
-                api.get("/invest/analysis/v3", { params: { market, symbol, compare_symbols: compareSymbols } }),
+                api.get("/invest/analysis/v2", { params: { market, symbol } }),
+                api.get("/invest/analysis/v3", { params: { market, symbol } }),
             ]);
 
             const nextV1 = unwrapData(r1);
@@ -1006,7 +1013,7 @@ export const InvestAssistant = () => {
                             const Icon = item.icon;
                             const active = market === item.value;
                             return (
-                                <button key={item.value} type="button" className={`rounded-[2rem] border p-4 text-left ${active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700"}`} onClick={() => { const preset = PRESETS[item.value][0]; setMarket(item.value); setSelectedSymbol(preset); setSymbolInput(preset); setCompareInput(""); setChartInterval("DAY"); setChartData(null); }}>
+                                <button key={item.value} type="button" className={`rounded-[2rem] border p-4 text-left ${active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700"}`} onClick={() => { const preset = PRESETS[item.value][0]; setMarket(item.value); setSelectedSymbol(preset); setSymbolInput(preset); setChartInterval("DAY"); setChartData(null); }}>
                                     <Icon className="h-5 w-5" />
                                     <div className="mt-3 text-lg font-black">{item.label}</div>
                                     <div className={`mt-1 text-xs font-medium ${active ? "text-slate-300" : "text-slate-400"}`}>{item.helper}</div>
@@ -1020,10 +1027,6 @@ export const InvestAssistant = () => {
                         <div className="mt-1 text-xs font-medium text-slate-500">{price?.source === "KIS" ? "KIS 실시간 시세 응답을 사용 중입니다." : "가용 provider 기준 응답을 사용 중입니다."}</div>
                         <div className="mt-4 space-y-4">
                             <SymbolSuggestBox market={market} value={symbolInput} onChange={(value) => { setSymbolInput(value); setSelectedSymbol(""); }} onSelect={selectSymbol} />
-                            <div>
-                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">비교 종목</label>
-                                <input className="input-base" value={compareInput} onChange={(event) => setCompareInput(event.target.value)} placeholder={market === "KR" ? "예: 000660, 035420" : "예: MSFT, NVDA"} />
-                            </div>
                             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                                 <button type="button" className="btn-primary" onClick={() => fetchAnalysis()} disabled={loading}>{loading ? "분석 조회 중..." : "분석 시작"}</button>
                                 <button type="button" className="btn-secondary" onClick={() => fetchAnalysis({ silent: true })} disabled={loading}><RefreshCw className="h-4 w-4" /></button>
@@ -1166,12 +1169,12 @@ export const InvestAssistant = () => {
                             ) : <EmptySlot message="v3 추천 데이터가 없습니다." />}
                         </Card>
 
-                        <Card title={isKr ? "보조 진단값" : "v3 진단값"} subtitle={isKr ? "재무, 배당, 뉴스 기반 보조 해석" : "valuation / sentiment / ETF 힌트"}>
+                        <Card title={isKr ? "보조 진단값" : "v3 진단값"} subtitle={isKr ? "재무, 배당, 뉴스 기반 보조 해석" : "밸류, 배당, 기술, SEC 기준 보고 정보"}>
                             <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">밸류 레이블</div><div className="mt-1 text-base font-black text-slate-900">{v3?.valuation?.valuation_label || "-"}</div></div>
-                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">평균 감성</div><div className="mt-1 text-base font-black text-slate-900">{v3?.sentiment_snapshot?.average_sentiment_score != null ? formatCompact(v3.sentiment_snapshot.average_sentiment_score, 3) : "-"}</div></div>
-                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">기사 수</div><div className="mt-1 text-base font-black text-slate-900">{v3?.sentiment_snapshot?.article_count ?? "-"}</div></div>
-                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">ETF 추정</div><div className="mt-1 text-base font-black text-slate-900">{v3?.etf_profile?.etf ? "ETF 가능성 있음" : "일반 종목 분석"}</div></div>
+                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">밸류 레이블</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (v3?.valuation?.valuation_label || "-") : formatValuationLabel(v3?.valuation?.valuation_label)}</div></div>
+                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "평균 감성" : "배당 레이블"}</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (v3?.sentiment_snapshot?.average_sentiment_score != null ? formatCompact(v3.sentiment_snapshot.average_sentiment_score, 3) : "-") : (dividend?.dividend_label || "배당 정보 부족")}</div></div>
+                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "기사 수" : "기술 진단"}</div><div className={`mt-1 text-base font-black ${!isKr && indicatorAnalysis.score != null ? toneByValue(indicatorAnalysis.score - 50) : "text-slate-900"}`}>{isKr ? (v3?.sentiment_snapshot?.article_count ?? "-") : (indicatorAnalysis.label ? `${indicatorAnalysis.label} (${indicatorAnalysis.score ?? 0}점)` : "기술 진단 없음")}</div></div>
+                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "ETF 추정" : "SEC 기준 연도"}</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (v3?.etf_profile?.etf ? "ETF 가능성 있음" : "일반 종목 분석") : (summary?.business_year ? `${summary.business_year}년 ${summary?.report_code || ""}`.trim() : "연간 보고 정보 없음")}</div></div>
                             </div>
                         </Card>
                     </div>
