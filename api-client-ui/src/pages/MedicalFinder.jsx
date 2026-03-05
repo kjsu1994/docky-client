@@ -787,6 +787,7 @@ export const MedicalFinder = () => {
                                 const selected = String(id) === String(selectedId);
                                 const name = item?.institution_name ?? item?.institutionName;
                                 const address = getDisplayAddress(item);
+                                const openedAt = item?.opened_at ?? item?.openedAt;
                                 return (
                                     <button key={id} onClick={() => { setSelectedId(id); setMobileDetailOpen(true); }} className={`w-full rounded-3xl border p-5 text-left shadow-sm transition-all ${selected ? "border-teal-300 bg-rose-50/30" : "border-slate-100 bg-white hover:border-rose-100"}`}>
                                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -801,8 +802,8 @@ export const MedicalFinder = () => {
                                         </div>
                                         <div className="mt-4 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                                             <div className="rounded-xl bg-slate-50 p-3">
-                                                <div className="text-xs font-black text-slate-400">{"\uC7A5\uBE44\uB300\uBD84\uB958\uBA85"}</div>
-                                                <div className="mt-1 text-base font-black text-slate-800">{item?.primary_equipment_category ?? item?.primaryEquipmentCategory ?? "-"}</div>
+                                                <div className="text-xs font-black text-slate-400">{"\uAC1C\uC6D0\uC77C"}</div>
+                                                <div className="mt-1 text-base font-black text-slate-800">{openedAt || "-"}</div>
                                             </div>
                                             <div className="rounded-xl bg-slate-50 p-3">
                                                 <div className="flex items-center gap-1 text-xs font-black text-slate-400"><Activity className="h-3.5 w-3.5" />{"장비수 합계"}</div>
