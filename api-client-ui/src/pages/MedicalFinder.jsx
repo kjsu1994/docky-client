@@ -582,13 +582,24 @@ export const MedicalFinder = () => {
         equipmentItems.forEach((row) => {
             const categoryName = row?.equipment_category_name ?? row?.equipmentCategoryName ?? "-";
             const categoryCode = row?.equipment_category_code ?? row?.equipmentCategoryCode ?? "-";
+            const modelName = row?.model_name ?? row?.modelName ?? "-";
+            const equipmentCount = Math.max(0, toNumber(row?.equipment_count ?? row?.equipmentCount));
             const key = `${categoryName}||${categoryCode}`;
             if (!map.has(key)) {
-                map.set(key, { categoryName, categoryCode, rows: [] });
+                map.set(key, { categoryName, categoryCode, rows: [], modelCountMap: new Map() });
             }
-            map.get(key).rows.push(row);
+            const group = map.get(key);
+            group.rows.push(row);
+            group.modelCountMap.set(modelName, (group.modelCountMap.get(modelName) ?? 0) + equipmentCount);
         });
-        return Array.from(map.values());
+        return Array.from(map.values()).map((group) => ({
+            categoryName: group.categoryName,
+            categoryCode: group.categoryCode,
+            rows: group.rows,
+            modelCounts: Array.from(group.modelCountMap.entries())
+                .map(([modelName, count]) => ({ modelName, count }))
+                .sort((a, b) => b.count - a.count || a.modelName.localeCompare(b.modelName, "ko-KR")),
+        }));
     }, [equipmentItems]);
 
     const selectedDisplayAddress = useMemo(() => {
@@ -758,6 +769,16 @@ export const MedicalFinder = () => {
                                         {groupedEquipments.map((group) => (
                                             <div key={`${group.categoryName}-${group.categoryCode}`} className="rounded-xl border border-slate-100 p-3">
                                                 <div className="mb-2 text-xs font-black text-slate-700">{`장비대분류명: ${group.categoryName} / 장비대분류코드: ${group.categoryCode}`}</div>
+                                                <div className="mb-2 rounded-lg bg-emerald-50 p-2 text-[11px] text-emerald-800">
+                                                    <div className="font-black">{"모델별 수량"}</div>
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {group.modelCounts.map((model) => (
+                                                            <span key={`${group.categoryCode}-${model.modelName}`} className="rounded-full bg-white px-2 py-0.5 font-bold text-emerald-700">
+                                                                {`${model.modelName}: ${model.count}개`}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                                 <div className="space-y-2">
                                                     {group.rows.map((row, idx) => (
                                                         <div key={`${group.categoryCode}-${idx}`} className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
@@ -856,6 +877,16 @@ export const MedicalFinder = () => {
                                             <div key={`m-${group.categoryName}-${group.categoryCode}`} className="rounded-lg bg-white p-2 text-xs text-slate-700">
                                                 <div className="font-black">{`장비대분류명: ${group.categoryName}`}</div>
                                                 <div className="mb-1">{`장비대분류코드: ${group.categoryCode}`}</div>
+                                                <div className="mb-2 rounded-md bg-emerald-50 p-2 text-[11px] text-emerald-800">
+                                                    <div className="font-black">{"모델별 수량"}</div>
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {group.modelCounts.map((model) => (
+                                                            <span key={`mobile-${group.categoryCode}-${model.modelName}`} className="rounded-full bg-white px-2 py-0.5 font-bold text-emerald-700">
+                                                                {`${model.modelName}: ${model.count}개`}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                                 {group.rows.map((row, idx) => (
                                                     <div key={`m-${group.categoryCode}-${idx}`} className="mb-1 rounded-md bg-slate-50 p-2">
                                                         <div>{`장비세분류명: ${row?.equipment_type_name ?? row?.equipmentTypeName ?? "-"}`}</div>
@@ -876,6 +907,7 @@ export const MedicalFinder = () => {
         </div>
     );
 };
+
 
 
 
