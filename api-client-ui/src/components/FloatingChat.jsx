@@ -34,6 +34,8 @@ import toast from "react-hot-toast";
 import { formatRelativeTime, debounce, normalizeChatTimestamp, resolveAssetUrl, formatFileSize, isImageFile } from "../utils/helpers";
 import { LoadingSpinner } from "./LoadingSpinner";
 
+const CHAT_ROOM_READ_EVENT = "chat-room-read";
+
 export const FloatingChat = () => {
     const { user, isAuthenticated } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
@@ -190,6 +192,21 @@ export const FloatingChat = () => {
             console.error("Read mark failed:", err);
         }
     };
+
+    useEffect(() => {
+        const handleExternalRead = (event) => {
+            const roomId = event?.detail?.roomId;
+            if (!roomId) return;
+            setRooms((prev) =>
+                (prev || []).map((room) =>
+                    String(getRoomId(room)) === String(roomId) ? { ...room, unread_count: 0, unreadCount: 0 } : room
+                )
+            );
+        };
+
+        window.addEventListener(CHAT_ROOM_READ_EVENT, handleExternalRead);
+        return () => window.removeEventListener(CHAT_ROOM_READ_EVENT, handleExternalRead);
+    }, []);
 
     
     const applyIncomingToRoom = (roomId, normalized, forceRead = false) => {

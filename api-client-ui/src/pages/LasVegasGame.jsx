@@ -8,8 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { DiceCountBadge, DiceFace, MoneyCard } from "../common/LasVegasVisuals";
 
 const ROOM_STORAGE_KEY = "las_vegas_last_room_id";
-const ROLL_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3";
-const BET_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/1084/1084-preview.mp3";
+const CHAT_ROOM_READ_EVENT = "chat-room-read";
 
 const normalizeRoomId = (room) => room?.room_id || room?.roomId;
 const normalizeChatRoomId = (roomOrState) =>
@@ -103,8 +102,8 @@ export const LasVegasGame = () => {
     });
     const [joinCode, setJoinCode] = useState("");
     const [settingsForm, setSettingsForm] = useState({
-        round_count: 4,
-        turn_time_seconds: 25,
+        round_count: "4",
+        turn_time_seconds: "25",
     });
     const [hotCasinoNo, setHotCasinoNo] = useState(null);
 
@@ -113,8 +112,9 @@ export const LasVegasGame = () => {
     const chatSubRef = useRef(null);
     const chatScrollRef = useRef(null);
     const prevCasinoSignatureRef = useRef("");
-    const rollAudioRef = useRef(typeof Audio !== "undefined" ? new Audio(ROLL_SOUND_URL) : null);
-    const betAudioRef = useRef(typeof Audio !== "undefined" ? new Audio(BET_SOUND_URL) : null);
+    const lastReadMarkAtRef = useRef(0);
+    const audioContextRef = useRef(null);
+    const isBetSoundPlayingRef = useRef(false);
 
     const myMemberId = user?.member_id || user?.memberId || user?.id || null;
     const chatRoomId = normalizeChatRoomId(state) || normalizeChatRoomId(selectedRoom) || null;
@@ -125,8 +125,8 @@ export const LasVegasGame = () => {
         Number(selectedRoom.host_member_id || selectedRoom.hostMemberId) === Number(myMemberId);
     const myTurn = state && myMemberId &&
         Number(state.turn_member_id || state.turnMemberId) === Number(myMemberId);
-    const canRoll = myTurn && (!state?.current_roll || state.current_roll.length === 0);
-    const canBet = myTurn && (state?.current_roll?.length || 0) > 0;
+    const canRoll = !isFinished && myTurn && (!state?.current_roll || state.current_roll.length === 0);
+    const canBet = !isFinished && myTurn && (state?.current_roll?.length || 0) > 0;
 
     const currentRoll = state?.current_roll || [];
     const currentRollCountByFace = useMemo(() => {
@@ -189,6 +189,7 @@ export const LasVegasGame = () => {
         chatSubRef.current = client.subscribe(`/sub/chat/room/${roomId}`, (msg) => {
             const payload = JSON.parse(msg.body || "{}");
             setChatMessages((prev) => [...prev, payload]);
+            markChatRoomAsRead(roomId).catch(() => {});
         });
     };
 
@@ -213,6 +214,15 @@ export const LasVegasGame = () => {
         }
     };
 
+    const markChatRoomAsRead = async (roomId) => {
+        if (!roomId) return;
+        const now = Date.now();
+        if (now - lastReadMarkAtRef.current < 1000) return;
+        lastReadMarkAtRef.current = now;
+        await api.patch(`/chat/room/${roomId}/read`);
+        window.dispatchEvent(new CustomEvent(CHAT_ROOM_READ_EVENT, { detail: { roomId: String(roomId) } }));
+    };
+
     const hydrateRoomContext = async (room) => {
         setSelectedRoom(room);
         const roomId = normalizeRoomId(room);
@@ -227,6 +237,7 @@ export const LasVegasGame = () => {
             if (snapshotChatRoomId) {
                 subscribeChatRoom(client, snapshotChatRoomId);
                 await fetchChatMessages(snapshotChatRoomId);
+                await markChatRoomAsRead(snapshotChatRoomId);
             } else {
                 setChatMessages([]);
             }
@@ -265,8 +276,8 @@ export const LasVegasGame = () => {
     useEffect(() => {
         if (!selectedRoom) return;
         setSettingsForm({
-            round_count: selectedRoom.round_count || selectedRoom.roundCount || 4,
-            turn_time_seconds: selectedRoom.turn_time_seconds || selectedRoom.turnTimeSeconds || 25,
+            round_count: String(selectedRoom.round_count || selectedRoom.roundCount || 4),
+            turn_time_seconds: String(selectedRoom.turn_time_seconds || selectedRoom.turnTimeSeconds || 25),
         });
     }, [selectedRoom]);
 
@@ -289,6 +300,25 @@ export const LasVegasGame = () => {
             chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
         }
     }, [chatMessages]);
+
+    useEffect(() => {
+        if (!chatRoomId || !selectedRoom) return;
+        markChatRoomAsRead(chatRoomId).catch(() => {});
+
+        const onVisible = () => {
+            if (document.visibilityState === "visible") {
+                markChatRoomAsRead(chatRoomId).catch(() => {});
+            }
+        };
+        const onFocus = () => markChatRoomAsRead(chatRoomId).catch(() => {});
+
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onVisible);
+        return () => {
+            window.removeEventListener("focus", onFocus);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, [chatRoomId, selectedRoom]);
 
     useEffect(() => {
         const casinos = state?.casinos || [];
@@ -388,15 +418,121 @@ export const LasVegasGame = () => {
     };
 
     const playActionSound = (type) => {
-        const audio = type === "ROLL_DICE" ? rollAudioRef.current : betAudioRef.current;
-        if (!audio) return;
+        if (type === "ROLL_DICE") {
+            playDiceRollSound();
+            return;
+        }
+        const context = getAudioContext();
+        if (!context || isBetSoundPlayingRef.current) return;
+        if (context.state === "suspended") {
+            context.resume().catch(() => {});
+        }
+
+        const now = context.currentTime;
+        const master = context.createGain();
+        const oscillator = context.createOscillator();
+        const accent = context.createOscillator();
+        const gain = context.createGain();
+
         try {
-            audio.pause();
-            audio.currentTime = 0;
-            audio.play().catch(() => {});
+            isBetSoundPlayingRef.current = true;
+            master.gain.setValueAtTime(0.20, now);
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.36, now + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+            oscillator.type = "triangle";
+            oscillator.frequency.setValueAtTime(880, now);
+            oscillator.frequency.exponentialRampToValueAtTime(660, now + 0.12);
+
+            accent.type = "sine";
+            accent.frequency.setValueAtTime(1320, now);
+            accent.frequency.exponentialRampToValueAtTime(990, now + 0.08);
+
+            oscillator.connect(gain);
+            accent.connect(gain);
+            gain.connect(master);
+            master.connect(context.destination);
+
+            oscillator.start(now);
+            accent.start(now);
+            oscillator.stop(now + 0.12);
+            accent.stop(now + 0.08);
+
+            window.setTimeout(() => {
+                isBetSoundPlayingRef.current = false;
+            }, 140);
         } catch {
+            isBetSoundPlayingRef.current = false;
             // Ignore browser autoplay or decode failures for optional SFX.
         }
+    };
+
+    const getAudioContext = () => {
+        if (typeof window === "undefined") return null;
+        if (audioContextRef.current) return audioContextRef.current;
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextCtor) return null;
+        audioContextRef.current = new AudioContextCtor();
+        return audioContextRef.current;
+    };
+
+    const playDiceRollSound = () => {
+        const context = getAudioContext();
+        if (!context) return;
+        if (context.state === "suspended") {
+            context.resume().catch(() => {});
+        }
+
+        const now = context.currentTime;
+        const master = context.createGain();
+        master.gain.setValueAtTime(0.40, now);
+        master.connect(context.destination);
+
+        // Layer short filtered-noise bursts to mimic dice clatter across a hard table.
+        // 딱딱한 테이블 위를 구르는 주사위 느낌을 내기 위해 짧은 노이즈 버스트를 겹친다.
+        for (let i = 0; i < 8; i += 1) {
+            const start = now + (i * 0.045);
+            const duration = 0.028 + (Math.random() * 0.03);
+            const frameCount = Math.max(1, Math.floor(context.sampleRate * duration));
+            const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+            const channel = buffer.getChannelData(0);
+            for (let j = 0; j < channel.length; j += 1) {
+                channel[j] = (Math.random() * 2 - 1) * (1 - (j / channel.length));
+            }
+
+            const source = context.createBufferSource();
+            source.buffer = buffer;
+
+            const filter = context.createBiquadFilter();
+            filter.type = "bandpass";
+            filter.frequency.setValueAtTime(1500 + Math.random() * 1800, start);
+            filter.Q.setValueAtTime(1.2 + Math.random() * 2, start);
+
+            const burstGain = context.createGain();
+            burstGain.gain.setValueAtTime(0.0001, start);
+            burstGain.gain.exponentialRampToValueAtTime(0.44 + Math.random() * 0.36, start + 0.006);
+            burstGain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+            source.connect(filter);
+            filter.connect(burstGain);
+            burstGain.connect(master);
+            source.start(start);
+            source.stop(start + duration);
+        }
+
+        const tail = context.createOscillator();
+        const tailGain = context.createGain();
+        tail.type = "triangle";
+        tail.frequency.setValueAtTime(190, now);
+        tail.frequency.exponentialRampToValueAtTime(90, now + 0.35);
+        tailGain.gain.setValueAtTime(0.0001, now);
+        tailGain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+        tailGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+        tail.connect(tailGain);
+        tailGain.connect(master);
+        tail.start(now);
+        tail.stop(now + 0.36);
     };
 
     const publishGameAction = (actionType, casinoNo = null) => {
@@ -436,7 +572,10 @@ export const LasVegasGame = () => {
         if (!selectedRoom) return;
         const roomId = normalizeRoomId(selectedRoom);
         try {
-            const response = await api.patch(`/game/las-vegas/rooms/${roomId}/settings`, settingsForm);
+            const response = await api.patch(`/game/las-vegas/rooms/${roomId}/settings`, {
+                round_count: toPlainInt(settingsForm.round_count, 4),
+                turn_time_seconds: toPlainInt(settingsForm.turn_time_seconds, 25),
+            });
             setSelectedRoom(response.data);
             toast.success("설정 저장 완료");
         } catch {
@@ -661,8 +800,8 @@ export const LasVegasGame = () => {
 
                         {isHost && roomStatus === "WAITING" && (
                             <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
-                                <input type="number" min={1} max={10} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.round_count} onChange={(e) => setSettingsForm((prev) => ({ ...prev, round_count: Number(e.target.value) }))} />
-                                <input type="number" min={5} max={180} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turn_time_seconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turn_time_seconds: Number(e.target.value) }))} />
+                                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.round_count} onChange={(e) => setSettingsForm((prev) => ({ ...prev, round_count: normalizeNumericText(e.target.value, 1, 10) }))} />
+                                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turn_time_seconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turn_time_seconds: normalizeNumericText(e.target.value, 5, 180) }))} />
                                 <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white md:col-span-2" onClick={updateSettings}>방 설정 저장</button>
                             </div>
                         )}
@@ -697,7 +836,7 @@ export const LasVegasGame = () => {
                                     )}
                                 </div>
 
-                                {myTurn && (
+                                {!isFinished && myTurn && (
                                     <div className="mb-3 rounded-2xl bg-white/10 p-3">
                                         <div className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-100">My Action</div>
                                         <div className="flex flex-wrap gap-2">
