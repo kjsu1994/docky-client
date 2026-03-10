@@ -9,7 +9,7 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 
 const roomIdOf = (room) => room?.room_id || room?.roomId || null;
-const chatRoomIdOf = (room) => room?.chat_room_id || room?.chatRoomId || null;
+const chatRoomIdOf = (room) => room?.chat_room_id || room?.chatRoomId || room?.room_id || room?.roomId || room?.id || null;
 const parseIntSafe = (value, fallback = 0) => {
   const parsed = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -45,6 +45,8 @@ export const NoThanksGame = () => {
   const gameSubRef = useRef(null);
   const chatSubRef = useRef(null);
   const chatScrollRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const isActionSoundPlayingRef = useRef(false);
 
   const myMemberId = Number(user?.member_id || user?.memberId || user?.id || 0);
   const roomStatus = gameState?.room_status || gameState?.roomStatus || selectedRoom?.room_status || selectedRoom?.roomStatus || null;
@@ -78,6 +80,76 @@ export const NoThanksGame = () => {
 
   const normalizeSettingsField = (field, min, max, fallback) => {
     setSettingsForm((prev) => ({ ...prev, [field]: clampNumberText(prev[field], min, max, fallback) }));
+  };
+
+  const getAudioContext = () => {
+    if (typeof window === "undefined") return null;
+    if (audioContextRef.current) return audioContextRef.current;
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    audioContextRef.current = new AudioContextCtor();
+    return audioContextRef.current;
+  };
+
+  const playActionSound = (actionType) => {
+    const context = getAudioContext();
+    if (!context || isActionSoundPlayingRef.current) return;
+    if (context.state === "suspended") {
+      context.resume().catch(() => {});
+    }
+
+    const now = context.currentTime;
+    const master = context.createGain();
+    const primary = context.createOscillator();
+    const accent = context.createOscillator();
+    const gain = context.createGain();
+
+    try {
+      isActionSoundPlayingRef.current = true;
+      if (actionType === "TAKE") {
+        master.gain.setValueAtTime(0.20, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.36, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+        primary.type = "triangle";
+        primary.frequency.setValueAtTime(880, now);
+        primary.frequency.exponentialRampToValueAtTime(660, now + 0.12);
+
+        accent.type = "sine";
+        accent.frequency.setValueAtTime(1320, now);
+        accent.frequency.exponentialRampToValueAtTime(990, now + 0.08);
+      } else {
+        master.gain.setValueAtTime(0.14, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.24, now + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+
+        primary.type = "square";
+        primary.frequency.setValueAtTime(620, now);
+        primary.frequency.exponentialRampToValueAtTime(420, now + 0.09);
+
+        accent.type = "triangle";
+        accent.frequency.setValueAtTime(930, now);
+        accent.frequency.exponentialRampToValueAtTime(700, now + 0.06);
+      }
+
+      primary.connect(gain);
+      accent.connect(gain);
+      gain.connect(master);
+      master.connect(context.destination);
+
+      primary.start(now);
+      accent.start(now);
+      primary.stop(now + (actionType === "TAKE" ? 0.12 : 0.09));
+      accent.stop(now + (actionType === "TAKE" ? 0.08 : 0.06));
+
+      window.setTimeout(() => {
+        isActionSoundPlayingRef.current = false;
+      }, actionType === "TAKE" ? 140 : 110);
+    } catch {
+      isActionSoundPlayingRef.current = false;
+    }
   };
 
   const ensureSocket = () => {
@@ -132,7 +204,6 @@ export const NoThanksGame = () => {
       const payload = JSON.parse(message.body || "{}");
       setGameState(payload);
       refreshSelectedRoom(roomId).catch(() => {});
-      if (payload.message) toast(payload.message);
     });
   };
 
@@ -344,6 +415,7 @@ export const NoThanksGame = () => {
       toast.error("실시간 연결이 아직 준비되지 않았습니다.");
       return;
     }
+    playActionSound(actionType);
     client.publish({
       destination: `/pub/game/no-thanks/${roomIdOf(selectedRoom)}/action`,
       body: JSON.stringify({ action_type: actionType, member_id: myMemberId }),
@@ -351,31 +423,41 @@ export const NoThanksGame = () => {
   };
 
   const sendChat = () => {
-    if (!chatInput.trim() || !chatRoomId) return;
+    if (!chatInput.trim() || !chatRoomId || !myMemberId) return;
     const client = ensureSocket();
     if (!client.connected) {
       toast.error("채팅 연결이 아직 준비되지 않았습니다.");
       return;
     }
+    const message = chatInput.trim();
     client.publish({
       destination: "/pub/chat/message",
-      body: JSON.stringify({ chat_room_id: Number(chatRoomId), message: chatInput.trim() }),
+      body: JSON.stringify({
+        roomId: Number(chatRoomId),
+        chatRoomId: Number(chatRoomId),
+        senderId: Number(myMemberId),
+        type: "TALK",
+        message,
+      }),
+      headers: { "content-type": "application/json" },
     });
     setChatInput("");
   };
 
   return (
     <div className="animate-fade-in space-y-6">
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl">
-        <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-          <Play className="h-3.5 w-3.5 text-emerald-500" />
-          노땡스
-        </div>
-        <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">노땡스</h1>
-        <p className="mt-3 text-sm font-medium text-slate-500 sm:text-base">
-          더 많은 칩 그리고 더 적은 숫자의 카드를 보유하여 승리하세요.
-        </p>
-      </section>
+      {!selectedRoom && (
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl">
+          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+            <Play className="h-3.5 w-3.5 text-emerald-500" />
+            노땡스
+          </div>
+          <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">노땡스</h1>
+          <p className="mt-3 text-sm font-medium text-slate-500 sm:text-base">
+            더 많은 칩 그리고 더 적은 숫자의 카드를 보유하여 승리하세요.
+          </p>
+        </section>
+      )}
 
       {!selectedRoom && (
         <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
