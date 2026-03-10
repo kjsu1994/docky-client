@@ -586,7 +586,7 @@ const QuickMenuLink = ({ to, icon: Icon, title, color }) => {
     return (
         <Link to={to} className="group flex flex-col items-center gap-1.5 rounded-[1.5rem] p-1.5">
             <div className={`flex aspect-square w-full items-center justify-center rounded-[1.5rem] bg-white shadow-lg transition-all duration-500 group-hover:-translate-y-1 group-hover:scale-105 group-hover:shadow-xl group-active:scale-95 ${colors[color]}`}>
-                <Icon className="h-8 w-8 sm:h-16 sm:w-16 lg:h-20 lg:w-20" />
+                <Icon className="h-10 w-10 sm:h-20 sm:w-20 lg:h-24 lg:w-24" />
             </div>
             <span className="text-center text-[14px] font-bold leading-tight text-slate-600 transition-colors group-hover:text-primary-600 sm:text-[18px] lg:text-[20px]">{title}</span>
         </Link>
