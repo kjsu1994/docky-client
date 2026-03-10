@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import toast from "react-hot-toast";
-import { Crown, Dices, MessageSquare, Play, TimerReset, Users } from "lucide-react";
+import { CheckCircle2, Crown, Dices, MessageSquare, Play, TimerReset, Users } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import { DiceCountBadge, DiceFace, MoneyCard } from "../common/LasVegasVisuals";
@@ -13,6 +13,15 @@ const CHAT_ROOM_READ_EVENT = "chat-room-read";
 const normalizeRoomId = (room) => room?.room_id || room?.roomId;
 const normalizeChatRoomId = (roomOrState) =>
     roomOrState?.chat_room_id || roomOrState?.chatRoomId || roomOrState?.room_id || roomOrState?.roomId || roomOrState?.id;
+const isReadyPlayer = (player) =>
+    Boolean(player?.ready ?? player?.is_ready ?? player?.isReady ?? player?.ready_status ?? player?.readyStatus);
+const extractReadyMemberIds = (players) =>
+    new Set(
+        (Array.isArray(players) ? players : [])
+            .filter((player) => isReadyPlayer(player))
+            .map((player) => Number(player.member_id || player.memberId))
+            .filter((memberId) => Number.isFinite(memberId) && memberId > 0)
+    );
 const formatWon = (value) => `${Number(value || 0).toLocaleString("ko-KR")}원`;
 const toPlainInt = (value, fallback = 0) => {
     const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -94,6 +103,7 @@ export const LasVegasGame = () => {
     const [loading, setLoading] = useState(false);
     const [creating, setCreating] = useState(false);
     const [rematching, setRematching] = useState(false);
+    const [forceFinishing, setForceFinishing] = useState(false);
     const [secondsLeft, setSecondsLeft] = useState(null);
     const [createForm, setCreateForm] = useState({
         title: "",
@@ -140,6 +150,7 @@ export const LasVegasGame = () => {
     const livePlayers = Array.isArray(state?.players) ? state.players : [];
     const roomPlayers = Array.isArray(selectedRoom?.players) ? selectedRoom.players : [];
     const players = livePlayers.length > 0 ? livePlayers : roomPlayers;
+    const readyMemberIds = useMemo(() => extractReadyMemberIds(players), [players]);
     const hostNickname = useMemo(() => {
         const hostId = Number(selectedRoom?.host_member_id || selectedRoom?.hostMemberId || 0);
         return roomPlayers.find((player) => Number(player.member_id || player.memberId) === hostId)?.nickname || "-";
@@ -630,6 +641,26 @@ export const LasVegasGame = () => {
         }
     };
 
+    const forceFinishGame = async () => {
+        if (!selectedRoom) return;
+        if (!window.confirm("게임 진행중인데 종료할까요? 현재 판은 취소되고 같은 방 대기 상태로 돌아갑니다.")) {
+            return;
+        }
+        const roomId = normalizeRoomId(selectedRoom);
+        try {
+            setForceFinishing(true);
+            const response = await api.post(`/game/las-vegas/rooms/${roomId}/force-finish`);
+            setSelectedRoom(response.data);
+            await fetchState(roomId);
+            await fetchRooms();
+            toast.success("현재 게임을 종료하고 대기 상태로 돌아갔습니다.");
+        } catch {
+            toast.error("강제 종료에 실패했습니다.");
+        } finally {
+            setForceFinishing(false);
+        }
+    };
+
     const leaveRoom = async () => {
         if (!selectedRoom) return;
         const roomId = normalizeRoomId(selectedRoom);
@@ -757,9 +788,18 @@ export const LasVegasGame = () => {
                             <div>
                                 <div className="text-lg font-black text-slate-900">{selectedRoom.title}</div>
                                 <div className="text-xs text-slate-500">방 코드 {selectedRoom.room_code || selectedRoom.roomCode}</div>
+                                {isHost && roomStatus === "PLAYING" && (
+                                    <button
+                                        className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700 disabled:opacity-50"
+                                        onClick={forceFinishGame}
+                                        disabled={forceFinishing}
+                                    >
+                                        {forceFinishing ? "종료 중..." : "강제 종료"}
+                                    </button>
+                                )}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>준비 토글</button>
+                                <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>준비하기</button>
                                 {isHost && <button className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white" onClick={startGame}>시작</button>}
                                 <button className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" onClick={leaveRoom}>퇴장</button>
                             </div>
@@ -883,9 +923,18 @@ export const LasVegasGame = () => {
                                     {sortedPlayers.map((player) => {
                                         const memberId = player.member_id || player.memberId;
                                         const isCurrent = Number(memberId) === Number(state?.turn_member_id || state?.turnMemberId);
+                                        const isReady = readyMemberIds.has(Number(memberId));
                                         return (
                                             <div key={`player-${memberId}`} className={`rounded-xl border p-3 ${isCurrent ? "border-primary-400 bg-primary-50" : "border-slate-100 bg-slate-50"}`}>
-                                                <div className="text-sm font-black text-slate-900">{player.nickname}</div>
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div className="text-sm font-black text-slate-900">{player.nickname}</div>
+                                                    {roomStatus === "WAITING" && (
+                                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${isReady ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                            {isReady ? "READY" : "WAIT"}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="mt-1 text-xs font-bold text-slate-600">
                                                     보유금 {formatWon(player.total_money || player.totalMoney || 0)} | 남은 주사위 {player.remaining_dice || player.remainingDice || 8}
                                                 </div>
