@@ -454,7 +454,7 @@ export const Home = () => {
                         <p className="text-sm font-medium text-slate-400">자주 사용하는 기능을 바로 실행하세요.</p>
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
+                <div className="grid grid-cols-4 gap-2 sm:gap-4 lg:grid-cols-4">
                     <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" />
                     <QuickMenuLink to="/app/facility" icon={Car} title="편의시설 찾기" color="sky" />
                     <QuickMenuLink to="/app/games" icon={Dices} title="게임 허브" color="amber" />
@@ -584,11 +584,11 @@ const QuickMenuLink = ({ to, icon: Icon, title, color }) => {
     };
 
     return (
-        <Link to={to} className="group flex flex-col items-center gap-3 rounded-[2.5rem] p-2">
-            <div className={`flex aspect-square w-full items-center justify-center rounded-[2.5rem] bg-white shadow-xl transition-all duration-500 group-hover:-translate-y-2 group-hover:scale-105 group-hover:shadow-2xl group-active:scale-95 ${colors[color]}`}>
-                <Icon className="h-8 w-8 sm:h-10 sm:w-10" />
+        <Link to={to} className="group flex flex-col items-center gap-1.5 rounded-[1.5rem] p-1.5">
+            <div className={`flex aspect-square w-full items-center justify-center rounded-[1.5rem] bg-white shadow-lg transition-all duration-500 group-hover:-translate-y-1 group-hover:scale-105 group-hover:shadow-xl group-active:scale-95 ${colors[color]}`}>
+                <Icon className="h-8 w-8 sm:h-16 sm:w-16 lg:h-20 lg:w-20" />
             </div>
-            <span className="text-[13px] font-bold text-slate-600 transition-colors group-hover:text-primary-600">{title}</span>
+            <span className="text-center text-[14px] font-bold leading-tight text-slate-600 transition-colors group-hover:text-primary-600 sm:text-[18px] lg:text-[20px]">{title}</span>
         </Link>
     );
 };

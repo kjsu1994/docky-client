@@ -107,13 +107,13 @@ export const LasVegasGame = () => {
     const [secondsLeft, setSecondsLeft] = useState(null);
     const [createForm, setCreateForm] = useState({
         title: "",
-        round_count: "4",
-        turn_time_seconds: "25",
+        round_count: "3",
+        turn_time_seconds: "50",
     });
     const [joinCode, setJoinCode] = useState("");
     const [settingsForm, setSettingsForm] = useState({
-        round_count: "4",
-        turn_time_seconds: "25",
+        round_count: "3",
+        turn_time_seconds: "50",
     });
     const [hotCasinoNo, setHotCasinoNo] = useState(null);
 
