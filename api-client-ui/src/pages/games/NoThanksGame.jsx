@@ -676,7 +676,13 @@ export const NoThanksGame = () => {
                       <button className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:opacity-50" disabled={!(roomStatus === "PLAYING" && isMyTurn)} onClick={() => publishAction("TAKE")}>카드 가져가기</button>
                       <button className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-white disabled:opacity-50" disabled={!(roomStatus === "PLAYING" && isMyTurn && myChips > 0)} onClick={() => publishAction("PASS")}>칩 1개 내고 넘기기</button>
                     </div>
-                    <div className="mt-3 text-xs text-slate-500">시간이 초과되면 칩이 남아 있을 때는 자동으로 넘기고, 칩이 없으면 자동으로 카드를 가져갑니다.</div>
+                    <div className="mt-3 space-y-2">
+                      <div className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600">
+                        <div>내 칩 {myChips}</div>
+                        <div className="mt-1">내 카드 {cardsLabel(myPlayer?.cards)}</div>
+                      </div>
+                      <div className="text-xs text-slate-500">시간이 초과되면 칩이 남아 있을 때는 자동으로 넘기고, 칩이 없으면 자동으로 카드를 가져갑니다.</div>
+                    </div>
                   </div>
                 </div>
               </div>
