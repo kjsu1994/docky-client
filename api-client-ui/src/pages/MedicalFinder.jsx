@@ -452,88 +452,54 @@ export const MedicalFinder = () => {
         });
         setPickedCenterMarker(center.latitude, center.longitude);
 
-        const rightClickListener = window.naver.maps.Event.addListener(mapRef.current, "rightclick", (event) => {
-            applyPickedCenter(event?.coord || event?.overlay?.position, "\uC6B0\uD074\uB9AD");
-        });
-        interactionListenersRef.current.push(rightClickListener);
-
-        const container = mapContainerRef.current;
-        const clearTimer = () => {
-            if (longPressStateRef.current.timerId) {
-                clearTimeout(longPressStateRef.current.timerId);
-                longPressStateRef.current.timerId = null;
-            }
-        };
-        const onTouchStart = (event) => {
-            const touch = event.touches?.[0];
-            if (!touch) return;
-            clearTimer();
-            longPressStateRef.current.startX = touch.clientX;
-            longPressStateRef.current.startY = touch.clientY;
-            longPressStateRef.current.moved = false;
-            longPressStateRef.current.timerId = setTimeout(() => {
-                if (!longPressStateRef.current.moved) {
-                    pickCenterByClientPoint(touch.clientX, touch.clientY, "\uB871\uD504\uB808\uC2A4");
-                }
-                clearTimer();
-            }, 650);
-        };
-        const onTouchMove = (event) => {
-            const touch = event.touches?.[0];
-            if (!touch) return;
-            const dx = Math.abs(touch.clientX - longPressStateRef.current.startX);
-            const dy = Math.abs(touch.clientY - longPressStateRef.current.startY);
-            if (dx > 10 || dy > 10) {
-                longPressStateRef.current.moved = true;
-                clearTimer();
-            }
-        };
-        const onTouchEnd = () => clearTimer();
-        const onTouchCancel = () => clearTimer();
-
-        container.addEventListener("touchstart", onTouchStart, { passive: true });
-        container.addEventListener("touchmove", onTouchMove, { passive: true });
-        container.addEventListener("touchend", onTouchEnd);
-        container.addEventListener("touchcancel", onTouchCancel);
-        interactionListenersRef.current.push({
-            remove: () => {
-                container.removeEventListener("touchstart", onTouchStart);
-                container.removeEventListener("touchmove", onTouchMove);
-                container.removeEventListener("touchend", onTouchEnd);
-                container.removeEventListener("touchcancel", onTouchCancel);
-            },
-        });
-    }, [applyPickedCenter, center.latitude, center.longitude, mapError, mapLoaded, pickCenterByClientPoint, setPickedCenterMarker]);
+    }, [center.latitude, center.longitude, mapError, mapLoaded, setPickedCenterMarker]);
 
     useEffect(() => {
         renderMarkers();
     }, [renderMarkers]);
 
     useEffect(() => {
-        if (!mapRef.current || !window.naver?.maps?.Event) return;
+        if (!mapLoaded || !mapRef.current || !window.naver?.maps?.Event) return;
+
+        clearInteractionListeners();
+
+        const applyCoordFromEvent = (event, label) => {
+            const coord = event?.coord || event?.overlay?.position;
+            if (coord) {
+                applyPickedCenter(coord, label);
+                return;
+            }
+            const pointerX = event?.pointerEvent?.clientX;
+            const pointerY = event?.pointerEvent?.clientY;
+            if (Number.isFinite(pointerX) && Number.isFinite(pointerY)) {
+                pickCenterByClientPoint(pointerX, pointerY, label);
+            }
+        };
+
+        const rightClickPickListener = window.naver.maps.Event.addListener(mapRef.current, "rightclick", (event) => {
+            applyCoordFromEvent(event, "우클릭");
+        });
+        interactionListenersRef.current.push(rightClickPickListener);
+
         const clickListener = window.naver.maps.Event.addListener(mapRef.current, "click", () => {
             closeAllInfoWindows();
         });
-        const rightClickListener = window.naver.maps.Event.addListener(mapRef.current, "rightclick", () => {
+        interactionListenersRef.current.push(clickListener);
+
+        const rightClickCloseListener = window.naver.maps.Event.addListener(mapRef.current, "rightclick", () => {
             closeAllInfoWindows();
         });
-        const container = mapContainerRef.current;
-        const handlePointerDown = () => {
-            closeAllInfoWindows();
-        };
-        if (container) {
-            container.addEventListener("touchstart", handlePointerDown, { passive: true });
-            container.addEventListener("mousedown", handlePointerDown);
-        }
+        interactionListenersRef.current.push(rightClickCloseListener);
+
+        const longTapListener = window.naver.maps.Event.addListener(mapRef.current, "longtap", (event) => {
+            applyCoordFromEvent(event, "길게 누르기");
+        });
+        interactionListenersRef.current.push(longTapListener);
+
         return () => {
-            window.naver.maps.Event.removeListener(clickListener);
-            window.naver.maps.Event.removeListener(rightClickListener);
-            if (container) {
-                container.removeEventListener("touchstart", handlePointerDown);
-                container.removeEventListener("mousedown", handlePointerDown);
-            }
+            clearInteractionListeners();
         };
-    }, [closeAllInfoWindows, mapLoaded]);
+    }, [applyPickedCenter, clearInteractionListeners, closeAllInfoWindows, mapLoaded, pickCenterByClientPoint]);
 
     const selectedItem = useMemo(() => {
         if (!items.length) return null;
@@ -907,8 +873,6 @@ export const MedicalFinder = () => {
         </div>
     );
 };
-
-
 
 
 
