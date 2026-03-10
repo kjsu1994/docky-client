@@ -215,20 +215,23 @@ const LevelRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
     if (!ranks?.length) return <div className="p-12 text-center text-slate-500">데이터가 없습니다.</div>;
     return (
         <div className="divide-y">
-            {ranks.map((item, index) => (
+            {ranks.map((member, index) => {
+                const profileUrl = member.profile_url || member.profileUrl || member.member?.profile_url || member.member?.profileUrl || "";
+                const displayName = member.name || member.user_name || member.userName || member.member?.name || member.nickname || member.member?.nickname || "익명";
+                return (
                 <div key={index} className={`p-6 transition-colors ${index < 3 ? "bg-gradient-to-r from-slate-50 to-transparent" : "hover:bg-slate-50"}`}>
                     <div className="flex items-center gap-4">
                         <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
                         <div className="flex-shrink-0">
-                            {normalizeProfileImageUrl(item.member?.profile_url || item.member?.profileUrl || "") ? <img src={normalizeProfileImageUrl(item.member?.profile_url || item.member?.profileUrl || "")} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold">{(item.member?.name || "U").charAt(0)}</div>}
+                            {normalizeProfileImageUrl(profileUrl) ? <img src={normalizeProfileImageUrl(profileUrl)} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold">{displayName.charAt(0)}</div>}
                         </div>
                         <div className="flex-1">
-                            <h3 className="font-bold text-slate-900 text-lg mb-1">{item.member?.name || "익명"}</h3>
-                            <div className="flex items-center gap-4 text-sm"><div className="flex items-center gap-1"><Award className="h-4 w-4 text-purple-500" /><span className="font-semibold text-purple-700">Lv. {item.level}</span></div><div className="text-slate-600">EXP: {formatNumber(item.total_exp || item.totalExp)}</div></div>
+                            <h3 className="font-bold text-slate-900 text-lg mb-1">{displayName}</h3>
+                            <div className="flex items-center gap-4 text-sm"><div className="flex items-center gap-1"><Award className="h-4 w-4 text-purple-500" /><span className="font-semibold text-purple-700">Lv. {member.level}</span></div><div className="text-slate-600">EXP: {formatNumber(member.total_exp || member.totalExp)}</div></div>
                         </div>
                     </div>
                 </div>
-            ))}
+            )})}
         </div>
     );
 };

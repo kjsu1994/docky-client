@@ -16,7 +16,7 @@ import {
     ChevronRight,
     HelpCircle,
     Film,
-    Bot,
+    Bot, BadgeX, BadgeDollarSign,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
@@ -67,7 +67,8 @@ export const AllMenu = () => {
 
     const games = [
         { title: "플린코", to: "/app/plinko", icon: Dices, color: "bg-violet-50 text-violet-600" },
-        { title: "라스베거스", to: "/app/games/las-vegas", icon: Dices, color: "bg-orange-50 text-orange-600" },
+        { title: "라스베거스", to: "/app/games/las-vegas", icon: BadgeDollarSign, color: "bg-orange-50 text-orange-600" },
+        { title: "노땡스", to: "/app/games/no-thanks", icon: BadgeX, color: "bg-slate-50 text-orange-600" },
     ];
 
     const account = [

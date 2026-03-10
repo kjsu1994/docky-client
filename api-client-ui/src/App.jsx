@@ -28,6 +28,7 @@ import { AdminStreamingStudio } from "./pages/admin/AdminStreamingStudio.jsx";
 import { InvestAssistant } from "./pages/facility/InvestAssistant.jsx";
 import { LasVegasGame } from "./pages/games/LasVegasGame.jsx";
 import { GamesHub } from "./pages/games/GamesHub.jsx";
+import { NoThanksGame } from "./pages/games/NoThanksGame.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
@@ -93,6 +94,7 @@ function App() {
                     <Route path="/app/mypage/edit" element={<ProtectedRoute><AppLayout><MypageEdit /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/plinko" element={<ProtectedRoute><AppLayout><LuckyPlinko /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/games/las-vegas" element={<ProtectedRoute><AppLayout><LasVegasGame /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/games/no-thanks" element={<ProtectedRoute><AppLayout><NoThanksGame /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/optimizer" element={<ProtectedRoute><AppLayout><MeetingOptimizer /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/facility" element={<ProtectedRoute><AppLayout><FacilityFinder /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/parking" element={<Navigate to="/app/facility" replace />} />
@@ -127,6 +129,8 @@ function App() {
 }
 
 export default App;
+
+
 
 
 

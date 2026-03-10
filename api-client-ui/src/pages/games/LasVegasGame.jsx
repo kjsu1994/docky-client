@@ -996,10 +996,12 @@ export const LasVegasGame = () => {
             <section className="rounded-[1.6rem] border border-slate-200 bg-white p-4 text-xs text-slate-500">
                 <div className="mb-1.5 flex items-center gap-1.5 font-black text-slate-700">
                     <Play className="h-3.5 w-3.5" />
-                    안내
+                    게임규칙
                 </div>
-                <div>페이지 새로고침 후에도 마지막 참여 방을 자동 복구합니다.</div>
-                <div>실시간 채팅은 기존 채팅 서버를 그대로 재사용합니다.</div>
+                <div>각 라운드마다 1번부터 6번 카지노에 머니 카드가 배치되고, 모든 카지노는 최소 7만원 이상이되도록 카드가 깔립니다.</div>
+                <div>내 차례에는 주사위를 굴린 뒤 같은 숫자 주사위를 한 카지노에 모두 배치해야 하며, 시간 초과시에는 자동으로 굴림 또는 배치가 진행됩니다.</div>
+                <div>라운드 종료 후 같은 카지노에서 주사위 수가 동점인 플레이어는 모두 탈락하고, 남은 플레이어가 많은 주사위 순서대로 큰 금액 카드부터 가져갑니다.</div>
+                <div>한 카지노에 배팅한 플레이어가 정확히 1명뿐이면 그 플레이어가 해당 카지노의 머니 카드를 모두 가져가며, 모든 라운드 수익 합계가 가장 큰 플레이어가 최종 우승합니다.</div>
             </section>
         </div>
     );
