@@ -27,6 +27,7 @@ import { StreamingHub } from "./pages/StreamingHub.jsx";
 import { AdminStreamingStudio } from "./pages/AdminStreamingStudio.jsx";
 import { InvestAssistant } from "./pages/InvestAssistant.jsx";
 import { LasVegasGame } from "./pages/LasVegasGame.jsx";
+import { GamesHub } from "./pages/GamesHub.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
@@ -83,6 +84,7 @@ function App() {
                     <Route path="/app/streaming" element={<ProtectedRoute><AppLayout><StreamingHub /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/invest" element={<ProtectedRoute><AppLayout><InvestAssistant /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/all-menu" element={<ProtectedRoute><AppLayout><AllMenu /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/games" element={<ProtectedRoute><AppLayout><GamesHub /></AppLayout></ProtectedRoute>} />
 
                     <Route path="/app/statistics" element={<ProtectedRoute><AppLayout><Statistics /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/ranks" element={<ProtectedRoute><AppLayout><Ranks /></AppLayout></ProtectedRoute>} />

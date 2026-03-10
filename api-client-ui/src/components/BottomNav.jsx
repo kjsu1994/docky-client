@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Home, LayoutGrid, Menu } from "lucide-react";
+import { Dices, Home, LayoutGrid, Menu } from "lucide-react";
 
 const NavItem = ({ to, icon: Icon, children }) => {
     return (
@@ -58,9 +58,10 @@ export const BottomNav = () => {
                 visible ? "translate-y-0" : "translate-y-full"
             } glass`}
         >
-            <div className="mx-auto flex h-full max-w-lg items-center justify-between">
+            <div className="mx-auto grid h-full max-w-lg grid-cols-4 items-center">
                 <NavItem to="/app" icon={Home}>HOME</NavItem>
                 <NavItem to="/app/boards/FREE_BOARD" icon={LayoutGrid}>BOARD</NavItem>
+                <NavItem to="/app/games" icon={Dices}>GAME</NavItem>
                 <NavItem to="/app/all-menu" icon={Menu}>MENU</NavItem>
             </div>
         </nav>

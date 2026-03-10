@@ -8,9 +8,7 @@ import {
     TrendingUp,
     TrendingDown,
     Car,
-    Trophy,
     Dices,
-    Newspaper,
     Bot,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -456,13 +454,10 @@ export const Home = () => {
                         <p className="text-sm font-medium text-slate-400">자주 사용하는 기능을 바로 실행하세요.</p>
                     </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 sm:gap-6 lg:grid-cols-6">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
                     <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" />
                     <QuickMenuLink to="/app/facility" icon={Car} title="편의시설 찾기" color="sky" />
-                    <QuickMenuLink to="/app/ranks" icon={Trophy} title="랭킹" color="amber" />
-                    <QuickMenuLink to="/app/plinko" icon={Dices} title="플링코" color="emerald" />
                     <QuickMenuLink to="/app/games/las-vegas" icon={Dices} title="라스베거스" color="amber" />
-                    <QuickMenuLink to="/app/news" icon={Newspaper} title="뉴스" color="indigo" />
                     <QuickMenuLink to="/app/invest" icon={Bot} title="Invest" color="blue" />
                 </div>
             </section>
