@@ -8,6 +8,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { DiceCountBadge, DiceFace, MoneyCard } from "../common/LasVegasVisuals";
 
 const ROOM_STORAGE_KEY = "las_vegas_last_room_id";
+const ROLL_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3";
+const BET_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/1084/1084-preview.mp3";
 
 const normalizeRoomId = (room) => room?.room_id || room?.roomId;
 const normalizeChatRoomId = (roomOrState) =>
@@ -92,12 +94,14 @@ export const LasVegasGame = () => {
     const [chatInput, setChatInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [rematching, setRematching] = useState(false);
     const [secondsLeft, setSecondsLeft] = useState(null);
     const [createForm, setCreateForm] = useState({
         title: "",
         round_count: "4",
         turn_time_seconds: "25",
     });
+    const [joinCode, setJoinCode] = useState("");
     const [settingsForm, setSettingsForm] = useState({
         round_count: 4,
         turn_time_seconds: 25,
@@ -109,9 +113,13 @@ export const LasVegasGame = () => {
     const chatSubRef = useRef(null);
     const chatScrollRef = useRef(null);
     const prevCasinoSignatureRef = useRef("");
+    const rollAudioRef = useRef(typeof Audio !== "undefined" ? new Audio(ROLL_SOUND_URL) : null);
+    const betAudioRef = useRef(typeof Audio !== "undefined" ? new Audio(BET_SOUND_URL) : null);
 
     const myMemberId = user?.member_id || user?.memberId || user?.id || null;
     const chatRoomId = normalizeChatRoomId(state) || normalizeChatRoomId(selectedRoom) || null;
+    const roomStatus = state?.room_status || state?.roomStatus || selectedRoom?.room_status || selectedRoom?.roomStatus || null;
+    const isFinished = roomStatus === "FINISHED";
 
     const isHost = selectedRoom && myMemberId &&
         Number(selectedRoom.host_member_id || selectedRoom.hostMemberId) === Number(myMemberId);
@@ -132,11 +140,19 @@ export const LasVegasGame = () => {
     const livePlayers = Array.isArray(state?.players) ? state.players : [];
     const roomPlayers = Array.isArray(selectedRoom?.players) ? selectedRoom.players : [];
     const players = livePlayers.length > 0 ? livePlayers : roomPlayers;
+    const hostNickname = useMemo(() => {
+        const hostId = Number(selectedRoom?.host_member_id || selectedRoom?.hostMemberId || 0);
+        return roomPlayers.find((player) => Number(player.member_id || player.memberId) === hostId)?.nickname || "-";
+    }, [roomPlayers, selectedRoom]);
     const sortedPlayers = [...players].sort((a, b) => {
         const aMoney = a.total_money || a.totalMoney || 0;
         const bMoney = b.total_money || b.totalMoney || 0;
         return bMoney - aMoney;
     });
+    const winnerMemberId = state?.winner_member_id || state?.winnerMemberId || null;
+    const winnerNickname = winnerMemberId
+        ? players.find((player) => Number(player.member_id || player.memberId) === Number(winnerMemberId))?.nickname || `플레이어 ${winnerMemberId}`
+        : null;
 
     const ensureSocket = () => {
         if (stompRef.current) return stompRef.current;
@@ -156,8 +172,16 @@ export const LasVegasGame = () => {
         gameSubRef.current = client.subscribe(`/sub/game/las-vegas/room/${roomId}`, (msg) => {
             const payload = JSON.parse(msg.body || "{}");
             setState(payload);
+            refreshSelectedRoom(roomId).catch(() => {});
             if (payload.message) toast(payload.message);
         });
+    };
+
+    const refreshSelectedRoom = async (roomId) => {
+        const response = await api.get("/game/las-vegas/rooms/me");
+        const matchedRoom = (response.data || []).find((room) => Number(normalizeRoomId(room)) === Number(roomId));
+        if (matchedRoom) setSelectedRoom(matchedRoom);
+        return matchedRoom || null;
     };
 
     const subscribeChatRoom = (client, roomId) => {
@@ -340,10 +364,46 @@ export const LasVegasGame = () => {
         }
     };
 
+    const joinRoomByCode = async (e) => {
+        e.preventDefault();
+        const normalizedCode = joinCode.trim().toUpperCase();
+        if (!normalizedCode) {
+            toast.error("방코드를 입력해 주세요.");
+            return;
+        }
+        try {
+            setLoading(true);
+            const response = await api.post("/game/las-vegas/rooms/join-by-code", {
+                room_code: normalizedCode,
+            });
+            setJoinCode("");
+            await hydrateRoomContext(response.data);
+            await fetchRooms();
+            toast.success("방코드로 입장했습니다.");
+        } catch {
+            toast.error("방코드 입장에 실패했습니다.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const playActionSound = (type) => {
+        const audio = type === "ROLL_DICE" ? rollAudioRef.current : betAudioRef.current;
+        if (!audio) return;
+        try {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+        } catch {
+            // Ignore browser autoplay or decode failures for optional SFX.
+        }
+    };
+
     const publishGameAction = (actionType, casinoNo = null) => {
         if (!stompRef.current?.connected || !selectedRoom || !myMemberId) return;
         const roomId = normalizeRoomId(selectedRoom);
         if (!roomId) return;
+        playActionSound(actionType);
         stompRef.current.publish({
             destination: `/pub/game/las-vegas/${roomId}/action`,
             body: JSON.stringify({
@@ -386,6 +446,10 @@ export const LasVegasGame = () => {
 
     const toggleReady = async () => {
         if (!selectedRoom) return;
+        if (roomStatus !== "WAITING") {
+            toast.error("대기 상태에서만 준비를 변경할 수 있습니다.");
+            return;
+        }
         const roomId = normalizeRoomId(selectedRoom);
         try {
             await api.post(`/game/las-vegas/rooms/${roomId}/ready`);
@@ -397,12 +461,33 @@ export const LasVegasGame = () => {
 
     const startGame = async () => {
         if (!selectedRoom) return;
+        if (roomStatus !== "WAITING") {
+            toast.error("한 판 더 하기로 대기 상태를 만든 뒤 시작할 수 있습니다.");
+            return;
+        }
         const roomId = normalizeRoomId(selectedRoom);
         try {
             await api.post(`/game/las-vegas/rooms/${roomId}/start`);
             toast.success("게임 시작");
         } catch {
             toast.error("게임 시작 실패");
+        }
+    };
+
+    const rematchGame = async () => {
+        if (!selectedRoom) return;
+        const roomId = normalizeRoomId(selectedRoom);
+        try {
+            setRematching(true);
+            const response = await api.post(`/game/las-vegas/rooms/${roomId}/rematch`);
+            setSelectedRoom(response.data);
+            await fetchState(roomId);
+            await fetchRooms();
+            toast.success("같은 방에서 새 판 준비를 시작했습니다.");
+        } catch {
+            toast.error("한 판 더 하기 준비에 실패했습니다.");
+        } finally {
+            setRematching(false);
         }
     };
 
@@ -434,7 +519,8 @@ export const LasVegasGame = () => {
                 }
                 .chip-burst { position: absolute; width: 14px; height: 14px; border-radius: 9999px; animation: chip-float 1.8s ease-out forwards; }
             `}</style>
-            <section className="rounded-[2rem] border border-white/20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-slate-100 shadow-2xl">
+            {!selectedRoom && (
+                <section className="rounded-[2rem] border border-white/20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-slate-100 shadow-2xl">
                 <div className="mb-4 flex items-center gap-3">
                     <div className="rounded-2xl bg-white/10 p-2.5"><Dices className="h-5 w-5" /></div>
                     <div>
@@ -481,7 +567,8 @@ export const LasVegasGame = () => {
                         {creating ? "생성 중..." : "방 만들기"}
                     </button>
                 </form>
-            </section>
+                </section>
+            )}
 
             {!selectedRoom && (
                 <section className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
@@ -489,6 +576,18 @@ export const LasVegasGame = () => {
                         <Users className="h-5 w-5" />
                         대기 중인 방
                     </h2>
+                    <form className="mb-4 flex flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:flex-row" onSubmit={joinRoomByCode}>
+                        <input
+                            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase"
+                            placeholder="방코드로 입장"
+                            value={joinCode}
+                            maxLength={8}
+                            onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                        />
+                        <button className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={loading}>
+                            코드 입장
+                        </button>
+                    </form>
                     <div className="space-y-2.5">
                         {!rooms.length && <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-400">대기 중인 방이 없습니다.</div>}
                         {rooms.map((room) => {
@@ -526,10 +625,29 @@ export const LasVegasGame = () => {
                                 <button className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" onClick={leaveRoom}>퇴장</button>
                             </div>
                         </div>
-                        <div className="mt-3 grid grid-cols-1 gap-2 text-xs md:grid-cols-3">
+                        {isHost && isFinished && (
+                            <div className="mt-3 flex justify-end">
+                                <button
+                                    className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
+                                    onClick={rematchGame}
+                                    disabled={rematching}
+                                >
+                                    {rematching ? "준비 중..." : "한 판 더 하기"}
+                                </button>
+                            </div>
+                        )}
+                        <div className="mt-3 grid grid-cols-1 gap-2 text-xs md:grid-cols-4">
                             <div className="rounded-xl bg-slate-50 px-3 py-2">
                                 <div className="font-black text-slate-700">방 제목</div>
                                 <div className="text-slate-500">{selectedRoom.title}</div>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                <div className="font-black text-slate-700">방장</div>
+                                <div className="text-slate-500">{hostNickname}</div>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                <div className="font-black text-slate-700">방코드</div>
+                                <div className="text-slate-500">{selectedRoom.room_code || selectedRoom.roomCode}</div>
                             </div>
                             <div className="rounded-xl bg-slate-50 px-3 py-2">
                                 <div className="font-black text-slate-700">라운드 수</div>
@@ -541,7 +659,7 @@ export const LasVegasGame = () => {
                             </div>
                         </div>
 
-                        {isHost && (
+                        {isHost && roomStatus === "WAITING" && (
                             <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
                                 <input type="number" min={1} max={10} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.round_count} onChange={(e) => setSettingsForm((prev) => ({ ...prev, round_count: Number(e.target.value) }))} />
                                 <input type="number" min={5} max={180} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turn_time_seconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turn_time_seconds: Number(e.target.value) }))} />
@@ -636,9 +754,9 @@ export const LasVegasGame = () => {
                                         );
                                     })}
                                 </div>
-                                {state?.winner_member_id && (
+                                {winnerMemberId && (
                                     <div className="relative mt-3 overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-700">
-                                        <div>우승자: 플레이어 {state.winner_member_id}</div>
+                                        <div>우승자: {winnerNickname}</div>
                                         <div className="pointer-events-none absolute inset-0">
                                             <span className="chip-burst left-[10%] bottom-2 bg-yellow-400" style={{ animationDelay: "0ms" }} />
                                             <span className="chip-burst left-[22%] bottom-1 bg-emerald-400" style={{ animationDelay: "120ms" }} />
