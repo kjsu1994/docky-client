@@ -7,6 +7,7 @@ import api from "../../utils/api.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
+const CHAT_ROOM_READ_EVENT = "chat-room-read";
 
 const roomIdOf = (room) => room?.room_id || room?.roomId || null;
 const chatRoomIdOf = (room) => room?.chat_room_id || room?.chatRoomId || room?.room_id || room?.roomId || room?.id || null;
@@ -38,6 +39,7 @@ export const NoThanksGame = () => {
   const [chatInput, setChatInput] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [secondsLeft, setSecondsLeft] = useState(null);
+  const [chipAnimations, setChipAnimations] = useState([]);
   const [createForm, setCreateForm] = useState({ title: "", start_chip_count: "11", turn_time_seconds: "15" });
   const [settingsForm, setSettingsForm] = useState({ start_chip_count: "11", turn_time_seconds: "15" });
 
@@ -47,6 +49,9 @@ export const NoThanksGame = () => {
   const chatScrollRef = useRef(null);
   const audioContextRef = useRef(null);
   const isActionSoundPlayingRef = useRef(false);
+  const previousPotChipsRef = useRef(0);
+  const chipAnimationIdRef = useRef(0);
+  const lastReadMarkAtRef = useRef(0);
 
   const myMemberId = Number(user?.member_id || user?.memberId || user?.id || 0);
   const roomStatus = gameState?.room_status || gameState?.roomStatus || selectedRoom?.room_status || selectedRoom?.roomStatus || null;
@@ -73,6 +78,13 @@ export const NoThanksGame = () => {
     if (aScore !== bScore) return aScore - bScore;
     return parseIntSafe(b?.chips, 0) - parseIntSafe(a?.chips, 0);
   });
+  const visiblePotChipCount = Math.min(potChips, 30);
+  const potChipStack = Array.from({ length: visiblePotChipCount }, (_, index) => ({
+    id: `stack-${index}`,
+    offsetX: (index % 6) * 36,
+    offsetY: Math.floor(index / 6) * 36,
+    rotate: 0,
+  }));
 
   const normalizeCreateField = (field, min, max, fallback) => {
     setCreateForm((prev) => ({ ...prev, [field]: clampNumberText(prev[field], min, max, fallback) }));
@@ -198,6 +210,15 @@ export const NoThanksGame = () => {
     }
   };
 
+  const markChatRoomAsRead = async (roomId) => {
+    if (!roomId) return;
+    const now = Date.now();
+    if (now - lastReadMarkAtRef.current < 1000) return;
+    lastReadMarkAtRef.current = now;
+    await api.patch(`/chat/room/${roomId}/read`);
+    window.dispatchEvent(new CustomEvent(CHAT_ROOM_READ_EVENT, { detail: { roomId: String(roomId) } }));
+  };
+
   const subscribeGameRoom = (client, roomId) => {
     if (gameSubRef.current) gameSubRef.current.unsubscribe();
     gameSubRef.current = client.subscribe(`/sub/game/no-thanks/room/${roomId}`, (message) => {
@@ -212,6 +233,7 @@ export const NoThanksGame = () => {
     chatSubRef.current = client.subscribe(`/sub/chat/room/${roomId}`, (message) => {
       const payload = JSON.parse(message.body || "{}");
       setChatMessages((prev) => [...prev, payload]);
+      markChatRoomAsRead(roomId).catch(() => {});
     });
   };
 
@@ -229,6 +251,7 @@ export const NoThanksGame = () => {
       if (snapshotChatRoomId) {
         subscribeChatRoom(client, snapshotChatRoomId);
         await fetchChatMessages(snapshotChatRoomId);
+        await markChatRoomAsRead(snapshotChatRoomId);
       } else {
         setChatMessages([]);
       }
@@ -281,6 +304,51 @@ export const NoThanksGame = () => {
   useEffect(() => {
     if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
   }, [chatMessages]);
+
+  useEffect(() => {
+    if (!chatRoomId || !selectedRoom) return;
+    markChatRoomAsRead(chatRoomId).catch(() => {});
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        markChatRoomAsRead(chatRoomId).catch(() => {});
+      }
+    };
+    const onFocus = () => markChatRoomAsRead(chatRoomId).catch(() => {});
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [chatRoomId, selectedRoom]);
+
+  useEffect(() => {
+    const previous = previousPotChipsRef.current;
+    if (potChips > previous) {
+      const additions = Math.min(potChips - previous, 3);
+      const nextAnimations = Array.from({ length: additions }, (_, index) => {
+        chipAnimationIdRef.current += 1;
+        const targetIndex = Math.min(previous + index, 29);
+        return {
+          id: chipAnimationIdRef.current,
+          delay: index * 90,
+          rotate: 0,
+          targetX: (targetIndex % 6) * 36,
+          targetY: Math.floor(targetIndex / 6) * 36,
+        };
+      });
+      setChipAnimations(nextAnimations);
+      const timer = window.setTimeout(() => setChipAnimations([]), 720);
+      previousPotChipsRef.current = potChips;
+      return () => window.clearTimeout(timer);
+    }
+    if (potChips === 0 && previous !== 0) {
+      setChipAnimations([]);
+    }
+    previousPotChipsRef.current = potChips;
+  }, [potChips]);
 
   useEffect(() => () => {
     if (gameSubRef.current) gameSubRef.current.unsubscribe();
@@ -446,6 +514,13 @@ export const NoThanksGame = () => {
 
   return (
     <div className="animate-fade-in space-y-6">
+      <style>{`
+        @keyframes no-thanks-chip-drop {
+          0% { transform: translate(68px, -70px) scale(0.7) rotate(0deg); opacity: 0; }
+          20% { opacity: 1; }
+          100% { transform: translate(var(--chip-x), var(--chip-y)) scale(1) rotate(var(--chip-rotate)); opacity: 1; }
+        }
+      `}</style>
       {!selectedRoom && (
         <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl">
           <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
@@ -558,9 +633,41 @@ export const NoThanksGame = () => {
                   {secondsLeft !== null && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${secondsLeft <= 5 ? "bg-rose-100 text-rose-600" : "bg-slate-100 text-slate-700"}`}><TimerReset className="h-3.5 w-3.5" />{secondsLeft}초</span>}
                 </div>
                 <div className="mt-5 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-700 p-6 text-white">
+                  <div className="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-700 p-6 text-white">
                     <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-300">현재 카드</div>
                     <div className="mt-3 text-6xl font-black tracking-tight">{currentCard ?? "-"}</div>
+                    <div className="relative mt-1 flex h-[196px] justify-center">
+                      <div className="relative h-full w-[228px]">
+                      {potChipStack.map((chip) => (
+                        <div
+                          key={chip.id}
+                          className="absolute top-0 left-0 h-[48px] w-[48px] rounded-full border-2 border-amber-200 bg-gradient-to-br from-amber-200 via-amber-400 to-orange-500 shadow-[0_8px_18px_rgba(251,191,36,0.32)]"
+                          style={{
+                            transform: `translate(${chip.offsetX}px, ${chip.offsetY}px) rotate(${chip.rotate}deg)`,
+                            zIndex: chip.offsetY + 1,
+                          }}
+                        >
+                          <div className="absolute inset-[5px] rounded-full border border-amber-100/80" />
+                          <div className="absolute inset-[14px] rounded-full bg-amber-100/70" />
+                        </div>
+                      ))}
+                      {chipAnimations.map((chip) => (
+                        <div
+                          key={chip.id}
+                          className="absolute top-0 left-0 h-[48px] w-[48px] rounded-full border-2 border-amber-200 bg-gradient-to-br from-amber-200 via-amber-400 to-orange-500 shadow-[0_8px_18px_rgba(251,191,36,0.32)]"
+                          style={{
+                            "--chip-x": `${chip.targetX}px`,
+                            "--chip-y": `${chip.targetY}px`,
+                            "--chip-rotate": `${chip.rotate}deg`,
+                            animation: `no-thanks-chip-drop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) ${chip.delay}ms forwards`,
+                          }}
+                        >
+                          <div className="absolute inset-[5px] rounded-full border border-amber-100/80" />
+                          <div className="absolute inset-[14px] rounded-full bg-amber-100/70" />
+                        </div>
+                      ))}
+                      </div>
+                    </div>
                     <div className="mt-3 text-sm text-slate-300">카드와 칩을 가져가거나 칩 1개를 내고 다음 플레이어에게 넘길 수 있습니다.</div>
                   </div>
                   <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
