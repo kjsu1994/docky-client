@@ -517,7 +517,7 @@ export const RestroomFinder = () => {
                     <div className="rounded-2xl bg-cyan-50 p-3 text-cyan-700"><Bath className="h-6 w-6" /></div>
                     <div>
                         <h1 className="text-xl font-black text-slate-900">화장실 찾기</h1>
-                        <p className="text-sm text-slate-500">지도 기능을 주차장 찾기와 동일하게 제공합니다.</p>
+                        <p className="text-sm text-slate-500">주변의 공개된 화장실을 확인하세요.</p>
                     </div>
                 </div>
             </div>

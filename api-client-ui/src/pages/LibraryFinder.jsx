@@ -348,7 +348,7 @@ export const LibraryFinder = () => {
                     <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700"><Library className="h-6 w-6" /></div>
                     <div>
                         <h1 className="text-xl font-black text-slate-900">도서관 찾기</h1>
-                        <p className="text-sm text-slate-500">화장실/주차장과 동일한 지도 패턴으로 도서관을 조회합니다.</p>
+                        <p className="text-sm text-slate-500">내주변 도서관을 찾아보세요.</p>
                     </div>
                 </div>
             </div>

@@ -53,7 +53,7 @@ export const AllMenu = () => {
         { title: "Todo", to: "/app/todos", icon: CalendarDays, color: "bg-emerald-50 text-emerald-700" },
         { title: "통계", to: "/app/statistics", icon: BarChart, color: "bg-indigo-50 text-indigo-600" },
         { title: "스트리밍", to: "/app/streaming", icon: Film, color: "bg-fuchsia-50 text-fuchsia-700" },
-        { title: "자유게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare, color: "bg-sky-50 text-sky-600" },
+        { title: "사용자게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare, color: "bg-sky-50 text-sky-600" },
         { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle, color: "bg-emerald-50 text-emerald-600" },
         { title: "Invest", to: "/app/invest", icon: Bot, color: "bg-sky-50 text-sky-700" },
     ];
@@ -62,9 +62,12 @@ export const AllMenu = () => {
         { title: "중간장소 찾기", to: "/app/optimizer", icon: MapPin, color: "bg-rose-50 text-rose-600" },
         { title: "편의시설 찾기", to: "/app/facility", icon: Car, color: "bg-cyan-50 text-cyan-700" },
         { title: "순위", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
+        { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
+    ];
+
+    const games = [
         { title: "플린코", to: "/app/plinko", icon: Dices, color: "bg-violet-50 text-violet-600" },
         { title: "라스베거스", to: "/app/games/las-vegas", icon: Dices, color: "bg-orange-50 text-orange-600" },
-        { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
     ];
 
     const account = [
@@ -100,6 +103,7 @@ export const AllMenu = () => {
 
             <MenuSection title="Core Services" items={mainServices} />
             <MenuSection title="Useful Tools" items={tools} />
+            <MenuSection title="Games" items={games} />
             <MenuSection title="Account" items={account} />
             {isAdmin && <MenuSection title="Administrator" items={admin} />}
 
@@ -111,6 +115,5 @@ export const AllMenu = () => {
         </div>
     );
 };
-
 
 

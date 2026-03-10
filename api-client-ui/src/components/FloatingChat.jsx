@@ -890,8 +890,8 @@ export const FloatingChat = () => {
                                         <MessageSquare className="h-5 w-5" />
                                     </div>
                                     <div>
-                                        <div className="font-black text-sm uppercase tracking-wider">Secure Chat</div>
-                                        <div className="text-[10px] font-bold text-primary-100 uppercase tracking-widest">?뚯썝 硫붿떊?</div>
+                                        <div className="font-black text-sm uppercase tracking-wider">채팅방</div>
+                                        <div className="text-[10px] font-bold text-primary-100 uppercase tracking-widest">방을 개설하고 사용자를 초대하여 사용하세요.</div>
                                     </div>
                                 </>
                             )}
@@ -909,7 +909,7 @@ export const FloatingChat = () => {
                                     <div className="p-4 border-b bg-white/80 backdrop-blur-md flex items-center justify-between">
                                         <div className="relative flex-1">
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                                            <input type="text" placeholder="Search conversations..." className="input-base py-2 pl-10 pr-4 text-xs font-bold bg-slate-50 border-0" />
+                                            <input type="text" placeholder="채팅방 검색" className="input-base py-2 pl-10 pr-4 text-xs font-bold bg-slate-50 border-0" />
                                         </div>
                                         <button onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="ml-3 p-2.5 rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-100 hover:scale-105 transition-transform"><Plus className="h-5 w-5" /></button>
                                     </div>

@@ -48,7 +48,7 @@ export const BoardList = () => {
     const [refreshKey, setRefreshKey] = useState(0);
     const [paging, setPaging] = useState({ page: 1, size: 10 });
 
-    // 자유게시판인 경우 공지사항(ADMIN_NOTICE)과 일반글(FREE_BOARD)을 함께 가져옴
+    // 사용자게시판인 경우 공지사항(ADMIN_NOTICE)과 일반글(FREE_BOARD)을 함께 가져옴
     const fetchKind = kind === "FREE_BOARD" ? ["FREE_BOARD", "ADMIN_NOTICE"] : kind;
     const { boards, loading, error, pageInfo } = useBoards(fetchKind, paging.page, paging.size, refreshKey);
 

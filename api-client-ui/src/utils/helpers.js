@@ -41,7 +41,7 @@ export const normalizeChatTimestamp = (value) => {
 // text-fixed
 export const getBoardKindLabel = (kind) => {
     const labels = {
-        FREE_BOARD: "자유게시판",
+        FREE_BOARD: "사용자게시판",
         ADMIN_NOTICE: "공지사항",
         QUESTION_ANSWER: "Q&A 게시판",
     };

@@ -4,13 +4,13 @@ import { ArrowRight, Dices, Sparkles } from "lucide-react";
 const games = [
     {
         title: "플링코",
-        description: "빠르게 플레이하는 캐주얼 드롭 게임",
+        description: "혼자 플레이하는 캐쥬얼 게임",
         to: "/app/plinko",
         tone: "from-emerald-500 via-teal-500 to-cyan-500",
     },
     {
         title: "라스베거스",
-        description: "실시간 방 입장형 보드게임",
+        description: "2~6인 실시간 방 입장형 보드게임",
         to: "/app/games/las-vegas",
         tone: "from-amber-500 via-orange-500 to-rose-500",
     },
@@ -29,7 +29,7 @@ export const GamesHub = () => {
                     </div>
                     <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">게임을 선택하세요</h1>
                     <p className="mt-3 text-sm font-medium text-slate-500 sm:text-base">
-                        플링코와 라스베거스 중 원하는 게임으로 바로 이동할 수 있습니다.
+                        원하는 게임을 선택해서 바로 이동할 수 있습니다.
                     </p>
                 </div>
             </section>

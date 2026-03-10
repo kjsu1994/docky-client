@@ -450,12 +450,12 @@ export const Home = () => {
             <section className="space-y-6">
                 <div className="flex items-end justify-between px-2">
                     <div className="space-y-1">
-                        <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight text-slate-900">빠른 서비스</h2>
-                        <p className="text-sm font-medium text-slate-400">자주 사용하는 기능을 바로 실행하세요.</p>
+                        <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight text-slate-900">주요 서비스</h2>
+                        <p className="text-sm font-medium text-slate-400">주요 기능을 바로 실행하세요.</p>
                     </div>
                 </div>
                 <div className="grid grid-cols-4 gap-2 sm:gap-4 lg:grid-cols-4">
-                    <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" />
+                    <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="사용자게시판" color="blue" />
                     <QuickMenuLink to="/app/facility" icon={Car} title="편의시설 찾기" color="sky" />
                     <QuickMenuLink to="/app/games" icon={Dices} title="게임 허브" color="amber" />
                     <QuickMenuLink to="/app/invest" icon={Bot} title="Invest" color="blue" />
@@ -585,7 +585,7 @@ const QuickMenuLink = ({ to, icon: Icon, title, color }) => {
 
     return (
         <Link to={to} className="group flex flex-col items-center gap-1.5 rounded-[1.5rem] p-1.5">
-            <div className={`flex aspect-square w-full items-center justify-center rounded-[1.5rem] bg-white shadow-lg transition-all duration-500 group-hover:-translate-y-1 group-hover:scale-105 group-hover:shadow-xl group-active:scale-95 ${colors[color]}`}>
+            <div className={`flex aspect-square w-full items-center justify-center rounded-[1.5rem] border border-slate-200 bg-white shadow-lg transition-all duration-500 group-hover:-translate-y-1 group-hover:scale-105 group-hover:shadow-xl group-active:scale-95 ${colors[color]}`}>
                 <Icon className="h-10 w-10 sm:h-20 sm:w-20 lg:h-24 lg:w-24" />
             </div>
             <span className="text-center text-[14px] font-bold leading-tight text-slate-600 transition-colors group-hover:text-primary-600 sm:text-[18px] lg:text-[20px]">{title}</span>

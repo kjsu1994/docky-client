@@ -409,9 +409,9 @@ export const TodoCalendar = () => {
                                 <CalendarRange className="h-3.5 w-3.5" />
                                 Todo
                             </div>
-                            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900">날짜 중심 Todo 캘린더</h1>
+                            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900">Todo List</h1>
                             <p className="mt-2 text-sm font-medium text-slate-500">
-                                이번 주 목록에서 시작하고, 월간 보기로 전체를 확인한 뒤, 필요한 날만 하루 단위로 집중할 수 있습니다.
+                                일간, 주간, 월간으로 다양한 목표를 실천하세요.
                             </p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">

@@ -61,7 +61,7 @@ export const Header = () => {
                     { title: "홈", to: "/app", icon: Home },
                     { title: "Todo", to: "/app/todos", icon: CalendarDays },
                     { title: "통계", to: "/app/statistics", icon: BarChart },
-                    { title: "자유게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare },
+                    { title: "사용자게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare },
                     { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle },
                 ],
             },

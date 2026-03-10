@@ -649,7 +649,7 @@ export const MedicalFinder = () => {
                     <div className="rounded-2xl bg-rose-50 p-3 text-rose-700"><Stethoscope className="h-6 w-6" /></div>
                     <div>
                         <h1 className="text-xl font-black text-slate-900">{"의료시설 찾기"}</h1>
-                        <p className="text-sm text-slate-500">{"주차장 찾기와 동일한 지도 UX로 의료기관 장비 정보를 조회합니다."}</p>
+                        <p className="text-sm text-slate-500">{"검색한 장소의 의료시설과 의료설비들을 확인하세요."}</p>
                     </div>
                 </div>
             </div>

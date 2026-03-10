@@ -158,7 +158,7 @@ export const Ranks = () => {
             {activeTab === "boards" && (
                 <div className="card p-4">
                     <div className="flex gap-2">
-                        <BoardTypeButton active={boardRankType === "FREE_BOARD"} onClick={() => setBoardRankType("FREE_BOARD")}>자유게시판</BoardTypeButton>
+                        <BoardTypeButton active={boardRankType === "FREE_BOARD"} onClick={() => setBoardRankType("FREE_BOARD")}>사용자게시판</BoardTypeButton>
                         <BoardTypeButton active={boardRankType === "ADMIN_NOTICE"} onClick={() => setBoardRankType("ADMIN_NOTICE")}>공지사항</BoardTypeButton>
                         <BoardTypeButton active={boardRankType === "QUESTION_ANSWER"} onClick={() => setBoardRankType("QUESTION_ANSWER")}>Q&A 게시판</BoardTypeButton>
                     </div>

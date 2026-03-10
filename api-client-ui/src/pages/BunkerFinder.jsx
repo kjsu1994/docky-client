@@ -514,7 +514,7 @@ export const BunkerFinder = () => {
                     <div className="rounded-2xl bg-teal-50 p-3 text-teal-700"><Shield className="h-6 w-6" /></div>
                     <div>
                         <h1 className="text-xl font-black text-slate-900">{"\uB300\uD53C\uC18C \uCC3E\uAE30"}</h1>
-                        <p className="text-sm text-slate-500">{"\uC8FC\uCC28\uC7A5 \uCC3E\uAE30\uC640 \uB3D9\uC77C\uD55C \uC9C0\uB3C4 UX\uB85C \uC778\uADFC \uB300\uD53C\uC18C\uB97C \uC870\uD68C\uD569\uB2C8\uB2E4."}</p>
+                        <p className="text-sm text-slate-500">{"\uC778\uADFC \uB300\uD53C\uC18C\uB97C \uC870\uD68C\uD569\uB2C8\uB2E4."}</p>
                     </div>
                 </div>
             </div>
