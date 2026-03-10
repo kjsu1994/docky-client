@@ -60,7 +60,7 @@ export const AllMenu = () => {
 
     const tools = [
         { title: "중간장소 찾기", to: "/app/optimizer", icon: MapPin, color: "bg-rose-50 text-rose-600" },
-        { title: "편의시설 찾기", to: "/app/facility", icon: Car, color: "bg-cyan-50 text-cyan-700" },
+        { title: "주변 찾기", to: "/app/facility", icon: Car, color: "bg-cyan-50 text-cyan-700" },
         { title: "순위", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
         { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
     ];

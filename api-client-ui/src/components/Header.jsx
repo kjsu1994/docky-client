@@ -69,7 +69,7 @@ export const Header = () => {
                 title: "Tools",
                 items: [
                     { title: "중간장소", to: "/app/optimizer", icon: MapPin },
-                    { title: "편의시설 찾기", to: "/app/facility", icon: Car },
+                    { title: "주변 찾기", to: "/app/facility", icon: Car },
                     { title: "순위", to: "/app/ranks", icon: Trophy },
                     { title: "플린코", to: "/app/plinko", icon: Dices },
                     { title: "라스베거스", to: "/app/games/las-vegas", icon: Dices },

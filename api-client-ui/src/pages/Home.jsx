@@ -456,7 +456,7 @@ export const Home = () => {
                 </div>
                 <div className="grid grid-cols-4 gap-2 sm:gap-4 lg:grid-cols-4">
                     <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="사용자게시판" color="blue" />
-                    <QuickMenuLink to="/app/facility" icon={Car} title="편의시설 찾기" color="sky" />
+                    <QuickMenuLink to="/app/facility" icon={Car} title="주변 찾기" color="sky" />
                     <QuickMenuLink to="/app/games" icon={Dices} title="게임 허브" color="amber" />
                     <QuickMenuLink to="/app/invest" icon={Bot} title="Invest" color="blue" />
                 </div>
@@ -584,7 +584,7 @@ const QuickMenuLink = ({ to, icon: Icon, title, color }) => {
     };
 
     return (
-        <Link to={to} className="group flex flex-col items-center gap-1.5 rounded-[1.5rem] p-1.5">
+        <Link to={to} className="group flex flex-col items-center gap-1.5 rounded-[1.5rem] p-2">
             <div className={`flex aspect-square w-full items-center justify-center rounded-[1.5rem] border border-slate-200 bg-white shadow-lg transition-all duration-500 group-hover:-translate-y-1 group-hover:scale-105 group-hover:shadow-xl group-active:scale-95 ${colors[color]}`}>
                 <Icon className="h-10 w-10 sm:h-20 sm:w-20 lg:h-24 lg:w-24" />
             </div>
