@@ -457,7 +457,7 @@ export const Home = () => {
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
                     <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="자유게시판" color="blue" />
                     <QuickMenuLink to="/app/facility" icon={Car} title="편의시설 찾기" color="sky" />
-                    <QuickMenuLink to="/app/games/las-vegas" icon={Dices} title="라스베거스" color="amber" />
+                    <QuickMenuLink to="/app/games" icon={Dices} title="게임 허브" color="amber" />
                     <QuickMenuLink to="/app/invest" icon={Bot} title="Invest" color="blue" />
                 </div>
             </section>
