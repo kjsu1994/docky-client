@@ -63,6 +63,7 @@ export const AllMenu = () => {
         { title: "편의시설 찾기", to: "/app/facility", icon: Car, color: "bg-cyan-50 text-cyan-700" },
         { title: "순위", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
         { title: "플린코", to: "/app/plinko", icon: Dices, color: "bg-violet-50 text-violet-600" },
+        { title: "라스베거스", to: "/app/games/las-vegas", icon: Dices, color: "bg-orange-50 text-orange-600" },
         { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
     ];
 

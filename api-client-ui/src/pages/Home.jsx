@@ -461,6 +461,7 @@ export const Home = () => {
                     <QuickMenuLink to="/app/facility" icon={Car} title="편의시설 찾기" color="sky" />
                     <QuickMenuLink to="/app/ranks" icon={Trophy} title="랭킹" color="amber" />
                     <QuickMenuLink to="/app/plinko" icon={Dices} title="플링코" color="emerald" />
+                    <QuickMenuLink to="/app/games/las-vegas" icon={Dices} title="라스베거스" color="amber" />
                     <QuickMenuLink to="/app/news" icon={Newspaper} title="뉴스" color="indigo" />
                     <QuickMenuLink to="/app/invest" icon={Bot} title="Invest" color="blue" />
                 </div>

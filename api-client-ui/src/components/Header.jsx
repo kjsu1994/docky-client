@@ -72,6 +72,7 @@ export const Header = () => {
                     { title: "편의시설 찾기", to: "/app/facility", icon: Car },
                     { title: "순위", to: "/app/ranks", icon: Trophy },
                     { title: "플린코", to: "/app/plinko", icon: Dices },
+                    { title: "라스베거스", to: "/app/games/las-vegas", icon: Dices },
                     { title: "뉴스", to: "/app/news", icon: Newspaper },
                     { title: "스트리밍", to: "/app/streaming", icon: Film },
                 ],
