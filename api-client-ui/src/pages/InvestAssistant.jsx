@@ -416,9 +416,15 @@ const analyzeIndicatorState = (points) => {
             scoreDelta -= 6;
             messages.push("MACD와 시그널이 0선 아래에 머물러 약한 모멘텀입니다.");
             details.push("MACD < Signal and < 0: -6점");
+        } else if (latest.macd > latest.macdSignal && latest.macd < 0) {
+            messages.push("MACD가 시그널선 위로 올라왔지만 아직 0선 아래라 약세 구간에서 반등을 시도하는 모습입니다.");
+            details.push("MACD 반등 시도 구간: 0점");
+        } else if (latest.macd < latest.macdSignal && latest.macd > 0) {
+            messages.push("MACD가 시그널선 아래로 내려왔지만 아직 0선 위라 강세 구간에서 단기 숨 고르기 흐름입니다.");
+            details.push("MACD 강세 둔화 구간: 0점");
         } else {
-            messages.push(`MACD 중심선은 0이며 현재 히스토그램은 ${formatCompact(latest.macdHistogram, 3)} 수준입니다.`);
-            details.push("MACD 중립 구간: 0점");
+            messages.push("MACD가 0선 부근에서 방향성을 탐색 중이라 뚜렷한 추세 우위는 아직 약합니다.");
+            details.push("MACD 방향성 탐색 구간: 0점");
         }
     }
 
@@ -447,6 +453,82 @@ const analyzeIndicatorState = (points) => {
     return { messages, score, label, details };
 };
 
+const buildIndicatorSnapshot = (points) => {
+    const series = buildIndicatorSeries(points);
+    const latest = series[series.length - 1];
+    const previous = series.length > 1 ? series[series.length - 2] : null;
+
+    if (!latest) {
+        return {
+            rsiSummary: "차트 데이터가 부족합니다.",
+            macdSummary: "차트 데이터가 부족합니다.",
+            bollingerSummary: "차트 데이터가 부족합니다.",
+        };
+    }
+
+    let rsiSummary = "RSI 해석 데이터가 부족합니다.";
+    if (Number.isFinite(latest.rsi14)) {
+        if (latest.rsi14 >= 70) {
+            rsiSummary = `과열 구간입니다. 기준선 70 상단인 ${latest.rsi14.toFixed(1)}입니다.`;
+        } else if (latest.rsi14 <= 30) {
+            rsiSummary = `과매도 구간입니다. 기준선 30 하단인 ${latest.rsi14.toFixed(1)}입니다.`;
+        } else if (latest.rsi14 >= 55) {
+            rsiSummary = `기준선 50 위 강세권입니다. 현재 ${latest.rsi14.toFixed(1)}입니다.`;
+        } else if (latest.rsi14 <= 45) {
+            rsiSummary = `기준선 50 아래 약세권입니다. 현재 ${latest.rsi14.toFixed(1)}입니다.`;
+        } else {
+            rsiSummary = `30~70 중립 구간입니다. 현재 ${latest.rsi14.toFixed(1)}입니다.`;
+        }
+    }
+
+    let macdSummary = "MACD 해석 데이터가 부족합니다.";
+    if (
+        previous
+        && Number.isFinite(previous.macd)
+        && Number.isFinite(previous.macdSignal)
+        && Number.isFinite(latest.macd)
+        && Number.isFinite(latest.macdSignal)
+    ) {
+        const prevSpread = previous.macd - previous.macdSignal;
+        const latestSpread = latest.macd - latest.macdSignal;
+        if (prevSpread <= 0 && latestSpread > 0) {
+            macdSummary = "시그널선을 상향 돌파해 단기 골든크로스 신호입니다.";
+        } else if (prevSpread >= 0 && latestSpread < 0) {
+            macdSummary = "시그널선을 하향 이탈해 단기 데드크로스 신호입니다.";
+        } else if (latest.macd > latest.macdSignal && latest.macd >= 0) {
+            macdSummary = "0선 위에서 움직여 상대적으로 강한 모멘텀입니다.";
+        } else if (latest.macd < latest.macdSignal && latest.macd <= 0) {
+            macdSummary = "0선 아래에 머물러 약한 모멘텀입니다.";
+        } else if (latest.macd > latest.macdSignal && latest.macd < 0) {
+            macdSummary = "시그널선 위로 올라왔지만 아직 0선 아래라 약세 구간 반등 시도 단계입니다.";
+        } else if (latest.macd < latest.macdSignal && latest.macd > 0) {
+            macdSummary = "시그널선 아래로 내려왔지만 아직 0선 위라 강세 구간의 단기 조정 흐름입니다.";
+        } else {
+            macdSummary = "0선 부근에서 방향성을 탐색 중이라 뚜렷한 추세 우위가 약합니다.";
+        }
+    }
+
+    let bollingerSummary = "볼린저 해석 데이터가 부족합니다.";
+    if (
+        Number.isFinite(latest.close)
+        && Number.isFinite(latest.bollingerUpper)
+        && Number.isFinite(latest.bollingerLower)
+        && Number.isFinite(latest.sma20)
+    ) {
+        if (latest.close >= latest.bollingerUpper) {
+            bollingerSummary = "상단 밴드에 닿아 단기 과열 여부를 점검할 구간입니다.";
+        } else if (latest.close <= latest.bollingerLower) {
+            bollingerSummary = "하단 밴드에 닿아 기술적 반등 가능성을 볼 수 있습니다.";
+        } else if (latest.close >= latest.sma20) {
+            bollingerSummary = "중심선인 20일선 위에 있어 밴드 기준 강한 편입니다.";
+        } else {
+            bollingerSummary = "중심선인 20일선 아래에 있어 밴드 기준 약한 편입니다.";
+        }
+    }
+
+    return { rsiSummary, macdSummary, bollingerSummary };
+};
+
 const formatChartTickLabel = (tradingDate, interval) => {
     if (!tradingDate) return "";
     const [year, month] = String(tradingDate).split("-");
@@ -473,6 +555,7 @@ const CandlestickChart = ({ points, currency, interval }) => {
     });
 
     const candles = useMemo(() => buildIndicatorSeries(points), [points]);
+    const indicatorSnapshot = useMemo(() => buildIndicatorSnapshot(points), [points]);
     const visibleCount = interval === "DAY" ? 60 : interval === "WEEK" ? 78 : 36;
     const visibleCandles = useMemo(() => candles.slice(-visibleCount), [candles, visibleCount]);
 
@@ -712,11 +795,24 @@ const CandlestickChart = ({ points, currency, interval }) => {
                 </svg>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">첫 종가</div><div className="mt-1 text-sm font-black text-slate-900">{formatCurrency(first?.close, currency)}</div></div>
                 <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">최신 종가</div><div className="mt-1 text-sm font-black text-slate-900">{formatCurrency(latest?.close, currency)}</div></div>
-                <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">RSI 14</div><div className={`mt-1 text-sm font-black ${toneByValue((hovered?.rsi14 || 0) - 50)}`}>{visibleIndicators.rsi && hovered?.rsi14 != null ? formatCompact(hovered.rsi14, 2) : '-'}</div></div>
-                <div className="rounded-2xl bg-white p-4"><div className="text-xs font-black text-slate-400">MACD Histogram</div><div className={`mt-1 text-sm font-black ${toneByValue(hovered?.macdHistogram)}`}>{visibleIndicators.macd && hovered?.macdHistogram != null ? formatCompact(hovered.macdHistogram, 3) : '-'}</div></div>
+                <div className="rounded-2xl bg-white p-4">
+                    <div className="text-xs font-black text-slate-400">RSI 14</div>
+                    <div className={`mt-1 text-sm font-black ${toneByValue((hovered?.rsi14 || 0) - 50)}`}>{visibleIndicators.rsi && hovered?.rsi14 != null ? formatCompact(hovered.rsi14, 2) : '-'}</div>
+                    <div className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">{indicatorSnapshot.rsiSummary}</div>
+                </div>
+                <div className="rounded-2xl bg-white p-4">
+                    <div className="text-xs font-black text-slate-400">MACD Histogram</div>
+                    <div className={`mt-1 text-sm font-black ${toneByValue(hovered?.macdHistogram)}`}>{visibleIndicators.macd && hovered?.macdHistogram != null ? formatCompact(hovered.macdHistogram, 3) : '-'}</div>
+                    <div className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">{indicatorSnapshot.macdSummary}</div>
+                </div>
+                <div className="rounded-2xl bg-white p-4">
+                    <div className="text-xs font-black text-slate-400">볼린저 위치</div>
+                    <div className={`mt-1 text-sm font-black ${toneByValue((hovered?.close || 0) - (hovered?.sma20 || 0))}`}>{visibleIndicators.bollinger && hovered?.sma20 != null ? `20일선 ${formatCurrency(hovered.sma20, currency)}` : '-'}</div>
+                    <div className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">{indicatorSnapshot.bollingerSummary}</div>
+                </div>
             </div>
         </div>
     );
@@ -920,6 +1016,7 @@ export const InvestAssistant = () => {
         ? limitations.find((item) => /alpha vantage|provider issue|api key/i.test(item))
         : "";
     const indicatorAnalysis = useMemo(() => analyzeIndicatorState(chartData?.points), [chartData?.points]);
+    const indicatorSnapshot = useMemo(() => buildIndicatorSnapshot(chartData?.points), [chartData?.points]);
     const indicatorMessages = indicatorAnalysis.messages || [];
 
     const fetchChart = async (nextMarket, symbol, interval, fallbackSource = {}) => {
@@ -1173,7 +1270,15 @@ export const InvestAssistant = () => {
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">밸류 레이블</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (v3?.valuation?.valuation_label || "-") : formatValuationLabel(v3?.valuation?.valuation_label)}</div></div>
                                 <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "평균 감성" : "배당 레이블"}</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (v3?.sentiment_snapshot?.average_sentiment_score != null ? formatCompact(v3.sentiment_snapshot.average_sentiment_score, 3) : "-") : (dividend?.dividend_label || "배당 정보 부족")}</div></div>
-                                <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "기사 수" : "기술 진단"}</div><div className={`mt-1 text-base font-black ${!isKr && indicatorAnalysis.score != null ? toneByValue(indicatorAnalysis.score - 50) : "text-slate-900"}`}>{isKr ? (v3?.sentiment_snapshot?.article_count ?? "-") : (indicatorAnalysis.label ? `${indicatorAnalysis.label} (${indicatorAnalysis.score ?? 0}점)` : "기술 진단 없음")}</div></div>
+                                <div className="rounded-2xl bg-slate-50 p-4">
+                                    <div className="text-xs font-black text-slate-400">기술 진단</div>
+                                    <div className={`mt-1 text-base font-black ${indicatorAnalysis.score != null ? toneByValue(indicatorAnalysis.score - 50) : "text-slate-900"}`}>{indicatorAnalysis.label ? `${indicatorAnalysis.label} (${indicatorAnalysis.score ?? 0}점)` : "기술 진단 없음"}</div>
+                                    <div className="mt-2 space-y-1 text-[11px] font-medium leading-relaxed text-slate-500">
+                                        <div>RSI: {indicatorSnapshot.rsiSummary}</div>
+                                        <div>MACD: {indicatorSnapshot.macdSummary}</div>
+                                        <div>볼린저: {indicatorSnapshot.bollingerSummary}</div>
+                                    </div>
+                                </div>
                                 <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{isKr ? "ETF 추정" : "SEC 기준 연도"}</div><div className="mt-1 text-base font-black text-slate-900">{isKr ? (v3?.etf_profile?.etf ? "ETF 가능성 있음" : "일반 종목 분석") : (summary?.business_year ? `${summary.business_year}년 ${summary?.report_code || ""}`.trim() : "연간 보고 정보 없음")}</div></div>
                             </div>
                         </Card>
