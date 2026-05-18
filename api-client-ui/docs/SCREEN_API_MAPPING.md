@@ -45,6 +45,14 @@
   - `GET /stats/summary`
   - `GET /stats/visitors/compare`
   - `GET /stats/trend?days={1..365}`
+- `/app/chat`
+  - `GET /chat/rooms`
+  - `POST /chat/room`
+  - `POST /chat/ai/room`
+  - `GET /chat/room/{roomId}/messages`
+  - `GET /chat/room/{roomId}/members`
+  - `PATCH /chat/room/{roomId}/read`
+  - `POST /chat/room/{roomId}/file`
 - `/app/plinko`
   - `POST /game/dice/roll`
   - `POST /game/dice/reroll`

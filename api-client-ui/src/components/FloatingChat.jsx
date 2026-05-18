@@ -6,6 +6,7 @@ if (typeof global === 'undefined') {
 import { 
     Send, 
     Plus, 
+    Bot,
     Hash, 
     User, 
     Users, 
@@ -38,6 +39,7 @@ const CHAT_ROOM_READ_EVENT = "chat-room-read";
 
 export const FloatingChat = () => {
     const { user, isAuthenticated } = useAuth();
+    const isAiRoom = (room) => room?.type === "AI";
     const [isOpen, setIsOpen] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, roomId: null });
@@ -573,6 +575,9 @@ export const FloatingChat = () => {
             upsertRoomPreview(roomId, fileName, optimisticMsg.createdAt, 0);
 
             client.publish({ destination: "/pub/chat/message", body: JSON.stringify(messagePayload), headers: { "content-type": "application/json" } });
+            if (isAiRoom(currentRoom) && fileImage) {
+                toast.success("이미지를 첨부했습니다. 이어서 질문을 보내면 AI가 함께 봅니다.");
+            }
         } catch (error) {
             toast.error(error.response?.data?.message || "파일 업로드에 실패했습니다.");
         } finally {
@@ -636,6 +641,23 @@ export const FloatingChat = () => {
         } catch (error) {
             console.error("Room creation failed:", error);
             toast.error(error.response?.data?.message || "諛??앹꽦 ?ㅽ뙣");
+        }
+    };
+
+    const openAiRoom = async () => {
+        try {
+            const response = await api.post("/chat/ai/room");
+            const roomId = Number(response.data?.data ?? response.data);
+            const updatedRooms = await fetchRooms();
+            const found = updatedRooms.find((room) => String(getRoomId(room)) === String(roomId));
+            if (found) {
+                setCurrentRoom(found);
+            }
+            setIsOpen(true);
+            setIsMinimized(false);
+        } catch (error) {
+            console.error("AI room open failed:", error);
+            toast.error(error.response?.data?.message || "AI 채팅방을 열지 못했습니다.");
         }
     };
 
@@ -877,7 +899,7 @@ export const FloatingChat = () => {
                                 <>
                                     <button onClick={() => setCurrentRoom(null)} className="p-1.5 hover:bg-white/20 rounded-xl transition-colors"><ArrowLeft className="h-4 w-4" /></button>
                                     <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
-                                        {currentRoom.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                                        {currentRoom.type === "AI" ? <Bot className="h-5 w-5" /> : currentRoom.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
                                     </div>
                                     <div className="min-w-0">
                                         <div className="font-black text-sm truncate leading-tight">{currentRoom.title}</div>
@@ -911,6 +933,7 @@ export const FloatingChat = () => {
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
                                             <input type="text" placeholder="채팅방 검색" className="input-base py-2 pl-10 pr-4 text-xs font-bold bg-slate-50 border-0" />
                                         </div>
+                                        <button onClick={openAiRoom} className="ml-3 p-2.5 rounded-2xl bg-cyan-600 text-white shadow-lg shadow-cyan-100 hover:scale-105 transition-transform"><Bot className="h-5 w-5" /></button>
                                         <button onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="ml-3 p-2.5 rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-100 hover:scale-105 transition-transform"><Plus className="h-5 w-5" /></button>
                                     </div>
                                     <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -923,7 +946,7 @@ export const FloatingChat = () => {
                                                         onContextMenu={(e) => handleContextMenu(e, roomId)}
                                                         className={`w-full flex items-center gap-4 p-4 rounded-[1.5rem] transition-all text-slate-700 hover:shadow-xl hover:-translate-y-0.5 ${isActive ? 'bg-white shadow-xl ring-2 ring-primary-100' : 'bg-white/50 border border-slate-100'}`}>
                                                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 text-primary-600 flex items-center justify-center font-black shrink-0 shadow-sm">
-                                                            {room.type === "PERSONAL" ? <User className="h-6 w-6" /> : <Users className="h-6 w-6" />}
+                                                            {room.type === "AI" ? <Bot className="h-6 w-6" /> : room.type === "PERSONAL" ? <User className="h-6 w-6" /> : <Users className="h-6 w-6" />}
                                                         </div>
                                                         <div className="flex-1 text-left min-w-0">
                                                             <div className="flex justify-between items-center mb-1">
@@ -1022,9 +1045,14 @@ export const FloatingChat = () => {
                                         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                                             <button type="button" onClick={() => fileInputRef.current.click()} className="p-2.5 text-slate-300 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"><FileIcon className="h-5 w-5" /></button>
                                             <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.7z" />
-                                            <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="Type a message..." className="input-base h-11 border-0 bg-slate-50 font-medium" />
+                                            <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={isAiRoom(currentRoom) ? "질문 입력 후 전송" : "Type a message..."} className="input-base h-11 border-0 bg-slate-50 font-medium" />
                                             <button type="submit" disabled={!newMessage.trim() || !isConnected} className="p-2.5 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-100 disabled:opacity-20 transition-all active:scale-90"><Send className="h-5 w-5" /></button>
                                         </form>
+                                        {isAiRoom(currentRoom) && (
+                                            <p className="mt-2 text-[10px] font-bold text-slate-400">
+                                                AI 방은 서버 기본 모델만 사용하며, 최근 첨부 이미지도 함께 전달합니다.
+                                            </p>
+                                        )}
                                     </div>
                                     {showMemberList && (
                                         <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-20 flex flex-col animate-fade-in p-2">

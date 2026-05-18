@@ -6,6 +6,7 @@ if (typeof global === 'undefined') {
 import { 
     Send, 
     Plus, 
+    Bot,
     Hash, 
     User, 
     Users, 
@@ -32,6 +33,7 @@ import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 
 export const Chat = () => {
     const { user } = useAuth();
+    const isAiRoom = (room) => room?.type === "AI";
     
     // 채팅방 ID 추출 유틸리티
     const getRoomId = (room) => {
@@ -359,6 +361,9 @@ export const Chat = () => {
                 body: JSON.stringify(messagePayload),
                 headers: { "content-type": "application/json" }
             });
+            if (isAiRoom(currentRoom) && fileImage) {
+                toast.success("이미지를 첨부했습니다. 이어서 질문을 보내면 AI가 함께 봅니다.");
+            }
         } catch (error) {
             toast.error(error.response?.data?.message || "파일 업로드에 실패했습니다.");
         } finally {
@@ -393,6 +398,22 @@ export const Chat = () => {
         } catch (error) {
             console.error("Room creation failed:", error);
             toast.error(error.response?.data?.message || "방 생성 실패");
+        }
+    };
+
+    const openAiRoom = async () => {
+        try {
+            const response = await api.post("/chat/ai/room");
+            const roomId = Number(response.data?.data ?? response.data);
+            const updatedRooms = await fetchRooms();
+            const found = updatedRooms.find((room) => String(getRoomId(room)) === String(roomId));
+            setCurrentRoom(found || null);
+            if (!found) {
+                toast.success("AI 채팅방을 열었습니다.");
+            }
+        } catch (error) {
+            console.error("AI room open failed:", error);
+            toast.error(error.response?.data?.message || "AI 채팅방을 열지 못했습니다.");
         }
     };
 
@@ -469,6 +490,7 @@ export const Chat = () => {
                     <h2 className="font-bold text-slate-900 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary-600" />채팅방</h2>
                     <div className="flex gap-1">
                         <button onClick={fetchRooms} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors"><RefreshCw className={`h-4 w-4 ${loadingRooms ? 'animate-spin' : ''}`} /></button>
+                        <button onClick={openAiRoom} className="p-1.5 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition-colors"><Bot className="h-5 w-5" /></button>
                         <button onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors"><Plus className="h-5 w-5" /></button>
                     </div>
                 </div>
@@ -488,7 +510,7 @@ export const Chat = () => {
                                     <button key={roomId || Math.random()} onClick={() => { setCurrentRoom(room); setMessages([]); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
                                         className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${isActive ? "bg-primary-600 text-white shadow-md" : "hover:bg-white hover:shadow-sm text-slate-700"}`}>
                                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold shadow-sm ${isActive ? "bg-white/20" : "bg-primary-100 text-primary-700"}`}>
-                                            {room.type === "PERSONAL" ? <User className="h-6 w-6" /> : <Users className="h-6 w-6" />}
+                                            {room.type === "AI" ? <Bot className="h-6 w-6" /> : room.type === "PERSONAL" ? <User className="h-6 w-6" /> : <Users className="h-6 w-6" />}
                                         </div>
                                         <div className="flex-1 text-left min-w-0">
                                             <div className="flex justify-between items-center mb-0.5">
@@ -513,7 +535,7 @@ export const Chat = () => {
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-slate-100"><ArrowLeft className="h-5 w-5" /></button>
                                 <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold">
-                                    {currentRoom.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                                    {currentRoom.type === "AI" ? <Bot className="h-5 w-5" /> : currentRoom.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-slate-900">{currentRoom.title}</h3>
@@ -607,10 +629,15 @@ export const Chat = () => {
                                         <button type="button" onClick={() => fileInputRef.current.click()} className="p-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"><FileIcon className="h-5 w-5" /></button>
                                         <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.7z" />
                                         <div className="flex-1 relative">
-                                            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="메시지를 입력해주세요..." className="w-full pl-4 pr-12 py-3 bg-slate-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-primary-500 resize-none max-h-32" rows="1" />
+                                            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={isAiRoom(currentRoom) ? "질문을 입력하세요. 이미지는 먼저 첨부한 뒤 질문하면 됩니다." : "메시지를 입력해주세요..."} className="w-full pl-4 pr-12 py-3 bg-slate-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-primary-500 resize-none max-h-32" rows="1" />
                                             <button type="submit" disabled={!newMessage.trim() || !isConnected} className={`absolute right-2 bottom-2 p-1.5 rounded-lg transition-all ${ (newMessage.trim() && isConnected) ? "bg-primary-600 text-white shadow-md" : "bg-slate-200 text-slate-400" }`}><Send className="h-4 w-4" /></button>
                                         </div>
                                     </form>
+                                    {isAiRoom(currentRoom) && (
+                                        <p className="mt-2 text-xs font-semibold text-slate-400">
+                                            AI 방은 서버 기본 모델만 사용합니다. 이미지를 첨부한 뒤 질문을 보내면 최근 첨부 이미지까지 함께 전달합니다.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             {showMemberList && (
