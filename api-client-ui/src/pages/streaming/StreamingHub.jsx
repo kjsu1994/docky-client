@@ -1,6 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { Film, PlayCircle, RefreshCw, AlertTriangle, Clapperboard, ArrowLeft, Clock3 } from "lucide-react";
-import Hls from "hls.js";
 import toast from "react-hot-toast";
 import api from "../../utils/api.js";
 
@@ -20,6 +19,7 @@ export const StreamingHub = () => {
     const [loading, setLoading] = useState(true);
     const [playLoading, setPlayLoading] = useState(false);
     const [error, setError] = useState("");
+    const [playbackUnsupported, setPlaybackUnsupported] = useState(false);
     const videoRef = useRef(null);
 
     const nativeHlsSupported = useMemo(() => {
@@ -27,7 +27,6 @@ export const StreamingHub = () => {
         const video = document.createElement("video");
         return Boolean(video.canPlayType("application/vnd.apple.mpegurl"));
     }, []);
-    const hlsPlaybackSupported = nativeHlsSupported || Hls.isSupported();
     const selectedVideo = videos.find((video) => video.video_id === selectedVideoId) || null;
 
     const fetchVideos = async () => {
@@ -78,6 +77,9 @@ export const StreamingHub = () => {
             return undefined;
         }
 
+        let cancelled = false;
+        let hlsInstance = null;
+        setPlaybackUnsupported(false);
         video.pause();
         video.removeAttribute("src");
         video.load();
@@ -88,23 +90,37 @@ export const StreamingHub = () => {
             return undefined;
         }
 
-        if (Hls.isSupported()) {
-            const hls = new Hls({ enableWorker: true });
-            hls.loadSource(playInfo.playlist_url);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.ERROR, (_event, data) => {
-                if (data?.fatal) {
-                    toast.error("스트리밍 재생 중 오류가 발생했습니다.");
+        import("hls.js")
+            .then((module) => {
+                if (cancelled) return;
+                const Hls = module.default;
+                if (!Hls?.isSupported?.()) {
+                    setPlaybackUnsupported(true);
+                    video.src = playInfo.playlist_url;
+                    video.load();
+                    return;
                 }
-            });
-            return () => {
-                hls.destroy();
-            };
-        }
 
-        video.src = playInfo.playlist_url;
-        video.load();
-        return undefined;
+                hlsInstance = new Hls({ enableWorker: true });
+                hlsInstance.loadSource(playInfo.playlist_url);
+                hlsInstance.attachMedia(video);
+                hlsInstance.on(Hls.Events.ERROR, (_event, data) => {
+                    if (data?.fatal) {
+                        toast.error("스트리밍 재생 중 오류가 발생했습니다.");
+                    }
+                });
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setPlaybackUnsupported(true);
+                video.src = playInfo.playlist_url;
+                video.load();
+            });
+
+        return () => {
+            cancelled = true;
+            hlsInstance?.destroy();
+        };
     }, [nativeHlsSupported, playInfo?.playlist_url]);
 
     const renderThumbnail = (video, className) => {
@@ -122,7 +138,7 @@ export const StreamingHub = () => {
         <section className="space-y-8 animate-fade-in pb-10">
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/50">
                 <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary-500">Streaming</p>
+                    <p className="text-[11px] font-black text-primary-500">스트리밍</p>
                     <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">영상 스트리밍 허브</h1>
                     <p className="mt-2 text-sm font-medium text-slate-400">목록에서 영상을 고른 뒤 상세 화면에서 재생할 수 있습니다.</p>
                 </div>
@@ -137,12 +153,12 @@ export const StreamingHub = () => {
                 </button>
             </div>
 
-            {!hlsPlaybackSupported && (
+            {playbackUnsupported && (
                 <div className="rounded-3xl border border-amber-100 bg-amber-50/70 p-5 text-sm font-semibold text-amber-800">
                     <div className="flex items-start gap-3">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                         <div>
-                            이 브라우저는 HLS 재생을 지원하지 않을 수 있습니다. Safari 계열 브라우저가 가장 안정적이며, 다른 브라우저는 내장 플레이어를 통해 재생을 시도합니다.
+                            이 브라우저에서는 HLS 전용 재생 엔진을 사용할 수 없어 내장 플레이어로 재생을 시도합니다. Safari 계열 브라우저가 가장 안정적입니다.
                         </div>
                     </div>
                 </div>
@@ -216,7 +232,7 @@ export const StreamingHub = () => {
 
                     <div className="space-y-5">
                         <div>
-                            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary-500">Now Playing</p>
+                            <p className="text-[11px] font-black text-primary-500">현재 재생</p>
                             <h2 className="mt-2 text-3xl font-black text-slate-900">{selectedVideo?.title || playInfo?.title}</h2>
                         </div>
 

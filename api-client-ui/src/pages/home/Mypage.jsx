@@ -661,7 +661,7 @@ const ProfileTab = ({ memberData, levelData, levelHistory, levelHistoryLoading, 
             </div>
 
             <div className="card p-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Account Management</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">계정 관리</h3>
                 <div className="space-y-3">
                     <button
                         onClick={onDeleteAccount}
@@ -674,11 +674,11 @@ const ProfileTab = ({ memberData, levelData, levelHistory, levelHistoryLoading, 
             </div>
 
             <div className="card p-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">XP History</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">경험치 이력</h3>
                 {levelHistoryLoading ? (
-                    <LoadingSpinner text="Loading XP history..." />
+                    <LoadingSpinner text="경험치 이력을 불러오는 중..." />
                 ) : !levelHistory.length ? (
-                    <div className="text-sm text-slate-500">No XP history yet.</div>
+                    <div className="text-sm text-slate-500">아직 경험치 이력이 없습니다.</div>
                 ) : (
                     <div className="space-y-2">
                         {levelHistory.map((item) => (
@@ -692,7 +692,7 @@ const ProfileTab = ({ memberData, levelData, levelHistory, levelHistoryLoading, 
                                     </div>
                                 </div>
                                 <div className="mt-1 text-xs text-slate-500">
-                                    penalty: {formatNumber(item.penalty_exp ?? item.penaltyExp ?? 0)} | {toDisplayDate(item.created_at || item.createdAt) || "-"}
+                                    차감 {formatNumber(item.penalty_exp ?? item.penaltyExp ?? 0)} | {toDisplayDate(item.created_at || item.createdAt) || "-"}
                                 </div>
                             </div>
                         ))}
@@ -795,7 +795,7 @@ const StatsTab = ({ memberData, levelData, levelHistory, levelHistoryLoading }) 
             </div>
 
             <div className="card p-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Level Progress</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">레벨 진행도</h3>
                 <div className="space-y-4">
                     <div>
                         <div className="flex items-center justify-between mb-2">

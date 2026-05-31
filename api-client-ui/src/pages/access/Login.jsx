@@ -26,7 +26,7 @@ export const Login = () => {
     const lockCloseBtnRef = useRef(null);
 
     const formatDateTime = (value) => {
-        if (!value) return "No end date";
+        if (!value) return "종료일 없음";
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return String(value);
         return date.toLocaleString();
@@ -115,7 +115,7 @@ export const Login = () => {
             if (data?.code === "ACCOUNT_LOCKED") {
                 setLockInfo({
                     email,
-                    reason: data?.sanction_info?.reason || "No reason provided",
+                    reason: data?.sanction_info?.reason || "사유가 제공되지 않았습니다.",
                     startsAt: data?.sanction_info?.startsAt || data?.sanction_info?.starts_at || null,
                     endsAt: data?.sanction_info?.endsAt || data?.sanction_info?.ends_at || null,
                 });
@@ -129,17 +129,17 @@ export const Login = () => {
     const handleReleaseRequest = async () => {
         if (!lockInfo?.email || releaseLoading) return;
 
-        const toastId = toast.loading("Submitting release request...");
+        const toastId = toast.loading("해제 요청을 제출하는 중...");
         setReleaseLoading(true);
         try {
             await api.post("/sanctions/release-request", {
                 email: lockInfo.email,
                 request_reason: releaseReason.trim() || undefined,
             });
-            toast.success("Release request submitted.", { id: toastId });
+            toast.success("해제 요청이 제출되었습니다.", { id: toastId });
             setReleaseReason("");
         } catch (error) {
-            toast.error(error?.response?.data?.message || "Failed to submit release request.", { id: toastId });
+            toast.error(error?.response?.data?.message || "해제 요청 제출에 실패했습니다.", { id: toastId });
         } finally {
             setReleaseLoading(false);
         }
@@ -147,10 +147,6 @@ export const Login = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
-            {/* Background decorative elements */}
-            <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary-100/50 rounded-full blur-3xl opacity-50" />
-            <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-sky-100/50 rounded-full blur-3xl opacity-50" />
-
             <div className="w-full max-w-md relative z-10">
                 {/* 로고 & 타이틀 */}
                 <div className="text-center mb-10">
@@ -158,7 +154,7 @@ export const Login = () => {
                         <span className="text-3xl font-black italic tracking-tighter">C</span>
                     </div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">
-                        Welcome
+                        로그인
                     </h1>
                     <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">
                         벌꿀오소리 커뮤니티
@@ -170,7 +166,7 @@ export const Login = () => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                                Email Address
+                                이메일
                             </label>
                             <div className="relative group">
                                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
@@ -187,7 +183,7 @@ export const Login = () => {
 
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                                Secure Password
+                                비밀번호
                             </label>
                             <div className="relative group">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
@@ -212,10 +208,10 @@ export const Login = () => {
                                 {loading ? (
                                     <span className="flex items-center justify-center gap-3">
                                         <div className="loading-spinner border-white/30 border-t-white" />
-                                        AUTHENTICATING...
+                                        인증 확인 중...
                                     </span>
                                 ) : (
-                                    "CONTINUE SIGN IN"
+                                    "로그인"
                                 )}
                             </button>
 
@@ -228,19 +224,19 @@ export const Login = () => {
                                 className="btn-secondary w-full h-14 flex items-center justify-center gap-3 border-slate-100 hover:border-slate-200"
                             >
                                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="h-5 w-5" />
-                                <span className="tracking-tight">{googleLoading ? "REDIRECTING..." : "LOG IN WITH GOOGLE"}</span>
+                                <span className="tracking-tight">{googleLoading ? "이동 중..." : "Google로 로그인"}</span>
                             </button>
                         </div>
                     </form>
 
                     <div className="mt-10 pt-8 border-t border-slate-50 text-center">
                         <p className="text-sm font-medium text-slate-400">
-                            New to our platform?{" "}
+                            처음이신가요?{" "}
                             <Link
                                 to="/register"
                                 className="font-black text-primary-600 hover:text-primary-700 underline underline-offset-4 decoration-primary-200"
                             >
-                                CREATE ACCOUNT
+                                회원가입
                             </Link>
                         </p>
                     </div>
@@ -250,23 +246,23 @@ export const Login = () => {
             {lockInfo && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-                        <h2 className="text-xl font-black text-slate-900">Account Locked</h2>
+                        <h2 className="text-xl font-black text-slate-900">계정 이용 제한</h2>
                         <p className="mt-2 text-sm text-slate-600">
-                            This account is currently sanctioned. Please review the details below.
+                            현재 이 계정은 제재 상태입니다. 아래 내용을 확인하고 필요하면 해제를 요청하세요.
                         </p>
 
                         <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                            <div><b>Email:</b> {lockInfo.email}</div>
-                            <div><b>Reason:</b> {lockInfo.reason}</div>
-                            <div><b>Start:</b> {formatDateTime(lockInfo.startsAt)}</div>
-                            <div><b>End:</b> {formatDateTime(lockInfo.endsAt)}</div>
+                            <div><b>이메일:</b> {lockInfo.email}</div>
+                            <div><b>사유:</b> {lockInfo.reason}</div>
+                            <div><b>시작:</b> {formatDateTime(lockInfo.startsAt)}</div>
+                            <div><b>종료:</b> {formatDateTime(lockInfo.endsAt)}</div>
                         </div>
 
                         <textarea
                             className="input-base mt-4 min-h-[88px] w-full"
                             value={releaseReason}
                             onChange={(e) => setReleaseReason(e.target.value)}
-                            placeholder="Add a message for release review (optional)"
+                            placeholder="해제 검토에 필요한 내용을 입력하세요. (선택)"
                             maxLength={500}
                         />
 
@@ -278,7 +274,7 @@ export const Login = () => {
                                 onClick={() => setLockInfo(null)}
                                 disabled={releaseLoading}
                             >
-                                Close
+                                닫기
                             </button>
                             <button
                                 type="button"
@@ -288,7 +284,7 @@ export const Login = () => {
                                 aria-busy={releaseLoading}
                                 data-busy-indicator="true"
                             >
-                                {releaseLoading ? "Submitting..." : "Request Release"}
+                                {releaseLoading ? "제출 중..." : "해제 요청"}
                             </button>
                         </div>
                     </div>

@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { isImageFile } from "../../utils/helpers.js";
 import { canManageByOwnerOrAdmin } from "../../utils/authorization.js";
 
-// text-fixed
+// Quill 에디터를 작성 화면에서 필요할 때 로드합니다.
 const loadQuill = () =>
     new Promise((resolve) => {
         if (window.Quill) return resolve(window.Quill);
@@ -68,7 +68,7 @@ export const BoardForm = () => {
         hasRole(user?.role, "ROLE_ADMIN") ||
         hasRole(user?.member?.roles, "ROLE_ADMIN");
 
-    // text-fixed
+    // 공지는 관리자만 작성할 수 있습니다.
     useEffect(() => {
         if (kind === "ADMIN_NOTICE" && !isAdmin) {
             toast.error("공지사항은 관리자만 작성할 수 있습니다.");
@@ -86,7 +86,7 @@ export const BoardForm = () => {
     const editorRef = useRef(null);
     const quillRef = useRef(null);
 
-    // text-fixed
+    // 에디터 초기화
     useEffect(() => {
         loadQuill().then((Quill) => {
             if (!editorRef.current || quillRef.current) return;
@@ -111,7 +111,7 @@ export const BoardForm = () => {
             quillRef.current = quill;
             setEditorReady(true);
 
-            // text-fixed
+            // 툴바 이미지 버튼은 서버 업로드를 거쳐 본문에 삽입합니다.
             quill.getModule("toolbar").addHandler("image", () => {
                 const input = document.createElement("input");
                 input.type = "file";
@@ -125,7 +125,7 @@ export const BoardForm = () => {
                 input.click();
             });
 
-            // text-fixed
+            // 붙여넣기 이미지 업로드
             quill.root.addEventListener("paste", async (e) => {
                 const items = Array.from(e.clipboardData?.items || []);
                 const imageItems = items.filter((i) => i.type.startsWith("image/"));
@@ -138,7 +138,7 @@ export const BoardForm = () => {
                 }
             });
 
-            // text-fixed
+            // 드래그 앤 드롭 이미지 업로드
             quill.root.addEventListener("drop", async (e) => {
                 e.preventDefault();
                 const files = Array.from(e.dataTransfer?.files || []).filter((f) =>
@@ -154,14 +154,14 @@ export const BoardForm = () => {
         return () => { quillRef.current = null; };
     }, []);
 
-    // text-fixed
+    // 본문 이미지 서버 업로드
     const uploadImageToServer = async (quill, file) => {
         if (isHeicLikeFile(file)) {
             toast.error("HEIC/HEIF 이미지는 지원되지 않습니다. JPG/PNG로 변경 후 업로드해주세요.");
             return;
         }
 
-        // text-fixed
+        // 이미지 용량 제한
         if (file.size > 5 * 1024 * 1024) {
             toast.error("이미지 크기는 5MB 이하여야 합니다.");
             return;
@@ -177,7 +177,7 @@ export const BoardForm = () => {
             const imageUrl = response.data?.url || response.data;
             if (!imageUrl) throw new Error("URL 없음");
 
-            // text-fixed
+            // 업로드된 이미지 URL을 현재 커서 위치에 삽입합니다.
             const range = quill.getSelection(true);
             quill.insertEmbed(range.index, "image", imageUrl);
             quill.setSelection(range.index + 1);
@@ -189,7 +189,7 @@ export const BoardForm = () => {
         }
     };
 
-    // text-fixed
+    // 수정 화면에서는 기존 게시글과 첨부파일을 불러옵니다.
     useEffect(() => {
         if (!isEdit || !editorReady) return;
 
@@ -216,7 +216,7 @@ export const BoardForm = () => {
             .catch(() => toast.error("게시글 로딩 실패"));
     }, [isEdit, boardId, editorReady, user, kind, navigate]);
 
-    // text-fixed
+    // 첨부파일 선택
     const handleFileChange = (e) => {
         setAttachFiles((prev) => [...prev, ...Array.from(e.target.files)]);
     };
@@ -256,7 +256,7 @@ export const BoardForm = () => {
         return formDataToSend;
     };
 
-    // text-fixed
+    // 저장 처리
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -271,7 +271,7 @@ export const BoardForm = () => {
         try {
             if (isEdit) {
                 if (deletedExistingFileIds.length > 0) {
-                    // text-fixed
+                    // 삭제로 표시된 기존 첨부파일을 먼저 제거합니다.
                     await Promise.all(
                         deletedExistingFileIds.map((fileId) =>
                             api.delete(`/boards/${boardId}/files/${fileId}`)
@@ -281,7 +281,7 @@ export const BoardForm = () => {
 
                 const formDataToSend = buildSubmitFormData({ includeNewFiles: true });
                 await uploadFiles(`/boards/${boardId}`, formDataToSend, "patch");
-                toast.success("Post updated.");
+                toast.success("게시글이 수정되었습니다.");
             } else {
                 const formDataToSend = buildSubmitFormData({ includeNewFiles: true });
                 const createEndpoints = [
@@ -311,7 +311,7 @@ export const BoardForm = () => {
                 if (!createSuccess && lastError) {
                     throw lastError;
                 }
-                toast.success("Post created.");
+                toast.success("게시글이 등록되었습니다.");
             }
 
             navigate(`/app/boards/${kind}`);
@@ -324,7 +324,7 @@ export const BoardForm = () => {
 
     return (
         <div className="space-y-6">
-            {/* text-fixed */}
+            {/* 작성 화면 헤더 */}
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-slate-900">
                     {isEdit ? "게시글 수정" : "게시글 작성"}
@@ -337,7 +337,7 @@ export const BoardForm = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="card p-8 space-y-6">
 
-                    {/* ?쒕ぉ */}
+                    {/* 제목 */}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">제목</label>
                         <input
@@ -345,12 +345,12 @@ export const BoardForm = () => {
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             className="input-base"
-                            placeholder="Enter title"
+                            placeholder="제목을 입력하세요"
                             required
                         />
                     </div>
 
-                    {/* ?먮뵒??*/}
+                    {/* 내용 에디터 */}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                             내용
@@ -445,7 +445,7 @@ export const BoardForm = () => {
                 </div>
             </form>
 
-            {/* Quill ?ㅽ???*/}
+            {/* Quill 스타일 */}
             <style>{`
                 .quill-wrapper .ql-toolbar {
                     border-top-left-radius: 0.75rem;

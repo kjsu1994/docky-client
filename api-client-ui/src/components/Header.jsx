@@ -56,17 +56,17 @@ export const Header = () => {
     const panelSections = useMemo(() => {
         const sections = [
             {
-                title: "Core",
+                title: "핵심",
                 items: [
                     { title: "홈", to: "/app", icon: Home },
-                    { title: "Todo", to: "/app/todos", icon: CalendarDays },
+                    { title: "할 일", to: "/app/todos", icon: CalendarDays },
                     { title: "통계", to: "/app/statistics", icon: BarChart },
                     { title: "사용자게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare },
                     { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle },
                 ],
             },
             {
-                title: "Tools",
+                title: "도구",
                 items: [
                     { title: "중간장소", to: "/app/optimizer", icon: MapPin },
                     { title: "주변 찾기", to: "/app/facility", icon: Car },
@@ -76,7 +76,7 @@ export const Header = () => {
                 ],
             },
             {
-                title: "Games",
+                title: "게임",
                 items: [
                     { title: "게임 허브", to: "/app/games", icon: Dices },
                     { title: "플린코", to: "/app/plinko", icon: Dices },
@@ -89,7 +89,7 @@ export const Header = () => {
                 ],
             },
             {
-                title: "Account",
+                title: "계정",
                 items: [
                     { title: "내 정보", to: "/app/mypage", icon: User },
                     { title: "정보 수정", to: "/app/mypage/edit", icon: Settings },
@@ -98,7 +98,7 @@ export const Header = () => {
         ];
         if (isAdmin) {
             sections.push({
-                title: "Admin",
+                title: "관리",
                 items: [
                     { title: "관리자 콘솔", to: "/app/admin/anomalies", icon: ShieldAlert },
                     { title: "운영 관리", to: "/app/admin/operations", icon: ShieldAlert },
@@ -175,7 +175,7 @@ export const Header = () => {
                                 >
                                     <div className="mb-5 flex items-center justify-between">
                                         <div>
-                                            <div className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">All Menu</div>
+                                            <div className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">전체 메뉴</div>
                                             <p className="mt-1 text-sm font-semibold text-slate-500">자주 쓰는 메뉴를 카테고리별로 모아봤어요.</p>
                                         </div>
                                         <button

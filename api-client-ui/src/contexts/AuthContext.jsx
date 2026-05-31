@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import toast from "react-hot-toast";
@@ -38,7 +38,6 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    // text-fixed
     useEffect(() => {
         const initAuth = async () => {
             const token = localStorage.getItem("accessToken");
@@ -60,21 +59,19 @@ export const AuthProvider = ({ children }) => {
         initAuth();
     }, []);
 
-    //2026.02.12 ?섏젙
     const login = async (email, password) => {
         try {
             const response = await api.post("/members/login", { email, password });
             const loginBody = response.data?.data || response.data;
             const loginRoles = Array.isArray(loginBody?.roles) ? loginBody.roles : null;
 
-            // text-fixed
             const authHeader = response.headers?.authorization || response.headers?.Authorization;
             const refreshHeader = response.headers?.refresh || response.headers?.Refresh;
 
             const accessToken = authHeader?.replace(/^Bearer\s+/i, "");
             const refreshToken = refreshHeader?.replace(/^Bearer\s+/i, "");
 
-            if (!accessToken) throw new Error("토큰을 찾을 수 없습니다.");
+            if (!accessToken) throw new Error("로그인 토큰을 찾을 수 없습니다.");
 
             localStorage.setItem("accessToken", accessToken);
             localStorage.setItem("refreshToken", refreshToken);
@@ -82,30 +79,24 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem("userRoles", JSON.stringify(loginRoles));
             }
 
-            // text-fixed
             const userResponse = await api.get("/members");
             const userData = userResponse.data.data || userResponse.data;
             setUser(withRolesFallback(userData, loginRoles || parseStoredRoles()));
 
             toast.success("로그인 성공!");
 
-            // text-fixed
             try {
-                // text-fixed
                 const queueResponse = await api.post("/api/queue/join");
                 const queueData = queueResponse.data?.data || queueResponse.data;
-                
-                // text-fixed
                 if (queueData.status === "WAITING") {
                     navigate("/queue", { replace: true });
                     return;
                 }
             } catch (err) {
-                // text-fixed
                 console.error("Queue join failed, proceeding anyway:", err);
             }
 
-            navigate("/app"); // If queue status is ALLOWED, move to main
+            navigate("/app");
         } catch (error) {
             if (error?.response?.data?.code === "ACCOUNT_LOCKED") {
                 throw error;
@@ -160,7 +151,6 @@ export const AuthProvider = ({ children }) => {
             try {
                 await api.post("/members/logout");
             } catch (error) {
-                // text-fixed
                 console.error("Failed to logout from server:", error);
             }
         }
@@ -171,7 +161,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
 
         if (!silent) {
-            toast.success("Logged out successfully.");
+            toast.success("로그아웃되었습니다.");
         }
         navigate("/login");
     };

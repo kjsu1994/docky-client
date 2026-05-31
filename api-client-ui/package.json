@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "smoke:tabletop-ui": "node scripts/tabletop-ui-smoke.mjs"
+    "smoke:tabletop-ui": "node scripts/tabletop-ui-smoke.mjs",
+    "smoke:page-guides": "node scripts/page-guide-smoke.mjs",
+    "smoke:text-quality": "node scripts/text-quality-smoke.mjs",
+    "smoke:all": "node scripts/smoke-all.mjs"
   },
   "dependencies": {
     "@stomp/stompjs": "^7.3.0",

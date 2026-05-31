@@ -59,10 +59,10 @@ export const BottomNav = () => {
             } glass`}
         >
             <div className="mx-auto grid h-full max-w-lg grid-cols-4 items-center">
-                <NavItem to="/app" icon={Home}>HOME</NavItem>
-                <NavItem to="/app/boards/FREE_BOARD" icon={LayoutGrid}>BOARD</NavItem>
-                <NavItem to="/app/games" icon={Dices}>GAME</NavItem>
-                <NavItem to="/app/all-menu" icon={Menu}>MENU</NavItem>
+                <NavItem to="/app" icon={Home}>홈</NavItem>
+                <NavItem to="/app/boards/FREE_BOARD" icon={LayoutGrid}>게시판</NavItem>
+                <NavItem to="/app/games" icon={Dices}>게임</NavItem>
+                <NavItem to="/app/all-menu" icon={Menu}>메뉴</NavItem>
             </div>
         </nav>
     );

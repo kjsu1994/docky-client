@@ -33,8 +33,8 @@ const getModerationItemId = (item, targetType) => {
 const getModerationItemHidden = (item) => Boolean(pick(item, "hiddenYn", "hidden_yn", false));
 
 const getModerationPrimaryText = (item, targetType) => {
-    if (targetType === "BOARD") return pick(item, "title", "title", "(No title)");
-    return pick(item, "contents", "contents", "(No contents)");
+    if (targetType === "BOARD") return pick(item, "title", "title", "(제목 없음)");
+    return pick(item, "contents", "contents", "(내용 없음)");
 };
 
 const getModerationSecondaryText = (item, targetType) => {
@@ -121,7 +121,7 @@ export const AdminOperations = () => {
             setModerationItems(Array.isArray(items) ? items : []);
         } catch (err) {
             setModerationItems([]);
-            setModerationError(err?.response?.data?.message || "Failed to load moderation list.");
+            setModerationError(err?.response?.data?.message || "검토 목록을 불러오지 못했습니다.");
         } finally {
             setModerationLoading(false);
         }
@@ -147,7 +147,7 @@ export const AdminOperations = () => {
     const submitBatchModeration = async (actionType) => {
         const ids = [...new Set(selectedIds)].filter((value) => Number.isFinite(Number(value)) && Number(value) > 0);
         if (!ids.length) {
-            toast.error("Select at least one item.");
+            toast.error("항목을 하나 이상 선택하세요.");
             return;
         }
 
@@ -166,9 +166,9 @@ export const AdminOperations = () => {
             setBatchResult(data);
             await fetchModerationItems(targetType);
             setSelectedIds([]);
-            toast.success(actionType === "HIDE" ? "Selected items are now hidden." : "Selected items are now visible.");
+            toast.success(actionType === "HIDE" ? "선택 항목을 숨김 처리했습니다." : "선택 항목을 공개 처리했습니다.");
         } catch (err) {
-            const message = err?.response?.data?.message || "Bulk moderation failed.";
+            const message = err?.response?.data?.message || "일괄 처리에 실패했습니다.";
             setBatchError(message);
             toast.error(message);
         } finally {
@@ -207,7 +207,7 @@ export const AdminOperations = () => {
             setBanners(Array.isArray(items) ? items : []);
         } catch (err) {
             setBanners([]);
-            setBannerError(err?.response?.data?.message || "Failed to load banners.");
+            setBannerError(err?.response?.data?.message || "배너 목록을 불러오지 못했습니다.");
         } finally {
             setBannerLoading(false);
         }
@@ -238,17 +238,17 @@ export const AdminOperations = () => {
     const submitBannerForm = async () => {
         const title = String(bannerForm.title || "").trim();
         if (!title) {
-            toast.error("Banner title is required.");
+            toast.error("배너 제목을 입력하세요.");
             return;
         }
         const isAdsense = String(bannerForm.renderMode || "").toUpperCase() === "ADSENSE";
         if (isAdsense) {
             if (!String(bannerForm.adProvider || "").trim()) {
-                toast.error("Ad provider is required for ADSENSE mode.");
+                toast.error("애드센스 모드에서는 광고 제공자를 입력해야 합니다.");
                 return;
             }
             if (!String(bannerForm.adsenseClient || "").trim() || !String(bannerForm.adsenseSlot || "").trim()) {
-                toast.error("AdSense client and slot are required for ADSENSE mode.");
+                toast.error("애드센스 client와 slot을 모두 입력해야 합니다.");
                 return;
             }
         }
@@ -275,15 +275,15 @@ export const AdminOperations = () => {
         try {
             if (editingBannerId) {
                 await api.patch(`/admin/banners/${editingBannerId}`, payload);
-                toast.success("Banner updated.");
+                toast.success("배너를 수정했습니다.");
             } else {
                 await api.post("/admin/banners", payload);
-                toast.success("Banner created.");
+                toast.success("배너를 생성했습니다.");
             }
             await fetchAdminBanners();
             resetBannerForm();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "Failed to save banner.");
+            toast.error(err?.response?.data?.message || "배너 저장에 실패했습니다.");
         } finally {
             setBannerSaving(false);
         }
@@ -293,28 +293,28 @@ export const AdminOperations = () => {
         const bannerId = Number(pick(banner, "bannerId", "banner_id", 0));
         if (!bannerId) return;
         const nextActive = !Boolean(pick(banner, "activeYn", "active_yn", false));
-        const toastId = toast.loading("Updating banner state...");
+        const toastId = toast.loading("배너 상태를 변경하는 중입니다...");
         try {
             await api.patch(`/admin/banners/${bannerId}/active`, { active_yn: nextActive });
             await fetchAdminBanners();
-            toast.success(nextActive ? "Banner activated." : "Banner deactivated.", { id: toastId });
+            toast.success(nextActive ? "배너를 활성화했습니다." : "배너를 비활성화했습니다.", { id: toastId });
         } catch (err) {
-            toast.error(err?.response?.data?.message || "Failed to update banner state.", { id: toastId });
+            toast.error(err?.response?.data?.message || "배너 상태 변경에 실패했습니다.", { id: toastId });
         }
     };
 
     const removeBanner = async (banner) => {
         const bannerId = Number(pick(banner, "bannerId", "banner_id", 0));
         if (!bannerId) return;
-        if (!window.confirm("Delete this banner?")) return;
-        const toastId = toast.loading("Deleting banner...");
+        if (!window.confirm("이 배너를 삭제할까요?")) return;
+        const toastId = toast.loading("배너를 삭제하는 중입니다...");
         try {
             await api.delete(`/admin/banners/${bannerId}`);
             await fetchAdminBanners();
             if (editingBannerId === bannerId) resetBannerForm();
-            toast.success("Banner deleted.", { id: toastId });
+            toast.success("배너를 삭제했습니다.", { id: toastId });
         } catch (err) {
-            toast.error(err?.response?.data?.message || "Failed to delete banner.", { id: toastId });
+            toast.error(err?.response?.data?.message || "배너 삭제에 실패했습니다.", { id: toastId });
         }
     };
 
@@ -361,7 +361,7 @@ export const AdminOperations = () => {
             setMemberCandidates(Array.isArray(items) ? items : []);
         } catch (err) {
             setMemberCandidates([]);
-            setMemberSearchError(err?.response?.data?.message || "Failed to search members.");
+            setMemberSearchError(err?.response?.data?.message || "회원을 검색하지 못했습니다.");
         } finally {
             setMemberSearchLoading(false);
         }
@@ -370,7 +370,7 @@ export const AdminOperations = () => {
     const fetchMemberDetail = async (memberIdOverride) => {
         const memberId = Number(memberIdOverride ?? memberIdInput);
         if (!Number.isFinite(memberId) || memberId <= 0) {
-            toast.error("Enter a valid member ID.");
+            toast.error("올바른 회원 ID를 입력하세요.");
             return;
         }
 
@@ -381,7 +381,7 @@ export const AdminOperations = () => {
             const data = unwrapData(response.data);
             setMemberDetail(data);
         } catch (err) {
-            const message = err?.response?.data?.message || "Failed to fetch member detail.";
+            const message = err?.response?.data?.message || "회원 상세 정보를 불러오지 못했습니다.";
             setMemberError(message);
             setMemberDetail(null);
             toast.error(message);
@@ -393,7 +393,7 @@ export const AdminOperations = () => {
     const selectCandidate = async (member) => {
         const memberId = getMemberIdValue(member);
         if (!memberId) {
-            toast.error("Invalid member candidate.");
+            toast.error("선택한 회원 정보를 확인할 수 없습니다.");
             return;
         }
         setMemberIdInput(String(memberId));
@@ -408,8 +408,8 @@ export const AdminOperations = () => {
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
                     <ShieldAlert className="h-8 w-8 text-rose-500" />
                 </div>
-                <h1 className="text-xl font-black">Admin Only Page</h1>
-                <p className="text-sm font-medium opacity-70">ROLE_ADMIN or ROLE_MASTER is required.</p>
+                <h1 className="text-xl font-black">관리자 전용 페이지</h1>
+                <p className="text-sm font-medium opacity-70">ROLE_ADMIN 또는 ROLE_MASTER 권한이 필요합니다.</p>
             </section>
         );
     }
@@ -425,44 +425,44 @@ export const AdminOperations = () => {
         <section className="space-y-8 animate-fade-in pb-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900">Admin Operations</h1>
-                    <p className="text-sm font-medium text-slate-400">Bulk moderation tools and member 360 detail lookup.</p>
+                    <h1 className="text-3xl font-black tracking-tight text-slate-900">관리자 운영 도구</h1>
+                    <p className="text-sm font-medium text-slate-400">콘텐츠 일괄 조치와 회원 상세 정보를 한 화면에서 처리합니다.</p>
                 </div>
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-6">
-                <h2 className="text-base font-black text-slate-900">How To Use</h2>
+                <h2 className="text-base font-black text-slate-900">사용 방법</h2>
                 <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="rounded-2xl bg-white p-4">
-                        <div className="text-xs font-black uppercase tracking-widest text-primary-600">Bulk Moderation</div>
+                        <div className="text-xs font-black tracking-widest text-primary-600">일괄 검토</div>
                         <p className="mt-2 text-sm text-slate-600">
-                            Search board/comment list by keyword, select multiple targets, then run hide or recover in one batch.
+                            게시글/댓글을 검색하고 여러 대상을 선택한 뒤 숨김 또는 복구를 한 번에 실행합니다.
                         </p>
                     </div>
                     <div className="rounded-2xl bg-white p-4">
-                        <div className="text-xs font-black uppercase tracking-widest text-primary-600">Member 360 Detail</div>
+                        <div className="text-xs font-black tracking-widest text-primary-600">회원 360 상세</div>
                         <p className="mt-2 text-sm text-slate-600">
-                            Search a member ID to review profile summary, recent content, sanctions, and report history in one view.
+                            회원을 검색해 프로필, 최근 활동, 제재, 신고 이력을 한 화면에서 확인합니다.
                         </p>
                     </div>
                 </div>
                 <p className="mt-4 text-xs font-semibold text-slate-500">
-                    Note: All actions are audited and reflected in admin logs.
+                    모든 관리자 조치는 감사 로그에 기록됩니다.
                 </p>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <div className="card p-8 space-y-5">
-                    <h2 className="text-lg font-black text-slate-900">Bulk Moderation</h2>
+                    <h2 className="text-lg font-black text-slate-900">콘텐츠 일괄 검토</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <select className="input-base" value={targetType} onChange={(e) => setTargetType(e.target.value)}>
-                            <option value="BOARD">BOARD</option>
-                            <option value="COMMENT">COMMENT</option>
+                            <option value="BOARD">게시글</option>
+                            <option value="COMMENT">댓글</option>
                         </select>
                         <select className="input-base" value={bulkHiddenFilter} onChange={(e) => setBulkHiddenFilter(e.target.value)}>
-                            <option value="ALL">All status</option>
-                            <option value="VISIBLE">Visible only</option>
-                            <option value="HIDDEN">Hidden only</option>
+                            <option value="ALL">전체 상태</option>
+                            <option value="VISIBLE">공개 항목만</option>
+                            <option value="HIDDEN">숨김 항목만</option>
                         </select>
                         <button
                             className="btn-primary"
@@ -470,7 +470,7 @@ export const AdminOperations = () => {
                             onClick={() => submitBatchModeration("HIDE")}
                         >
                             {batchLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <EyeOff className="h-4 w-4" />}
-                            <span className="ml-2">Hide Selected</span>
+                            <span className="ml-2">선택 숨김</span>
                         </button>
                         <button
                             className="btn-secondary"
@@ -478,7 +478,7 @@ export const AdminOperations = () => {
                             onClick={() => submitBatchModeration("RECOVER")}
                         >
                             {batchLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                            <span className="ml-2">Recover Selected</span>
+                            <span className="ml-2">선택 복구</span>
                         </button>
                     </div>
 
@@ -486,7 +486,7 @@ export const AdminOperations = () => {
                         className="input-base"
                         value={bulkKeyword}
                         onChange={(e) => setBulkKeyword(e.target.value)}
-                        placeholder="Search by id/title/content/writer"
+                        placeholder="ID, 제목, 내용, 작성자로 검색"
                     />
 
                     <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -496,7 +496,7 @@ export const AdminOperations = () => {
                             onClick={selectAllFiltered}
                             disabled={!filteredModerationItems.length}
                         >
-                            Select Filtered
+                            필터 결과 전체 선택
                         </button>
                         <button
                             type="button"
@@ -504,14 +504,14 @@ export const AdminOperations = () => {
                             onClick={clearSelected}
                             disabled={!selectedIds.length}
                         >
-                            Clear Selected
+                            선택 해제
                         </button>
-                        <span className="font-semibold text-slate-500">Selected: {selectedIds.length}</span>
+                        <span className="font-semibold text-slate-500">선택: {selectedIds.length}</span>
                     </div>
 
                     {moderationLoading ? (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
-                            Loading moderation list...
+                            검토 목록을 불러오는 중입니다...
                         </div>
                     ) : moderationError ? (
                         <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
@@ -519,7 +519,7 @@ export const AdminOperations = () => {
                         </div>
                     ) : !filteredModerationItems.length ? (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
-                            No matching items.
+                            조건에 맞는 항목이 없습니다.
                         </div>
                     ) : (
                         <div className="max-h-56 overflow-auto rounded-2xl border border-slate-100 bg-slate-50/40 p-2 space-y-2">
@@ -546,7 +546,7 @@ export const AdminOperations = () => {
                                             </div>
                                         </div>
                                         <span className={`rounded-lg px-2 py-0.5 text-[10px] font-black ${hidden ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
-                                            {hidden ? "HIDDEN" : "VISIBLE"}
+                                            {hidden ? "숨김" : "공개"}
                                         </span>
                                     </label>
                                 );
@@ -558,7 +558,7 @@ export const AdminOperations = () => {
                         className="input-base"
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
-                        placeholder="Reason (optional, max 500)"
+                        placeholder="사유 (선택, 최대 500자)"
                         maxLength={500}
                     />
 
@@ -570,29 +570,29 @@ export const AdminOperations = () => {
 
                     {batchResult ? (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 text-sm space-y-1">
-                            <div><b>Total requested:</b> {pick(batchResult, "totalRequested", "total_requested", 0)}</div>
-                            <div><b>Processed:</b> {pick(batchResult, "processedCount", "processed_count", 0)}</div>
-                            <div><b>Failed IDs:</b> {(pick(batchResult, "failedIds", "failed_ids", []) || []).join(", ") || "None"}</div>
+                            <div><b>요청:</b> {pick(batchResult, "totalRequested", "total_requested", 0)}</div>
+                            <div><b>처리됨:</b> {pick(batchResult, "processedCount", "processed_count", 0)}</div>
+                            <div><b>실패 ID:</b> {(pick(batchResult, "failedIds", "failed_ids", []) || []).join(", ") || "없음"}</div>
                         </div>
                     ) : (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
-                            Select targets from the list, then execute bulk moderation.
+                            목록에서 대상을 선택한 뒤 일괄 조치를 실행하세요.
                         </div>
                     )}
                 </div>
 
                 <div className="card p-8 space-y-5">
-                    <h2 className="text-lg font-black text-slate-900">Member 360 Detail</h2>
+                    <h2 className="text-lg font-black text-slate-900">회원 360 상세</h2>
                     <div className="space-y-2">
                         <input
                             className="input-base"
                             value={memberKeyword}
                             onChange={(e) => setMemberKeyword(e.target.value)}
-                            placeholder="Search member by name/email"
+                            placeholder="이름 또는 이메일로 회원 검색"
                         />
                         {memberSearchLoading ? (
                             <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs font-semibold text-slate-500">
-                                Searching members...
+                                회원을 검색하는 중입니다...
                             </div>
                         ) : null}
                         {memberSearchError ? (
@@ -611,7 +611,7 @@ export const AdminOperations = () => {
                                             onClick={() => selectCandidate(member)}
                                             className="w-full rounded-xl bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-primary-50"
                                         >
-                                            <div>{pick(member, "name", "name", "(No name)")} ({pick(member, "email", "email", "-")})</div>
+                                            <div>{pick(member, "name", "name", "(이름 없음)")} ({pick(member, "email", "email", "-")})</div>
                                             <div className="text-[10px] text-slate-400">#{candidateId || "-"}</div>
                                         </button>
                                     );
@@ -619,7 +619,7 @@ export const AdminOperations = () => {
                             </div>
                         ) : String(memberKeyword || "").trim() ? (
                             <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs font-semibold text-slate-500">
-                                No candidates found.
+                                검색 결과가 없습니다.
                             </div>
                         ) : null}
                     </div>
@@ -628,11 +628,11 @@ export const AdminOperations = () => {
                             className="input-base flex-1"
                             value={memberIdInput}
                             onChange={(e) => setMemberIdInput(e.target.value)}
-                            placeholder="Enter member ID"
+                            placeholder="회원 ID 입력"
                         />
                         <button className="btn-primary" disabled={memberLoading} aria-busy={memberLoading} onClick={fetchMemberDetail}>
                             {memberLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UserSearch className="h-4 w-4" />}
-                            <span className="ml-2">Search</span>
+                            <span className="ml-2">조회</span>
                         </button>
                     </div>
 
@@ -644,7 +644,7 @@ export const AdminOperations = () => {
 
                     {!memberLoading && !memberError && !memberDetail ? (
                         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
-                            Enter a member ID and search.
+                            회원 ID를 입력하고 조회하세요.
                         </div>
                     ) : null}
                 </div>
@@ -652,7 +652,7 @@ export const AdminOperations = () => {
 
             <div className="card p-8 space-y-6">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-black text-slate-900">Banner Management</h2>
+                    <h2 className="text-lg font-black text-slate-900">배너 관리</h2>
                     <button
                         type="button"
                         className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200"
@@ -661,49 +661,49 @@ export const AdminOperations = () => {
                         aria-busy={bannerLoading}
                         data-busy-indicator="true"
                     >
-                        {bannerLoading ? "Refreshing..." : "Refresh"}
+                        {bannerLoading ? "새로고침 중..." : "새로고침"}
                     </button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <select className="input-base" value={bannerForm.bannerType} onChange={(e) => setBannerForm((prev) => ({ ...prev, bannerType: e.target.value }))}>
-                        <option value="NOTICE">NOTICE</option>
-                        <option value="AD">AD</option>
+                        <option value="NOTICE">공지</option>
+                        <option value="AD">광고</option>
                     </select>
                     <select className="input-base" value={bannerForm.renderMode} onChange={(e) => setBannerForm((prev) => ({ ...prev, renderMode: e.target.value }))}>
-                        <option value="CONTENT">CONTENT</option>
-                        <option value="ADSENSE">ADSENSE</option>
+                        <option value="CONTENT">콘텐츠</option>
+                        <option value="ADSENSE">애드센스</option>
                     </select>
                     <select className="input-base" value={bannerForm.targetAudience} onChange={(e) => setBannerForm((prev) => ({ ...prev, targetAudience: e.target.value }))}>
-                        <option value="ALL">ALL</option>
-                        <option value="GUEST">GUEST</option>
-                        <option value="USER">USER</option>
-                        <option value="ADMIN">ADMIN</option>
+                        <option value="ALL">전체</option>
+                        <option value="GUEST">방문자</option>
+                        <option value="USER">회원</option>
+                        <option value="ADMIN">관리자</option>
                     </select>
-                    <input className="input-base" value={bannerForm.adProvider} onChange={(e) => setBannerForm((prev) => ({ ...prev, adProvider: e.target.value }))} placeholder="Ad provider (e.g. ADSENSE)" />
-                    <input className="input-base md:col-span-2" value={bannerForm.title} onChange={(e) => setBannerForm((prev) => ({ ...prev, title: e.target.value }))} placeholder="Banner title" />
-                    <textarea className="input-base md:col-span-2 min-h-[88px]" value={bannerForm.description} onChange={(e) => setBannerForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="Banner description" />
-                    <input className="input-base md:col-span-2" value={bannerForm.imageUrl} onChange={(e) => setBannerForm((prev) => ({ ...prev, imageUrl: e.target.value }))} placeholder="Image URL (optional)" />
-                    <input className="input-base md:col-span-2" value={bannerForm.linkUrl} onChange={(e) => setBannerForm((prev) => ({ ...prev, linkUrl: e.target.value }))} placeholder="Link URL (optional)" />
-                    <input className="input-base" value={bannerForm.ctaText} onChange={(e) => setBannerForm((prev) => ({ ...prev, ctaText: e.target.value }))} placeholder="CTA text (optional)" />
+                    <input className="input-base" value={bannerForm.adProvider} onChange={(e) => setBannerForm((prev) => ({ ...prev, adProvider: e.target.value }))} placeholder="광고 제공자 (예: ADSENSE)" />
+                    <input className="input-base md:col-span-2" value={bannerForm.title} onChange={(e) => setBannerForm((prev) => ({ ...prev, title: e.target.value }))} placeholder="배너 제목" />
+                    <textarea className="input-base md:col-span-2 min-h-[88px]" value={bannerForm.description} onChange={(e) => setBannerForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="배너 설명" />
+                    <input className="input-base md:col-span-2" value={bannerForm.imageUrl} onChange={(e) => setBannerForm((prev) => ({ ...prev, imageUrl: e.target.value }))} placeholder="이미지 URL (선택)" />
+                    <input className="input-base md:col-span-2" value={bannerForm.linkUrl} onChange={(e) => setBannerForm((prev) => ({ ...prev, linkUrl: e.target.value }))} placeholder="연결 URL (선택)" />
+                    <input className="input-base" value={bannerForm.ctaText} onChange={(e) => setBannerForm((prev) => ({ ...prev, ctaText: e.target.value }))} placeholder="버튼 문구 (선택)" />
                     <input className="input-base" value={bannerForm.adsenseClient} onChange={(e) => setBannerForm((prev) => ({ ...prev, adsenseClient: e.target.value }))} placeholder="AdSense client (ca-pub-...)" />
                     <input className="input-base" value={bannerForm.adsenseSlot} onChange={(e) => setBannerForm((prev) => ({ ...prev, adsenseSlot: e.target.value }))} placeholder="AdSense slot ID" />
-                    <input className="input-base" type="number" min={0} max={1000} value={bannerForm.priority} onChange={(e) => setBannerForm((prev) => ({ ...prev, priority: e.target.value }))} placeholder="Priority" />
+                    <input className="input-base" type="number" min={0} max={1000} value={bannerForm.priority} onChange={(e) => setBannerForm((prev) => ({ ...prev, priority: e.target.value }))} placeholder="우선순위" />
                     <input className="input-base" type="datetime-local" value={bannerForm.startAt} onChange={(e) => setBannerForm((prev) => ({ ...prev, startAt: e.target.value }))} />
                     <input className="input-base" type="datetime-local" value={bannerForm.endAt} onChange={(e) => setBannerForm((prev) => ({ ...prev, endAt: e.target.value }))} />
                     <label className="md:col-span-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
                         <input type="checkbox" checked={bannerForm.activeYn} onChange={(e) => setBannerForm((prev) => ({ ...prev, activeYn: e.target.checked }))} />
-                        Active
+                        사용 중
                     </label>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                     <button className="btn-primary" type="button" onClick={submitBannerForm} disabled={bannerSaving} aria-busy={bannerSaving} data-busy-indicator="true">
-                        {bannerSaving ? "Saving..." : editingBannerId ? "Update Banner" : "Create Banner"}
+                        {bannerSaving ? "저장 중..." : editingBannerId ? "배너 수정" : "배너 생성"}
                     </button>
                     {editingBannerId ? (
                         <button className="btn-secondary" type="button" onClick={resetBannerForm} disabled={bannerSaving}>
-                            Cancel Edit
+                            수정 취소
                         </button>
                     ) : null}
                 </div>
@@ -716,7 +716,7 @@ export const AdminOperations = () => {
 
                 {!banners.length ? (
                     <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-sm text-slate-500">
-                        No banners yet.
+                        등록된 배너가 없습니다.
                     </div>
                 ) : (
                     <div className="space-y-3 max-h-[420px] overflow-auto pr-1">
@@ -734,25 +734,25 @@ export const AdminOperations = () => {
                                         <div>
                                             <div className="text-sm font-black text-slate-900">#{bannerId} {pick(banner, "title", "title", "-")}</div>
                                             <div className="mt-1 text-[11px] text-slate-500">
-                                                {pick(banner, "bannerType", "banner_type", "-")} | {pick(banner, "renderMode", "render_mode", "-")} | {pick(banner, "targetAudience", "target_audience", "-")} | priority {pick(banner, "priority", "priority", 0)}
+                                                {pick(banner, "bannerType", "banner_type", "-")} | {pick(banner, "renderMode", "render_mode", "-")} | {pick(banner, "targetAudience", "target_audience", "-")} | 우선순위 {pick(banner, "priority", "priority", 0)}
                                             </div>
                                         </div>
                                         <span className={`rounded-lg px-2 py-0.5 text-[10px] font-black ${activeYn ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-                                            {activeYn ? "ACTIVE" : "INACTIVE"}
+                                            {activeYn ? "활성" : "비활성"}
                                         </span>
                                     </div>
                                     <p className="mt-2 text-xs text-slate-600">{pick(banner, "description", "description", "")}</p>
                                     {(pick(banner, "adProvider", "ad_provider", "") || pick(banner, "adsenseClient", "adsense_client", "")) ? (
                                         <div className="mt-2 text-[11px] text-slate-500">
-                                            Provider: {pick(banner, "adProvider", "ad_provider", "-")} | Client: {pick(banner, "adsenseClient", "adsense_client", "-")} | Slot: {pick(banner, "adsenseSlot", "adsense_slot", "-")}
+                                            제공자: {pick(banner, "adProvider", "ad_provider", "-")} | Client: {pick(banner, "adsenseClient", "adsense_client", "-")} | Slot: {pick(banner, "adsenseSlot", "adsense_slot", "-")}
                                         </div>
                                     ) : null}
                                     <div className="mt-3 flex flex-wrap gap-2">
-                                        <button type="button" className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-black text-white hover:bg-primary-600" onClick={(e) => { e.stopPropagation(); startEditBanner(banner); }}>Edit</button>
-                                        <button type="button" className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200" onClick={() => toggleBannerActive(banner)}>
-                                            {activeYn ? "Deactivate" : "Activate"}
+                                        <button type="button" className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-black text-white hover:bg-primary-600" onClick={(e) => { e.stopPropagation(); startEditBanner(banner); }}>수정</button>
+                                        <button type="button" className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200" onClick={(e) => { e.stopPropagation(); toggleBannerActive(banner); }}>
+                                            {activeYn ? "비활성화" : "활성화"}
                                         </button>
-                                        <button type="button" className="rounded-xl bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 hover:bg-rose-200" onClick={(e) => { e.stopPropagation(); removeBanner(banner); }}>Delete</button>
+                                        <button type="button" className="rounded-xl bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 hover:bg-rose-200" onClick={(e) => { e.stopPropagation(); removeBanner(banner); }}>삭제</button>
                                     </div>
                                 </div>
                             );
@@ -764,30 +764,30 @@ export const AdminOperations = () => {
             {memberDetail ? (
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div className="card p-6 xl:col-span-1 space-y-3">
-                        <h3 className="text-base font-black text-slate-900">Basic Info</h3>
+                        <h3 className="text-base font-black text-slate-900">기본 정보</h3>
                         <div className="text-sm"><b>ID:</b> {pick(memberInfo, "memberId", "member_id", "-")}</div>
-                        <div className="text-sm"><b>Email:</b> {pick(memberInfo, "email", "email", "-")}</div>
-                        <div className="text-sm"><b>Name:</b> {pick(memberInfo, "name", "name", "-")}</div>
-                        <div className="text-sm"><b>Status:</b> {pick(memberInfo, "memberStatus", "member_status", "-")}</div>
-                        <div className="text-sm"><b>Roles:</b> {(pick(memberInfo, "roles", "roles", []) || []).join(", ") || "-"}</div>
-                        <div className="text-sm"><b>Points:</b> {pick(memberInfo, "point", "point", 0)}</div>
-                        <div className="text-sm"><b>Trees:</b> {pick(memberInfo, "treeCount", "tree_count", 0)}</div>
-                        <div className="text-sm"><b>Boards:</b> {pick(memberInfo, "boardCount", "board_count", 0)}</div>
-                        <div className="text-sm"><b>Comments:</b> {pick(memberInfo, "commentCount", "comment_count", 0)}</div>
+                        <div className="text-sm"><b>이메일:</b> {pick(memberInfo, "email", "email", "-")}</div>
+                        <div className="text-sm"><b>이름:</b> {pick(memberInfo, "name", "name", "-")}</div>
+                        <div className="text-sm"><b>상태:</b> {pick(memberInfo, "memberStatus", "member_status", "-")}</div>
+                        <div className="text-sm"><b>권한:</b> {(pick(memberInfo, "roles", "roles", []) || []).join(", ") || "-"}</div>
+                        <div className="text-sm"><b>포인트:</b> {pick(memberInfo, "point", "point", 0)}</div>
+                        <div className="text-sm"><b>나무:</b> {pick(memberInfo, "treeCount", "tree_count", 0)}</div>
+                        <div className="text-sm"><b>게시글:</b> {pick(memberInfo, "boardCount", "board_count", 0)}</div>
+                        <div className="text-sm"><b>댓글:</b> {pick(memberInfo, "commentCount", "comment_count", 0)}</div>
                     </div>
 
                     <div className="card p-6 xl:col-span-2">
-                        <h3 className="mb-3 text-base font-black text-slate-900">Recent Boards / Comments</h3>
+                        <h3 className="mb-3 text-base font-black text-slate-900">최근 게시글 / 댓글</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="rounded-2xl bg-slate-50/50 p-4">
-                                <div className="mb-2 text-xs font-black text-slate-500 uppercase">Recent Boards</div>
-                                {!recentBoards.length ? <div className="text-xs text-slate-400">No data</div> : (
+                                <div className="mb-2 text-xs font-black text-slate-500">최근 게시글</div>
+                                {!recentBoards.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                     <ul className="space-y-2 text-sm">
                                         {recentBoards.map((board, idx) => (
                                             <li key={`${pick(board, "boardId", "board_id", idx)}-${idx}`} className="flex items-center justify-between gap-2">
                                                 <span className="truncate">#{pick(board, "boardId", "board_id", "-")} {pick(board, "title", "title", "-")}</span>
                                                 <span className={`text-[10px] font-black ${pick(board, "hiddenYn", "hidden_yn", false) ? "text-rose-600" : "text-emerald-600"}`}>
-                                                    {pick(board, "hiddenYn", "hidden_yn", false) ? "HIDDEN" : "VISIBLE"}
+                                                    {pick(board, "hiddenYn", "hidden_yn", false) ? "숨김" : "공개"}
                                                 </span>
                                             </li>
                                         ))}
@@ -795,14 +795,14 @@ export const AdminOperations = () => {
                                 )}
                             </div>
                             <div className="rounded-2xl bg-slate-50/50 p-4">
-                                <div className="mb-2 text-xs font-black text-slate-500 uppercase">Recent Comments</div>
-                                {!recentComments.length ? <div className="text-xs text-slate-400">No data</div> : (
+                                <div className="mb-2 text-xs font-black text-slate-500">최근 댓글</div>
+                                {!recentComments.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                     <ul className="space-y-2 text-sm">
                                         {recentComments.map((comment, idx) => (
                                             <li key={`${pick(comment, "commentId", "comment_id", idx)}-${idx}`} className="flex items-center justify-between gap-2">
                                                 <span className="truncate">#{pick(comment, "commentId", "comment_id", "-")} {pick(comment, "contents", "contents", "-")}</span>
                                                 <span className={`text-[10px] font-black ${pick(comment, "hiddenYn", "hidden_yn", false) ? "text-rose-600" : "text-emerald-600"}`}>
-                                                    {pick(comment, "hiddenYn", "hidden_yn", false) ? "HIDDEN" : "VISIBLE"}
+                                                    {pick(comment, "hiddenYn", "hidden_yn", false) ? "숨김" : "공개"}
                                                 </span>
                                             </li>
                                         ))}
@@ -814,8 +814,8 @@ export const AdminOperations = () => {
 
                     <div className="card p-6 xl:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div className="rounded-2xl bg-slate-50/50 p-4">
-                            <div className="mb-2 text-xs font-black text-slate-500 uppercase">Sanctions</div>
-                            {!sanctions.length ? <div className="text-xs text-slate-400">No data</div> : (
+                            <div className="mb-2 text-xs font-black text-slate-500">제재 이력</div>
+                            {!sanctions.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                 <ul className="space-y-2 text-sm">
                                     {sanctions.map((item, idx) => (
                                         <li key={`${pick(item, "sanctionId", "sanction_id", idx)}-${idx}`}>
@@ -826,8 +826,8 @@ export const AdminOperations = () => {
                             )}
                         </div>
                         <div className="rounded-2xl bg-slate-50/50 p-4">
-                            <div className="mb-2 text-xs font-black text-slate-500 uppercase">Received Reports</div>
-                            {!receivedReports.length ? <div className="text-xs text-slate-400">No data</div> : (
+                            <div className="mb-2 text-xs font-black text-slate-500">받은 신고</div>
+                            {!receivedReports.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                 <ul className="space-y-2 text-sm">
                                     {receivedReports.map((item, idx) => (
                                         <li key={`${pick(item, "reportId", "report_id", idx)}-${idx}`}>
@@ -838,8 +838,8 @@ export const AdminOperations = () => {
                             )}
                         </div>
                         <div className="rounded-2xl bg-slate-50/50 p-4">
-                            <div className="mb-2 text-xs font-black text-slate-500 uppercase">Made Reports</div>
-                            {!madeReports.length ? <div className="text-xs text-slate-400">No data</div> : (
+                            <div className="mb-2 text-xs font-black text-slate-500">작성한 신고</div>
+                            {!madeReports.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                 <ul className="space-y-2 text-sm">
                                     {madeReports.map((item, idx) => (
                                         <li key={`${pick(item, "reportId", "report_id", idx)}-${idx}`}>

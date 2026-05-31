@@ -1,7 +1,7 @@
 ﻿import { format, formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 
-// URL에서 쿼리 파라미터 읽기
+// 날짜 표시
 export const formatDate = (date) => {
     if (!date) return "";
     return format(new Date(date), "yyyy-MM-dd HH:mm", { locale: ko });
@@ -38,7 +38,7 @@ export const normalizeChatTimestamp = (value) => {
     return parsed.toISOString();
 };
 
-// text-fixed
+// 게시판 종류 표시명
 export const getBoardKindLabel = (kind) => {
     const labels = {
         FREE_BOARD: "사용자게시판",
@@ -48,7 +48,7 @@ export const getBoardKindLabel = (kind) => {
     return labels[kind] || kind;
 };
 
-// text-fixed
+// 게시판 종류 배지 색상
 export const getBoardKindColor = (kind) => {
     const colors = {
         FREE_BOARD: "bg-blue-100 text-blue-700",
@@ -58,7 +58,7 @@ export const getBoardKindColor = (kind) => {
     return colors[kind] || "bg-slate-100 text-slate-700";
 };
 
-// text-fixed
+// 파일 크기 표시
 export const formatFileSize = (bytes) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -67,21 +67,21 @@ export const formatFileSize = (bytes) => {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
 };
 
-// text-fixed
+// 이미지 파일 판별
 export const isImageFile = (filename) => {
     if (!filename) return false;
     const ext = filename.split(".").pop().toLowerCase();
     return ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext);
 };
 
-// text-fixed
+// 긴 텍스트 줄임
 export const truncateText = (text, maxLength = 100) => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + "...";
 };
 
-// text-fixed
+// HTML 태그 제거
 export const stripHtmlTags = (html) => {
     if (!html) return "";
     return String(html)
@@ -96,7 +96,7 @@ export const stripHtmlTags = (html) => {
         .trim();
 };
 
-// text-fixed
+// 내부 저장소 URL 판별
 const INTERNAL_HOST_PATTERN = /^(localhost|127\.0\.0\.1|minio|host\.docker\.internal)$/i;
 
 const getAssetOrigin = () => {
@@ -169,7 +169,7 @@ export const formatNumber = (num) => {
     return num.toLocaleString("ko-KR");
 };
 
-// text-fixed
+// 입력 지연 처리
 export const debounce = (func, wait) => {
     let timeout;
     return function executedFunction(...args) {
@@ -182,7 +182,7 @@ export const debounce = (func, wait) => {
     };
 };
 
-// text-fixed
+// 로컬 스토리지 JSON 헬퍼
 export const storage = {
     get: (key) => {
         try {

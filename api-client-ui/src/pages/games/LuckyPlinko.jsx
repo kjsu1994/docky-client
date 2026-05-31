@@ -601,23 +601,23 @@ export const LuckyPlinko = () => {
                             </div>
                             <div>
                                 <h1 className="text-5xl font-black text-white tracking-tighter italic uppercase drop-shadow-lg">Lucky Plinko</h1>
-                                <p className="text-amber-500/70 font-black tracking-widest text-[10px] uppercase">Real Physics Arcade</p>
+                                <p className="text-amber-500/70 font-black tracking-widest text-[10px]">실시간 물리 아케이드</p>
                             </div>
                         </div>
                         <div className="bg-slate-900/80 px-10 py-6 rounded-[2rem] border border-white/10 shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)]">
-                            <span className="text-[10px] text-amber-500 font-black tracking-widest uppercase mb-1 block opacity-50 text-center">Wallet Balance</span>
+                            <span className="text-[10px] text-amber-500 font-black tracking-widest mb-1 block opacity-50 text-center">보유 포인트</span>
                             <div className="text-4xl font-black text-white flex items-center gap-3">
                                 <Coins className="h-8 w-8 text-amber-400" />
                                 {formatNumber(plinkoResult?.totalPoint || user?.point || 0)}
                             </div>
                             {playInProgress && (
                                 <div className="mt-2 text-center text-amber-200 text-xs font-black tracking-wide">
-                                    LANDING {landedCount}/{totalToLand}
+                                    착지 중 {landedCount}/{totalToLand}
                                 </div>
                             )}
                             {plinkoResult?.earnedPoint !== undefined && (
                                 <div className="mt-2 text-center text-emerald-300 text-sm font-black tracking-wide">
-                                    +{formatNumber(plinkoResult.earnedPoint)} EARNED
+                                    +{formatNumber(plinkoResult.earnedPoint)} 획득
                                 </div>
                             )}
                         </div>
@@ -628,7 +628,7 @@ export const LuckyPlinko = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                 <div className="lg:col-span-5">
                     <div className="card bg-indigo-950 p-10 h-full flex flex-col rounded-[4rem] border-[6px] border-indigo-900 shadow-2xl relative overflow-hidden">
-                        <h3 className="text-2xl font-black text-indigo-300 italic tracking-tighter mb-8 uppercase">Dice Station</h3>
+                        <h3 className="text-2xl font-black text-indigo-300 italic tracking-tighter mb-8">주사위 구역</h3>
                         <div className="flex-1 flex flex-col justify-center items-center gap-14 bg-black/40 rounded-[3rem] p-10 shadow-inner">
                             <div className="flex flex-wrap justify-center gap-8 perspective-1000">
                                 {dice.map((val, idx) => (
@@ -638,26 +638,26 @@ export const LuckyPlinko = () => {
                             {gameResult && (
                                 <div className="text-center animate-slide-up bg-white/5 w-full py-8 rounded-[2.5rem] border border-white/10 shadow-lg">
                                     <div className="text-4xl font-black text-amber-400 italic mb-1 uppercase drop-shadow-md">{gameResult.rankName}</div>
-                                    <div className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-2">Marbles Awarded</div>
+                                    <div className="text-xs text-slate-500 font-bold tracking-widest mb-2">획득 구슬</div>
                                     <div className="text-7xl font-black text-white tabular-nums tracking-tighter">{marbles}</div>
                                 </div>
                             )}
                         </div>
                         <div className="mt-10 space-y-4">
                             {step === 1 && (
-                                <button onClick={rollDice} disabled={rolling} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] active:translate-y-2 transition-all">START ROLL (100P)</button>
+                                <button onClick={rollDice} disabled={rolling} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] active:translate-y-2 transition-all">첫 굴림 (100P)</button>
                             )}
                             {step === 2 && (
                                 <div className="flex flex-col gap-4">
-                                    <button onClick={rerollDice} disabled={rolling || heldIndices.length < 1 || heldIndices.length > 4} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] disabled:opacity-50">REROLL OTHERS</button>
+                                    <button onClick={rerollDice} disabled={rolling || heldIndices.length < 1 || heldIndices.length > 4} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] disabled:opacity-50">나머지 다시 굴리기</button>
                                     <div className="flex gap-3">
-                                        <button onClick={() => setStep(3)} className="flex-1 py-4 rounded-2xl bg-slate-800 text-indigo-300 font-bold border border-indigo-900">KEEP</button>
-                                        {marbles > 0 && <button onClick={playPlinko} disabled={playInProgress} className="flex-1 py-4 rounded-2xl bg-amber-500 text-black font-black shadow-lg animate-pulse disabled:opacity-40 disabled:animate-none">PLAY NOW!</button>}
+                                        <button onClick={() => setStep(3)} className="flex-1 py-4 rounded-2xl bg-slate-800 text-indigo-300 font-bold border border-indigo-900">확정</button>
+                                        {marbles > 0 && <button onClick={playPlinko} disabled={playInProgress} className="flex-1 py-4 rounded-2xl bg-amber-500 text-black font-black shadow-lg animate-pulse disabled:opacity-40 disabled:animate-none">바로 시작</button>}
                                     </div>
                                 </div>
                             )}
                             {(step === 3 || step === 4) && (
-                                <button onClick={resetGame} disabled={rolling} className="w-full py-6 rounded-3xl bg-slate-800 text-white font-black text-xl">NEW GAME</button>
+                                <button onClick={resetGame} disabled={rolling} className="w-full py-6 rounded-3xl bg-slate-800 text-white font-black text-xl">새 게임</button>
                             )}
                         </div>
                     </div>
@@ -666,9 +666,9 @@ export const LuckyPlinko = () => {
                 <div className="lg:col-span-7">
                     <div className="card bg-slate-900 p-10 rounded-[5rem] border-[10px] border-slate-800 shadow-2xl flex flex-col items-center relative overflow-hidden">
                         <div className="w-full flex justify-between items-center mb-10 z-10">
-                            <h3 className="text-3xl font-black text-white italic tracking-tighter uppercase">Cabinet Board</h3>
+                            <h3 className="text-3xl font-black text-white italic tracking-tighter">플링코 보드</h3>
                             {step === 3 && marbles > 0 && (
-                                <button onClick={playPlinko} disabled={playInProgress} className="bg-amber-500 text-black px-12 py-4 rounded-2xl font-black text-2xl shadow-[0_0_30px_rgba(245,158,11,0.4)] animate-bounce disabled:opacity-40 disabled:animate-none">PUSH START</button>
+                                <button onClick={playPlinko} disabled={playInProgress} className="bg-amber-500 text-black px-12 py-4 rounded-2xl font-black text-2xl shadow-[0_0_30px_rgba(245,158,11,0.4)] animate-bounce disabled:opacity-40 disabled:animate-none">구슬 투입</button>
                             )}
                         </div>
 

@@ -63,15 +63,29 @@ const variantsByGame = {
   blokus: [
     variant("BASE", "본게임", false, 4, 4, "20x20 보드와 네 색 조각", ["4인", "20x20", "모서리 연결"]),
     variant("DUO", "듀오", true, 2, 2, "14x14 2인 전용 규칙", ["14x14", "2인 전용", "중앙 시작점"]),
+    variant("TWO_PLAYER", "2인 변형", false, 2, 2, "두 명이 두 색씩 조종", ["2인", "두 색 조종", "점수 합산"]),
+    variant("THREE_PLAYER", "3인 변형", false, 3, 3, "남는 색을 번갈아 배치", ["3인", "공유 초록", "순환 조종"]),
+    variant("TEAM", "2대2 팀전", false, 4, 4, "마주 보는 색의 점수 합산", ["2대2", "팀 점수", "마주 보는 색"]),
   ],
   mahe: [
     variant("BASE", "본게임", false, 2, 7, "거북이 업기와 알 카드 점수", ["2~7인", "거북이 업기", "알 카드"]),
   ],
   dalmuti: [
     variant("BASE", "본게임", false, 4, 8, "계급 카드와 세금", ["4~8인", "세금", "혁명"]),
+    variant("STRIPPED_DECK", "줄인 덱", true, 4, 5, "4~5인 공식 선택 규칙", ["4~5인", "일부 계급 제외", "빠른 패"]),
     variant("FIRST_DEAL_REVOLUTION", "첫 손 세금 없음", true, 4, 8, "첫 판 혁명 선택 규칙", ["첫 손 세금 없음", "혁명 선택", "공식 선택 규칙"]),
   ],
 };
+
+const variantCreateCases = [
+  { game: "catan", variantCode: "FIVE_SIX" },
+  { game: "blokus", variantCode: "DUO" },
+  { game: "blokus", variantCode: "TWO_PLAYER" },
+  { game: "blokus", variantCode: "THREE_PLAYER" },
+  { game: "blokus", variantCode: "TEAM" },
+  { game: "dalmuti", variantCode: "STRIPPED_DECK" },
+  { game: "dalmuti", variantCode: "FIRST_DEAL_REVOLUTION" },
+];
 
 let nextMessageId = 1;
 const mockState = {
@@ -685,6 +699,21 @@ async function setInputByAriaLabel(ws, label, value) {
   if (result === false) throw new Error(`Input with aria-label ${label} not found`);
 }
 
+async function setSelectByAriaLabel(ws, label, value) {
+  const result = await evaluate(ws, `(() => {
+    const select = Array.from(document.querySelectorAll("select")).find((node) => node.getAttribute("aria-label") === ${JSON.stringify(label)});
+    if (!select) return "missing";
+    const option = Array.from(select.options).find((item) => item.value === ${JSON.stringify(value)} && !item.disabled);
+    if (!option) return "option-missing";
+    const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(select), "value");
+    descriptor.set.call(select, ${JSON.stringify(value)});
+    select.dispatchEvent(new Event("input", { bubbles: true }));
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    return select.value;
+  })()`);
+  if (result !== value) throw new Error(`Select ${label} could not be set to ${value}: ${result}`);
+}
+
 async function clickButtonByText(ws, text) {
   const result = await evaluate(ws, `(() => {
     const button = Array.from(document.querySelectorAll("button")).find((node) => node.innerText.trim() === ${JSON.stringify(text)} && !node.disabled);
@@ -786,6 +815,25 @@ async function runRoomFlowSmoke(ws, game) {
   return `${game} room flow: ok create/start/join-by-code/ready`;
 }
 
+async function runVariantCreateSmoke(ws, { game, variantCode }) {
+  mockState.requests = mockState.requests.filter((request) => request.game !== game);
+  mockState.activeRoomsByGame.delete(game);
+
+  await navigateToGame(ws, game);
+  await setSelectByAriaLabel(ws, `${gameNames[game]} 규칙 선택`, variantCode);
+  const title = `${gameNames[game]} ${variantCode} 검증 방`;
+  await setInputByAriaLabel(ws, "방 제목", title);
+  await clickButtonByText(ws, "방 만들기");
+  await waitForText(ws, "방 코드");
+  assertRequest(
+    game,
+    "create",
+    (request) => request.body?.title === title && request.body?.variant_code === variantCode,
+    `create-room POST payload for ${variantCode}`
+  );
+  return `${game} ${variantCode} variant create: ok`;
+}
+
 async function inspectPage(ws, testCase, viewport) {
   await send(ws, "Emulation.setDeviceMetricsOverride", {
     width: viewport.width,
@@ -794,6 +842,10 @@ async function inspectPage(ws, testCase, viewport) {
     mobile: viewport.mobile,
   });
   await send(ws, "Page.navigate", { url: `${baseUrl}${testCase.path}` });
+  await waitForAppIdle(ws);
+  for (const text of testCase.expectedTexts) {
+    await waitForText(ws, text);
+  }
   await waitForAppIdle(ws);
   const response = await send(ws, "Runtime.evaluate", {
     returnByValue: true,
@@ -922,6 +974,14 @@ async function main() {
     for (const game of ["catan", "blokus", "mahe", "dalmuti"]) {
       flowResults.push(await runRoomFlowSmoke(ws, game));
     }
+    const variantResults = [];
+    for (const item of variantCreateCases) {
+      variantResults.push(await runVariantCreateSmoke(ws, item));
+    }
+    const expectedPageChecks = cases.length * viewports.length;
+    if (results.length !== expectedPageChecks || flowResults.length !== 4 || variantResults.length !== variantCreateCases.length) {
+      throw new Error(`Incomplete tabletop smoke coverage: pages ${results.length}/${expectedPageChecks}, flows ${flowResults.length}/4, variants ${variantResults.length}/${variantCreateCases.length}`);
+    }
     if (runtimeErrors.length) {
       throw new Error(`Runtime errors: ${runtimeErrors.join(" | ")}`);
     }
@@ -929,6 +989,8 @@ async function main() {
       console.log(`${result.case} ${result.viewport}: ok ${result.width}/${result.scrollWidth} ${result.url}`);
     });
     flowResults.forEach((result) => console.log(result));
+    variantResults.forEach((result) => console.log(result));
+    console.log(`tabletop-ui-smoke ok (${results.length} responsive page checks, ${flowResults.length} room flows, ${variantResults.length} variant create checks)`);
   } finally {
     if (chrome.exitCode === null) {
       chrome.kill();
@@ -949,7 +1011,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error(error.message);
   process.exit(1);
-});
+}

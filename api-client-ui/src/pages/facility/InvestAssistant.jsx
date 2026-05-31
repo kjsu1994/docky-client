@@ -674,7 +674,7 @@ const CandlestickChart = ({ points, currency, interval }) => {
         <div className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Candlestick</div>
+                    <div className="text-xs font-black text-slate-400">캔들 차트</div>
                     <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
                         국내와 미국 모두 동일한 캔들 차트를 사용하며, 볼린저 밴드와 RSI, MACD를 함께 확인할 수 있습니다.
                     </p>
@@ -804,7 +804,7 @@ const CandlestickChart = ({ points, currency, interval }) => {
                     <div className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">{indicatorSnapshot.rsiSummary}</div>
                 </div>
                 <div className="rounded-2xl bg-white p-4">
-                    <div className="text-xs font-black text-slate-400">MACD Histogram</div>
+                    <div className="text-xs font-black text-slate-400">MACD 히스토그램</div>
                     <div className={`mt-1 text-sm font-black ${toneByValue(hovered?.macdHistogram)}`}>{visibleIndicators.macd && hovered?.macdHistogram != null ? formatCompact(hovered.macdHistogram, 3) : '-'}</div>
                     <div className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">{indicatorSnapshot.macdSummary}</div>
                 </div>
@@ -1100,7 +1100,7 @@ export const InvestAssistant = () => {
     return (
         <div className="-mx-4 space-y-6 px-1 animate-fade-in pb-10 sm:mx-0 sm:space-y-8 sm:px-0">
             <section className="card bg-white p-4 sm:p-8">
-                <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-sky-700"><Bot className="h-3.5 w-3.5" />Invest Workspace</div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-black text-sky-700"><Bot className="h-3.5 w-3.5" />투자 작업공간</div>
                 <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-5xl">투자 도우미.</h1>
                 <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">종목 검색 후 현재가, 일봉/주봉/월봉 차트, 기본 분석, 뉴스, 추천 레이어까지 한 번에 확인할 수 있습니다.</p>
 

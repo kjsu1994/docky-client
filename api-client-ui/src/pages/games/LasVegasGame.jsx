@@ -720,7 +720,7 @@ export const LasVegasGame = () => {
                 <div className="mb-4 flex items-center gap-3">
                     <div className="rounded-2xl bg-white/10 p-2.5"><Dices className="h-5 w-5" /></div>
                     <div>
-                        <h1 className="text-xl font-black tracking-tight">LAS VEGAS LIVE TABLE</h1>
+                        <h1 className="text-xl font-black tracking-tight">라스베가스 라이브 테이블</h1>
                         <p className="text-xs text-slate-300">방장 설정 + 실시간 턴 + 자동 타임아웃 액션</p>
                     </div>
                 </div>
@@ -881,9 +881,9 @@ export const LasVegasGame = () => {
                                     : "border-white/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800"
                             }`}>
                                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-black text-emerald-50">
-                                    <span className="rounded-full bg-white/20 px-2.5 py-1">ROUND {state?.round_no || state?.roundNo || 0} / {state?.round_count || state?.roundCount || 0}</span>
+                                    <span className="rounded-full bg-white/20 px-2.5 py-1">라운드 {state?.round_no || state?.roundNo || 0} / {state?.round_count || state?.roundCount || 0}</span>
                                     <span className="rounded-full bg-white/20 px-2.5 py-1">
-                                        TURN {state?.players?.find((p) => Number(p.member_id || p.memberId) === Number(state.turn_member_id || state.turnMemberId))?.nickname || "-"}
+                                        차례 {state?.players?.find((p) => Number(p.member_id || p.memberId) === Number(state.turn_member_id || state.turnMemberId))?.nickname || "-"}
                                     </span>
                                     {myTurn && (
                                         <span className="animate-pulse rounded-full bg-sky-100 px-2.5 py-1 text-sky-700 ring-2 ring-sky-200">
@@ -934,7 +934,7 @@ export const LasVegasGame = () => {
 
                                 {!isFinished && myTurn && (
                                     <div className="mb-3 rounded-2xl bg-white/10 p-3">
-                                        <div className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-100">My Action</div>
+                                        <div className="mb-2 text-xs font-black text-emerald-100">내 행동</div>
                                         <div className="flex flex-wrap gap-2">
                                             <button
                                                 className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
@@ -983,7 +983,7 @@ export const LasVegasGame = () => {
                                                     {roomStatus === "WAITING" && (
                                                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${isReady ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
                                                             <CheckCircle2 className="h-3.5 w-3.5" />
-                                                            {isReady ? "READY" : "WAIT"}
+                                                            {isReady ? "준비" : "대기"}
                                                         </span>
                                                     )}
                                                 </div>

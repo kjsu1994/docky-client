@@ -700,7 +700,7 @@ export const NoThanksGame = () => {
                           {roomStatus === "WAITING" && (
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${readyMemberIds.has(id) ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
                               <CheckCircle2 className="h-3.5 w-3.5" />
-                              {readyMemberIds.has(id) ? "READY" : "대기"}
+                              {readyMemberIds.has(id) ? "준비" : "대기"}
                             </span>
                           )}
                         </div>

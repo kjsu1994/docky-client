@@ -332,48 +332,13 @@
   border-color: rgba(37, 99, 235, 0.8);
 }
 
-/* 움직이는 다이내믹 배경 배경 */
+/* 전역 앱 배경 */
 .bg-vibe {
   position: fixed;
   inset: 0;
   z-index: -1;
   overflow: hidden;
   background: #f8fafc;
-}
-
-.bg-vibe-blob {
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
-  border-radius: 50%;
-  filter: blur(60px);
-  animation: move 20s infinite alternate;
-}
-
-.bg-vibe-blob:nth-child(2) {
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, transparent 70%);
-  width: 400px;
-  height: 400px;
-  left: 20%;
-  top: 40%;
-  animation-duration: 25s;
-  animation-delay: -5s;
-}
-
-.bg-vibe-blob:nth-child(3) {
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.05) 0%, transparent 70%);
-  width: 600px;
-  height: 600px;
-  right: 10%;
-  bottom: 10%;
-  animation-duration: 30s;
-  animation-delay: -10s;
-}
-
-@keyframes move {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(100px, 100px) scale(1.1); }
 }
 
 /* 스크롤바 스타일링 */

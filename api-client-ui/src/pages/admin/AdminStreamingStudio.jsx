@@ -276,7 +276,7 @@ export const AdminStreamingStudio = () => {
         <section className="space-y-8 animate-fade-in pb-10">
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/50">
                 <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary-500">Admin Streaming</p>
+                    <p className="text-[11px] font-black text-primary-500">관리자 스트리밍</p>
                     <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">스트리밍 스튜디오</h1>
                     <p className="mt-2 text-sm font-medium text-slate-400">웹 업로드와 inbox 반입을 함께 관리하는 관리자 전용 스튜디오입니다.</p>
                 </div>
@@ -419,7 +419,7 @@ export const AdminStreamingStudio = () => {
                                                         ) : null}
                                                     </div>
                                                 </div>
-                                                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${file.ready ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{file.ready ? "READY" : "BLOCKED"}</span>
+                                                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${file.ready ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{file.ready ? "가져오기 가능" : "차단됨"}</span>
                                             </div>
                                         </label>
                                     );

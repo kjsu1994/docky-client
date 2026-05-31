@@ -196,8 +196,8 @@ export const AddressSearchBox = ({
         ? (!canSearch || loadingResolve)
         : (loadingPostcode || loadingResolve);
 
-    const primaryLoadingText = primaryIsResolve ? "검색중..." : "LOADING...";
-    const secondaryLoadingText = secondaryIsResolve ? "조회중..." : "LOADING...";
+    const primaryLoadingText = primaryIsResolve ? "검색 중..." : "주소창 여는 중...";
+    const secondaryLoadingText = secondaryIsResolve ? "조회 중..." : "주소창 여는 중...";
     const primaryLoading = primaryIsResolve ? loadingResolve : loadingPostcode;
     const secondaryLoading = secondaryIsResolve ? loadingResolve : loadingPostcode;
 

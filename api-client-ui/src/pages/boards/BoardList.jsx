@@ -290,7 +290,7 @@ const NoticeBoardCard = ({ board, onDelete, onOpen, user }) => {
     return (
         <div onClick={onOpen} className="p-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 hover:shadow-md transition-all cursor-pointer relative overflow-hidden">
             <div className="flex items-center justify-between mb-1 text-[10px] font-black text-amber-600 uppercase tracking-widest">
-                <span className="flex items-center gap-1"><Megaphone className="h-3 w-3" />Notice</span>
+                <span className="flex items-center gap-1"><Megaphone className="h-3 w-3" />공지</span>
                 {canManage && <button onClick={(e) => { e.stopPropagation(); onDelete(board.board_id || board.boardId); }} className="text-[11px] px-2 py-0.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 font-bold">삭제</button>}
             </div>
             <h3 className="text-sm font-bold text-slate-900 line-clamp-1">{board.title}</h3>

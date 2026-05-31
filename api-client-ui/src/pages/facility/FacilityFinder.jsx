@@ -1,10 +1,12 @@
-﻿import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Bath, Car, Library, Shield, Stethoscope } from "lucide-react";
-import { ParkingFinder } from "./ParkingFinder.jsx";
-import { RestroomFinder } from "./RestroomFinder.jsx";
-import { LibraryFinder } from "./LibraryFinder.jsx";
-import { BunkerFinder } from "./BunkerFinder.jsx";
-import { MedicalFinder } from "./MedicalFinder.jsx";
+import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
+
+const ParkingFinder = lazy(() => import("./ParkingFinder.jsx").then((module) => ({ default: module.ParkingFinder })));
+const RestroomFinder = lazy(() => import("./RestroomFinder.jsx").then((module) => ({ default: module.RestroomFinder })));
+const LibraryFinder = lazy(() => import("./LibraryFinder.jsx").then((module) => ({ default: module.LibraryFinder })));
+const BunkerFinder = lazy(() => import("./BunkerFinder.jsx").then((module) => ({ default: module.BunkerFinder })));
+const MedicalFinder = lazy(() => import("./MedicalFinder.jsx").then((module) => ({ default: module.MedicalFinder })));
 
 export const FacilityFinder = () => {
     const [activeTab, setActiveTab] = useState("parking");
@@ -33,11 +35,13 @@ export const FacilityFinder = () => {
                 </div>
             </div>
 
-            {activeTab === "parking" && <ParkingFinder />}
-            {activeTab === "restroom" && <RestroomFinder />}
-            {activeTab === "library" && <LibraryFinder />}
-            {activeTab === "bunker" && <BunkerFinder />}
-            {activeTab === "medical" && <MedicalFinder />}
+            <Suspense fallback={<div className="rounded-3xl bg-white p-10 shadow-sm"><LoadingSpinner /></div>}>
+                {activeTab === "parking" && <ParkingFinder />}
+                {activeTab === "restroom" && <RestroomFinder />}
+                {activeTab === "library" && <LibraryFinder />}
+                {activeTab === "bunker" && <BunkerFinder />}
+                {activeTab === "medical" && <MedicalFinder />}
+            </Suspense>
         </div>
     );
 };

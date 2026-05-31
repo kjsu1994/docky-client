@@ -152,7 +152,7 @@ export const TodoCalendar = () => {
             setTodos(items);
         } catch (fetchError) {
             console.error("Todo fetch failed:", fetchError);
-            setError("Todo 목록을 불러오지 못했습니다.");
+            setError("할 일 목록을 불러오지 못했습니다.");
         } finally {
             setLoading(false);
         }
@@ -396,7 +396,7 @@ export const TodoCalendar = () => {
         );
     };
 
-    if (loading) return <LoadingSpinner text="Todo 목록을 불러오는 중입니다..." />;
+    if (loading) return <LoadingSpinner text="할 일 목록을 불러오는 중입니다..." />;
     if (error) return <ErrorMessage message={error} onRetry={fetchTodos} />;
 
     return (
@@ -407,9 +407,9 @@ export const TodoCalendar = () => {
                         <div>
                             <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-white">
                                 <CalendarRange className="h-3.5 w-3.5" />
-                                Todo
+                                할 일
                             </div>
-                            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900">Todo List</h1>
+                            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900">할 일 목록</h1>
                             <p className="mt-2 text-sm font-medium text-slate-500">
                                 일간, 주간, 월간으로 다양한 목표를 실천하세요.
                             </p>

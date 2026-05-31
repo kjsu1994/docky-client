@@ -22,9 +22,8 @@ export const GlobalNetworkIndicator = () => {
     if (!visible) return null;
 
     return (
-        <div className="network-indicator" aria-live="polite" aria-label="Loading">
+        <div className="network-indicator" aria-live="polite" aria-label="요청 처리 중">
             <div className="network-indicator__bar" />
         </div>
     );
 };
-

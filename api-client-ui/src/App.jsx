@@ -6,39 +6,40 @@ import { LoadingPage } from "./components/LoadingSpinner";
 import { Header } from "./components/Header";
 import { Login } from "./pages/access/Login.jsx";
 import { Register } from "./pages/access/Register.jsx";
-import { Home } from "./pages/home/Home.jsx";
-import { BoardList } from "./pages/boards/BoardList.jsx";
-import { BoardDetail } from "./pages/boards/BoardDetail.jsx";
-import { BoardForm } from "./pages/boards/BoardForm.jsx";
-import { Mypage } from "./pages/home/Mypage.jsx";
-import { MypageEdit } from "./pages/home/MypageEdit.jsx";
-import { Ranks } from "./pages/home/Ranks.jsx";
-import { News } from "./pages/facility/News.jsx";
-import { Statistics } from "./pages/home/Statistics.jsx";
-import { LuckyPlinko } from "./pages/games/LuckyPlinko.jsx";
 import { Queue } from "./pages/access/Queue.jsx";
-import { MeetingOptimizer } from "./pages/facility/MeetingOptimizer.jsx";
-import { FacilityFinder } from "./pages/facility/FacilityFinder.jsx";
-import { AdminAnomalies } from "./pages/admin/AdminAnomalies.jsx";
-import { AdminOperations } from "./pages/admin/AdminOperations.jsx";
-import { Chat } from "./pages/chat/Chat.jsx";
-import { AllMenu } from "./pages/home/AllMenu.jsx";
-import { TodoCalendar } from "./pages/facility/TodoCalendar.jsx";
-import { StreamingHub } from "./pages/streaming/StreamingHub.jsx";
-import { AdminStreamingStudio } from "./pages/admin/AdminStreamingStudio.jsx";
-import { InvestAssistant } from "./pages/facility/InvestAssistant.jsx";
-import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
 import { GlobalNetworkIndicator } from "./components/GlobalNetworkIndicator.jsx";
+import { PageGuideButton } from "./common/PageGuideButton.jsx";
 
+const FloatingChat = lazy(() => import("./components/FloatingChat.jsx").then((module) => ({ default: module.FloatingChat })));
+const Home = lazy(() => import("./pages/home/Home.jsx").then((module) => ({ default: module.Home })));
+const BoardList = lazy(() => import("./pages/boards/BoardList.jsx").then((module) => ({ default: module.BoardList })));
+const BoardDetail = lazy(() => import("./pages/boards/BoardDetail.jsx").then((module) => ({ default: module.BoardDetail })));
+const BoardForm = lazy(() => import("./pages/boards/BoardForm.jsx").then((module) => ({ default: module.BoardForm })));
+const Chat = lazy(() => import("./pages/chat/Chat.jsx").then((module) => ({ default: module.Chat })));
+const TodoCalendar = lazy(() => import("./pages/facility/TodoCalendar.jsx").then((module) => ({ default: module.TodoCalendar })));
+const StreamingHub = lazy(() => import("./pages/streaming/StreamingHub.jsx").then((module) => ({ default: module.StreamingHub })));
+const InvestAssistant = lazy(() => import("./pages/facility/InvestAssistant.jsx").then((module) => ({ default: module.InvestAssistant })));
+const AllMenu = lazy(() => import("./pages/home/AllMenu.jsx").then((module) => ({ default: module.AllMenu })));
 const GamesHub = lazy(() => import("./pages/games/GamesHub.jsx").then((module) => ({ default: module.GamesHub })));
+const Statistics = lazy(() => import("./pages/home/Statistics.jsx").then((module) => ({ default: module.Statistics })));
+const Ranks = lazy(() => import("./pages/home/Ranks.jsx").then((module) => ({ default: module.Ranks })));
+const News = lazy(() => import("./pages/facility/News.jsx").then((module) => ({ default: module.News })));
+const Mypage = lazy(() => import("./pages/home/Mypage.jsx").then((module) => ({ default: module.Mypage })));
+const MypageEdit = lazy(() => import("./pages/home/MypageEdit.jsx").then((module) => ({ default: module.MypageEdit })));
+const LuckyPlinko = lazy(() => import("./pages/games/LuckyPlinko.jsx").then((module) => ({ default: module.LuckyPlinko })));
 const LasVegasGame = lazy(() => import("./pages/games/LasVegasGame.jsx").then((module) => ({ default: module.LasVegasGame })));
 const NoThanksGame = lazy(() => import("./pages/games/NoThanksGame.jsx").then((module) => ({ default: module.NoThanksGame })));
 const CatanGame = lazy(() => import("./pages/games/TabletopGame.jsx").then((module) => ({ default: module.CatanGame })));
 const BlokusGame = lazy(() => import("./pages/games/TabletopGame.jsx").then((module) => ({ default: module.BlokusGame })));
 const MaheGame = lazy(() => import("./pages/games/TabletopGame.jsx").then((module) => ({ default: module.MaheGame })));
 const DalmutiGame = lazy(() => import("./pages/games/TabletopGame.jsx").then((module) => ({ default: module.DalmutiGame })));
+const MeetingOptimizer = lazy(() => import("./pages/facility/MeetingOptimizer.jsx").then((module) => ({ default: module.MeetingOptimizer })));
+const FacilityFinder = lazy(() => import("./pages/facility/FacilityFinder.jsx").then((module) => ({ default: module.FacilityFinder })));
+const AdminAnomalies = lazy(() => import("./pages/admin/AdminAnomalies.jsx").then((module) => ({ default: module.AdminAnomalies })));
+const AdminOperations = lazy(() => import("./pages/admin/AdminOperations.jsx").then((module) => ({ default: module.AdminOperations })));
+const AdminStreamingStudio = lazy(() => import("./pages/admin/AdminStreamingStudio.jsx").then((module) => ({ default: module.AdminStreamingStudio })));
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -53,24 +54,21 @@ const AppLayout = ({ children }) => {
     return (
         <div className="min-h-screen relative overflow-hidden">
             <CustomCursor />
-            {/* Dynamic Background Blobs */}
-            <div className="bg-vibe">
-                <div className="bg-vibe-blob" />
-                <div className="bg-vibe-blob" />
-                <div className="bg-vibe-blob" />
-            </div>
+            <div className="bg-vibe" />
             
             <Header />
             <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8 relative z-10">
                 {children}
             </main>
-            <FloatingChat />
+            <Suspense fallback={null}>
+                <FloatingChat />
+            </Suspense>
             <BottomNav />
         </div>
     );
 };
 
-const GameRoute = ({ children }) => (
+const AppRoute = ({ children }) => (
     <ProtectedRoute>
         <AppLayout>
             <Suspense fallback={<LoadingPage />}>
@@ -80,47 +78,50 @@ const GameRoute = ({ children }) => (
     </ProtectedRoute>
 );
 
+const GameRoute = AppRoute;
+
 function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
                 <GlobalNetworkIndicator />
+                <PageGuideButton />
                 <Routes>
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/queue" element={<Queue />} />
 
-                    <Route path="/app" element={<ProtectedRoute><AppLayout><Home /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/boards/:kind" element={<ProtectedRoute><AppLayout><BoardList /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/boards/:kind/new" element={<ProtectedRoute><AppLayout><BoardForm /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/boards/:kind/:boardId/edit" element={<ProtectedRoute><AppLayout><BoardForm /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/boards/:kind/:boardId" element={<ProtectedRoute><AppLayout><BoardDetail /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app" element={<AppRoute><Home /></AppRoute>} />
+                    <Route path="/app/boards/:kind" element={<AppRoute><BoardList /></AppRoute>} />
+                    <Route path="/app/boards/:kind/new" element={<AppRoute><BoardForm /></AppRoute>} />
+                    <Route path="/app/boards/:kind/:boardId/edit" element={<AppRoute><BoardForm /></AppRoute>} />
+                    <Route path="/app/boards/:kind/:boardId" element={<AppRoute><BoardDetail /></AppRoute>} />
 
-                    <Route path="/app/chat" element={<ProtectedRoute><AppLayout><Chat /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/todos" element={<ProtectedRoute><AppLayout><TodoCalendar /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/streaming" element={<ProtectedRoute><AppLayout><StreamingHub /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/invest" element={<ProtectedRoute><AppLayout><InvestAssistant /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/all-menu" element={<ProtectedRoute><AppLayout><AllMenu /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/chat" element={<AppRoute><Chat /></AppRoute>} />
+                    <Route path="/app/todos" element={<AppRoute><TodoCalendar /></AppRoute>} />
+                    <Route path="/app/streaming" element={<AppRoute><StreamingHub /></AppRoute>} />
+                    <Route path="/app/invest" element={<AppRoute><InvestAssistant /></AppRoute>} />
+                    <Route path="/app/all-menu" element={<AppRoute><AllMenu /></AppRoute>} />
                     <Route path="/app/games" element={<GameRoute><GamesHub /></GameRoute>} />
 
-                    <Route path="/app/statistics" element={<ProtectedRoute><AppLayout><Statistics /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/ranks" element={<ProtectedRoute><AppLayout><Ranks /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/news" element={<ProtectedRoute><AppLayout><News /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/mypage" element={<ProtectedRoute><AppLayout><Mypage /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/mypage/edit" element={<ProtectedRoute><AppLayout><MypageEdit /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/plinko" element={<ProtectedRoute><AppLayout><LuckyPlinko /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/statistics" element={<AppRoute><Statistics /></AppRoute>} />
+                    <Route path="/app/ranks" element={<AppRoute><Ranks /></AppRoute>} />
+                    <Route path="/app/news" element={<AppRoute><News /></AppRoute>} />
+                    <Route path="/app/mypage" element={<AppRoute><Mypage /></AppRoute>} />
+                    <Route path="/app/mypage/edit" element={<AppRoute><MypageEdit /></AppRoute>} />
+                    <Route path="/app/plinko" element={<AppRoute><LuckyPlinko /></AppRoute>} />
                     <Route path="/app/games/las-vegas" element={<GameRoute><LasVegasGame /></GameRoute>} />
                     <Route path="/app/games/no-thanks" element={<GameRoute><NoThanksGame /></GameRoute>} />
                     <Route path="/app/games/catan" element={<GameRoute><CatanGame /></GameRoute>} />
                     <Route path="/app/games/blokus" element={<GameRoute><BlokusGame /></GameRoute>} />
                     <Route path="/app/games/mahe" element={<GameRoute><MaheGame /></GameRoute>} />
                     <Route path="/app/games/dalmuti" element={<GameRoute><DalmutiGame /></GameRoute>} />
-                    <Route path="/app/optimizer" element={<ProtectedRoute><AppLayout><MeetingOptimizer /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/facility" element={<ProtectedRoute><AppLayout><FacilityFinder /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/optimizer" element={<AppRoute><MeetingOptimizer /></AppRoute>} />
+                    <Route path="/app/facility" element={<AppRoute><FacilityFinder /></AppRoute>} />
                     <Route path="/app/parking" element={<Navigate to="/app/facility" replace />} />
-                    <Route path="/app/admin/anomalies" element={<ProtectedRoute><AppLayout><AdminAnomalies /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/admin/operations" element={<ProtectedRoute><AppLayout><AdminOperations /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/admin/streaming" element={<ProtectedRoute><AppLayout><AdminStreamingStudio /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/admin/anomalies" element={<AppRoute><AdminAnomalies /></AppRoute>} />
+                    <Route path="/app/admin/operations" element={<AppRoute><AdminOperations /></AppRoute>} />
+                    <Route path="/app/admin/streaming" element={<AppRoute><AdminStreamingStudio /></AppRoute>} />
 
                     <Route path="/" element={<Navigate to="/app" replace />} />
                     <Route path="*" element={<Navigate to="/app" replace />} />

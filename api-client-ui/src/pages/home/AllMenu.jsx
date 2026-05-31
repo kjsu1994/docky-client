@@ -50,12 +50,12 @@ export const AllMenu = () => {
 
     const mainServices = [
         { title: "홈", to: "/app", icon: Home, color: "bg-blue-50 text-blue-600" },
-        { title: "Todo", to: "/app/todos", icon: CalendarDays, color: "bg-emerald-50 text-emerald-700" },
+        { title: "할 일", to: "/app/todos", icon: CalendarDays, color: "bg-emerald-50 text-emerald-700" },
         { title: "통계", to: "/app/statistics", icon: BarChart, color: "bg-indigo-50 text-indigo-600" },
         { title: "스트리밍", to: "/app/streaming", icon: Film, color: "bg-fuchsia-50 text-fuchsia-700" },
         { title: "사용자게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare, color: "bg-sky-50 text-sky-600" },
         { title: "Q&A", to: "/app/boards/QUESTION_ANSWER", icon: HelpCircle, color: "bg-emerald-50 text-emerald-600" },
-        { title: "Invest", to: "/app/invest", icon: Bot, color: "bg-sky-50 text-sky-700" },
+        { title: "투자 도우미", to: "/app/invest", icon: Bot, color: "bg-sky-50 text-sky-700" },
     ];
 
     const tools = [
@@ -107,15 +107,15 @@ export const AllMenu = () => {
                 </button>
             </div>
 
-            <MenuSection title="Core Services" items={mainServices} />
-            <MenuSection title="Useful Tools" items={tools} />
-            <MenuSection title="Games" items={games} />
-            <MenuSection title="Account" items={account} />
-            {isAdmin && <MenuSection title="Administrator" items={admin} />}
+            <MenuSection title="핵심 서비스" items={mainServices} />
+            <MenuSection title="편의 도구" items={tools} />
+            <MenuSection title="게임" items={games} />
+            <MenuSection title="계정" items={account} />
+            {isAdmin && <MenuSection title="관리자" items={admin} />}
 
             <div className="pt-4 text-center">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">
-                    Next Gen Community Platform v2.0
+                    커뮤니티 플랫폼 v2.0
                 </p>
             </div>
         </div>
