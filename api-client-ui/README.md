@@ -218,7 +218,7 @@ npm run dev
   - Room state load failures from non-member or stale saved rooms now clear the selected room/subscription and ask the user to re-enter.
   - Added `npm run smoke:tabletop-ui`, a no-dependency Chrome/Edge DevTools smoke check that mocks authenticated member/game API responses and opens `/app/games` plus Catan, Blokus, Mahe, and Dalmuti lobbies at desktop, tablet, and smartphone widths.
   - The same smoke check now clicks the shared room flow for all four new games: create a titled room, send host start, join by room code, and send guest ready, while asserting the REST payloads and Korean waiting-room text.
-  - Verification: `npm run smoke:tabletop-ui` succeeded on 2026-05-31 for 15 route/viewport combinations plus Catan, Blokus, Mahe, and Dalmuti create/start/join-by-code/ready interaction flows, with Korean hub/lobby text present, the Catan active-room selected-rule brief present, and no page-level horizontal overflow.
+  - Verification: `npm run smoke:tabletop-ui` succeeded on 2026-05-31 for 18 route/viewport combinations plus Catan, Blokus, Mahe, and Dalmuti create/start/join-by-code/ready interaction flows, with Korean hub/lobby text present, the Catan active-room selected-rule brief present, Blokus placement guidance visible, Mahe duplicate mobile dice panel hidden, Las Vegas public-roll/previous-bet UI visible, and no page-level horizontal overflow.
   - Verification: `npm run build` succeeded on 2026-05-31 after adding shared tabletop lobby loading/error/refresh states, new-game navigation entries, and mobile quick-jump offset fixes.
   - Game detail routes now lazy-load Las Vegas, No Thanks, and shared tabletop screens so the games hub and general app entry do not eagerly load every board-game UI.
   - Mapped the new shared APIs in `docs/SCREEN_API_MAPPING.md`.
@@ -266,6 +266,7 @@ npm run dev
   - Blokus board density selection is now stored locally, so players who switch to mobile/compact/standard/expanded cells keep the same board scale when reopening the room or returning on the same device.
   - Blokus now renders a board-top `지금 할 일` status card with the current color, selected piece, total legal placements, selected anchor cell, and the next placement/pass hint before the piece drawer and mobile sticky controls.
   - 블로커스 모바일 배치 바에서 회전/뒤집기와 빠른 조각 선택을 바로 처리할 수 있어, 스마트폰/태블릿에서 보드와 조각 패널 사이를 왕복하지 않아도 됩니다.
+  - 블로커스 보드 배치 미리보기는 현재 색으로 강하게 표시하고 합법/불법 위치의 외곽선과 `놓기` 버튼 안내를 분리해, 도형이 실제로 덮을 칸과 버튼 활성 조건을 더 쉽게 확인할 수 있습니다.
   - Selected pieces now show the current legal-placement count, total legal-placement count across all remaining pieces, remaining piece/square totals, and Korean pass guidance so players understand that passing is only accepted when every remaining piece is blocked.
   - Blokus 3-player rooms now explain the shared green color turn order in Korean, and the score panel marks green as a shared non-scoring color while the server test pins player 1 -> 2 -> 3 controller rotation.
   - Mobile and tablet layouts now include a safe-area-aware sticky placement strip directly under the board, so players can confirm a selected cell or pass without scrolling back to the side panel.
@@ -297,6 +298,10 @@ npm run dev
   - Turn, score, winner, and recent-record text now resolves room participant nicknames instead of relying only on seat numbers.
   - Variant options use the shared room min/max player contract, and the server engine now also rejects invalid Mahe variant/player-count pairs.
   - Finished games now show a Korean final-winner strip with total score from the server `winner` score flag.
+  - Mobile/tablet Mahe now keeps rolling controls in the sticky track action strip and hides the lower duplicate dice panel, while desktop keeps the right-side dice panel.
+- Las Vegas play screen update (`src/pages/games/LasVegasGame.jsx`)
+  - Current roll dice are now shown in a shared public roll panel for every player, not only inside the acting player's controls.
+  - The previous betting target remains highlighted with a Korean banner and casino-card marker using the server `lastPlaced*` fields, and the casino grid is denser on mobile so six casinos fit with less scrolling.
   - Uses `POST /game/mahe/rooms/{roomId}/actions` for server-authoritative `ROLL_DIE`, `STOP_ROLLING`, and `CHOOSE_DICE_COUNT`.
   - Verification: `npm run build` succeeded on 2026-05-31.
 - Dalmuti play screen update (`src/pages/games/TabletopGame.jsx`)

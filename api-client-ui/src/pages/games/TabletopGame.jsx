@@ -1349,6 +1349,16 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
     { label: "가능", value: `${totalLegalPlacementCount.toLocaleString("ko-KR")}곳` },
     { label: "선택", value: anchorCell ? `${anchorCell.x + 1}, ${anchorCell.y + 1}` : "없음" },
   ];
+  const placeButtonEnabled = myTurn && Boolean(anchorCell) && Boolean(placementStatus.legal);
+  const placeButtonHint = !myTurn
+    ? "내 차례가 되면 놓을 수 있습니다."
+    : !selectedPiece
+      ? "먼저 오른쪽 조각 목록에서 도형을 고르세요."
+      : !anchorCell
+        ? "보드 칸을 누르면 도형이 덮을 칸이 색으로 표시됩니다."
+        : placementStatus.legal
+          ? "초록/현재 색 미리보기 칸에 확정 배치할 수 있습니다."
+          : placementStatus.reason || "현재 위치에는 놓을 수 없습니다.";
 
   useEffect(() => {
     if (!remainingPieceCodes.includes(selectedPieceCode)) {
@@ -1535,12 +1545,12 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
                   key={`${x}:${y}`}
                   type="button"
                   className={[
-                    "relative border border-white/60 transition-colors",
+                    "relative border border-white/60 transition-all",
                     color ? `${colorClasses[color] || "bg-slate-500"} shadow-inner` : startPoint ? "bg-amber-100 hover:bg-amber-200" : "bg-slate-50 hover:bg-slate-100",
-                    preview && !cell && placementStatus.legal ? `${colorClasses[currentColor] || "bg-slate-400"} opacity-60` : "",
-                    preview && !cell && !placementStatus.legal ? "bg-rose-200 ring-1 ring-rose-400" : "",
-                    preview && cell ? "ring-2 ring-rose-500" : "",
-                    anchored ? "ring-2 ring-slate-950" : "",
+                    preview && !cell && placementStatus.legal ? `${colorClasses[currentColor] || "bg-slate-400"} z-10 scale-105 opacity-95 ring-2 ring-slate-950 ring-offset-1 ring-offset-white shadow-[0_0_0_2px_rgba(255,255,255,0.9)_inset]` : "",
+                    preview && !cell && !placementStatus.legal ? "z-10 scale-105 bg-rose-300 ring-2 ring-rose-700 ring-offset-1 ring-offset-white" : "",
+                    preview && cell ? "z-10 ring-2 ring-rose-700 ring-offset-1 ring-offset-white" : "",
+                    anchored ? "z-20 ring-2 ring-slate-950 ring-offset-2 ring-offset-amber-200" : "",
                   ].join(" ")}
                   style={{ width: boardCellSize, height: boardCellSize }}
                   onMouseEnter={() => {
@@ -1556,6 +1566,9 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
                 >
                   {startPoint && !cell && (
                     <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500 shadow-sm" />
+                  )}
+                  {preview && !cell && (
+                    <span className={`absolute inset-[22%] rounded-[3px] border ${placementStatus.legal ? "border-white/90 bg-white/25" : "border-rose-900/70 bg-white/20"}`} />
                   )}
                 </button>
               );
@@ -1622,8 +1635,8 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <button
               type="button"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
-              disabled={!myTurn || !anchorCell || !placementStatus.legal}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-black text-white ${placeButtonEnabled ? "bg-emerald-600 shadow-lg shadow-emerald-200" : "bg-slate-400 opacity-70"}`}
+              disabled={!placeButtonEnabled}
               onClick={() => anchorCell && place(anchorCell.x, anchorCell.y).catch(() => toast.error("놓을 수 없는 위치입니다."))}
             >
               <CheckCircle2 className="h-4 w-4" />
@@ -1639,7 +1652,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
             </button>
           </div>
           <div className={`mt-2 rounded-xl px-3 py-2 text-[11px] font-bold ${canPass ? "bg-amber-50 text-amber-700" : "bg-slate-50 text-slate-500"}`}>
-            {canPass ? "남은 모든 조각이 막혀 패스할 수 있습니다." : `남은 조각 전체에서 둘 수 있는 위치가 ${totalLegalPlacementCount.toLocaleString("ko-KR")}곳 있습니다.`}
+            {canPass ? "남은 모든 조각이 막혀 패스할 수 있습니다." : placeButtonHint}
           </div>
           {selectedPieceBlocked && (
             <button
@@ -1718,13 +1731,16 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
           </div>
           <button
             type="button"
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
-            disabled={!myTurn || !anchorCell || !placementStatus.legal}
+            className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-black text-white ${placeButtonEnabled ? "bg-emerald-600 shadow-lg shadow-emerald-200" : "bg-slate-400 opacity-70"}`}
+            disabled={!placeButtonEnabled}
             onClick={() => anchorCell && place(anchorCell.x, anchorCell.y).catch(() => toast.error("둘 수 없는 위치입니다."))}
           >
             <CheckCircle2 className="h-4 w-4" />
             선택 위치에 놓기
           </button>
+          <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] font-bold leading-relaxed ${placeButtonEnabled ? "border-emerald-100 bg-emerald-50 text-emerald-700" : "border-slate-100 bg-slate-50 text-slate-500"}`}>
+            {placeButtonHint}
+          </div>
           <div className="mt-3 grid max-h-[360px] grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3 xl:grid-cols-2">
             {remainingPieceCodes.map((pieceCode) => {
               const piece = pieceByCode.get(pieceCode);
@@ -2235,7 +2251,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
       </div>
 
       <aside className="space-y-4">
-        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
+        <div data-smoke="mahe-side-dice-panel" className="hidden rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4 xl:block">
           <div className="text-sm font-black text-slate-900">주사위</div>
           <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-500" role="status" aria-live="polite" aria-atomic="true">
             {turnMessage}

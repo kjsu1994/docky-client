@@ -102,6 +102,7 @@
   - `npm run smoke:tabletop-ui` launches Chrome/Edge headless, mocks authenticated `/members`, `/game/{game}/variants`, `/rooms`, `/rooms/me`, `/rooms/{roomId}/state`, and `/chat/rooms` responses, then checks `/app/games` plus the four new game lobbies across desktop, tablet, and smartphone widths for Korean entry text and page-level horizontal overflow.
   - The smoke check also clicks the shared room flow for Catan, Blokus, Mahe, and Dalmuti, verifying `POST /game/{game}/rooms`, `POST /game/{game}/rooms/{roomId}/start`, `POST /game/{game}/rooms/join-by-code`, and `POST /game/{game}/rooms/{roomId}/ready` payload/endpoint usage from the browser UI.
   - For Catan, the smoke mock now returns a minimal active `gameState` after start and verifies that the Korean selected-rule brief renders in the browser play surface.
+  - The smoke mock also verifies Blokus placement guidance after selecting a board cell, Mahe's mobile duplicate dice panel visibility rule, and Las Vegas active public-roll/previous-bet UI across desktop, tablet, and smartphone widths.
   - the shared rules panel renders Korean rule cards for each game's objective, turn flow, scoring, and supported official variants; it is client-side guidance only and all legality remains under the same room/action endpoints.
   - dynamic turn, selected-target, selected-card, room-request, and server-judgement messages are exposed as polite live-status regions while preserving the same visual layout across desktop, tablet, and smartphone screens.
   - the Catan board panel also renders a Korean `지금 할 일` live-status card from `phase`, `activeSeatNo`, pending trade/choice fields, selected board IDs, and visible hand state, giving a next-action hint without changing any `/actions` payload.
@@ -144,6 +145,7 @@
   - the Blokus board panel renders a Korean `지금 할 일` live-status card from current color, turn owner, selected piece, selected anchor, and client-visible legal-placement counts without changing `PLACE` or `PASS` payloads.
   - side and mobile piece pickers render client-side legal-placement counts per remaining piece and provide a local auto-select action for the first currently placeable piece when the selected piece is blocked.
   - the `PASS` controls are disabled until the client-side total legal-placement count across all remaining pieces is zero; the server remains authoritative and rejects invalid `PASS`
+  - placement previews now use the current color with stronger legal/illegal outlines, and the `놓기` button area explains whether a piece, board cell, or legal position is still missing before sending the same `PLACE` payload.
 - `/app/games/mahe`
   - the games hub card exposes compact Korean rule-scope chips and a richer link label for Mahe base game, turtle stacking, and dice-odds guidance before the shared room flow loads.
   - same shared room APIs under `/game/mahe`
@@ -159,6 +161,10 @@
   - the start raft uses the same active/projected visual state as numbered track spaces, so position `0` is represented in client previews without changing server position data.
   - the Mahe track panel renders a Korean `지금 할 일` live-status card from phase, active/decision seat, dice sum, current egg, and projected risk state without changing any action payload.
   - bust and final-egg guidance are rendered from `stacks`, `activeSeatNo`, `eggDeck`, `currentEgg`, and `finalEggRound` so players can see which carried turtle segment is at risk.
+  - on mobile and tablet, rolling controls live only in the sticky track action strip; the lower duplicate dice panel is hidden until desktop width.
+- `/app/games/las-vegas`
+  - The play surface renders `current_roll` as a public roll panel for every viewer and uses `last_placed_member_id`, `last_placed_casino_no`, and `last_placed_dice_count` to keep the previous casino bet highlighted after placement.
+  - The mobile casino grid uses two compact columns with smaller money cards so the six casinos are visible with less vertical scrolling.
 - `/app/games/dalmuti`
   - the games hub card exposes compact Korean rule-scope chips and a richer link label for Dalmuti base game, tax, and revolution support before the shared room flow loads.
   - the Dalmuti hub preview labels the joker-style card as `광`, matching the in-game Korean card terminology without changing API data.

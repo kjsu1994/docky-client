@@ -45,7 +45,7 @@ const casinoName = {
     6: "Cosmo",
 };
 
-const CasinoPanel = ({ casino, statePlayers, isHot }) => {
+const CasinoPanel = ({ casino, statePlayers, isHot, isLastPlaced }) => {
     const casinoNo = toPlainInt(casino.casino_no || casino.casinoNo, 0);
     const total = casino.total_money || casino.totalMoney || 0;
     const moneyCards = casino.money_cards || casino.moneyCards || [];
@@ -60,9 +60,9 @@ const CasinoPanel = ({ casino, statePlayers, isHot }) => {
     }, [statePlayers]);
 
     return (
-        <article className={`rounded-[1.6rem] border p-4 shadow-xl backdrop-blur-md transition-all duration-500 ${
-            isHot
-                ? "border-amber-300 bg-gradient-to-br from-amber-500/30 via-orange-500/25 to-slate-900/80 shadow-amber-400/30 scale-[1.01]"
+        <article className={`rounded-2xl border p-2.5 shadow-xl backdrop-blur-md transition-all duration-500 sm:rounded-[1.6rem] sm:p-4 ${
+            isHot || isLastPlaced
+                ? "border-amber-300 bg-gradient-to-br from-amber-500/35 via-orange-500/30 to-slate-900/85 shadow-amber-400/30 scale-[1.01] ring-2 ring-amber-300/70"
                 : "border-white/20 bg-gradient-to-br from-slate-900/80 to-slate-800/85 shadow-slate-900/30"
         }`}>
             <header className="mb-3 flex items-center justify-between">
@@ -70,13 +70,18 @@ const CasinoPanel = ({ casino, statePlayers, isHot }) => {
                     <div className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200">Casino {casinoNo}</div>
                     <div className="text-sm font-black text-white">{casinoName[casinoNo] || `Table ${casinoNo}`}</div>
                 </div>
-                <div className="rounded-full bg-emerald-400/20 px-2.5 py-1 text-xs font-black text-emerald-300">{formatWon(total)}</div>
+                <div className="rounded-full bg-emerald-400/20 px-2.5 py-1 text-[11px] font-black text-emerald-300 sm:text-xs">{formatWon(total)}</div>
             </header>
+            {isLastPlaced && (
+                <div className="mb-2 rounded-xl border border-amber-200/40 bg-amber-200/20 px-2 py-1 text-[10px] font-black text-amber-100">
+                    직전 배팅 위치
+                </div>
+            )}
 
-            <div className="mb-4 flex min-h-[3.5rem] flex-wrap gap-2">
+            <div className="mb-3 flex min-h-[2.5rem] flex-wrap gap-1.5 sm:mb-4 sm:min-h-[3.5rem] sm:gap-2">
                 {!moneyCards.length && <div className="text-xs text-slate-400">머니 카드 없음</div>}
                 {moneyCards.map((amount, idx) => (
-                    <MoneyCard key={`${casinoNo}-money-${idx}-${amount}`} amount={amount} className="w-20 scale-90" />
+                    <MoneyCard key={`${casinoNo}-money-${idx}-${amount}`} amount={amount} className="w-14 scale-90 sm:w-20" />
                 ))}
             </div>
 
@@ -164,6 +169,20 @@ export const LasVegasGame = () => {
     const winnerNickname = winnerMemberId
         ? players.find((player) => Number(player.member_id || player.memberId) === Number(winnerMemberId))?.nickname || `플레이어 ${winnerMemberId}`
         : null;
+    const currentTurnMemberId = state?.turn_member_id || state?.turnMemberId || null;
+    const currentRollPlayer = currentTurnMemberId
+        ? players.find((player) => Number(player.member_id || player.memberId) === Number(currentTurnMemberId))
+        : null;
+    const currentRollPlayerName = currentRollPlayer?.nickname || (currentTurnMemberId ? `플레이어 ${currentTurnMemberId}` : "-");
+    const lastPlacedMemberId = state?.last_placed_member_id || state?.lastPlacedMemberId || null;
+    const lastPlacedCasinoNo = toPlainInt(state?.last_placed_casino_no || state?.lastPlacedCasinoNo, 0);
+    const lastPlacedDiceCount = toPlainInt(state?.last_placed_dice_count || state?.lastPlacedDiceCount, 0);
+    const lastPlacedPlayer = lastPlacedMemberId
+        ? players.find((player) => Number(player.member_id || player.memberId) === Number(lastPlacedMemberId))
+        : null;
+    const lastPlacedText = lastPlacedCasinoNo
+        ? `${lastPlacedPlayer?.nickname || `플레이어 ${lastPlacedMemberId}`}님이 ${casinoName[lastPlacedCasinoNo] || `${lastPlacedCasinoNo}번`}에 주사위 ${lastPlacedDiceCount}개를 배팅했습니다.`
+        : "";
 
     const ensureSocket = () => {
         if (stompRef.current) return stompRef.current;
@@ -240,25 +259,32 @@ export const LasVegasGame = () => {
         if (!roomId) return;
         localStorage.setItem(ROOM_STORAGE_KEY, String(roomId));
 
-        const client = ensureSocket();
-        const subscribeAll = async () => {
-            subscribeGameRoom(client, roomId);
+        const loadSnapshot = async () => {
             const snapshot = await fetchState(roomId);
             const snapshotChatRoomId = normalizeChatRoomId(snapshot) || normalizeChatRoomId(room);
             if (snapshotChatRoomId) {
-                subscribeChatRoom(client, snapshotChatRoomId);
                 await fetchChatMessages(snapshotChatRoomId);
                 await markChatRoomAsRead(snapshotChatRoomId);
             } else {
                 setChatMessages([]);
             }
+            return snapshotChatRoomId;
+        };
+        const snapshotChatRoomId = await loadSnapshot();
+
+        const client = ensureSocket();
+        const subscribeAll = () => {
+            subscribeGameRoom(client, roomId);
+            if (snapshotChatRoomId) {
+                subscribeChatRoom(client, snapshotChatRoomId);
+            }
         };
 
         if (client.connected) {
-            await subscribeAll();
+            subscribeAll();
         } else {
             client.onConnect = () => {
-                subscribeAll().catch(() => toast.error("방 상태 초기화 실패"));
+                subscribeAll();
             };
         }
     };
@@ -358,7 +384,7 @@ export const LasVegasGame = () => {
             prevCasinoSignatureRef.current = signature;
             if (changedCasino) {
                 setHotCasinoNo(changedCasino);
-                setTimeout(() => setHotCasinoNo(null), 900);
+                setTimeout(() => setHotCasinoNo(null), 6000);
             }
         }
     }, [state?.casinos]);
@@ -876,6 +902,36 @@ export const LasVegasGame = () => {
                                     )}
                                 </div>
 
+                                {!!currentRoll.length && (
+                                    <div className="mb-3 rounded-2xl border border-white/20 bg-white/15 p-3 shadow-inner">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <div className="text-[11px] font-black text-cyan-100">공개 굴림</div>
+                                                <div className="text-sm font-black text-white">{currentRollPlayerName}님의 주사위</div>
+                                            </div>
+                                            <div className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-black text-white">
+                                                배팅할 숫자 선택 대기
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                            {currentRoll.map((value, idx) => <DiceFace key={`public-roll-${idx}`} value={toPlainInt(value, 1)} size={32} />)}
+                                        </div>
+                                        <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+                                            {[1, 2, 3, 4, 5, 6].map((face) => (
+                                                <div key={`public-roll-count-${face}`} className="rounded-xl bg-white/10 px-2 py-1.5 text-center text-[11px] font-black text-white">
+                                                    {face}번 {toPlainInt(currentRollCountByFace[face], 0)}개
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {lastPlacedText && (
+                                    <div className="mb-3 rounded-2xl border border-amber-200/50 bg-amber-300/20 px-3 py-2 text-xs font-black leading-relaxed text-amber-50">
+                                        {lastPlacedText}
+                                    </div>
+                                )}
+
                                 {!isFinished && myTurn && (
                                     <div className="mb-3 rounded-2xl bg-white/10 p-3">
                                         <div className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-100">My Action</div>
@@ -894,21 +950,17 @@ export const LasVegasGame = () => {
                                                 </button>
                                             ))}
                                         </div>
-                                        {!!currentRoll.length && (
-                                            <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-white/10 p-2">
-                                                {currentRoll.map((value, idx) => <DiceFace key={`roll-${idx}`} value={toPlainInt(value, 1)} size={30} />)}
-                                            </div>
-                                        )}
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-3">
                                     {(state?.casinos || []).map((casino) => (
                                         <CasinoPanel
                                             key={casino.casino_no || casino.casinoNo}
                                             casino={casino}
                                             statePlayers={state?.players}
                                             isHot={Number(casino.casino_no || casino.casinoNo) === Number(hotCasinoNo)}
+                                            isLastPlaced={Number(casino.casino_no || casino.casinoNo) === Number(lastPlacedCasinoNo)}
                                         />
                                     ))}
                                 </div>

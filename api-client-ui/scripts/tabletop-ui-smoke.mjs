@@ -48,6 +48,11 @@ const cases = [
     label: "dalmuti lobby",
     expectedTexts: ["달무티", "방 만들기", "입장", "본게임", "첫 손 세금 없음"],
   },
+  {
+    path: "/app/games/las-vegas",
+    label: "las vegas active",
+    expectedTexts: ["공개 굴림", "직전 배팅 위치", "검증 사용자님이 Bellagio에 주사위 2개를 배팅했습니다."],
+  },
 ];
 
 const variantsByGame = {
@@ -79,6 +84,7 @@ const gameNames = {
   blokus: "블로커스",
   mahe: "마헤",
   dalmuti: "달무티",
+  "las-vegas": "라스베가스",
 };
 const gameCodePrefix = {
   catan: "CATN",
@@ -300,6 +306,169 @@ function catanSmokeGameState(room) {
   };
 }
 
+function blokusSmokeGameState(room) {
+  return {
+    game: "BLOKUS",
+    variantCode: room.variantCode || room.variant_code || "BASE",
+    variant_code: room.variantCode || room.variant_code || "BASE",
+    phase: "PLAYING",
+    boardSize: 20,
+    board_size: 20,
+    currentColor: "BLUE",
+    current_color: "BLUE",
+    currentSeatNo: 1,
+    current_seat_no: 1,
+    board: [],
+    startPoints: [{ x: 0, y: 0, color: "BLUE" }],
+    start_points: [{ x: 0, y: 0, color: "BLUE" }],
+    pieces: [
+      { code: "I1", name: "1칸", size: 1, cells: [{ x: 0, y: 0 }] },
+      { code: "I2", name: "2칸", size: 2, cells: [{ x: 0, y: 0 }, { x: 1, y: 0 }] },
+    ],
+    colors: [
+      {
+        color: "BLUE",
+        label: "파랑",
+        ownerSeatNo: 1,
+        owner_seat_no: 1,
+        remainingPieceCodes: ["I1", "I2"],
+        remaining_piece_codes: ["I1", "I2"],
+        shared: false,
+        controllerSeatNos: [1],
+        controller_seat_nos: [1],
+        score: -3,
+      },
+    ],
+    scores: [
+      { scoreKey: "SEAT_1", score_key: "SEAT_1", label: "검증 사용자", colors: ["BLUE"], score: -3, winner: false },
+    ],
+    moveHistory: [],
+    move_history: [],
+  };
+}
+
+function maheSmokeGameState() {
+  return {
+    game: "MAHE",
+    variantName: "본게임",
+    variant_name: "본게임",
+    phase: "ROLLING",
+    trackSize: 21,
+    track_size: 21,
+    activeSeatNo: 1,
+    active_seat_no: 1,
+    decisionSeatNo: 0,
+    decision_seat_no: 0,
+    currentEgg: 4,
+    current_egg: 4,
+    dice: [2],
+    diceSum: 2,
+    dice_sum: 2,
+    finalEggRound: false,
+    final_egg_round: false,
+    eggDeck: [3, 5, 7],
+    egg_deck: [3, 5, 7],
+    turtles: [
+      { seatNo: 1, seat_no: 1, position: 0 },
+      { seatNo: 2, seat_no: 2, position: 0 },
+    ],
+    stacks: [
+      { position: 0, seatNos: [1, 2], seat_nos: [1, 2] },
+    ],
+    scores: [
+      { seatNo: 1, seat_no: 1, score: 0, cards: [], winner: false },
+      { seatNo: 2, seat_no: 2, score: 0, cards: [], winner: false },
+    ],
+    moveHistory: [],
+    move_history: [],
+  };
+}
+
+function lasVegasSmokeRoom() {
+  return {
+    roomId: 9090,
+    room_id: 9090,
+    roomCode: "LVSMOKE",
+    room_code: "LVSMOKE",
+    title: "라스베가스 스모크 방",
+    roomStatus: "PLAYING",
+    room_status: "PLAYING",
+    hostMemberId: 999,
+    host_member_id: 999,
+    chatRoomId: 9191,
+    chat_room_id: 9191,
+    minPlayers: 2,
+    min_players: 2,
+    maxPlayers: 6,
+    max_players: 6,
+    roundCount: 3,
+    round_count: 3,
+    currentRoundNo: 1,
+    current_round_no: 1,
+    turnTimeSeconds: 50,
+    turn_time_seconds: 50,
+    players: [
+      player(999, 1, false, "검증 사용자"),
+      player(1001, 2, true, "상대 플레이어"),
+    ],
+  };
+}
+
+function lasVegasSmokeState() {
+  return {
+    eventType: "snapshot",
+    event_type: "snapshot",
+    roomId: 9090,
+    room_id: 9090,
+    roomCode: "LVSMOKE",
+    room_code: "LVSMOKE",
+    roomStatus: "PLAYING",
+    room_status: "PLAYING",
+    phase: "PLAYING",
+    roundNo: 1,
+    round_no: 1,
+    roundCount: 3,
+    round_count: 3,
+    turnMemberId: 1001,
+    turn_member_id: 1001,
+    turnDeadlineAt: new Date(Date.now() + 60000).toISOString(),
+    turn_deadline_at: new Date(Date.now() + 60000).toISOString(),
+    chatRoomId: 9191,
+    chat_room_id: 9191,
+    winnerMemberId: null,
+    winner_member_id: null,
+    message: null,
+    currentRoll: [2, 2, 5, 6],
+    current_roll: [2, 2, 5, 6],
+    lastPlacedMemberId: 999,
+    last_placed_member_id: 999,
+    lastPlacedCasinoNo: 1,
+    last_placed_casino_no: 1,
+    lastPlacedDiceCount: 2,
+    last_placed_dice_count: 2,
+    lastPlacedAt: new Date(Date.now() - 8000).toISOString(),
+    last_placed_at: new Date(Date.now() - 8000).toISOString(),
+    players: [
+      { memberId: 999, member_id: 999, nickname: "검증 사용자", seatNo: 1, seat_no: 1, ready: false, totalMoney: 30000, total_money: 30000, remainingDice: 6, remaining_dice: 6 },
+      { memberId: 1001, member_id: 1001, nickname: "상대 플레이어", seatNo: 2, seat_no: 2, ready: false, totalMoney: 10000, total_money: 10000, remainingDice: 4, remaining_dice: 4 },
+    ],
+    casinos: [1, 2, 3, 4, 5, 6].map((casinoNo) => {
+      const moneyCards = casinoNo === 1 ? [50000, 30000] : [40000, 30000];
+      const diceByPlayer = casinoNo === 1 ? { 999: 2 } : {};
+      return {
+        casinoNo,
+        casino_no: casinoNo,
+        moneyCards,
+        money_cards: moneyCards,
+        totalMoney: moneyCards.reduce((sum, value) => sum + value, 0),
+        total_money: moneyCards.reduce((sum, value) => sum + value, 0),
+        diceByPlayer,
+        dice_by_player: diceByPlayer,
+      };
+    }),
+  };
+}
+
 function recordRequest(kind, game, pathname, body) {
   mockState.requests.push({ kind, game, pathname, body });
 }
@@ -357,9 +526,26 @@ function routeMock(url, method, postData = "") {
   if (method === "GET" && pathname === "/api/chat/rooms") {
     return { status: 200, body: { data: [] } };
   }
+  if (method === "GET" && /^\/api\/chat\/room\/\d+\/messages$/.test(pathname)) {
+    return { status: 200, body: { data: [] } };
+  }
+  if (method === "PATCH" && /^\/api\/chat\/room\/\d+\/read$/.test(pathname)) {
+    return { status: 200, body: { data: true } };
+  }
   const match = pathname.match(/^\/api\/game\/([^/]+)\/(.+)$/);
   if (!match) return null;
   const [, game, suffix] = match;
+  if (game === "las-vegas") {
+    if (method === "GET" && suffix === "rooms") {
+      return { status: 200, body: [] };
+    }
+    if (method === "GET" && suffix === "rooms/me") {
+      return { status: 200, body: [lasVegasSmokeRoom()] };
+    }
+    if (method === "GET" && /^rooms\/\d+\/state$/.test(suffix)) {
+      return { status: 200, body: lasVegasSmokeState() };
+    }
+  }
   if (method === "GET" && suffix === "variants") {
     return { status: 200, body: variantsByGame[game] || [] };
   }
@@ -406,7 +592,11 @@ function routeMock(url, method, postData = "") {
     mockState.activeRoomsByGame.set(game, room);
     const gameState = game === "catan" && room.roomStatus === "PLAYING"
       ? catanSmokeGameState(room)
-      : null;
+      : game === "blokus" && room.roomStatus === "PLAYING"
+        ? blokusSmokeGameState(room)
+        : game === "mahe" && room.roomStatus === "PLAYING"
+          ? maheSmokeGameState(room)
+          : null;
     return {
       status: 200,
       body: {
@@ -510,7 +700,7 @@ async function resetGameStorage(ws) {
     localStorage.setItem("accessToken", "smoke-access-token");
     localStorage.setItem("refreshToken", "smoke-refresh-token");
     localStorage.setItem("userRoles", JSON.stringify(["ROLE_USER"]));
-    ["catan_last_room_id", "blokus_last_room_id", "mahe_last_room_id", "dalmuti_last_room_id"].forEach((key) => localStorage.removeItem(key));
+    ["catan_last_room_id", "blokus_last_room_id", "mahe_last_room_id", "dalmuti_last_room_id", "las_vegas_last_room_id"].forEach((key) => localStorage.removeItem(key));
     return true;
   })()`);
 }
@@ -552,6 +742,34 @@ async function runRoomFlowSmoke(ws, game) {
   if (game === "catan") {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-rule-brief"]'))`, "catan selected rule brief");
     await waitForExpression(ws, `document.querySelector('[data-smoke="catan-rule-brief"]')?.textContent.includes("10")`, "catan rule target");
+  }
+  if (game === "blokus") {
+    await waitForText(ws, "보드 칸을 누르면");
+    const clicked = await evaluate(ws, `(() => {
+      const button = Array.from(document.querySelectorAll("button")).find((node) => (node.getAttribute("aria-label") || "").startsWith("1열 1행"));
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`);
+    if (!clicked) throw new Error("blokus room flow: board cell button not found");
+    await waitForText(ws, "초록/현재 색");
+    await waitForText(ws, "선택 위치에 놓기");
+  }
+  if (game === "mahe") {
+    await send(ws, "Emulation.setDeviceMetricsOverride", {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 2,
+      mobile: true,
+    });
+    await waitForExpression(
+      ws,
+      `(() => {
+        const panel = document.querySelector('[data-smoke="mahe-side-dice-panel"]');
+        return Boolean(panel) && getComputedStyle(panel).display === "none";
+      })()`,
+      "mahe duplicate dice panel hidden on mobile"
+    );
   }
   assertRequest(game, "start", null, "start POST request");
 
