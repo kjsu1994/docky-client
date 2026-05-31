@@ -29,9 +29,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      // 운영 배포 산출물 경로를 compose 기준으로 고정
+      // Write production assets directly to the compose-served static directory.
       outDir: "C:/compose/minio-data/client/dist",
-      emptyOutDir: false,
+      emptyOutDir: true,
       sourcemap: false,
       rollupOptions: {
         output: {

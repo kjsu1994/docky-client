@@ -57,6 +57,130 @@
   - `POST /game/dice/roll`
   - `POST /game/dice/reroll`
   - `POST /game/plinko/play`
+- `/app/games/catan`
+  - `Header.jsx` and `/app/all-menu` expose the game hub plus direct Korean entries for Catan, Blokus, Mahe, and Dalmuti; this only changes navigation discovery and does not call any game API before route entry.
+  - `/app/games` groups Catan, Blokus, Mahe, and Dalmuti under the first-screen `신규 보드게임` section, with older games separated into `기존 게임`.
+  - `/app/games` is lazy-loaded as a separate `GamesHub` production chunk before the shared room flow, while each game detail route keeps its own lazy game chunk.
+  - the new-game cards render locally drawn board/card miniatures for Catan terrain, Blokus polyominoes, Mahe turtle stacks, and Dalmuti court cards; this is visual-only and does not call any game API.
+  - the games hub card exposes compact Korean rule-scope chips and a richer link label for Catan's 3~6 player, base-game, 5-6 player, and official-expansion entry point before the shared room flow loads.
+  - game-card preloading runs on pointer hover and keyboard focus only, avoiding touch-start downloads of the large shared tabletop chunk while users scroll on phones.
+  - `GET /game/catan/variants`
+  - the variant selector renders the full server-provided Catan list, grouped into base game, 5-6 player expansion, Seafarers, Traders & Barbarians, Explorers & Pirates, and Cities & Knights while still defaulting new rooms to `BASE`.
+  - room creation and host settings expose the same selected `variant_code` through both the native select and a grouped visual rule picker with base/expansion badges and player-count ranges.
+  - rule-picker cards, waiting-room cards, selected-room headers, and selected-rule summaries render server-provided Korean `featureTags`/`variantFeatureTags`, with a local `variant_code` fallback for older payloads.
+  - active tabletop rooms render a mobile/tablet Korean quick-jump bar above the board shell; it links to per-game board/action/status/hand anchors and does not change any REST or websocket payload.
+  - mobile/tablet quick-jump bars reserve space for the sticky app header and the target board/action/status anchors use a larger scroll margin, so hash navigation does not hide the destination under the header.
+  - long variant pickers use bounded internal scrolling with sticky group headers and group counts; this only affects rule selection presentation and preserves the same `variant_code` create/settings payloads.
+  - sticky action strips use bounded internal scrolling on smartphone and tablet breakpoints, preserving touch access to controls without changing any action payload.
+  - host settings disable variants whose `max_players` is already below the current room occupancy and show a Korean inline reason before calling `PATCH /game/catan/rooms/{roomId}/settings`.
+  - `GET /game/catan/rooms`
+  - `POST /game/catan/rooms`
+  - `GET /game/catan/rooms/me`
+  - `POST /game/catan/rooms/join-by-code`
+  - `POST /game/catan/rooms/{roomId}/join`
+  - `POST /game/catan/rooms/{roomId}/ready`
+  - `POST /game/catan/rooms/{roomId}/start`
+  - `PATCH /game/catan/rooms/{roomId}/settings`
+  - `POST /game/catan/rooms/{roomId}/leave`
+  - `GET /game/catan/rooms/{roomId}/state`
+  - `POST /game/catan/rooms/{roomId}/actions` (`SETUP_BUILD`, `ROLL_DICE`, `DISCARD_RESOURCES`, `DISCARD_PROGRESS_CARD`, `CHOOSE_GOLD_RESOURCE`, `CHOOSE_AQUEDUCT_RESOURCE`, `MOVE_ROBBER`, `MOVE_PIRATE`, `BUILD_ROAD`, `BUILD_BRIDGE`, `BUILD_SHIP`, `MOVE_SHIP`, `BUILD_SETTLER`, `LOAD_SETTLER`, `BUILD_CREW`, `UNLOAD_CREW_TO_PIRATE_LAIR`, `ROLL_FISH_HAUL`, `CATCH_FISH`, `COLLECT_SPICE`, `SELL_RESOURCE_FOR_GOLD`, `CHASE_AWAY_PIRATE`, `TRANSFER_CARGO`, `DELIVER_CARGO`, `FOUND_SETTLEMENT_FROM_SHIP`, `SPEND_FISH_MOVE_ROBBER`, `SPEND_FISH_STEAL_RESOURCE`, `SPEND_FISH_TAKE_RESOURCE`, `SPEND_FISH_BUILD_ROAD`, `SPEND_FISH_DRAW_DEVELOPMENT`, `GIVE_OLD_BOOT`, `SPEND_GOLD_FOR_RESOURCE`, `BID_CAMEL`, `PLACE_CAMEL`, `RECRUIT_BARBARIAN_KNIGHT`, `EXPEL_BARBARIANS`, `BUILD_KNIGHT`, `ACTIVATE_KNIGHT`, `PROMOTE_KNIGHT`, `MOVE_KNIGHT`, `MOVE_DISPLACED_KNIGHT`, `CHASE_ROBBER_WITH_KNIGHT`, `BUILD_CITY_IMPROVEMENT`, `BUILD_CITY_WALL`, `PLAY_PROGRESS_CARD`, `REMOVE_DESERTER_KNIGHT`, `PLACE_DESERTER_KNIGHT`, `MOVE_INTRIGUE_KNIGHT`, `RESPOND_COMMERCIAL_HARBOR`, `CHOOSE_MASTER_MERCHANT_CARDS`, `CHOOSE_SPY_PROGRESS_CARD`, `CHOOSE_DEFENDER_PROGRESS_CARD`, `RESPOND_WEDDING_CARDS`, `BUILD_SETTLEMENT`, `BUILD_HARBOR_SETTLEMENT`, `BUILD_CITY`, `MARITIME_TRADE`, `PROPOSE_TRADE`, `ACCEPT_TRADE`, `REJECT_TRADE`, `CANCEL_TRADE`, `BUY_DEVELOPMENT_CARD`, `PLAY_DEVELOPMENT_CARD`, `END_TURN`)
+  - `GET /rooms/{roomId}/state` requires room membership; the screen clears stale selected-room state on 403/404 and returns users to the lobby list.
+  - Shared lobby readiness follows the server rule that guest readiness gates host start; hosts are shown as 방장 and get a Korean start-condition badge instead of a misleading ready badge.
+  - Waiting rooms render a shared start-condition checklist for player range, guest readiness, and host authority before the per-game `/start` call is enabled.
+  - selected-room start guidance derives its Korean range and key-rule note from the active room variant metadata rather than hard-coding one game's expansion rule.
+  - shared create/join/waiting-room controls expose Korean labels for room title, room code, variant selection, refresh, ready/start, settings save, room actions, and listed-room entry; the room-code submit button stays disabled until a code is entered.
+  - the shared variant picker exposes Korean comparison labels for each base/expansion choice, including player range, selected state, feature tags, and disabled reasons, while preserving the same `variant_code` request payload for create/settings calls.
+  - Shared room operations locally lock with a synchronous ref guard while `create`, `join`, `ready`, `start`, `settings`, `leave`, `force-finish`, or `rematch` requests are pending, so repeated mobile taps do not duplicate room-state mutations before the server response returns or React disabled state renders.
+  - Shared tabletop lobby loading and error states are client-only: initial `variants`/`rooms` fetches expose Korean loading text, failed fetches show an inline alert with a `다시 시도` action that reloads both metadata and rooms, manual room-list refresh shows progress, and the empty-room state remains distinct from loading.
+  - Lobby reloads, saved-room restoration, room opening, state fetches, and STOMP room updates ignore stale responses after route changes or rapid room switches; this changes only client state safety and preserves the same `/variants`, `/rooms`, `/rooms/me`, `/state`, and websocket payloads.
+  - Waiting-room join cards use the room summary `players` and `maxPlayers` fields to show `가득 참`, block new joins before the backend max-player guard, and reopen rooms where the viewer is already listed.
+  - Selected room headers expose a local clipboard-only `코드 복사` action for the displayed `roomCode`; no additional API call is required.
+  - Shared action submission shows a Korean server-judgement status and blocks duplicate in-flight action requests before they reach the per-game `/actions` endpoint.
+  - the active board area renders an in-flight server-judgement overlay while `POST /game/{game}/rooms/{roomId}/actions` is pending, preventing duplicate board taps on desktop and mobile.
+  - active play surfaces use game-specific accent styling plus contained touch scrolling and safe-area-aware mobile action strips; this is visual/interaction polish only and does not change API requests.
+  - active play surfaces scope `min-width: 0` and media `max-width: 100%` safeguards to tabletop screens, preventing long Korean labels or SVG/canvas surfaces from forcing page-level horizontal overflow while preserving explicit board scroll containers.
+  - `npm run smoke:tabletop-ui` launches Chrome/Edge headless, mocks authenticated `/members`, `/game/{game}/variants`, `/rooms`, `/rooms/me`, `/rooms/{roomId}/state`, and `/chat/rooms` responses, then checks `/app/games` plus the four new game lobbies across desktop, tablet, and smartphone widths for Korean entry text and page-level horizontal overflow.
+  - The smoke check also clicks the shared room flow for Catan, Blokus, Mahe, and Dalmuti, verifying `POST /game/{game}/rooms`, `POST /game/{game}/rooms/{roomId}/start`, `POST /game/{game}/rooms/join-by-code`, and `POST /game/{game}/rooms/{roomId}/ready` payload/endpoint usage from the browser UI.
+  - For Catan, the smoke mock now returns a minimal active `gameState` after start and verifies that the Korean selected-rule brief renders in the browser play surface.
+  - the shared rules panel renders Korean rule cards for each game's objective, turn flow, scoring, and supported official variants; it is client-side guidance only and all legality remains under the same room/action endpoints.
+  - dynamic turn, selected-target, selected-card, room-request, and server-judgement messages are exposed as polite live-status regions while preserving the same visual layout across desktop, tablet, and smartphone screens.
+  - the Catan board panel also renders a Korean `지금 할 일` live-status card from `phase`, `activeSeatNo`, pending trade/choice fields, selected board IDs, and visible hand state, giving a next-action hint without changing any `/actions` payload.
+  - the Catan board panel now renders a Korean selected-rule brief from sanitized game-state flags such as `seafarersScenarioCode`, `citiesKnightsRule`, `tradersBarbariansRule`, `explorersPiratesRule`, `pairedTurnRule`, `winningPoints`, and `hiddenFogCount`; this is visual guidance only and does not alter room/action payloads.
+  - player score rows treat `victory_points` as viewer-relative total and `public_victory_points` as public score, so hidden development-card victory points are only explained on the owning player's row.
+  - finished-game state renders a board-top final-winner strip from `winner_seat_no` and the viewer-relative winner score.
+  - 5-6 player rooms render phase-aware Catanian 1/2 markers, distinguishing setup, Catanian 1 roll/action, Catanian 2 follow-up action, the viewer's current marker role, turn-end consequences, and the next marker movement.
+  - victory-point development cards are displayed as automatic hidden points and are not offered in the playable development-card action selector.
+  - base-game maritime trade, development-card purchase, and development-card play controls are disabled client-side when the visible state is clearly insufficient for the server action contract, including next-turn timing for newly purchased development cards.
+  - player-to-player trade UI shows one pending proposal at a time and keeps new proposals hidden until the current offer is accepted, rejected, or cancelled.
+  - selected board targets are summarized from the same game state in both the action panel and mobile board footer before action submission: hex terrain/number/production, edge route/cargo/camel/dock, and vertex building/port/knight/cargo details.
+  - selected Catan target chips use Korean labels instead of raw target IDs, and Cities & Knights knight markers render as Korean `기{level}` labels while preserving the same selected `hex_id`, `edge_id`, and `vertex_id` action payloads.
+  - the Catan mobile selected-target footer links to `#catan-action-panel`, so smartphone users can jump from board selection to the server-backed action controls without manually scrolling past the board.
+  - the Catan action panel links back to `#catan-board-panel` on smartphone/tablet layouts, keeping the board-to-action loop short after checking or submitting a move.
+  - the shared mobile quick-jump bar also links Catan users to `#catan-board-panel` and `#catan-action-panel`.
+  - Catan SVG board targets expose keyboard activation and Korean `aria-label` text for hexes, routes, cloth villages, and vertices while preserving the same `selected*Id` state used by touch/click actions.
+  - Catan hex rendering uses locally drawn SVG terrain textures for forest, pasture, field, hill, mountain, desert, gold, sea, and unexplored tiles; this is visual-only and does not change server state or action payloads.
+  - Cities & Knights knight placement now pre-checks the selected vertex against the same empty-intersection and own-route adjacency conditions before sending `BUILD_KNIGHT`; the server remains authoritative for the `vertex_id` payload.
+  - Cities & Knights knight movement now pre-checks source-to-destination reachability through the player's route network on the client before sending `MOVE_KNIGHT`; the server remains authoritative for the same `vertex_id` and `target_vertex_id` payload.
+  - recent event labels include `RESOURCE_SUPPLY_SHORTAGE` as "자원 공급 부족" for finite resource-card production skips; finite-bank rejections for maritime trade and Year of Plenty return through the normal action error path.
+  - the my-resource panel renders public `resourceBank` counts from the sanitized state, and gold-field, Aqueduct, maritime trade, and Year of Plenty controls use them for pre-submit limits while server-side validation remains authoritative.
+  - player-to-player resource trade controls render for resource-only Catan variants, including base 3~4 player rooms, 5~6 player extension rooms, Seafarers, and Traders & Barbarians; Cities & Knights and Explorers & Pirates keep separate specialized flows.
+  - Seafarers state rendering includes New Shores/Four Islands/Fog Islands/Through the Desert/Forgotten Tribe/Catan for Cloth scenario markers, gift-island edge tokens, cloth-village supply markers, cloth connection counts, and cloth victory-point badges from the same room/action API.
+  - Seafarers player badges format `homeIslandIds` and `settledForeignIslandIds` as Korean numbered island/region labels while preserving the same sanitized state fields.
+- `/app/games/blokus`
+  - the games hub card exposes compact Korean rule-scope chips and a richer link label for Blokus base game, Duo, and team-play entry before the shared room flow loads.
+  - the Blokus hub chip labels the official Duo mode as `듀오` for Korean-first display; the underlying route and variant payloads are unchanged.
+  - same shared room APIs under `/game/blokus`
+  - the variant selector groups Blokus choices into base game, Duo, player-count variants, and team play.
+  - `POST /game/blokus/rooms/{roomId}/actions` (`PLACE`, `PASS`)
+  - the play screen uses server score `winner` flags to render the finished-game final-winner strip and expands each score row with per-color official scoring details in a compact mobile-safe layout
+  - score rows map server score groups back to room participant nicknames for Duo, two-color, three-player, and team variants while keeping server score totals authoritative
+  - board density controls persist the selected cell size in local storage, so the Blokus board keeps the same mobile/compact/standard/expanded scale when the player reopens the room on the same device.
+  - 3-player rooms show the shared green color as a non-scoring shared color, including the current controller and the player 1 -> 2 -> 3 control order.
+  - the mobile/tablet board view includes a safe-area-aware sticky placement strip wired to the same `PLACE` and `PASS` actions as the side panel
+  - the shared mobile quick-jump bar links Blokus users to `#blokus-board-panel` and `#blokus-action-strip`.
+  - the sticky placement strip also exposes rotate/flip controls and a quick piece rail sorted toward currently playable pieces, without changing the server-authoritative `PLACE` payload.
+  - board-cell buttons expose Korean `aria-label`/title text for coordinates, occupied colors, start points, selected anchors, and placement-preview legality while preserving the same `PLACE` action payload.
+  - rotate/flip controls and piece selector buttons expose Korean `aria-label`/pressed state for current orientation, piece size, legal-placement count, and selected state without changing `PLACE` payloads.
+  - the Blokus board panel renders a Korean `지금 할 일` live-status card from current color, turn owner, selected piece, selected anchor, and client-visible legal-placement counts without changing `PLACE` or `PASS` payloads.
+  - side and mobile piece pickers render client-side legal-placement counts per remaining piece and provide a local auto-select action for the first currently placeable piece when the selected piece is blocked.
+  - the `PASS` controls are disabled until the client-side total legal-placement count across all remaining pieces is zero; the server remains authoritative and rejects invalid `PASS`
+- `/app/games/mahe`
+  - the games hub card exposes compact Korean rule-scope chips and a richer link label for Mahe base game, turtle stacking, and dice-odds guidance before the shared room flow loads.
+  - same shared room APIs under `/game/mahe`
+  - the variant selector keeps Mahe under the base-game group while preserving the shared min/max contract.
+  - `POST /game/mahe/rooms/{roomId}/actions` (`ROLL_DIE`, `STOP_ROLLING`, `CHOOSE_DICE_COUNT`)
+  - the play screen uses server score `winner` flags to render the finished-game final-winner strip
+  - the mobile track view mirrors the same `ROLL_DIE`, `STOP_ROLLING`, and `CHOOSE_DICE_COUNT` controls in a safe-area-aware sticky strip under the track
+  - the shared mobile quick-jump bar links Mahe users to `#mahe-board-panel` and `#mahe-action-strip`.
+  - stacked turtle order, carried-turtle dice-choice authority, moving turtle segment, and egg-card tie-break information are rendered from the server `stacks`, `activeSeatNo`, `decisionSeatNo`, and `scores` snapshot fields
+  - movement/scoring previews name the top moving turtle as the egg recipient when a carried stack crosses the finish line
+  - next-roll face previews and carried-choice dice-count odds are calculated from the same visible dice/position state before sending the server-authoritative action
+  - track spaces, the start raft, next-roll outcome tiles, and dice-count buttons expose Korean labels for stack order, active/projected positions, bust risk, safe movement, and egg-scoring chances without changing `ROLL_DIE`, `STOP_ROLLING`, or `CHOOSE_DICE_COUNT` payloads.
+  - the start raft uses the same active/projected visual state as numbered track spaces, so position `0` is represented in client previews without changing server position data.
+  - the Mahe track panel renders a Korean `지금 할 일` live-status card from phase, active/decision seat, dice sum, current egg, and projected risk state without changing any action payload.
+  - bust and final-egg guidance are rendered from `stacks`, `activeSeatNo`, `eggDeck`, `currentEgg`, and `finalEggRound` so players can see which carried turtle segment is at risk.
+- `/app/games/dalmuti`
+  - the games hub card exposes compact Korean rule-scope chips and a richer link label for Dalmuti base game, tax, and revolution support before the shared room flow loads.
+  - the Dalmuti hub preview labels the joker-style card as `광`, matching the in-game Korean card terminology without changing API data.
+  - same shared room APIs under `/game/dalmuti`
+  - the variant selector separates the base game from official optional rules such as stripped deck and first-deal revolution.
+  - `POST /game/dalmuti/rooms/{roomId}/actions` (`DECLARE_REVOLUTION`, `SKIP_REVOLUTION`, `RETURN_TAX`, `PLAY`, `PASS`)
+  - after a finished hand, the existing rematch/ready/start flow carries over next-hand roles and turn order from the previous finishing order
+  - the play screen shows stripped-deck variant badges, per-hand result points, and cumulative score ranking from the sanitized game state
+  - sticky mobile submit/pass controls use the shared safe-area offset so they stay reachable on smartphone browser chrome and notched screens
+  - the shared mobile quick-jump bar links Dalmuti users to `#dalmuti-status-panel`, `#dalmuti-hand-panel`, and `#dalmuti-action-strip`.
+  - the Dalmuti submit strip remains sticky through tablet widths, matching Blokus/Mahe touch-control behavior while keeping the same `PLAY`, `PASS`, and `RETURN_TAX` API payloads.
+  - tax-return submit controls also render inside the same sticky hand strip and stay disabled until the sanitized pending exchange count matches the selected `card_ids`
+  - the sticky submit area summarizes selected cards as compact chips and exposes a local clear action before `PLAY` or `RETURN_TAX` is sent
+  - hand-card buttons expose Korean `aria-label`, `aria-pressed`, and title text for rank, joker/wild status, selected state, and disabled phases while preserving the same `card_ids` action payload.
+  - in-game Dalmuti joker cards render the face marker as Korean `광`, matching the hub preview and server rank name while preserving the same sanitized `jester` card field.
+  - hand-rank quick-select controls show playable/blocked, joker-fill, and tax-return hints before changing the local `card_ids` selection, while final legality remains server-authoritative through the same `PLAY` and `RETURN_TAX` action endpoints
+  - hand-rank quick-select buttons expose Korean `aria-label`, `aria-pressed`, and title text for selected state, playable/blocked badge, joker-fill, and tax-return reason while preserving the same local `card_ids` selection behavior.
+  - tax-return progress is rendered from sanitized `taxExchanges`, showing both Greater/Lesser Dalmuti exchanges, completed state, waiting state, and the selected Dalmuti player's return-card requirement.
+  - revolution decision controls normalize eligible and declined seat IDs before enabling Declare/Skip buttons, while final legality remains server-authoritative through `DECLARE_REVOLUTION` and `SKIP_REVOLUTION`.
+  - current-trick pass progress is rendered from `consecutivePassSeatNos`, `currentTrick`, and per-player hand counts so players can see when the server will clear the trick
+  - top and smartphone sticky progress notices derive the viewer's current obligation from `phase`, `activeSeatNo`, `taxExchanges`, `currentTrick`, and revolution eligibility before sending any action.
+  - the Dalmuti progress notice now includes `지금 할 일` quick facts for phase, turn owner, selected-card count, and current trick baseline while preserving the same `PLAY`, `PASS`, `RETURN_TAX`, and revolution action payloads.
 - `/app/optimizer`
   - `POST /api/optimizer/optimize`
 - `/app/admin/anomalies` (ROLE_ADMIN)

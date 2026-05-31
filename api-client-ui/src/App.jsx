@@ -1,5 +1,6 @@
 ﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LoadingPage } from "./components/LoadingSpinner";
 import { Header } from "./components/Header";
@@ -26,13 +27,18 @@ import { TodoCalendar } from "./pages/facility/TodoCalendar.jsx";
 import { StreamingHub } from "./pages/streaming/StreamingHub.jsx";
 import { AdminStreamingStudio } from "./pages/admin/AdminStreamingStudio.jsx";
 import { InvestAssistant } from "./pages/facility/InvestAssistant.jsx";
-import { LasVegasGame } from "./pages/games/LasVegasGame.jsx";
-import { GamesHub } from "./pages/games/GamesHub.jsx";
-import { NoThanksGame } from "./pages/games/NoThanksGame.jsx";
 import { FloatingChat } from "./components/FloatingChat.jsx";
 import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
 import { GlobalNetworkIndicator } from "./components/GlobalNetworkIndicator.jsx";
+
+const GamesHub = lazy(() => import("./pages/games/GamesHub.jsx").then((module) => ({ default: module.GamesHub })));
+const LasVegasGame = lazy(() => import("./pages/games/LasVegasGame.jsx").then((module) => ({ default: module.LasVegasGame })));
+const NoThanksGame = lazy(() => import("./pages/games/NoThanksGame.jsx").then((module) => ({ default: module.NoThanksGame })));
+const CatanGame = lazy(() => import("./pages/games/TabletopGame.jsx").then((module) => ({ default: module.CatanGame })));
+const BlokusGame = lazy(() => import("./pages/games/TabletopGame.jsx").then((module) => ({ default: module.BlokusGame })));
+const MaheGame = lazy(() => import("./pages/games/TabletopGame.jsx").then((module) => ({ default: module.MaheGame })));
+const DalmutiGame = lazy(() => import("./pages/games/TabletopGame.jsx").then((module) => ({ default: module.DalmutiGame })));
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -64,6 +70,16 @@ const AppLayout = ({ children }) => {
     );
 };
 
+const GameRoute = ({ children }) => (
+    <ProtectedRoute>
+        <AppLayout>
+            <Suspense fallback={<LoadingPage />}>
+                {children}
+            </Suspense>
+        </AppLayout>
+    </ProtectedRoute>
+);
+
 function App() {
     return (
         <BrowserRouter>
@@ -85,7 +101,7 @@ function App() {
                     <Route path="/app/streaming" element={<ProtectedRoute><AppLayout><StreamingHub /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/invest" element={<ProtectedRoute><AppLayout><InvestAssistant /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/all-menu" element={<ProtectedRoute><AppLayout><AllMenu /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/games" element={<ProtectedRoute><AppLayout><GamesHub /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/games" element={<GameRoute><GamesHub /></GameRoute>} />
 
                     <Route path="/app/statistics" element={<ProtectedRoute><AppLayout><Statistics /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/ranks" element={<ProtectedRoute><AppLayout><Ranks /></AppLayout></ProtectedRoute>} />
@@ -93,8 +109,12 @@ function App() {
                     <Route path="/app/mypage" element={<ProtectedRoute><AppLayout><Mypage /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/mypage/edit" element={<ProtectedRoute><AppLayout><MypageEdit /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/plinko" element={<ProtectedRoute><AppLayout><LuckyPlinko /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/games/las-vegas" element={<ProtectedRoute><AppLayout><LasVegasGame /></AppLayout></ProtectedRoute>} />
-                    <Route path="/app/games/no-thanks" element={<ProtectedRoute><AppLayout><NoThanksGame /></AppLayout></ProtectedRoute>} />
+                    <Route path="/app/games/las-vegas" element={<GameRoute><LasVegasGame /></GameRoute>} />
+                    <Route path="/app/games/no-thanks" element={<GameRoute><NoThanksGame /></GameRoute>} />
+                    <Route path="/app/games/catan" element={<GameRoute><CatanGame /></GameRoute>} />
+                    <Route path="/app/games/blokus" element={<GameRoute><BlokusGame /></GameRoute>} />
+                    <Route path="/app/games/mahe" element={<GameRoute><MaheGame /></GameRoute>} />
+                    <Route path="/app/games/dalmuti" element={<GameRoute><DalmutiGame /></GameRoute>} />
                     <Route path="/app/optimizer" element={<ProtectedRoute><AppLayout><MeetingOptimizer /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/facility" element={<ProtectedRoute><AppLayout><FacilityFinder /></AppLayout></ProtectedRoute>} />
                     <Route path="/app/parking" element={<Navigate to="/app/facility" replace />} />
