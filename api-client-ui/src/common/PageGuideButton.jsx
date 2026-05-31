@@ -37,8 +37,8 @@ export const PageGuideButton = () => {
                     appRoute ? "top-24" : "top-4"
                 }`}
                 onClick={() => setOpen(true)}
-                aria-label={`${guide.title} 설명서 열기`}
-                title={`${guide.title} 설명서`}
+                aria-label={`${guide.title} 설명 열기`}
+                title={`${guide.title} 설명`}
             >
                 <CircleHelp className="h-5 w-5" />
             </button>
@@ -62,7 +62,7 @@ export const PageGuideButton = () => {
                                 <div className="min-w-0">
                                     <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600">
                                         <BookOpen className="h-3.5 w-3.5 text-primary-500" />
-                                        페이지 설명서
+                                        페이지 설명
                                     </div>
                                     <h2 id="page-guide-title" className="mt-3 break-words text-2xl font-black text-slate-900 sm:text-3xl">
                                         {guide.title}
@@ -75,7 +75,7 @@ export const PageGuideButton = () => {
                                     type="button"
                                     className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200"
                                     onClick={() => setOpen(false)}
-                                    aria-label="페이지 설명서 닫기"
+                                    aria-label="페이지 설명 닫기"
                                 >
                                     <X className="h-5 w-5" />
                                 </button>
@@ -102,7 +102,7 @@ export const PageGuideButton = () => {
                         </div>
                         <footer className="border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
                             <p className="text-xs font-bold leading-relaxed text-slate-500">
-                                실제 저장, 전송, 삭제 같은 동작은 버튼을 누른 뒤 화면에 표시되는 확인 메시지와 서버 응답을 기준으로 처리됩니다.
+                                실제 저장, 전송, 삭제 같은 동작은 버튼을 누른 뒤 표시되는 확인 메시지와 서버 응답을 기준으로 처리됩니다.
                             </p>
                         </footer>
                     </section>

@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import api from "../../utils/api.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
+import { confirmAction } from "../../common/confirmAction.jsx";
 
 const unwrapData = (payload) => payload?.data?.data ?? payload?.data ?? payload ?? null;
 
@@ -306,7 +307,12 @@ export const AdminOperations = () => {
     const removeBanner = async (banner) => {
         const bannerId = Number(pick(banner, "bannerId", "banner_id", 0));
         if (!bannerId) return;
-        if (!window.confirm("이 배너를 삭제할까요?")) return;
+        const confirmed = await confirmAction({
+            title: "배너를 삭제할까요?",
+            description: "운영 노출 목록에서 즉시 제거됩니다.",
+            confirmText: "삭제",
+        });
+        if (!confirmed) return;
         const toastId = toast.loading("배너를 삭제하는 중입니다...");
         try {
             await api.delete(`/admin/banners/${bannerId}`);

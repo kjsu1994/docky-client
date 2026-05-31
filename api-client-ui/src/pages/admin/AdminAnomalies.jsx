@@ -785,7 +785,7 @@ export const AdminAnomalies = () => {
 
     const createRule = async () => {
         if (!newRule.metric.trim()) {
-            window.alert("지표 이름을 입력하세요.");
+            toast.error("지표 이름을 입력하세요.");
             return;
         }
 

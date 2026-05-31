@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import api, { uploadFiles } from "../../utils/api.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
+import { confirmAction } from "../../common/confirmAction.jsx";
 
 const unwrap = (payload) => payload?.data?.data ?? payload?.data ?? payload ?? null;
 
@@ -246,7 +247,12 @@ export const AdminStreamingStudio = () => {
     };
 
     const handleDelete = async (videoId) => {
-        if (!window.confirm("이 영상을 삭제하시겠습니까? 원본/HLS/썸네일이 함께 제거됩니다.")) return;
+        const confirmed = await confirmAction({
+            title: "영상을 삭제할까요?",
+            description: "원본, HLS 파일, 썸네일이 함께 제거됩니다.",
+            confirmText: "삭제",
+        });
+        if (!confirmed) return;
         const toastId = toast.loading("영상을 삭제하는 중입니다...");
         try {
             await api.delete(`/admin/streaming/videos/${videoId}`);

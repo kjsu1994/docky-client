@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { CheckCircle2, Crown, MessageSquare, Play, TimerReset } from "lucide-react";
 import api from "../../utils/api.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
+import { confirmAction } from "../../common/confirmAction.jsx";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
@@ -448,7 +449,12 @@ export const NoThanksGame = () => {
 
   const forceFinishGame = async () => {
     if (!selectedRoom) return;
-    if (!window.confirm("게임이 아직 진행 중입니다. 종료하고 대기방으로 돌아가시겠습니까?")) return;
+    const confirmed = await confirmAction({
+      title: "진행 중인 게임을 종료할까요?",
+      description: "현재 판을 종료하고 대기방으로 돌아갑니다.",
+      confirmText: "종료",
+    });
+    if (!confirmed) return;
     try {
       const response = await api.post(`/game/no-thanks/rooms/${roomIdOf(selectedRoom)}/force-finish`);
       setSelectedRoom(response.data);

@@ -154,7 +154,6 @@ export const Chat = () => {
         if (!roomId) return;
         setLoadingMembers(true);
         try {
-            console.log(`Fetching members for room ${roomId}...`);
             const response = await api.get(`/chat/room/${roomId}/members`);
             const data = response.data?.data || response.data;
             const safeMembers = Array.isArray(data) ? data : (data?.content || []);
@@ -213,20 +212,17 @@ export const Chat = () => {
         const client = new Client({
             webSocketFactory: () => socket,
             connectHeaders: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-            debug: (str) => { console.log("[STOMP Debug]", str); },
             reconnectDelay: 5000,
             heartbeatIncoming: 4000,
             heartbeatOutgoing: 4000,
         });
 
-        client.onConnect = (frame) => {
-            console.log("STOMP Connected");
+        client.onConnect = () => {
             stompClientRef.current = client;
             setIsConnected(true);
         };
 
         client.onDisconnect = () => {
-            console.log("STOMP Disconnected");
             setIsConnected(false);
         };
 
@@ -263,7 +259,7 @@ export const Chat = () => {
             }
         });
 
-        api.patch(`/chat/room/${roomId}/read`).catch(console.error);
+        api.patch(`/chat/room/${roomId}/read`).catch(() => undefined);
         return () => { subscription.unsubscribe(); };
     }, [isConnected, currentRoom]);
 
@@ -379,8 +375,6 @@ export const Chat = () => {
             // 방 생성 시에는 본인만 멤버로 등록해 생성한다.
             const myId = Number(user.member_id || user.memberId || user.id);
             const memberIds = [myId];
-
-            console.log("[Chat] Creating room with title:", newRoomTitle);
 
             const payload = { title: newRoomTitle, type: newRoomType, memberIds: memberIds };
             const response = await api.post("/chat/room", payload);

@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { formatRelativeTime } from "../utils/helpers.js";
 import { canManageByOwnerOrAdmin } from "../utils/authorization.js";
 import { normalizeProfileImageUrl } from "../utils/profileImage.js";
+import { confirmAction } from "../common/confirmAction.jsx";
 
 export const Comments = ({ boardId, onUpdate }) => {
     const { user } = useAuth();
@@ -138,7 +139,12 @@ export const Comments = ({ boardId, onUpdate }) => {
     };
 
     const handleDeleteComment = async (commentId) => {
-        if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
+        const confirmed = await confirmAction({
+            title: "댓글을 삭제할까요?",
+            description: "삭제한 댓글은 되돌릴 수 없습니다.",
+            confirmText: "삭제",
+        });
+        if (!confirmed) return;
 
         const existing = comments.find((comment) => (comment.comment_id || comment.commentId) === commentId);
         if (!existing) return;

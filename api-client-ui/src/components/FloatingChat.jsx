@@ -34,6 +34,7 @@ import api, { uploadFiles } from "../utils/api";
 import toast from "react-hot-toast";
 import { formatRelativeTime, debounce, normalizeChatTimestamp, resolveAssetUrl, formatFileSize, isImageFile } from "../utils/helpers";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { confirmAction } from "../common/confirmAction.jsx";
 
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
 
@@ -588,7 +589,13 @@ export const FloatingChat = () => {
     };
 
     const leaveRoom = async (roomId) => {
-        if (!roomId || !window.confirm("정말 이 채팅방에서 나가시겠습니까?")) return;
+        if (!roomId) return;
+        const confirmed = await confirmAction({
+            title: "채팅방에서 나갈까요?",
+            description: "나간 뒤에는 다시 초대받아야 참여할 수 있습니다.",
+            confirmText: "나가기",
+        });
+        if (!confirmed) return;
         try {
             await api.delete(`/chat/room/${roomId}/leave`);
             toast.success("채팅방에서 나갔습니다.");
@@ -622,8 +629,6 @@ export const FloatingChat = () => {
                 type: newRoomType, 
                 memberIds: memberIds 
             };
-            
-            console.log("[FloatingChat] Creating empty room with title:", newRoomTitle);
             
             const response = await api.post("/chat/room", payload);
             const createdData = response.data?.data || response.data;

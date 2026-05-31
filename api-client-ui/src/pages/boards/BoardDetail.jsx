@@ -23,6 +23,7 @@ import {
     normalizeContentImageUrls
 } from "../../utils/helpers.js";
 import { canManageByOwnerOrAdmin } from "../../utils/authorization.js";
+import { confirmAction } from "../../common/confirmAction.jsx";
 import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
 import { getBoardLikeCount, normalizeBoardDetail } from "../../adapters/boardAdapter.js";
 
@@ -128,7 +129,12 @@ export const BoardDetail = () => {
     };
 
     const handleDelete = async () => {
-        if (!window.confirm("정말 삭제하시겠습니까?")) return;
+        const confirmed = await confirmAction({
+            title: "게시글을 삭제할까요?",
+            description: "본문, 첨부파일, 댓글 정보가 함께 정리될 수 있습니다.",
+            confirmText: "삭제",
+        });
+        if (!confirmed) return;
         try {
             await api.delete(`/boards/${boardId}`);
             toast.success("게시글이 삭제되었습니다.");

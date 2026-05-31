@@ -27,6 +27,7 @@ import {
     resolveAssetUrl,
 } from "../../utils/helpers.js";
 import { canManageByOwnerOrAdmin, isAdminUser } from "../../utils/authorization.js";
+import { confirmAction } from "../../common/confirmAction.jsx";
 
 // ── 유틸리티 함수 ──────────────────────────────────────────
 const isBoardNotice = (board) => {
@@ -111,7 +112,12 @@ export const BoardList = () => {
     };
 
     const handleDeleteBoard = async (boardId) => {
-        if (!window.confirm("정말 삭제하시겠습니까?")) return;
+        const confirmed = await confirmAction({
+            title: "게시글을 삭제할까요?",
+            description: "목록에서 즉시 제거되며 되돌릴 수 없습니다.",
+            confirmText: "삭제",
+        });
+        if (!confirmed) return;
         try {
             await api.delete(`/boards/${boardId}`);
             toast.success("삭제되었습니다.");
