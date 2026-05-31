@@ -53,6 +53,7 @@
   - `GET /chat/room/{roomId}/members`
   - `PATCH /chat/room/{roomId}/read`
   - `POST /chat/room/{roomId}/file`
+  - the floating chat widget shares the same chat APIs and now hides the bottom-right launcher while the full chat panel is open, so small mobile screens keep the message send button unobstructed.
 - `/app/plinko`
   - `POST /game/dice/roll`
   - `POST /game/dice/reroll`
@@ -63,6 +64,7 @@
   - `/app/games` is lazy-loaded as a separate `GamesHub` production chunk before the shared room flow, while each game detail route keeps its own lazy game chunk.
   - the new-game cards render locally drawn board/card miniatures for Catan terrain, Blokus polyominoes, Mahe turtle stacks, and Dalmuti court cards; this is visual-only and does not call any game API.
   - the games hub card exposes compact Korean rule-scope chips and a richer link label for Catan's 3~6 player, base-game, 5-6 player, and official-expansion entry point before the shared room flow loads.
+  - every `/app/games` card now exposes a top-right Korean manual button that opens a client-only beginner guide modal for the selected game; it does not call additional APIs and keeps the existing room/create/code-entry flow unchanged.
   - game-card preloading runs on pointer hover and keyboard focus only, avoiding touch-start downloads of the large shared tabletop chunk while users scroll on phones.
   - `GET /game/catan/variants`
   - the variant selector renders the full server-provided Catan list, grouped into base game, 5-6 player expansion, Seafarers, Traders & Barbarians, Explorers & Pirates, and Cities & Knights while still defaulting new rooms to `BASE`.

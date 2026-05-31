@@ -728,7 +728,7 @@ export const FloatingChat = () => {
     const totalUnreadCount = rooms.reduce((sum, room) => sum + getUnreadCount(room), 0);
     const panelMetrics = useMemo(() => {
         const width = isMinimized ? 288 : Math.min(400, Math.max(280, window.innerWidth - 48));
-        const height = isMinimized ? 64 : 600;
+        const height = isMinimized ? 64 : Math.max(320, Math.min(600, window.innerHeight - 48));
         return { width, height };
     }, [isMinimized]);
     const panelStyle = useMemo(() => {
@@ -832,16 +832,21 @@ export const FloatingChat = () => {
         setIsDraggingFab(false);
     };
 
+    const closeChat = () => {
+        setIsOpen(false);
+        setIsMinimized(false);
+    };
+
     const toggleChat = () => {
         if (didDragRef.current) {
             didDragRef.current = false;
             return;
         }
-        if (isMinimized) {
+        if (isOpen && isMinimized) {
             setIsMinimized(false);
             return;
         }
-        setIsOpen(!isOpen);
+        setIsOpen((prev) => !prev);
     };
 
     const handlePanelPointerDown = (e) => {
@@ -875,7 +880,7 @@ export const FloatingChat = () => {
             const root = chatRootRef.current;
             if (!root) return;
             if (root.contains(e.target)) return;
-            setIsOpen(false);
+            closeChat();
         };
 
         window.addEventListener("pointerdown", handleOutsidePointerDown, true);
@@ -920,7 +925,7 @@ export const FloatingChat = () => {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                             <button onClick={() => setIsMinimized(!isMinimized)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">{isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}</button>
-                            <button onClick={() => setIsOpen(false)} className="p-2 rounded-xl text-rose-200 hover:text-rose-100 hover:bg-rose-500/20 transition-colors"><X className="h-4 w-4" /></button>
+                            <button onClick={closeChat} className="p-2 rounded-xl text-rose-200 hover:text-rose-100 hover:bg-rose-500/20 transition-colors"><X className="h-4 w-4" /></button>
                         </div>
                     </div>
 
@@ -1085,21 +1090,25 @@ export const FloatingChat = () => {
                 </div>
             )}
 
-            <button
-                onClick={toggleChat}
-                onPointerDown={handleFabPointerDown}
-                onPointerMove={handleFabPointerMove}
-                onPointerUp={endFabDrag}
-                onPointerCancel={endFabDrag}
-                onPointerLeave={endFabDrag}
-                className={`pointer-events-auto w-16 h-16 rounded-[2rem] shadow-2xl flex items-center justify-center transition-all duration-500 active:scale-90 touch-none select-none ${isDraggingFab ? "cursor-grabbing" : "cursor-grab"} ${isOpen && !isMinimized ? "bg-white text-primary-600 rotate-90 scale-90" : "bg-primary-600 text-white hover:scale-110 shadow-primary-200"}`}>
-                {isOpen && !isMinimized ? <X className="h-7 w-7 text-rose-500" /> : <MessageCircle className="h-7 w-7" />}
-                {totalUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-6 h-6 px-1 bg-rose-500 text-white rounded-full border-2 border-white shadow-lg text-[10px] font-black flex items-center justify-center">
-                        {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
-                    </span>
-                )}
-            </button>
+            {(!isOpen || isMinimized) && (
+                <button
+                    onClick={toggleChat}
+                    onPointerDown={handleFabPointerDown}
+                    onPointerMove={handleFabPointerMove}
+                    onPointerUp={endFabDrag}
+                    onPointerCancel={endFabDrag}
+                    onPointerLeave={endFabDrag}
+                    className={`pointer-events-auto w-16 h-16 rounded-[2rem] bg-primary-600 text-white shadow-2xl shadow-primary-200 flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-90 touch-none select-none ${isDraggingFab ? "cursor-grabbing" : "cursor-grab"}`}
+                    aria-label={isMinimized ? "채팅창 펼치기" : "채팅창 열기"}
+                >
+                    <MessageCircle className="h-7 w-7" />
+                    {totalUnreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-6 h-6 px-1 bg-rose-500 text-white rounded-full border-2 border-white shadow-lg text-[10px] font-black flex items-center justify-center">
+                            {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
+                        </span>
+                    )}
+                </button>
+            )}
 
             {(showCreateModal || showInviteModal) && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md pointer-events-auto">

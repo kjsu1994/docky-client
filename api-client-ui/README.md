@@ -173,12 +173,16 @@ npm run dev
 - Feature removal (`src/App.jsx`, `src/components/Header.jsx`, `src/pages/AllMenu.jsx`, `src/pages/Home.jsx`)
   - Removed GPT question and electricity calculator routes/menu entry points.
   - Deleted page modules: `src/pages/GptQuestion.jsx`, `src/pages/Calculators.jsx`.
+- Floating chat mobile UX update (`src/components/FloatingChat.jsx`)
+  - The bottom-right chat launcher now hides while the full floating chat panel is open, so the mobile close icon no longer overlaps the message send button.
+  - The floating panel height is capped to the current viewport before positioning, keeping the input row reachable on smaller smartphone screens.
 - Tabletop game lobby foundation update (`src/App.jsx`, `src/pages/games/GamesHub.jsx`, `src/pages/games/TabletopGame.jsx`)
   - Added Korean-first game hub entries and routes for Catan, Blokus, Mahe, and Dalmuti.
   - Header and full-menu game navigation now expose the game hub plus direct entries for Catan, Blokus, Mahe, and Dalmuti, so desktop and mobile users can reach the new board games without relying only on the bottom game tab.
   - Games hub now groups Catan, Blokus, Mahe, and Dalmuti under a first-screen `신규 보드게임` section, with older games separated below so the active board-game work is easier to find.
   - Games hub cards now use Korean-first status copy, tighter mobile spacing, full-width touch entry buttons on smartphones, and focus rings for keyboard navigation.
   - Games hub cards now include custom CSS mini-previews for each game type instead of a repeated generic icon, so Catan, Blokus, Mahe, and Dalmuti are visually distinguishable before entering a room.
+  - Games hub cards now include a touch-sized top-right manual button that opens Korean beginner guides for Lucky Plinko, Las Vegas, No Thanks, Catan, Blokus, Mahe, and Dalmuti without changing any game API or room-entry flow.
   - Games hub previews for the four new board games now use richer locally drawn board/card miniatures: Catan terrain hexes with routes, Blokus polyomino placements, Mahe turtle-track stacks, and Dalmuti court cards, without external copyrighted assets.
   - Games hub labels and previews now prefer Korean board-game terms for new games, including Blokus `듀오` and Dalmuti `광` joker preview labels.
   - Games hub cards now show compact rule-scope chips and richer Korean link labels, making base/expansion, Duo/team, turtle-stack odds, and Dalmuti tax/revolution support easier to compare before entering a room.
