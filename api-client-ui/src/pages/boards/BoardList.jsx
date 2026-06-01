@@ -1,109 +1,99 @@
-import { useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
-    Search,
-    PlusCircle,
     Eye,
-    Heart,
     Filter,
-    Calendar,
+    Heart,
     Image as ImageIcon,
     Megaphone,
+    PlusCircle,
+    Search,
 } from "lucide-react";
-import { useBoards } from "../../hooks/useBoards.js";
-import { useAuth } from "../../contexts/AuthContext.jsx";
-import api from "../../utils/api.js";
 import toast from "react-hot-toast";
-import { ErrorMessage } from "../../components/ErrorMessage.jsx";
+import { useAuth } from "../../contexts/AuthContext.jsx";
+import { useBoards } from "../../hooks/useBoards.js";
+import { boardAdapter } from "../../adapters/boardAdapter.js";
 import { EmptyState } from "../../components/EmptyState.jsx";
+import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { Pagination } from "../../components/Pagination.jsx";
 import { ListSkeleton } from "../../components/Skeleton.jsx";
-import {
-    getBoardKindLabel,
-    formatRelativeTime,
-    truncateText,
-    formatNumber,
-    stripHtmlTags,
-    resolveAssetUrl,
-} from "../../utils/helpers.js";
-import { canManageByOwnerOrAdmin, isAdminUser } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import { canManageByOwnerOrAdmin, isAdminUser } from "../../utils/authorization.js";
+import {
+    formatNumber,
+    formatRelativeTime,
+    getBoardKindLabel,
+    resolveAssetUrl,
+    stripHtmlTags,
+    truncateText,
+} from "../../utils/helpers.js";
 
-// ── 유틸리티 함수 ──────────────────────────────────────────
 const isBoardNotice = (board) => {
-    const bKind = board.kind_of_board || board.kindOfBoard;
-    // 주입된 kind_of_board 값을 기반으로 판별
-    return bKind === "ADMIN_NOTICE" || board.is_notice === true || board.isNotice === true;
+    const kind = board.kind_of_board || board.kindOfBoard;
+    return kind === "ADMIN_NOTICE" || board.is_notice === true || board.isNotice === true;
 };
 
-// ── 메인 컴포넌트 ──────────────────────────────────────────
 export const BoardList = () => {
     const { kind = "FREE_BOARD" } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = isAdminUser(user);
 
-    const [subTab, setSubTab] = useState("all"); // all, notice, normal
+    const [subTab, setSubTab] = useState("all");
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("latest");
     const [refreshKey, setRefreshKey] = useState(0);
     const [paging, setPaging] = useState({ page: 1, size: 10 });
 
-    // 사용자게시판인 경우 공지사항(ADMIN_NOTICE)과 일반글(FREE_BOARD)을 함께 가져옴
-    const fetchKind = kind === "FREE_BOARD" ? ["FREE_BOARD", "ADMIN_NOTICE"] : kind;
-    const { boards, loading, error, pageInfo } = useBoards(fetchKind, paging.page, paging.size, refreshKey);
+    const isFreeBoard = kind === "FREE_BOARD";
+    const activeKind = isFreeBoard && subTab === "notice" ? "ADMIN_NOTICE" : kind;
+    const shouldFetchPinnedNotices = isFreeBoard && subTab === "all";
+    const boardQuery = useMemo(() => ({
+        searchType: "ALL",
+        searchValue: debouncedSearchTerm,
+        sortBy,
+    }), [debouncedSearchTerm, sortBy]);
 
-    // ── 데이터 처리 (useMemo) ──────────────────────────
+    const { boards, loading, error, pageInfo } = useBoards(activeKind, paging.page, paging.size, refreshKey, boardQuery);
+    const { boards: pinnedNotices, pageInfo: pinnedNoticePageInfo } = useBoards("ADMIN_NOTICE", 1, 5, refreshKey, {
+        ...boardQuery,
+        enabled: shouldFetchPinnedNotices,
+    });
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm.trim());
+        }, 300);
+        return () => window.clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        setPaging((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 }));
+    }, [kind, subTab, debouncedSearchTerm, sortBy]);
+
     const { noticeBoards, regularBoards, filteredCount } = useMemo(() => {
-        // 1. 공지사항 여부에 따른 분류
-        const notices = boards.filter(isBoardNotice);
-        const regulars = boards.filter(b => !isBoardNotice(b));
+        const activePageNotices = activeKind === "ADMIN_NOTICE" ? boards : [];
+        const activePageRegulars = activeKind === "ADMIN_NOTICE" ? [] : boards.filter((board) => !isBoardNotice(board));
+        const visibleNotices = shouldFetchPinnedNotices ? pinnedNotices : activePageNotices;
+        const totalNotices = shouldFetchPinnedNotices
+            ? (pinnedNoticePageInfo?.totalElements || visibleNotices.length)
+            : visibleNotices.length;
+        const totalRegulars = activeKind === "ADMIN_NOTICE"
+            ? 0
+            : (pageInfo?.totalElements || activePageRegulars.length);
 
-        // 2. 검색어 필터링 함수
-        const applySearch = (list) => {
-            if (!searchTerm) return list;
-            const lower = searchTerm.toLowerCase();
-            return list.filter(b => 
-                b.title?.toLowerCase().includes(lower) || 
-                stripHtmlTags(b.contents || b.content || "").toLowerCase().includes(lower) ||
-                (b.board_creator || b.boardCreator || "").toLowerCase().includes(lower)
-            );
+        return {
+            noticeBoards: visibleNotices,
+            regularBoards: activePageRegulars,
+            filteredCount: activeKind === "ADMIN_NOTICE"
+                ? (pageInfo?.totalElements || visibleNotices.length)
+                : totalRegulars + totalNotices,
         };
-
-        // 3. 현재 탭 상태에 따라 노출할 데이터 결정
-        let finalNotices = [];
-        let finalRegulars = [];
-
-        if (subTab === "all") {
-            finalNotices = applySearch(notices);
-            finalRegulars = applySearch(regulars);
-        } else if (subTab === "notice") {
-            finalNotices = applySearch(notices);
-            finalRegulars = [];
-        } else if (subTab === "normal") {
-            finalNotices = [];
-            finalRegulars = applySearch(regulars);
-        }
-
-        // 정렬 로직
-        const sortFn = (a, b) => {
-            if (sortBy === "popular") return (b.view_count || b.viewCount || 0) - (a.view_count || a.viewCount || 0);
-            if (sortBy === "likes") return (b.like_count || b.likeCount || 0) - (a.like_count || a.likeCount || 0);
-            return new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt);
-        };
-
-        finalNotices.sort(sortFn);
-        finalRegulars.sort(sortFn);
-
-        return { 
-            noticeBoards: finalNotices, 
-            regularBoards: finalRegulars,
-            filteredCount: finalNotices.length + finalRegulars.length
-        };
-    }, [boards, subTab, searchTerm, sortBy]);
+    }, [activeKind, boards, pageInfo?.totalElements, pinnedNoticePageInfo?.totalElements, pinnedNotices, shouldFetchPinnedNotices]);
 
     const handlePageChange = (newPage) => {
-        setPaging(prev => ({ ...prev, page: newPage }));
+        setPaging((prev) => ({ ...prev, page: newPage }));
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -118,60 +108,75 @@ export const BoardList = () => {
             confirmText: "삭제",
         });
         if (!confirmed) return;
+
         try {
-            await api.delete(`/boards/${boardId}`);
+            await boardAdapter.deleteBoard(boardId);
             toast.success("삭제되었습니다.");
-            setRefreshKey(prev => prev + 1);
-        } catch (err) { toast.error("삭제 실패"); }
+            setRefreshKey((prev) => prev + 1);
+        } catch (error) {
+            console.error("Failed to delete board:", error);
+            toast.error("삭제 실패");
+        }
     };
 
     const canWrite = kind !== "ADMIN_NOTICE" || isAdmin;
+    const newBoardKind = isFreeBoard && subTab === "notice" ? "ADMIN_NOTICE" : kind;
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">{getBoardKindLabel(kind)}</h1>
-                    <p className="text-sm text-slate-500 mt-1">총 {formatNumber(filteredCount)}개의 게시글</p>
+                    <p className="mt-1 text-sm text-slate-500">총 {formatNumber(filteredCount)}개의 게시글</p>
                 </div>
                 {canWrite && (
-                    <button 
-                        onClick={() => {
-                            const targetKind = (kind === "FREE_BOARD" && subTab === "notice") ? "ADMIN_NOTICE" : kind;
-                            navigate(`/app/boards/${targetKind}/new`);
-                        }} 
+                    <button
+                        type="button"
+                        onClick={() => navigate(`/app/boards/${newBoardKind}/new`)}
                         className="btn-primary flex items-center gap-2"
                     >
-                        <PlusCircle className="h-4 w-4" />글쓰기
+                        <PlusCircle className="h-4 w-4" />
+                        글쓰기
                     </button>
                 )}
             </div>
 
-            {kind === "FREE_BOARD" && (
-                <div className="flex border-b border-slate-200 gap-8">
+            {isFreeBoard && (
+                <div className="flex gap-8 border-b border-slate-200">
                     {[["all", "전체"], ["notice", "공지"], ["normal", "일반"]].map(([id, label]) => (
-                        <button key={id} onClick={() => setSubTab(id)} className={`pb-3 text-sm font-bold transition-all relative ${subTab === id ? "text-primary-600" : "text-slate-400 hover:text-slate-600"}`}>
+                        <button
+                            key={id}
+                            type="button"
+                            onClick={() => setSubTab(id)}
+                            className={`relative pb-3 text-sm font-bold transition-all ${subTab === id ? "text-primary-600" : "text-slate-400 hover:text-slate-600"}`}
+                        >
                             {label}
-                            {subTab === id && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary-600 animate-fade-in" />}
+                            {subTab === id && <div className="absolute bottom-0 left-0 h-0.5 w-full animate-fade-in bg-primary-600" />}
                         </button>
                     ))}
                 </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input type="text" placeholder="검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-base pl-9 w-full" />
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="검색..."
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        className="input-base w-full pl-9"
+                    />
                 </div>
                 <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-slate-400" />
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="input-base text-sm">
+                    <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="input-base text-sm">
                         <option value="latest">최신순</option>
                         <option value="popular">조회순</option>
                         <option value="likes">좋아요순</option>
                     </select>
-                    <select value={paging.size} onChange={(e) => handleSizeChange(Number(e.target.value))} className="input-base text-sm">
-                        {[10, 20, 50].map(s => <option key={s} value={s}>{s}개씩</option>)}
+                    <select value={paging.size} onChange={(event) => handleSizeChange(Number(event.target.value))} className="input-base text-sm">
+                        {[10, 20, 50].map((size) => <option key={size} value={size}>{size}개씩</option>)}
                     </select>
                 </div>
             </div>
@@ -185,36 +190,31 @@ export const BoardList = () => {
                         다시 시도
                     </button>
                 </div>
-            ) : (filteredCount === 0) ? (
+            ) : filteredCount === 0 ? (
                 <div className="space-y-4">
                     <EmptyState message="게시글이 없습니다." subMessage="새로운 이야기를 시작해보세요!" />
                     {canWrite && (
-                        <button
-                            type="button"
-                            className="btn-primary"
-                            onClick={() => {
-                                const targetKind = (kind === "FREE_BOARD" && subTab === "notice") ? "ADMIN_NOTICE" : kind;
-                                navigate(`/app/boards/${targetKind}/new`);
-                            }}
-                        >
+                        <button type="button" className="btn-primary" onClick={() => navigate(`/app/boards/${newBoardKind}/new`)}>
                             첫 글 작성하기
                         </button>
                     )}
                 </div>
             ) : (
                 <>
-                    {/* 1. 공지사항 섹션 */}
                     {noticeBoards.length > 0 && (
                         <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-amber-700"><Megaphone className="h-4 w-4" />필독 공지사항</div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {noticeBoards.map((b, idx) => (
-                                    <div key={b.board_id || b.boardId} className="animate-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
-                                        <NoticeBoardCard 
-                                            board={b} 
-                                            user={user} 
-                                            onDelete={handleDeleteBoard} 
-                                            onOpen={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}`)} 
+                            <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+                                <Megaphone className="h-4 w-4" />
+                                필독 공지사항
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {noticeBoards.map((board, index) => (
+                                    <div key={board.board_id || board.boardId} className="animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
+                                        <NoticeBoardCard
+                                            board={board}
+                                            user={user}
+                                            onDelete={handleDeleteBoard}
+                                            onOpen={() => navigate(`/app/boards/${board.kind_of_board || board.kindOfBoard || kind}/${board.board_id || board.boardId}`)}
                                         />
                                     </div>
                                 ))}
@@ -222,29 +222,33 @@ export const BoardList = () => {
                         </div>
                     )}
 
-                    {/* 2. 일반 게시글 섹션 */}
                     {regularBoards.length > 0 && (
-                        <div className="space-y-3 mt-4">
+                        <div className="mt-4 space-y-3">
                             {subTab === "all" && noticeBoards.length > 0 && (
-                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2 border-t pt-4">
-                                    <ImageIcon className="h-4 w-4" />일반 게시글
+                                <div className="mb-2 flex items-center gap-2 border-t pt-4 text-sm font-semibold text-slate-700">
+                                    <ImageIcon className="h-4 w-4" />
+                                    일반 게시글
                                 </div>
                             )}
-                            {regularBoards.map((b, idx) => (
-                                <div key={b.board_id || b.boardId} className="animate-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
-                                    <BoardCard 
-                                        board={b} 
-                                        user={user} 
-                                        onDelete={handleDeleteBoard} 
-                                        onOpen={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}`)} 
-                                        onEdit={() => navigate(`/app/boards/${b.kind_of_board || kind}/${b.board_id || b.boardId}/edit`)} 
+                            {regularBoards.map((board, index) => (
+                                <div key={board.board_id || board.boardId} className="animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
+                                    <BoardCard
+                                        board={board}
+                                        user={user}
+                                        onDelete={handleDeleteBoard}
+                                        onOpen={() => navigate(`/app/boards/${board.kind_of_board || board.kindOfBoard || kind}/${board.board_id || board.boardId}`)}
+                                        onEdit={() => navigate(`/app/boards/${board.kind_of_board || board.kindOfBoard || kind}/${board.board_id || board.boardId}/edit`)}
                                     />
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {pageInfo?.totalPages > 1 && <div className="py-4"><Pagination currentPage={paging.page} totalPages={pageInfo.totalPages} onPageChange={handlePageChange} /></div>}
+                    {pageInfo?.totalPages > 1 && (
+                        <div className="py-4">
+                            <Pagination currentPage={paging.page} totalPages={pageInfo.totalPages} onPageChange={handlePageChange} />
+                        </div>
+                    )}
                 </>
             )}
         </div>
@@ -252,31 +256,34 @@ export const BoardList = () => {
 };
 
 const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
-    const canManage = canManageByOwnerOrAdmin(user, board.member, { ownerName: board.board_creator || board.boardCreator, userName: user?.name });
+    const canManage = canManageByOwnerOrAdmin(user, board.member, {
+        ownerName: board.board_creator || board.boardCreator,
+        userName: user?.name,
+    });
     const contentHtml = board.contents || board.content || "";
     const imgMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
     const thumbnailUrl = imgMatch ? resolveAssetUrl(imgMatch[1]) : null;
     const [imgError, setImgError] = useState(false);
 
     return (
-        <div onClick={onOpen} className="card hover:shadow-lg transition-all group overflow-hidden cursor-pointer flex items-stretch min-h-[120px]">
+        <div onClick={onOpen} className="card group flex min-h-[120px] cursor-pointer items-stretch overflow-hidden transition-all hover:shadow-lg">
             {thumbnailUrl && !imgError && (
-                <div className="w-32 sm:w-40 flex-shrink-0 bg-slate-100 border-r relative">
-                    <img src={thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" onError={() => setImgError(true)} />
+                <div className="relative w-32 flex-shrink-0 border-r bg-slate-100 sm:w-40">
+                    <img src={thumbnailUrl} alt="게시글 이미지" className="h-full w-full object-cover" onError={() => setImgError(true)} />
                 </div>
             )}
-            <div className="flex-1 p-4 sm:p-5 min-w-0 flex flex-col justify-between">
+            <div className="flex min-w-0 flex-1 flex-col justify-between p-4 sm:p-5">
                 <div>
-                    <div className="flex justify-between items-start mb-1">
-                        <h3 className="font-bold text-slate-900 group-hover:text-primary-600 transition-colors line-clamp-1 text-base sm:text-lg">{board.title}</h3>
+                    <div className="mb-1 flex items-start justify-between">
+                        <h3 className="line-clamp-1 text-base font-bold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-lg">{board.title}</h3>
                         {canManage && (
-                            <div className="flex gap-1 ml-2 shrink-0">
-                                <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="text-xs px-2 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50">수정</button>
-                                <button onClick={(e) => { e.stopPropagation(); onDelete(board.board_id || board.boardId); }} className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50">삭제</button>
+                            <div className="ml-2 flex shrink-0 gap-1">
+                                <button type="button" onClick={(event) => { event.stopPropagation(); onEdit(); }} className="rounded-md border border-blue-200 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">수정</button>
+                                <button type="button" onClick={(event) => { event.stopPropagation(); onDelete(board.board_id || board.boardId); }} className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50">삭제</button>
                             </div>
                         )}
                     </div>
-                    <p className="text-sm text-slate-500 line-clamp-2 mb-3">{truncateText(stripHtmlTags(contentHtml), 150)}</p>
+                    <p className="mb-3 line-clamp-2 text-sm text-slate-500">{truncateText(stripHtmlTags(contentHtml), 150)}</p>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-slate-400">
                     <span className="font-medium text-slate-600">{board.board_creator || board.boardCreator || "익명"}</span>
@@ -292,15 +299,23 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
 };
 
 const NoticeBoardCard = ({ board, onDelete, onOpen, user }) => {
-    const canManage = canManageByOwnerOrAdmin(user, board.member, { ownerName: board.board_creator || board.boardCreator, userName: user?.name });
+    const canManage = canManageByOwnerOrAdmin(user, board.member, {
+        ownerName: board.board_creator || board.boardCreator,
+        userName: user?.name,
+    });
+
     return (
-        <div onClick={onOpen} className="p-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 hover:shadow-md transition-all cursor-pointer relative overflow-hidden">
-            <div className="flex items-center justify-between mb-1 text-[10px] font-black text-amber-600 uppercase tracking-widest">
+        <div onClick={onOpen} className="relative cursor-pointer overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 transition-all hover:shadow-md">
+            <div className="mb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-amber-600">
                 <span className="flex items-center gap-1"><Megaphone className="h-3 w-3" />공지</span>
-                {canManage && <button onClick={(e) => { e.stopPropagation(); onDelete(board.board_id || board.boardId); }} className="text-[11px] px-2 py-0.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 font-bold">삭제</button>}
+                {canManage && (
+                    <button type="button" onClick={(event) => { event.stopPropagation(); onDelete(board.board_id || board.boardId); }} className="rounded-md border border-red-200 px-2 py-0.5 text-[11px] font-bold text-red-600 hover:bg-red-50">
+                        삭제
+                    </button>
+                )}
             </div>
-            <h3 className="text-sm font-bold text-slate-900 line-clamp-1">{board.title}</h3>
-            <p className="text-xs text-slate-600 mt-1 line-clamp-1 opacity-80">{truncateText(stripHtmlTags(board.contents || board.content || ""), 80)}</p>
+            <h3 className="line-clamp-1 text-sm font-bold text-slate-900">{board.title}</h3>
+            <p className="mt-1 line-clamp-1 text-xs text-slate-600 opacity-80">{truncateText(stripHtmlTags(board.contents || board.content || ""), 80)}</p>
         </div>
     );
 };

@@ -6,49 +6,107 @@
 
 - 인증 사용자 조회: `GET /members`
 - 토큰 재발급: `POST /api/auth/reissue`
+  - 요청 헤더는 `Refresh: {refreshToken}`를 우선 사용하고, 기존 배포 호환을 위해 `Authorization: Bearer {refreshToken}`도 함께 전송합니다.
 - 공통 API 클라이언트: `src/utils/api.js`
-- 페이지별 도움말: `src/common/PageGuideButton.jsx`, `src/common/pageGuides.js`
+- 공통 에러 메시지 변환: `src/utils/api.js`의 `getApiErrorMessage`가 서버 메시지, validation 오류, HTTP 상태별 한국어 기본 문구를 어댑터에 제공합니다.
+- 공통 STOMP 연결 헤더: `src/adapters/realtimeAdapter.js`
+- 화면 계층은 axios 오류 응답 shape을 직접 읽지 않고, 인증/권한/상태 코드 판정은 각 adapter helper를 통해 처리합니다.
+- 페이지별 도움말: `src/common/PageGuideButton.jsx`, `src/common/pageGuides.js` (`?` 버튼 첫 열기 시점에 도움말 청크 로드)
 - 보호 라우트는 `ProtectedRoute`를 통과한 뒤 `AppLayout` 안에서 렌더링합니다.
 - 주요 앱 라우트는 `React.lazy`로 분리되어 초기 진입 번들을 줄입니다.
-- 플로팅 채팅은 `React.lazy`로 별도 청크에서 로드되지만, 사용하는 REST/WebSocket API는 기존과 같습니다.
+- 플로팅 채팅은 `FloatingChatEntry`의 가벼운 런처만 첫 화면에 포함하고, 사용자가 런처를 열기 전까지 전체 채팅 청크, 채팅방 REST 조회, STOMP/SockJS 연결을 시작하지 않습니다.
+- `npm run smoke:text-quality`는 화면 문자열과 문서의 깨진 한글, 문자열 리터럴 안의 반복 물음표, 한글 유니코드 이스케이프, 남은 주요 영어 문구를 공통 검증합니다.
+- `npm run smoke:navigation-routes`는 정적 `/app` 링크가 `src/App.jsx`의 실제 라우트 패턴으로 커버되는지 공통 검증합니다.
 
 ## 공개 화면
 
 - `/login`
   - `POST /members/login`
+  - `POST /sanctions/release-request`
   - OAuth 진입: `/oauth2/authorization/google`
+  - OAuth 실패 복귀: `/login?error` 또는 `/login?error=oauth2`를 한국어 실패 메시지로 처리한 뒤 쿼리를 제거합니다.
+  - 로그인 성공 후 `POST /api/queue/join` 응답이 `WAITING` 또는 `BLOCKED`이면 `/queue`로 이동합니다.
+  - 로그인, OAuth 토큰 처리, 제재 해제 요청은 `src/adapters/authAdapter.js`와 `src/adapters/queueAdapter.js`를 통해 처리합니다.
 - `/register`
   - `POST /members`
+  - `GET /members/check-email`
+  - `POST /members/email-verification/send`
+  - `POST /members/email-verification/confirm`
+  - 회원가입과 이메일 인증 응답 shape은 `src/adapters/authAdapter.js`에서 정규화합니다.
 - `/queue`
   - `POST /api/queue/join`
   - `GET /api/queue/status`
   - `DELETE /api/queue/leave`
+  - 화면 adapter는 backend 계약을 `/queue/*`로 호출하므로 브라우저 URL은 `/api/queue/*`가 되고, Vite/nginx rewrite 뒤 backend에는 `/queue/*`로 전달됩니다.
+  - 응답의 `poll_interval_seconds`를 사용해 다음 상태 조회 간격을 조절하고, `BLOCKED`는 앱 진입 없이 제한 상태로 표시합니다.
 
 ## 앱 홈과 커뮤니티
 
 - `/app`
-  - `GET /stats/summary`
-  - 게시글/랭킹/배너 요약 API
+  - `GET /stats/dashboard`
+  - fallback: `GET /stats/summary`, `GET /stats/visitors/compare`
+  - `GET /boards/latest?kind=FREE_BOARD&kind=ADMIN_NOTICE&page=0&size=6`
+  - fallback: `GET /boards?kind=FREE_BOARD&page=0&size=3`, `GET /boards?kind=ADMIN_NOTICE&page=0&size=3`
+  - `GET /banners?placement=HOME_HERO&target={GUEST|USER}&limit=10`
+  - `POST /banners/events`
+  - 화면은 `src/adapters/homeAdapter.js`에서 홈 통계, 최신 게시글, 운영 배너 응답 shape과 배너 이벤트 payload를 정규화합니다.
+  - 최신 게시글은 여러 게시판 종류를 단일 `boards/latest` 요청으로 받아 첫 화면 API 수를 줄이고, 새 서버 endpoint가 없으면 기존 게시판별 목록 조회로 fallback합니다.
+  - 방문자 수 응답 shape은 유지되며, 서버는 같은 방문자의 짧은 시간 내 반복 API 호출에 대해 Redis 방문자 집계 쓰기를 억제합니다. Redis 쓰기 실패 시에는 로컬 예약을 해제해 다음 요청이 집계를 재시도합니다.
+  - 최신 게시글의 게시판 배지는 서버 코드값 대신 `src/adapters/homeAdapter.js`의 한국어 라벨을 표시합니다.
 - `/app/boards/:kind`
   - `GET /boards`
+  - 목록 API의 `X-Total-Count`, `X-Total-Pages`, `X-Page-Number`, `X-Page-Size` 헤더로 페이지 정보를 보정합니다.
+  - 서버는 기본 목록 크기를 20개로 사용하고, 수동 요청의 `size`는 최대 50개로 보정합니다.
+  - 목록형 응답의 `contents`는 첫 이미지 태그와 짧은 요약 HTML만 포함합니다. 카드 썸네일과 요약 문구는 이 값을 사용하고, 전체 본문은 상세 API에서 조회합니다.
+  - 검색/정렬은 `searchType=ALL`, `searchValue`, `sort`를 서버 요청에 포함하고, 자유게시판 `전체` 탭의 공지사항은 별도 최신 목록으로 조회합니다.
+  - 목록 응답/pagination 헤더와 삭제 액션은 `src/adapters/boardAdapter.js`를 통해 처리합니다.
 - `/app/boards/:kind/:boardId`
-  - `GET /boards/{board-id}`
+  - `GET /boards/{board-id}` (`trackView=false`는 내부 갱신 시 조회수 증가 없이 재조회)
+  - 상세 조회, 좋아요, 삭제, 파일 다운로드, 신고 액션은 `src/adapters/boardAdapter.js`를 통해 처리합니다.
+  - 게시글/댓글 좋아요 응답 shape은 유지되며, 서버는 같은 대상 row를 잠근 뒤 토글해 빠른 연속 요청에서도 카운트/포인트 정합성을 유지합니다. 화면은 처리 중 버튼 비활성화 상태를 유지합니다.
+  - 첨부파일 표시는 `file_name`/`fileName`의 사용자용 파일명을 사용하고, 다운로드/삭제 액션은 object key가 아닌 `file_id`/`fileId`를 기준으로 처리합니다.
+  - 숨김 처리된 게시글의 첨부파일은 직접 `GET /file/{file-id}`로 접근해도 서버가 다운로드를 차단합니다.
+  - `DELETE /boards/{board-id}`는 기존 응답 계약을 유지하며, 서버가 게시글 삭제 전에 연결된 첨부파일 저장 객체를 정리합니다.
+  - 게시글 삭제와 첨부파일 다운로드 버튼은 처리 중 비활성화 상태를 표시해 중복 요청을 막습니다.
+  - 본문 HTML은 서버 저장 경계와 상세 렌더링 직전에 safelist sanitizer를 거쳐 위험 태그, event handler, `javascript:` 링크를 제거합니다.
   - `GET /comments?boardId={id}&page={page}&size={size}`
+  - 댓글 응답은 `src/adapters/commentAdapter.js`에서 `data/page_info`를 정규화하고, 상세 화면은 20개 단위로 추가 로드합니다. 서버는 댓글 목록 size를 최대 50개로 제한합니다.
+  - 공개 댓글 조회는 댓글과 부모 게시글이 모두 숨김 상태가 아닐 때만 반환됩니다.
   - `POST /comments`
+  - 댓글 작성 payload는 `src/adapters/commentAdapter.js`에서 `board_id`와 trim된 `contents`로 정규화합니다. 서버는 `boardId` legacy alias도 허용하지만, 화면은 2,000자 제한과 처리 중 비활성화 상태를 표시합니다.
   - `POST /reports`
+  - 게시글/댓글 신고는 `src/common/ReportDialog.jsx` 공통 모달을 통해 접수합니다. `boardAdapter`/`commentAdapter`는 `target_type`, `target_id`, trim된 `reason/detail`로 전송하고, 모달은 사유 120자/상세 2,000자 제한을 표시합니다.
 - `/app/boards/:kind/new`
-  - `POST /boards/{free|eco|green}`
+  - `POST /boards?kind={kind}`
+  - 화면은 외부 CDN 에디터 대신 로컬 contenteditable 에디터를 사용하고, 실제 저장 요청은 `POST /boards?kind={kind}`를 `src/adapters/boardAdapter.js`에서 보냅니다.
+  - 저장 payload의 본문 HTML은 `src/utils/helpers.js`의 safelist sanitizer를 통과하며, 서버도 같은 목적의 저장 경계 sanitizer를 적용합니다.
+  - 서버는 첨부파일 저장 object key를 UUID 기반으로 생성하지만, 응답 `file_name`/`fileName`은 화면 표시용 안전 파일명으로 유지합니다.
+  - 첨부파일은 게시글당 최대 5개, 파일당 20MB까지 허용하며, `src/adapters/boardAdapter.js`의 제한값으로 선택 단계에서 먼저 안내합니다.
 - `/app/boards/:kind/:boardId/edit`
   - `PATCH /boards/{board-id}`
   - `DELETE /boards/{board-id}/files/{file-id}`
+  - 본문 이미지 업로드, 기존 첨부파일 삭제, 수정 저장은 `src/adapters/boardAdapter.js`를 통해 처리합니다.
+  - 수정 화면은 기존 본문 HTML을 에디터에 넣기 전에도 같은 sanitizer를 적용합니다.
+  - 기존 첨부파일 삭제는 `file_id`/`fileId`만 사용하며, 화면은 저장 object key를 직접 파싱하지 않습니다.
+  - 수정 화면도 남아 있는 기존 첨부파일과 새 첨부파일의 합산 개수를 기준으로 같은 5개 제한을 적용합니다.
 - `/app/chat`
   - `GET /chat/rooms`
   - `POST /chat/room`
-  - `GET /chat/room/{roomId}/messages`
+  - `GET /chat/room/{roomId}/messages?page={zeroBasedPage}&size=20`
   - `GET /chat/room/{roomId}/members`
   - `PATCH /chat/room/{roomId}/read`
   - `POST /chat/room/{roomId}/file`
-  - 플로팅 채팅도 같은 API를 공유합니다.
+  - `POST /chat/room/{roomId}/invite`
+  - `DELETE /chat/room/{roomId}/leave`
+  - `POST /chat/ai/room`
+  - WebSocket/STOMP send: `/pub/chat/message`
+  - 화면과 플로팅 채팅은 `src/adapters/chatAdapter.js`에서 채팅방/메시지/멤버/첨부파일 응답 shape과 페이지 정보를 정규화합니다. UI는 1-based 페이지로 다루고 adapter가 서버 Pageable의 0-based `page` 요청으로 변환합니다.
+  - `/app/chat`은 방 선택 직후 `GET /chat/room/{roomId}/messages`와 `GET /chat/room/{roomId}/members`를 먼저 호출합니다. STOMP 연결은 신규 실시간 메시지 구독과 전송에만 필요하므로, 실시간 연결이 아직 대기 중이어도 기존 대화 기록과 멤버 목록은 표시되어야 합니다.
+  - 서버 `GET /chat/rooms` 응답의 `last_message`, `last_message_time`, `unread_count`를 adapter에서 정규화해 클라이언트가 방마다 메시지 목록을 다시 조회하지 않도록 합니다.
+  - 채팅방 검색은 이미 로드된 방 제목과 최근 메시지를 클라이언트에서 필터링하며, 키 입력마다 추가 API를 호출하지 않습니다.
+  - 메시지 입력은 `CHAT_MESSAGE_MAX_LENGTH=2000`을 공유해 전체 채팅과 플로팅 채팅에서 같은 `maxLength`/카운터를 표시합니다. 서버는 저장 전에 방 멤버십, TALK 2,000자 제한, FILE 메타데이터를 다시 검증합니다.
+  - STOMP CONNECT 인증 헤더는 채팅과 보드게임 실시간 화면 모두 `src/adapters/realtimeAdapter.js`에서 생성합니다. 토큰이 없으면 연결을 시작하지 않고, 서버는 JWT principal을 실제 sender로 사용해 payload의 `senderId` 위조를 막습니다.
+  - 채팅/보드게임 STOMP 구독은 서버가 방 멤버십을 다시 확인하므로 화면은 참여 중인 방의 `/sub/chat/room/*` 및 `/sub/game/*/room/*`만 구독합니다.
 
 ## 개인/정보 화면
 
@@ -56,44 +114,100 @@
   - `GET /members`
   - `GET /boards/myBoards`
   - `GET /members/level/history`
+  - `DELETE /members`
+  - `POST /members/withdraw/reauth`
+  - 화면은 `src/adapters/mypageAdapter.js`에서 회원/작성글/경험치 이력 응답 shape과 계정 상태 라벨을 정규화합니다.
 - `/app/mypage/edit`
   - `PATCH /members/{member-id}`
   - `POST /members/uploadProfile`
+  - 로컬 계정 비밀번호 확인은 `POST /members/login`을 재사용하며, 화면은 `src/adapters/mypageAdapter.js`를 경유합니다.
 - `/app/ranks`
-  - `GET /boards/rankBoards?kind={kind}`
-  - `GET /members/levelRanks`
-  - `GET /members/donationRanks`
+  - `GET /boards/rankBoards?kind={kind}&page=0&size=10`
+  - `GET /members/levelRanks?page=0&size=10`
+  - `GET /members/donationRanks?page=0&size=10`
+  - 화면은 `src/adapters/ranksAdapter.js`에서 게시판/레벨/기부 랭킹 응답 shape을 정규화합니다.
+  - 서버는 게시글 랭킹 `size`를 최대 20개로 보정합니다.
 - `/app/news`
-  - `GET /news`
+  - `GET /news?query={keyword}&sort={sim|date}&display={10|20|30|50}&start=1`
+  - 화면은 `src/adapters/newsAdapter.js`에서 응답 shape, HTML 제거, 기본 검색 파라미터를 정규화합니다.
+  - 뉴스 제공자 실패는 서버 표준 `ErrorResponse(status, code, message)`의 `message`를 adapter 에러 경계에서 표시합니다.
 - `/app/statistics`
-  - `GET /stats/summary`
-  - `GET /stats/visitors/compare`
+  - `GET /stats/dashboard`
+  - fallback: `GET /stats/summary`, `GET /stats/visitors/compare`
   - `GET /stats/trend?days={days}`
+  - 화면은 `src/adapters/statsAdapter.js`에서 요약, 방문자 비교, 기간 추이 응답 shape을 정규화하고, 기간 추이 재조회 실패는 해당 카드 안에서 재시도합니다.
+  - 기간 선택은 7/14/30일로 제한되어 있고, 서버는 같은 `days/items` 응답 shape으로 게시글/댓글 일별 bucket을 DB aggregate query에서 계산합니다.
+  - 방문자 집계 필드는 기존 이름과 타입을 유지하며, 서버의 중복 Redis write 억제와 Redis 실패 후 재시도 예약 해제는 화면 계약에 영향을 주지 않습니다.
 
 ## 편의 도구
 
 - `/app/todos`
-  - 할 일 목록 API
+  - `GET /todos?from_date={yyyy-MM-dd}&to_date={yyyy-MM-dd}`
+  - `POST /todos`
+  - `PATCH /todos/{todo-id}`
+  - `DELETE /todos/{todo-id}`
+  - 화면은 `src/adapters/todoAdapter.js`에서 응답 shape과 snake_case payload를 정규화하고, 생성/완료/수정/삭제 후 실패 시 원복되는 낙관적 갱신을 사용합니다.
+  - 작성/수정 입력은 서버의 제목 200자 제한을 카운터로 표시하며, `todoAdapter`는 `due_date`를 전송합니다. 서버는 `dueDate` legacy alias도 유지합니다.
+  - 서버는 `GET /todos` 조회 기간을 최대 93일로 제한하며, 초과 시 표준 `{status, code, message}` 오류를 반환합니다.
 - `/app/streaming`
-  - 스트리밍 허브 API
-  - 목록 화면은 `hls.js`를 포함하지 않고, 영상 재생 URL이 준비될 때 동적으로 플레이어 엔진을 로드합니다.
+  - `GET /streaming/videos?page={page}&size={size}`
+  - `GET /streaming/videos/{video-id}/play`
+  - 화면은 `src/adapters/streamingAdapter.js`에서 영상 목록/페이지 정보/재생 정보 응답 shape과 상태 라벨을 정규화합니다.
+  - 목록 화면은 `hls.js/light`를 포함하지 않고, 영상 재생 URL이 준비될 때 동적으로 플레이어 엔진을 로드합니다.
 - `/app/invest`
-  - 투자 분석 API
+  - `GET /invest/symbols/suggest?market={KR|US}&query={query}&limit={limit}`
+  - `GET /invest/chart?market={KR|US}&symbol={symbol}&interval={DAY|WEEK|MONTH}`
+  - `GET /invest/analysis?market={KR|US}&symbol={symbol}`
+  - `GET /invest/analysis/v2?market={KR|US}&symbol={symbol}`
+  - `GET /invest/analysis/v3?market={KR|US}&symbol={symbol}`
+  - 투자 분석/차트/종목 추천 응답 shape은 `src/adapters/investAdapter.js`에서 정규화합니다.
+  - 서버가 한글 우선 `limitations`를 반환해도 미국 제공자 경고 판별은 `src/adapters/investAdapter.js`에서 처리합니다.
+  - KIS/DART/SEC EDGAR 제공자 지연은 서버 timeout 안에서 실패 처리되며, 화면은 기존 오류 상태와 `limitations` 경고를 사용합니다.
   - 국내/미국 종목 보조 데이터는 응답에 있을 때만 렌더링합니다.
 - `/app/facility`
+  - 공용 `AddressSearchBox`
+    - `GET /addresses/suggest?query={keyword}&limit={limit}`
+    - `GET /addresses/geocode?address={address}`
+    - 응답 shape은 `src/adapters/addressSearchAdapter.js`에서 정규화합니다.
+    - 외부 지도/주소 제공자 지연이나 실패는 서버 timeout과 표준 에러 응답을 거쳐 adapter 에러 경계에서 처리합니다.
+  - `GET /parking/lots?latitude={lat}&longitude={lng}&radius_km={km}&paid_only={bool}&keyword={keyword}&sort={sort}&limit={limit}`
+  - `POST /admin/parking/import`
+  - `GET /restrooms/lots?latitude={lat}&longitude={lng}&radius_km={km}&open_type={type}&sort={sort}&limit={limit}`
+  - `POST /admin/restroom/import`
+  - `GET /libraries/lots?latitude={lat}&longitude={lng}&radius_km={km}&limit={limit}`
+  - `POST /admin/library/import`
+  - `GET /bunkers/lots?latitude={lat}&longitude={lng}&radius_km={km}&limit={limit}`
+  - `POST /admin/bunker/import`
+  - `GET /medical/lots?latitude={lat}&longitude={lng}&radius_km={km}&limit={limit}`
+  - `GET /medical/lots/{medicalLotId}`
+  - `POST /admin/medical/import`
+  - `GET /admin/medical/import/status`
   - 주차장, 화장실, 도서관, 대피소, 의료시설 하위 화면을 지연 로딩합니다.
+  - 시설 조회/CSV 재적재 응답 shape은 `src/adapters/facilityAdapter.js`에서 정규화하며, 조회 반경/개수는 어댑터에서 서버 한계(`radius_km=0..30`, `limit=1..200`)로 보정합니다.
+  - 시설 반경 조회의 서버 좌표 경계 계산은 공통 helper를 사용하며, 화면 API 계약과 adapter 정규화 shape은 변경하지 않습니다.
+  - 주차장/화장실/도서관/대피소 CSV 재적재 후 서버 좌표 보정은 누락 좌표 id를 커서 기반 배치로 처리하며, 화면 API 계약은 변경하지 않습니다.
+  - 의료 CSV 재적재 후 서버 좌표 큐 시딩도 누락 좌표 의료기관을 커서 기반 배치로 처리하며, import/status 응답 shape은 변경하지 않습니다.
 - `/app/optimizer`
   - `POST /api/optimizer/optimize`
+  - 화면 adapter는 backend 계약을 `/optimizer/*`로 호출하므로 브라우저 URL은 `/api/optimizer/*`가 되고, Vite/nginx rewrite 뒤 backend에는 `/optimizer/*`로 전달됩니다.
+  - 중간장소 추천 응답 shape은 `src/adapters/optimizerAdapter.js`에서 정규화합니다.
+  - 주소 수/유효 주소 부족 오류는 서버 표준 `ErrorResponse(status, code, message)`의 `message`를 adapter 에러 경계에서 표시합니다.
+  - 외부 지도/경로 제공자 지연은 서버 timeout 안에서 실패 처리되며, 화면은 기존 오류 상태와 토스트를 사용합니다.
 
 ## 게임
 
+- `/app/all-menu`
+  - 전체 메뉴 허브. `GET /members`로 현재 사용자와 관리자 권한을 확인하고, 화면의 나머지 항목은 `src/App.jsx`의 실제 라우트 링크만 사용합니다.
+  - 전용 `npm run smoke:hub-ui`는 관리자 메뉴 노출, 핵심/편의/게임/계정 링크 누락, 데스크톱/모바일 가로 overflow를 확인합니다.
 - `/app/games`
   - 게임 허브. 게임 설명서 모달은 클라이언트 로컬 데이터만 사용합니다.
   - 보드게임 입장 방식은 공통 흐름을 유지합니다: 방 제목 입력, 방 코드 입장, 준비, 방장 시작.
+  - 전용 `npm run smoke:hub-ui`는 게임 허브 문구, 카탄 설명서 모달 열기/닫기, 게임 입장 링크, 데스크톱/모바일 가로 overflow를 확인합니다.
 - `/app/plinko`
   - `POST /game/dice/roll`
   - `POST /game/dice/reroll`
   - `POST /game/plinko/play`
+  - 화면은 `src/adapters/luckyPlinkoAdapter.js`에서 주사위/플링코 응답 shape과 점수/랭크 라벨을 정규화합니다.
 - `/app/games/catan`
   - `GET /game/catan/variants`
   - `GET /game/catan/rooms`
@@ -116,9 +230,39 @@
 - `/app/games/dalmuti`
   - 공통 방 API: `/game/dalmuti/variants`, `/game/dalmuti/rooms`, `/game/dalmuti/rooms/{roomId}/state`
   - 액션: `POST /game/dalmuti/rooms/{roomId}/actions` (`DECLARE_REVOLUTION`, `SKIP_REVOLUTION`, `RETURN_TAX`, `PLAY`, `PASS`)
+- 카탄/블로커스/마헤/달무티 공통 화면은 `src/adapters/tabletopGameAdapter.js`를 통해 variants/rooms/state 응답 shape, join-by-code/settings/action REST payload, STOMP state payload를 정규화합니다. 서버는 게임별 대기방 목록을 최신 50개로 제한합니다.
 - `/app/games/las-vegas`
-  - 라스베가스 게임 API
+  - `GET /game/las-vegas/rooms`
+  - 서버는 기존 배열 응답 shape을 유지하면서 최신 대기방 50개만 반환합니다.
+  - `GET /game/las-vegas/rooms/me`
+  - `POST /game/las-vegas/rooms`
+  - `GET /game/las-vegas/rooms/{roomId}/state`
+  - `PATCH /game/las-vegas/rooms/{roomId}/settings`
+  - `POST /game/las-vegas/rooms/{roomId}/ready`
+  - `POST /game/las-vegas/rooms/{roomId}/start`
+  - `POST /game/las-vegas/rooms/{roomId}/force-finish`
+  - `POST /game/las-vegas/rooms/{roomId}/rematch`
+  - `POST /game/las-vegas/rooms/{roomId}/leave`
+  - `GET /chat/room/{chatRoomId}/messages`
+  - `PATCH /chat/room/{chatRoomId}/read`
+  - 라스베가스 화면은 `src/adapters/lasVegasGameAdapter.js`와 `src/adapters/chatAdapter.js`를 통해 서버 snake_case 응답, REST 요청, STOMP 액션 payload를 정규화합니다.
+  - STOMP action payload sends `action_type` and optional `casino_no` only; acting member is the server-side JWT principal.
 - `/app/games/no-thanks`
+  - `GET /game/no-thanks/rooms`
+  - 서버는 기존 배열 응답 shape을 유지하면서 최신 대기방 50개만 반환합니다.
+  - `GET /game/no-thanks/rooms/me`
+  - `POST /game/no-thanks/rooms`
+  - `GET /game/no-thanks/rooms/{roomId}/state`
+  - `PATCH /game/no-thanks/rooms/{roomId}/settings`
+  - `POST /game/no-thanks/rooms/{roomId}/ready`
+  - `POST /game/no-thanks/rooms/{roomId}/start`
+  - `POST /game/no-thanks/rooms/{roomId}/force-finish`
+  - `POST /game/no-thanks/rooms/{roomId}/rematch`
+  - `POST /game/no-thanks/rooms/{roomId}/leave`
+  - `GET /chat/room/{chatRoomId}/messages`
+  - `PATCH /chat/room/{chatRoomId}/read`
+  - 노땡스 화면은 `src/adapters/noThanksGameAdapter.js`와 `src/adapters/chatAdapter.js`를 통해 서버 snake_case 응답, REST 요청, STOMP 액션 payload를 정규화합니다.
+  - STOMP action payload sends `action_type` only; acting member is the server-side JWT principal.
   - 노 땡스 게임 API
 
 ## 관리자
@@ -151,6 +295,11 @@
   - `GET /admin/roles/members` (`ROLE_MASTER`)
   - `PATCH /admin/roles/members/{member-id}` (`ROLE_MASTER`)
   - `GET /admin/roles/audits` (`ROLE_MASTER`)
+  - 화면은 `src/adapters/adminAnomaliesAdapter.js`에서 이상징후/신고/제재/검토/감사/권한 관리 응답 shape과 관리자 payload를 정규화합니다.
+  - 권한 안내와 권한 관리 배지는 서버 권한 코드값 대신 한국어 라벨을 표시합니다.
+  - `GET /admin/audits?type=ALL&page=1&size=10`은 화면 계약을 유지하며, 서버는 내부 소스별 병합 풀을 제한해 큰 수동 요청의 과도한 DB/JVM 부하를 막습니다.
+  - 이상징후 사건, 신고, 제재, 제재 해제 요청, 검토 목록, 권한 목록/감사 목록은 기존 page response shape를 유지하며 서버가 요청 `size`를 최대 50건으로 제한합니다.
+  - 운영자 사유/메모 입력은 `src/common/promptAction.jsx` 공통 입력 토스트를 사용합니다.
 - `/app/admin/operations` (`ROLE_ADMIN` 또는 `ROLE_MASTER`)
   - `GET /admin/moderation/boards`
   - `GET /admin/moderation/comments`
@@ -163,8 +312,19 @@
   - `PATCH /admin/banners/{banner-id}`
   - `PATCH /admin/banners/{banner-id}/active`
   - `DELETE /admin/banners/{banner-id}`
+  - 화면은 `src/adapters/adminOperationsAdapter.js`에서 검토/배너/회원 상세 응답 shape과 배너 payload를 정규화합니다.
+  - 검토 목록과 배너 목록은 첫 페이지 50건만 요청하며, 서버도 관리 목록 `size`를 최대 50건으로 제한해 운영 화면의 큰 수동 요청을 방지합니다.
+  - 배너 카드의 광고 클라이언트/슬롯 정보와 헤더 권한 배지는 코드형 영문 표기 대신 한국어 라벨을 표시합니다.
+  - 회원 상세의 권한, 회원 상태, 제재 상태, 신고 상태는 adapter 라벨 필드를 사용해 서버 코드값을 화면에 직접 표시하지 않습니다.
 - `/app/admin/streaming`
-  - 관리자 스트리밍 운영 API
+  - `GET /admin/streaming/videos?page={page}&size={size}`
+  - `GET /admin/streaming/videos/inbox`
+  - `POST /admin/streaming/videos/batch`
+  - `POST /admin/streaming/videos/inbox/import`
+  - `DELETE /admin/streaming/videos/{video-id}`
+  - 화면은 `src/adapters/streamingAdapter.js`에서 관리자 영상 페이지/inbox 응답 shape과 업로드/반입 payload를 정규화합니다.
+  - 웹 업로드와 inbox 반입은 서버 변환 큐 보호를 위해 1회 최대 8개로 제한하며, 화면에서 먼저 한국어 안내를 표시합니다.
+  - 권한 안내와 영상 처리 상태는 코드값 대신 한국어 라벨을 표시하며, 전용 smoke가 상태/권한 코드 노출을 차단합니다.
 
 ## 실시간
 
@@ -175,6 +335,97 @@
 
 - 공통 페이지별 `?` 도움말 버튼이 추가되었습니다.
 - 앱 라우트와 시설 하위 화면을 지연 로딩하도록 정리했습니다.
-- 플로팅 채팅을 별도 지연 로딩 청크로 분리했습니다.
+- 플로팅 채팅을 별도 지연 로딩 청크로 분리하고, 최초 런처 열기 전까지 `FloatingChat` 청크 로드, `/chat/rooms`, `/ws/chat/*` 연결을 지연합니다.
 - 모바일 플로팅 채팅은 전체 패널이 열린 동안 런처를 숨겨 전송 버튼과 겹치지 않습니다.
 - 관리자 운영/이상징후 화면의 주요 UI 문구를 한국어 중심으로 정리했습니다.
+
+## 2026-06-01 변경 반영
+
+- 주요 어댑터의 에러 메시지 추출은 `getApiErrorMessage`를 공유해 네트워크 실패나 axios 기본 메시지가 그대로 UI에 노출되지 않도록 정리했습니다.
+- `/app` 홈 화면의 응답 정규화와 배너 노출/클릭 이벤트 전송을 `src/adapters/homeAdapter.js`로 분리했습니다. 사용 API 경로와 payload 계약은 변경하지 않았습니다.
+- `/app`의 AdSense 배너는 사용자가 광고 개인화 설정을 선택하기 전까지 외부 광고 스크립트 초기화, 광고 push, 광고 배너 노출 이벤트를 보류하고, 배너 영역에 한국어 안내 상태를 표시합니다. 선택 후에는 `광고 설정 변경` 버튼으로 저장된 동의를 지우고 다시 선택할 수 있습니다.
+- `/app`의 AdSense 배너 push는 같은 배너/동의/광고 클라이언트/슬롯 조합에서 한 번만 실행합니다. 같은 광고 배너로 다시 돌아오거나 visibility 상태가 바뀌어도 동일 DOM 슬롯에 반복 push하지 않습니다.
+- `/app` 홈 배너가 여러 개인 경우 자동 전환 일시정지/재생, 이전/다음 버튼, 점 선택을 표시하고, hover/focus/touch 직접 조작 중에는 자동 전환을 멈춥니다. 캐러셀에는 접근성 라벨과 현재 배너 점 표시를 제공하며, 무한 루프용 복제 슬라이드 전환 중에도 실제 화면에 보이는 슬라이드 하나만 활성으로 표시하고 비활성 슬라이드의 CTA는 탭 이동 대상에서 제외합니다. `prefers-reduced-motion` 사용자는 자동 전환이 멈춘 상태로 시작합니다.
+- `/app` 공통 레이아웃의 커스텀 커서는 fine pointer와 일반 모션 환경에서만 렌더링하고, 포인터 이동은 React state가 아니라 DOM ref + `requestAnimationFrame`으로 처리합니다. API 계약 영향은 없습니다.
+- `/app` 공통 하단 내비게이션은 `lg` 미만 뷰포트에서만 렌더링하고 스크롤 리스너를 연결합니다. 데스크톱에서는 보이지 않는 하단 내비게이션 DOM과 리스너를 만들지 않으며, 모바일에는 `aria-label="하단 주요 내비게이션"`을 제공합니다.
+- `/app` 홈 배너 자동 전환은 `document.hidden` 상태에서 타이머를 만들지 않습니다. 사용자가 보지 않는 백그라운드 탭에서는 배너 인덱스가 자동으로 이동하지 않아 불필요한 렌더와 노출 흐름을 줄이고, 탭이 다시 보이면 기존 재생/일시정지 상태에 따라 전환을 재개합니다.
+- `/app` 홈 배너 자동 전환은 `IntersectionObserver`로 배너 영역이 화면에 보일 때만 타이머를 유지합니다. 사용자가 최신 게시글 등 하단 영역으로 스크롤해 배너가 오프스크린이 되면 자동 전환을 멈추고, 배너가 다시 보이면 기존 재생/일시정지 상태에 따라 전환을 재개합니다.
+- `/app` 홈 배너 `IMPRESSION` 이벤트와 AdSense push도 같은 배너 가시성 조건을 사용합니다. 오프스크린 배너는 사용자가 다시 배너 영역을 볼 때까지 노출 이벤트와 광고 push 대상에서 제외됩니다.
+- `/app` 홈 배너 `IMPRESSION` 이벤트는 동일 탭의 같은 배너/위치/인증 상태 조합에 대해 30초 중복 전송을 건너뜁니다. 게스트와 로그인 상태는 dedupe 키를 분리해 로그인 직후 회원 노출 분석이 이전 게스트 노출로 누락되지 않게 합니다. 전송 실패 시에는 같은 탭 중복 예약을 해제해 재시도를 허용합니다. 서버도 같은 짧은 창 안의 중복 노출은 배너 조회와 이벤트 저장 전에 억제하며, `CLICK` 이벤트 계약은 유지합니다. 배너 이벤트 전송은 전역 로딩 표시와 분리된 백그라운드 요청입니다. CTA 클릭은 로그인 토큰이 있으면 인증 헤더를 유지하는 axios adapter 경로를 사용하고, 비로그인 클릭은 링크 이동 직전에도 누락 가능성을 줄이도록 keepalive와 `navigator.sendBeacon` fallback을 사용합니다. 배너 CTA URL과 이미지 URL은 `src/adapters/homeAdapter.js`에서 http(s) 외부 URL과 `/` 내부 경로만 허용하고 따옴표/역슬래시/제어 문자를 제외한 뒤 내부 링크를 React Router `Link`, 외부 링크를 새 탭 `a`로 렌더링해 앱 전체 문서 reload를 피하면서 링크 복사/새 탭 열기 같은 기본 브라우저 동작을 유지합니다. 허용되지 않는 URL은 클릭 링크나 배경 이미지로 만들지 않습니다. 이미지 배경은 현재/양옆 슬라이드에만 붙여 먼 배너 이미지가 첫 화면에서 한꺼번에 요청되지 않게 합니다.
+- `/app` 홈 통계/최신 게시글/운영 배너 요청은 `src/adapters/homeAdapter.js`에서 section timeout을 적용합니다. 통계 dashboard와 최신 게시글 통합 endpoint가 timeout난 경우에는 split fallback 요청을 추가로 보내지 않아 느린 API가 전체 홈 렌더링과 백엔드 부하를 함께 끌고 가지 않게 합니다.
+- docker compose 운영 nginx upstream은 `spring-backend-blue:8080`과 `spring-backend-green:8080`을 모두 포함합니다. 홈 첫 진입 API fan-out은 한 백엔드 컨테이너에만 고정되지 않고 nginx upstream failover/load balancing과 각 인스턴스의 짧은 캐시를 함께 사용합니다.
+- 서버 `bootJar` 산출물은 compose의 실제 blue/green bind mount 경로인 `C:/compose/backend/blue/app.jar`, `C:/compose/backend/green/app.jar`에도 함께 복사됩니다. 운영 nginx 경유 `/api/stats/dashboard`는 blue/green 재시작 후 200 응답을 반환하며, 클라이언트의 split stats fallback은 순차 배포 중 구버전 백엔드가 섞인 경우를 위한 호환 경로로 유지됩니다.
+- 운영 nginx backend proxy는 짧은 connect timeout과 `proxy_next_upstream` 재시도를 사용합니다. 한 blue/green 컨테이너가 재시작 중이어도 `/app` 홈 첫 진입의 `/api/stats/dashboard`, `/api/boards/latest`, `/api/banners` 요청이 다른 backend 인스턴스로 넘어갈 수 있도록 하기 위한 설정입니다.
+- 서버는 Docker/MinIO 환경에서 AWS SDK EC2 metadata probe를 기본 비활성화합니다. blue/green 재시작 시 불필요한 metadata connection-refused stack trace가 남지 않아 운영 로그에서 실제 홈 API 장애와 구분하기 쉽습니다.
+- `/app` 홈 통계가 사용하는 `/stats/dashboard` 서버 캐시는 `/stats/trend` 기간 추이 캐시와 별도 락을 사용합니다. 통계 화면에서 긴 추이 계산이 실행 중이어도 홈 첫 화면 요약/방문자 비교 응답이 같은 인스턴스 락 때문에 대기하지 않도록 유지합니다.
+- `/stats/summary`, `/stats/visitors/compare`, `/stats/dashboard`, `/stats/trend`는 Redis visitor count 조회가 실패해도 응답 shape을 유지합니다. 해당 방문자 수는 `0`으로 낮춰 반환하고 회원/게시글/댓글 요약 같은 Redis 외 지표는 계속 표시합니다.
+- `/app` 홈 방문자 수는 서버 `VisitorTrackingFilter`의 Redis 집계를 사용하되, Swagger, actuator, webjars, favicon, 정적 assets, 배너 분석 이벤트(`/banners/events`) 같은 운영/문서/분석 경로는 방문자 집계에서 제외합니다. 사용자 화면 접근과 운영 점검/백그라운드 분석 트래픽이 같은 `todayVisitors` 지표에 섞이지 않게 하기 위한 처리입니다.
+- 방문자 집계와 배너 이벤트에 공통으로 쓰이는 서버 `ClientIpResolver`는 프록시 IP 헤더 토큰에서 제어 문자를 제거하고 최대 80자로 제한합니다. 운영 프록시 뒤에서 비정상적으로 긴 `X-Forwarded-For` 값이 Redis visitor key, 대기열 식별자, 배너 이벤트 저장값으로 과도하게 커지지 않도록 하기 위한 방어입니다.
+- 홈 첫 진입의 `/stats/dashboard`, `/boards/latest`, `/banners` 병렬 요청은 같은 방문자 기준으로 서버 `VisitorTrackingFilter`의 로컬 예약을 먼저 통과합니다. 첫 Redis `SADD`가 아직 끝나지 않은 순간에 같은 인스턴스로 들어온 후속 요청도 같은 방문자 키를 보고 Redis 쓰기를 건너뛰도록 해 초기 fan-out에서 방문자 집계 write가 증폭되지 않게 합니다. 단, 첫 Redis 쓰기가 실패하면 로컬 예약을 해제해 다음 요청이 다시 집계를 시도합니다.
+- `/app` 홈 첫 방문은 통계/최신 게시글/운영 배너 응답을 기다리는 동안에도 주요 서비스와 섹션별 준비 상태를 먼저 렌더링합니다. API 완료 전 전체 화면 스피너로 홈 진입을 막지 않으며, 통계/게시글/배너 준비 상태는 각 섹션 안에서만 표시합니다.
+- `/app` 홈 데이터 로드는 최종 대시보드 캐시를 유지하면서 통계/최신 게시글/운영 배너 섹션 결과를 도착 순서대로 먼저 반영합니다. 느린 통계 API가 timeout을 기다리는 중에도 빠른 최신 게시글과 운영 배너 결과는 먼저 표시됩니다.
+- `/app` 홈 정상 대시보드 응답은 `src/adapters/homeAdapter.js`에서 20초 메모리 캐시와 in-flight 공유를 적용합니다. 클라이언트 캐시는 최근 16개 사용자/게스트 키로 제한합니다. 같은 사용자/게스트 키로 SPA 화면 이동 후 홈에 빠르게 돌아오는 경우 첫 렌더부터 캐시된 대시보드를 표시해 통계/최신 게시글/운영 배너 API 묶음과 전체 로딩 화면을 반복하지 않고, 사용자가 `다시 불러오기`를 누른 백그라운드 갱신은 캐시를 우회합니다. 진행 중 요청에 뒤늦게 붙은 홈 호출자도 이미 도착한 섹션 스냅샷과 이후 섹션 업데이트를 함께 받아 느린 통계 응답이 빠른 게시글/배너 렌더를 막지 않도록 유지합니다.
+- `/app` 홈 주요 서비스와 최신 게시글 링크는 hover/focus/touch 의도 시점에 대상 route chunk를 prefetch합니다. 초기 렌더에서는 다음 화면 청크를 요청하지 않고, 실제 이동 가능성이 생긴 뒤에만 `BoardList`, `BoardDetail`, `FacilityFinder`, `GamesHub`, `InvestAssistant` 청크를 미리 받아 SPA 이동 대기 시간을 줄입니다.
+- `/app` 홈 주요 서비스, 최신 게시글 전체보기, 최신 게시글 카드 링크는 한국어 `aria-label`을 제공해 카드형 링크도 스크린리더에서 목적이 명확하게 읽히도록 유지합니다.
+- `/app` 홈 통계/운영 배너/최신 게시글 섹션은 로딩과 부분 장애 상태를 `aria-busy`, `role=status`, `aria-live`로 노출합니다. 광고 개인화 선택 패널은 `role="dialog"`와 제목/설명 연결을 제공하며, API 계약은 변경하지 않습니다.
+- `/app` 홈 AdSense 개인화 설정은 `ads_personalization_consent` 저장값을 안전하게 읽고, 다른 탭에서 같은 저장값이 변경되거나 삭제되면 `storage` 이벤트로 현재 홈 UI 상태도 동기화합니다. 배너 API와 이벤트 payload 계약은 변경하지 않습니다.
+- `/app` 전역 플로팅 채팅은 사용자가 런처를 열기 전까지 전체 채팅 청크, 채팅방 REST 조회, STOMP/SockJS 연결을 시작하지 않습니다. 홈 스모크는 첫 화면 렌더 직후 `FloatingChat` 청크, `/chat/rooms`, `/ws/chat/info`가 호출되지 않는지 확인합니다.
+- `/app` 홈 화면의 통계/최신 게시글/배너 병렬 요청은 `AbortController` 신호를 어댑터까지 전달해 이전 요청이 늦게 끝나도 최신 화면 상태를 덮어쓰지 않게 합니다.
+- `/app` 홈 화면은 통계 요청만 실패하고 최신 게시글/배너가 정상인 부분 장애에서 전체 오류 화면으로 전환하지 않고, 통계 영역에 지연 문구와 재시도 버튼을 표시합니다.
+- `/app` 홈 화면은 최신 게시글 최신 API와 legacy fallback이 모두 실패한 경우 실제 빈 목록과 구분해 게시글 지연 문구와 재시도 버튼을 표시합니다.
+- `/app` 홈 화면은 운영 배너 요청이 실패한 경우 fallback 배너를 유지하되, 배너 영역에 지연 문구와 재시도 버튼을 표시합니다.
+- `/app` 홈 화면의 부분 장애 재시도 버튼은 전체 홈을 로딩 화면으로 바꾸지 않고 현재 콘텐츠를 유지한 채 백그라운드로 대시보드를 다시 요청합니다. 재시도 중 새로 실패한 섹션은 이미 정상 렌더링된 통계/최신 게시글/운영 배너를 빈 상태나 fallback으로 덮어쓰지 않습니다.
+- `/app` 홈 화면은 최신 게시글이 없는 경우에도 빈 상태 UI를 표시합니다.
+- `/app` 최신 게시글 카드는 `created_at`/`createdAt`을 어댑터의 `createdAt`으로 정규화한 뒤 한국어 상대시간으로 표시합니다.
+- `/app` 최신 게시글은 `/boards/latest` 단일 요청을 우선 사용해 자유게시판/공지사항을 합쳐 받고, 실패 시 기존 `/boards` 두 요청으로 fallback합니다. 서버는 동일 kind/page/sort 조합을 5초 동안 캐시하고 게시글 생성/수정/삭제/좋아요/관리자 숨김 변경 시 캐시를 비웁니다.
+- 홈 화면 전용 `npm run smoke:home-ui` 검증을 추가해 한국어 문구, 전역 플로팅 채팅 검색, 데스크톱/모바일 가로 오버플로를 확인합니다.
+- 모바일 홈의 플로팅 채팅/도움말 버튼은 하단 내비게이션 위 좌우 코너에 48px급 컴팩트 액션으로 배치해 본문 카드와 CTA를 가리지 않게 유지합니다.
+- 모바일 홈의 플로팅 채팅/도움말 버튼은 `BottomNav`의 표시 상태와 동기화됩니다. 하단 내비게이션이 스크롤로 숨겨질 때 두 버튼도 `opacity: 0`과 `pointer-events: none`으로 함께 숨고, 내비게이션이 다시 보이면 같이 복귀합니다.
+- 홈 실제 런타임 전용 `npm run smoke:home-runtime` 검증은 Docker compose nginx에서 서빙되는 `/app`과 실제 `/api/stats/dashboard`, `/api/boards/latest`, `/api/banners` 응답을 사용합니다. 보호 라우트 진입용 `/api/members`만 브라우저 CDP에서 합성 응답으로 처리하고, 한국어 문구, `aria-busy` 해제, 부분 장애 문구 미노출, unsafe URL 미렌더링, 데스크톱/모바일 가로 오버플로를 확인합니다.
+- 홈 정적 자산 전용 `npm run smoke:home-assets` 검증은 Docker compose nginx가 `/app` HTML을 immutable 캐시로 서빙하지 않고, Vite 해시 CSS/JS 자산에는 장기 immutable 캐시, gzip, `Vary: Accept-Encoding`, `nosniff` 헤더를 반환하는지 확인합니다.
+- 홈 성능 예산 전용 `npm run smoke:home-performance` 검증은 Docker compose nginx에서 `/app`을 headless Chrome으로 열고 첫 화면 준비 시간, DOMContentLoaded/load 시간, 로컬 JS/CSS 전송량을 예산 기준으로 확인합니다.
+- 홈 API 부하 전용 `npm run smoke:home-api-load` 검증은 Docker compose nginx를 통해 `/api/stats/dashboard`, `/api/boards/latest`, `/api/banners`를 기본 100개 동시 fan-out으로 호출하고, 모든 응답 200 및 p95 지연 기준을 확인합니다.
+- `/queue` 화면의 응답 정규화를 `src/adapters/queueAdapter.js`로 분리하고, 서버 제공 polling 간격을 기준으로 대기 상태를 재조회합니다.
+- `/login`과 OAuth 콜백 이후 대기열 응답도 `src/adapters/queueAdapter.js`를 사용해 `WAITING/BLOCKED` 상태를 같은 방식으로 처리합니다.
+- `/login`과 `/register`의 로그인, 회원가입, 이메일 인증, 제재 해제 요청은 `src/adapters/authAdapter.js`를 경유하며, 전용 `npm run smoke:auth-ui`로 로그인 이동과 이메일 인증 회원가입 흐름을 확인합니다.
+- `/app/boards/:kind` 목록은 배열 응답 body를 유지하면서 pagination 헤더를 읽어 전체 페이지 수를 계산합니다.
+- `/app/boards/:kind`와 `/app` 최신 게시글 카드의 목록형 `contents`는 첫 이미지와 짧은 요약만 포함되므로, 화면은 카드 렌더링에만 사용하고 전체 본문은 상세 API에서 조회합니다.
+- `/app/boards/:kind`와 `/app/mypage` 작성글 목록은 서버가 요청 `size`를 최대 50개로 보정하고, 게시글 랭킹은 최대 20개로 보정합니다.
+- `/app/boards/:kind` 검색/정렬은 서버 요청으로 처리하고, 자유게시판의 공지+일반글 혼합 탭은 로컬 슬라이스 대신 공지 고정 목록과 일반글 페이지를 분리합니다.
+- `/app/boards/:kind`와 `/app/boards/:kind/:boardId`의 게시글 액션 API 호출은 `src/adapters/boardAdapter.js`로 분리했습니다.
+- 게시글/댓글 화면의 에러 메시지 추출도 `boardAdapter`/`commentAdapter`에서 처리해 화면/훅이 오류 응답 shape을 직접 파싱하지 않습니다.
+- `/app/boards/:kind`의 목록 응답/pagination 헤더 정규화도 `src/adapters/boardAdapter.js`로 이동했으며, 전용 `npm run smoke:boards-ui`로 목록/탭/반응형 overflow를 확인합니다.
+- 뉴스/통계/할 일/마이페이지의 오류 메시지와 재인증 필요 코드 판별은 각 도메인 어댑터 헬퍼가 처리하며, page/component/hook/context 계층은 오류 응답 구조를 직접 읽지 않습니다.
+- `/app/boards/:kind/new`와 `/app/boards/:kind/:boardId/edit`은 CDN Quill 의존을 제거하고 로컬 에디터와 `boardAdapter` 저장 경로를 사용합니다.
+- `/app/boards/:kind/:boardId`의 게시글/댓글 신고 입력은 브라우저 prompt 대신 앱 내부 모달로 처리합니다.
+- `/app/boards/:kind/:boardId`는 댓글 작성/삭제 후 내부 갱신에 `trackView=false`를 사용해 조회수 오염을 막습니다.
+- `/app/boards/:kind/:boardId` 댓글 목록은 API adapter를 통해 페이지 정보를 읽고 `더 보기` 방식으로 렌더링합니다.
+- `/app/admin/anomalies`의 조치 설명, 신고 메모, 숨김/복구 사유, 역할 변경 사유 입력은 브라우저 prompt 대신 앱 내부 입력 토스트로 처리합니다.
+- `/app/admin/anomalies`의 대시보드 병렬 조회, 사건 조치, 신고/제재/검토/권한 변경, CSV 다운로드는 `src/adapters/adminAnomaliesAdapter.js`를 경유합니다.
+- `/app/admin/anomalies`의 CSV 다운로드는 서버의 최신 5,000건 export window 안에서 처리되며, 화면은 다운로드 중 버튼을 비활성화하고 성공/실패 토스트를 표시합니다.
+- `/app/admin/anomalies`의 사건 상세 타임라인은 서버의 최신 100개 조치 로그 window를 사용해 오래된 사건의 상세 조회도 일정한 크기로 유지합니다.
+- `/app/admin/anomalies`는 전용 `npm run smoke:admin-anomalies-ui`로 대시보드 주요 섹션, 사건 상세 조회, 권한 이력의 `ROLE_*` 코드 미노출, 데스크톱/모바일 overflow를 확인합니다.
+- `/app/todos`의 할 일 조회/생성/수정/삭제는 `src/adapters/todoAdapter.js`를 경유하며, 전용 `npm run smoke:todo-ui`로 한국어 문구, 생성 동작, 제목 길이 카운터, 반응형 overflow를 확인합니다.
+- `/app/statistics`의 요약/방문자 비교/기간 추이 조회는 `src/adapters/statsAdapter.js`를 경유하며, 전용 `npm run smoke:stats-ui`로 한국어 문구, 기간 변경, 반응형 overflow를 확인합니다.
+- `/app/statistics` 기간 추이 응답 shape은 유지되며, 서버는 게시글/댓글 일별 카운트를 일수별 반복 count 대신 DB aggregate query로 계산합니다.
+- `/app`과 `/app/statistics`의 방문자 수 표시는 기존 adapter 정규화 계약을 유지하고, 서버는 동일 방문자의 짧은 시간 내 반복 호출 Redis 쓰기를 억제합니다. Redis 쓰기 실패 후에는 서버가 로컬 예약을 해제해 다음 요청이 재시도되며, Redis visitor count 조회 실패 시에는 방문자 수만 `0`으로 낮춰 응답합니다.
+- `/app/news`의 뉴스 검색은 `src/adapters/newsAdapter.js`를 경유하며, 전용 `npm run smoke:news-ui`로 한국어 문구, 검색 동작, 반응형 overflow를 확인합니다.
+- `/app/ranks`의 게시판/레벨/기부 랭킹은 `src/adapters/ranksAdapter.js`를 경유하며, 전용 `npm run smoke:ranks-ui`로 한국어 문구, 탭 전환, 반응형 overflow를 확인합니다.
+- `/app/streaming`의 영상 목록/재생 정보는 `src/adapters/streamingAdapter.js`를 경유하며, 전용 `npm run smoke:streaming-ui`로 한국어 문구, 재생 화면 전환, 반응형 overflow를 확인합니다.
+- `/app/admin/streaming`의 관리자 영상 페이지 목록/업로드/inbox 반입/삭제는 `src/adapters/streamingAdapter.js`를 경유하며, 전용 `npm run smoke:admin-streaming-ui`로 한국어 상태/권한 라벨, 주요 액션 연결, 반응형 overflow를 확인합니다.
+- `/app/admin/anomalies`의 권한 안내, 권한 관리 배지, 권한 변경 이력은 `ROLE_*` 코드값 대신 한국어 라벨을 표시합니다.
+- `/app/admin/operations`의 일괄 검토/배너/회원 상세는 `src/adapters/adminOperationsAdapter.js`를 경유하며, 전용 `npm run smoke:admin-operations-ui`로 한국어 상태 라벨, 주요 액션 연결, 반응형 overflow를 확인합니다.
+- `/app/admin/operations`의 회원 상세 권한/상태/제재/신고 표시는 adapter의 한국어 라벨 필드를 사용하며, 전용 smoke가 `ROLE_*`, `MEMBER_*`, `PENDING/ACTIVE` 코드 노출을 차단합니다.
+- `/app/plinko`의 주사위/플링코 실행은 `src/adapters/luckyPlinkoAdapter.js`를 경유하며, 전용 `npm run smoke:plinko-ui`로 한국어 랭크/토스트, 캔버스 렌더링, 반응형 overflow를 확인합니다.
+- `/app/games/no-thanks`의 방 목록/생성/설정/상태 조회는 `src/adapters/noThanksGameAdapter.js`를 경유하며, 전용 `npm run smoke:no-thanks-ui`로 서버 snake_case 응답 정규화와 반응형 overflow를 확인합니다.
+- `/app/games/las-vegas`의 방 목록/생성/설정/상태/카지노 조회는 `src/adapters/lasVegasGameAdapter.js`를 경유하며, 전용 `npm run smoke:las-vegas-ui`로 서버 snake_case 응답 정규화와 반응형 overflow를 확인합니다.
+- `/app/games/{catan,blokus,mahe,dalmuti}`의 variants/rooms/state와 방 join/settings/action 요청은 `src/adapters/tabletopGameAdapter.js`를 경유하며, 기존 `npm run smoke:tabletop-ui`로 서버 snake_case 응답 정규화와 반응형 overflow를 확인합니다.
+- `/app/mypage`와 `/app/mypage/edit`은 `src/adapters/mypageAdapter.js`를 경유하며, 전용 `npm run smoke:mypage-ui`로 한국어 문구, 탭 전환, 프로필 수정 화면, 반응형 overflow를 확인합니다.
+- `/app/all-menu`과 `/app/games` 허브는 전용 `npm run smoke:hub-ui`로 관리자 메뉴 노출, 라우트 링크 누락, 게임 설명서 모달, 데스크톱/모바일 overflow를 확인합니다.
+- `/app/chat`과 전역 플로팅 채팅은 `src/adapters/chatAdapter.js`를 경유하며, 전용 `npm run smoke:chat-ui`와 홈 화면 스모크로 한국어 문구, 채팅방 검색/진입, STOMP 대기 중 기록/멤버 선조회, 초대 모달, 메시지 입력 2,000자 제한/카운터, STOMP 인증 헤더 구성, 반응형 overflow를 확인합니다.
+- `/app/facility`의 시설 하위 조회와 관리자 CSV 재적재는 `src/adapters/facilityAdapter.js`를 경유하며, 전용 `npm run smoke:facility-ui`로 하위 탭 전환, 지도 mock 렌더링, 반응형 overflow를 확인합니다.
+- 가입/프로필 수정/시설/중간장소 화면의 공용 주소 자동완성/지오코딩은 `src/adapters/addressSearchAdapter.js`를 경유합니다.
+- `/app/optimizer`의 중간장소 계산은 `src/adapters/optimizerAdapter.js`를 경유하며, 전용 `npm run smoke:optimizer-ui`로 주소 선택, 계산 결과, 지도 mock 렌더링, 반응형 overflow를 확인합니다.
+- `/app/invest`의 투자 분석/차트/종목 추천은 `src/adapters/investAdapter.js`를 경유하며, 전용 `npm run smoke:invest-ui`로 분석 결과, 차트 주기 전환, 추천 레이어, 반응형 overflow를 확인합니다.
+- 2026-06-01 game mapping note: `/app/games` renders one player-count sorted game section. The sort key is `minPlayers`, then `maxPlayers`, with stable registration order for exact ties; `npm run smoke:hub-ui` asserts the visible card order and absence of the old new/existing group labels.
+- 2026-06-01 realtime mapping note: `/app/games/las-vegas`, `/app/games/no-thanks`, and `/app/games/{catan,blokus,mahe,dalmuti}` bind realtime subscriptions only after a REST state refresh, refresh STOMP auth headers through `beforeConnect`, and rebind the latest active room after reconnect. Their dedicated smoke scripts include source assertions for this reconnect guard.

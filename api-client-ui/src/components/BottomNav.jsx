@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { Dices, Home, LayoutGrid, Menu } from "lucide-react";
+import { publishBottomNavVisibility } from "../hooks/useBottomNavVisibility.js";
+
+const shouldRenderBottomNav = () => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 1023px)").matches;
+};
 
 const NavItem = ({ to, icon: Icon, children }) => {
     return (
@@ -21,18 +27,33 @@ const NavItem = ({ to, icon: Icon, children }) => {
 };
 
 export const BottomNav = () => {
+    const [enabled, setEnabled] = useState(shouldRenderBottomNav);
     const [visible, setVisible] = useState(true);
     const lastScrollYRef = useRef(0);
-    const tickingRef = useRef(false);
+    const frameRef = useRef(0);
 
     useEffect(() => {
         if (typeof window === "undefined") return undefined;
+        const query = window.matchMedia("(max-width: 1023px)");
+        const syncEnabled = () => {
+            setEnabled(query.matches);
+            if (!query.matches) setVisible(true);
+        };
+
+        syncEnabled();
+        query.addEventListener?.("change", syncEnabled);
+        return () => query.removeEventListener?.("change", syncEnabled);
+    }, []);
+
+    useEffect(() => {
+        if (!enabled || typeof window === "undefined") return undefined;
+        lastScrollYRef.current = window.scrollY || 0;
 
         const onScroll = () => {
-            if (tickingRef.current) return;
-            tickingRef.current = true;
+            if (frameRef.current) return;
 
-            window.requestAnimationFrame(() => {
+            frameRef.current = window.requestAnimationFrame(() => {
+                frameRef.current = 0;
                 const currentY = window.scrollY || 0;
                 const lastY = lastScrollYRef.current;
                 const delta = currentY - lastY;
@@ -44,16 +65,34 @@ export const BottomNav = () => {
                 }
 
                 lastScrollYRef.current = currentY;
-                tickingRef.current = false;
             });
         };
 
         window.addEventListener("scroll", onScroll, { passive: true });
-        return () => window.removeEventListener("scroll", onScroll);
+        return () => {
+            window.removeEventListener("scroll", onScroll);
+            if (frameRef.current) {
+                window.cancelAnimationFrame(frameRef.current);
+                frameRef.current = 0;
+            }
+        };
+    }, [enabled]);
+
+    useEffect(() => {
+        publishBottomNavVisibility({ enabled, visible: enabled ? visible : true });
+    }, [enabled, visible]);
+
+    useEffect(() => {
+        return () => publishBottomNavVisibility({ enabled: false, visible: true });
     }, []);
+
+    if (!enabled) return null;
 
     return (
         <nav
+            aria-label="하단 주요 내비게이션"
+            data-bottom-nav="true"
+            data-bottom-nav-visible={visible ? "true" : "false"}
             className={`fixed bottom-0 left-0 right-0 z-50 h-20 border-t-white/20 px-4 pb-safe transition-transform duration-300 lg:hidden ${
                 visible ? "translate-y-0" : "translate-y-full"
             } glass`}

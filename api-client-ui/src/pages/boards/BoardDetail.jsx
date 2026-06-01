@@ -2,16 +2,15 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
-    Eye,
-    Heart,
     Download,
     Edit,
-    Trash2,
+    Eye,
     FileText,
-    Flag
+    Flag,
+    Heart,
+    Trash2,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
-import api from "../../utils/api.js";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
@@ -20,14 +19,16 @@ import {
     getBoardKindLabel,
     formatRelativeTime,
     formatNumber,
-    normalizeContentImageUrls
+    normalizeContentImageUrls,
+    sanitizeBoardContentHtml
 } from "../../utils/helpers.js";
 import { canManageByOwnerOrAdmin } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
-import { getBoardLikeCount, normalizeBoardDetail } from "../../adapters/boardAdapter.js";
+import { boardAdapter, boardErrorMessage, getBoardLikeCount } from "../../adapters/boardAdapter.js";
+import { ReportDialog } from "../../common/ReportDialog.jsx";
 
-const BoardBody = memo(({ html, files, onDownload }) => (
+const BoardBody = memo(({ html, files, downloadingFileIds, onDownload }) => (
     <div className="p-6">
         <div
             className="prose prose-slate max-w-none min-h-[200px] board-contents"
@@ -40,17 +41,26 @@ const BoardBody = memo(({ html, files, onDownload }) => (
                     <FileText className="h-4 w-4" /> 첨부파일 ({files.length})
                 </h3>
                 <div className="grid gap-2">
-                    {files.map((file, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
-                            <span className="text-sm truncate mr-4">{file.file_name || file.fileName}</span>
-                            <button
-                                onClick={() => onDownload(file.file_id || file.fileId, file.file_name || file.fileName)}
-                                className="btn-primary py-1 px-3 text-xs"
-                            >
-                                <Download className="h-3 w-3 mr-1" /> 다운로드
-                            </button>
-                        </div>
-                    ))}
+                    {files.map((file, idx) => {
+                        const fileId = file.file_id || file.fileId;
+                        const fileName = file.file_name || file.fileName || "attachment";
+                        const downloading = Boolean(downloadingFileIds[fileId]);
+
+                        return (
+                            <div key={fileId || idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+                                <span className="text-sm truncate mr-4">{fileName}</span>
+                                <button
+                                    onClick={() => onDownload(fileId, fileName)}
+                                    disabled={downloading}
+                                    aria-busy={downloading}
+                                    data-busy-indicator="true"
+                                    className="btn-primary py-1 px-3 text-xs disabled:opacity-60"
+                                >
+                                    <Download className="h-3 w-3 mr-1" /> {downloading ? "준비 중..." : "다운로드"}
+                                </button>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         )}
@@ -67,26 +77,36 @@ export const BoardDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [liking, setLiking] = useState(false);
-    const fetchedRef = useRef(false);
+    const [deleting, setDeleting] = useState(false);
+    const [downloadingFileIds, setDownloadingFileIds] = useState({});
+    const [reportOpen, setReportOpen] = useState(false);
+    const [reporting, setReporting] = useState(false);
+    const fetchedBoardIdRef = useRef(null);
+    const downloadingFileIdsRef = useRef({});
 
-    const fetchBoard = async () => {
-        setLoading(true);
+    const fetchBoard = async ({ trackView = true, silent = false } = {}) => {
+        if (!silent) setLoading(true);
         setError("");
         try {
-            const response = await api.get(`/boards/${boardId}`);
-            setBoard(normalizeBoardDetail(response));
+            const nextBoard = await boardAdapter.fetchBoardDetail(boardId, { trackView });
+            setBoard(nextBoard);
         } catch (err) {
             console.error("Failed to fetch board:", err);
-            setError(err.response?.data?.message || "게시글을 불러오는데 실패했습니다.");
+            const message = boardErrorMessage(err, "게시글을 불러오는데 실패했습니다.");
+            if (silent) {
+                toast.error(message);
+            } else {
+                setError(message);
+            }
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
     useEffect(() => {
-        if (boardId && !fetchedRef.current) {
+        if (boardId && fetchedBoardIdRef.current !== boardId) {
             fetchBoard();
-            fetchedRef.current = true;
+            fetchedBoardIdRef.current = boardId;
         }
     }, [boardId]);
 
@@ -102,12 +122,7 @@ export const BoardDetail = () => {
         }));
 
         try {
-            const response = await api.post(`/boards/${boardId}/Like`, null, {
-                meta: {
-                    trackNetwork: false,
-                },
-            });
-            const updatedData = normalizeBoardDetail(response) || {};
+            const updatedData = await boardAdapter.likeBoard(boardId) || {};
             const nextLikeCount = getBoardLikeCount(updatedData);
 
             setBoard((prev) => ({
@@ -122,32 +137,38 @@ export const BoardDetail = () => {
                 like_count: prevLikeCount,
                 likeCount: prevLikeCount,
             }));
-            toast.error(likeError.response?.data?.message || "좋아요 처리에 실패했습니다.");
+            toast.error(boardErrorMessage(likeError, "좋아요 처리에 실패했습니다."));
         } finally {
             setLiking(false);
         }
     };
 
     const handleDelete = async () => {
+        if (deleting) return;
         const confirmed = await confirmAction({
             title: "게시글을 삭제할까요?",
             description: "본문, 첨부파일, 댓글 정보가 함께 정리될 수 있습니다.",
             confirmText: "삭제",
         });
         if (!confirmed) return;
+        setDeleting(true);
         try {
-            await api.delete(`/boards/${boardId}`);
+            await boardAdapter.deleteBoard(boardId);
             toast.success("게시글이 삭제되었습니다.");
             navigate(`/app/boards/${kind}`);
-        } catch {
-            toast.error("게시글 삭제에 실패했습니다.");
+        } catch (deleteError) {
+            toast.error(boardErrorMessage(deleteError, "게시글 삭제에 실패했습니다."));
+            setDeleting(false);
         }
     };
 
     const handleDownload = useCallback(async (fileId, fileName) => {
+        if (!fileId || downloadingFileIdsRef.current[fileId]) return;
+        downloadingFileIdsRef.current = { ...downloadingFileIdsRef.current, [fileId]: true };
+        setDownloadingFileIds(downloadingFileIdsRef.current);
         try {
-            const response = await api.get(`/file/${fileId}`, { responseType: "blob" });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const blob = await boardAdapter.fetchBoardFile(fileId);
+            const url = window.URL.createObjectURL(new Blob([blob]));
             const link = document.createElement("a");
             link.href = url;
             link.setAttribute("download", fileName);
@@ -155,26 +176,27 @@ export const BoardDetail = () => {
             link.click();
             link.remove();
             window.URL.revokeObjectURL(url);
-        } catch {
-            toast.error("파일 다운로드에 실패했습니다.");
+        } catch (downloadError) {
+            toast.error(boardErrorMessage(downloadError, "파일 다운로드에 실패했습니다."));
+        } finally {
+            const next = { ...downloadingFileIdsRef.current };
+            delete next[fileId];
+            downloadingFileIdsRef.current = next;
+            setDownloadingFileIds(next);
         }
     }, []);
 
-    const handleReportBoard = async () => {
-        const reason = window.prompt("신고 사유를 입력해주세요", "부적절한 게시물");
-        if (!reason) return;
-        const detail = window.prompt("상세 내용을 입력해주세요 (선택)", "") || "";
-
+    const handleReportBoard = async ({ reason, detail }) => {
+        if (reporting) return;
+        setReporting(true);
         try {
-            await api.post("/reports", {
-                targetType: "BOARD",
-                targetId: Number(boardId),
-                reason,
-                detail,
-            });
+            await boardAdapter.reportBoard(boardId, { reason, detail });
             toast.success("신고가 접수되었습니다.");
+            setReportOpen(false);
         } catch (reportError) {
-            toast.error(reportError.response?.data?.message || "신고 접수에 실패했습니다.");
+            toast.error(boardErrorMessage(reportError, "신고 접수에 실패했습니다."));
+        } finally {
+            setReporting(false);
         }
     };
 
@@ -190,7 +212,7 @@ export const BoardDetail = () => {
     });
 
     const files = board.uploadDto || board.upload_dto || [];
-    const boardBodyHtml = normalizeContentImageUrls(board.contents || board.content || "");
+    const boardBodyHtml = sanitizeBoardContentHtml(normalizeContentImageUrls(board.contents || board.content || ""));
     const currentLikeCount = getBoardLikeCount(board);
     const currentViewCount = board.view_count ?? board.viewCount ?? 0;
     const authorProfileImageUrl = normalizeProfileImageUrl(board.member?.profile_url || board.member?.profileUrl || "");
@@ -207,8 +229,14 @@ export const BoardDetail = () => {
                         <button onClick={() => navigate(`/app/boards/${kind}/${boardId}/edit`)} className="btn-secondary flex items-center gap-2">
                             <Edit className="h-4 w-4" /> 수정
                         </button>
-                        <button onClick={handleDelete} className="btn-secondary text-red-600 flex items-center gap-2">
-                            <Trash2 className="h-4 w-4" /> 삭제
+                        <button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            aria-busy={deleting}
+                            data-busy-indicator="true"
+                            className="btn-secondary text-red-600 flex items-center gap-2 disabled:opacity-60"
+                        >
+                            <Trash2 className="h-4 w-4" /> {deleting ? "삭제 중..." : "삭제"}
                         </button>
                     </div>
                 )}
@@ -246,7 +274,12 @@ export const BoardDetail = () => {
                     </div>
                 </div>
 
-                <BoardBody html={boardBodyHtml} files={files} onDownload={handleDownload} />
+                <BoardBody
+                    html={boardBodyHtml}
+                    files={files}
+                    downloadingFileIds={downloadingFileIds}
+                    onDownload={handleDownload}
+                />
 
                 <div className="p-6 border-t bg-slate-50/30">
                     <div className="flex flex-wrap gap-2">
@@ -254,7 +287,7 @@ export const BoardDetail = () => {
                             <Heart className={`h-4 w-4 mr-2 ${liking ? "animate-ping" : ""}`} />
                             좋아요 {formatNumber(currentLikeCount)}
                         </button>
-                        <button onClick={handleReportBoard} className="btn-secondary text-amber-700 border-amber-200 hover:bg-amber-50">
+                        <button onClick={() => setReportOpen(true)} className="btn-secondary text-amber-700 border-amber-200 hover:bg-amber-50">
                             <Flag className="h-4 w-4 mr-2" /> 게시글 신고
                         </button>
                     </div>
@@ -263,7 +296,16 @@ export const BoardDetail = () => {
 
             <Comments
                 boardId={boardId}
-                onUpdate={fetchBoard}
+                onUpdate={() => fetchBoard({ trackView: false, silent: true })}
+            />
+
+            <ReportDialog
+                open={reportOpen}
+                targetLabel="게시글"
+                defaultReason="부적절한 게시물"
+                submitting={reporting}
+                onClose={() => setReportOpen(false)}
+                onSubmit={handleReportBoard}
             />
         </div>
     );

@@ -1,179 +1,171 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, Newspaper, ExternalLink, Calendar, TrendingUp } from "lucide-react";
-import api from "../../utils/api.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { formatRelativeTime } from "../../utils/helpers.js";
+import { NEWS_DEFAULT_DISPLAY, NEWS_DEFAULT_QUERY, NEWS_DEFAULT_SORT, newsAdapter, newsErrorMessage, normalizeNewsQuery } from "../../adapters/newsAdapter.js";
+
+const quickKeywords = ["기후위기", "탄소중립", "재생에너지", "전기차", "미세먼지"];
 
 export const News = () => {
-    const [query, setQuery] = useState("AI");
-    const [searchInput, setSearchInput] = useState("키워드사이 + 로 연결검색가능");
+    const [query, setQuery] = useState(NEWS_DEFAULT_QUERY);
+    const [searchInput, setSearchInput] = useState(NEWS_DEFAULT_QUERY);
     const [news, setNews] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [sortBy, setSortBy] = useState("sim"); // sim: 정확도순, date: 날짜순
-    const [display, setDisplay] = useState(20);
+    const [sortBy, setSortBy] = useState(NEWS_DEFAULT_SORT);
+    const [display, setDisplay] = useState(NEWS_DEFAULT_DISPLAY);
+    const requestSeqRef = useRef(0);
+    const initialLoadRef = useRef(false);
 
-    // 뉴스 검색
-    const fetchNews = async (searchQuery = query, sortType = sortBy, displayCount = display) => {
+    const fetchNews = useCallback(async ({ nextQuery = query, nextSort = sortBy, nextDisplay = display } = {}) => {
+        const requestId = requestSeqRef.current + 1;
+        requestSeqRef.current = requestId;
         setLoading(true);
         setError("");
         try {
-            const response = await api.get("/news", {
-                params: {
-                    query: searchQuery,
-                    sort: sortType,
-                    display: displayCount,
-                    start: 1
-                }
+            const result = await newsAdapter.search({
+                query: nextQuery,
+                sort: nextSort,
+                display: nextDisplay,
+                start: 1,
             });
-
-            // API 응답 구조에 따라 처리
-            const payload = response.data?.data || response.data || {};
-            const newsData = payload?.items || (Array.isArray(payload) ? payload : []);
-            setNews(newsData);
-
-            if (newsData.length === 0) {
-                setError("검색 결과가 없습니다. 다른 키워드로 검색해보세요.");
+            if (requestSeqRef.current !== requestId) return;
+            setNews(result.items);
+            setTotal(result.total);
+            if (result.items.length === 0) {
+                setError("검색 결과가 없습니다. 다른 키워드로 다시 검색해보세요.");
             }
         } catch (err) {
+            if (requestSeqRef.current !== requestId) return;
             console.error("Failed to fetch news:", err);
-            setError(err.response?.data?.message || "뉴스를 불러오는데 실패했습니다.");
+            setNews([]);
+            setTotal(0);
+            setError(newsErrorMessage(err, "뉴스를 불러오지 못했습니다."));
         } finally {
-            setLoading(false);
+            if (requestSeqRef.current === requestId) {
+                setLoading(false);
+            }
         }
-    };
+    }, [display, query, sortBy]);
 
-    // 초기 로드
     useEffect(() => {
-        fetchNews();
-    }, []);
+        if (initialLoadRef.current) return;
+        initialLoadRef.current = true;
+        fetchNews({
+            nextQuery: NEWS_DEFAULT_QUERY,
+            nextSort: NEWS_DEFAULT_SORT,
+            nextDisplay: NEWS_DEFAULT_DISPLAY,
+        });
+    }, [fetchNews]);
 
-    // 검색 핸들러
-    const handleSearch = (e) => {
-        e.preventDefault();
-        if (!searchInput.trim()) {
-            setError("검색어를 입력해주세요.");
-            return;
-        }
-        setQuery(searchInput);
-        fetchNews(searchInput, sortBy, display);
+    const handleSearch = (event) => {
+        event.preventDefault();
+        const nextQuery = normalizeNewsQuery(searchInput);
+        setSearchInput(nextQuery);
+        setQuery(nextQuery);
+        fetchNews({ nextQuery, nextSort: sortBy, nextDisplay: display });
     };
 
-    // 정렬 변경
-    const handleSortChange = (newSort) => {
-        setSortBy(newSort);
-        fetchNews(query, newSort, display);
+    const handleSortChange = (nextSort) => {
+        setSortBy(nextSort);
+        fetchNews({ nextQuery: query, nextSort, nextDisplay: display });
     };
 
-    // HTML 태그 제거 및 특수문자 변환
-    const cleanHtml = (html) => {
-        if (!html) return "";
-        return html
-            .replace(/<[^>]*>/g, "")
-            .replace(/&quot;/g, '"')
-            .replace(/&apos;/g, "'")
-            .replace(/&amp;/g, "&")
-            .replace(/&lt;/g, "<")
-            .replace(/&gt;/g, ">")
-            .replace(/&nbsp;/g, " ")
-            .replace(/<b>/g, "")
-            .replace(/<\/b>/g, "");
+    const handleDisplayChange = (nextDisplay) => {
+        setDisplay(nextDisplay);
+        fetchNews({ nextQuery: query, nextSort: sortBy, nextDisplay });
     };
 
-    // 날짜 포맷팅
-    const formatDate = (dateString) => {
-        try {
-            // "Wed, 12 Feb 2026 10:30:00 +0900" 형식
-            const date = new Date(dateString);
-            return formatRelativeTime(date);
-        } catch {
-            return dateString;
-        }
+    const handleKeywordClick = (keyword) => {
+        setSearchInput(keyword);
+        setQuery(keyword);
+        fetchNews({ nextQuery: keyword, nextSort: sortBy, nextDisplay: display });
     };
+
+    const retry = () => fetchNews({ nextQuery: query, nextSort: sortBy, nextDisplay: display });
 
     return (
         <div className="space-y-6">
-            {/* 헤더 */}
-            <div className="card p-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                <div className="flex items-center gap-3 mb-2">
-                    <Newspaper className="h-8 w-8" />
-                    <h1 className="text-3xl font-bold">환경 뉴스</h1>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                                <Newspaper className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">환경 뉴스</h1>
+                                <p className="text-sm font-medium text-slate-500">환경, 에너지, 지속가능성 이슈를 빠르게 확인하세요.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
+                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                        {total ? `검색 결과 ${Math.min(news.length, total).toLocaleString()} / ${total.toLocaleString()}건` : "실시간 뉴스 검색"}
+                    </div>
                 </div>
-                <p className="text-blue-100">최신 환경 관련 뉴스를 검색하고 확인하세요</p>
             </div>
 
-            {/* 검색 및 필터 */}
             <div className="card p-6 space-y-4">
-                {/* 검색바 */}
-                <form onSubmit={handleSearch} className="flex gap-2">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                         <input
-                            type="text"
+                            type="search"
                             value={searchInput}
-                            onChange={(e) => setSearchInput(e.target.value)}
-                            placeholder="환경, 탄소중립, 재생에너지 등..."
-                            className="input-base pl-11 w-full"
+                            onChange={(event) => setSearchInput(event.target.value)}
+                            placeholder="예: 탄소중립, 재생에너지, 미세먼지"
+                            className="input-base w-full pl-11"
+                            maxLength={60}
                         />
                     </div>
-                    <button type="submit" className="btn-primary px-6">
+                    <button type="submit" className="btn-primary px-6" disabled={loading}>
                         검색
                     </button>
                 </form>
 
-                {/* 필터 옵션 */}
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">정렬:</span>
+                <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">정렬</span>
                         <select
                             value={sortBy}
-                            onChange={(e) => handleSortChange(e.target.value)}
-                            className="px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onChange={(event) => handleSortChange(event.target.value)}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            disabled={loading}
                         >
                             <option value="sim">정확도순</option>
-                            <option value="date">날짜순</option>
+                            <option value="date">최신순</option>
                         </select>
-                    </div>
+                    </label>
 
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">결과 수:</span>
+                    <label className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">결과 수</span>
                         <select
                             value={display}
-                            onChange={(e) => {
-                                const newDisplay = parseInt(e.target.value);
-                                setDisplay(newDisplay);
-                                fetchNews(query, sortBy, newDisplay);
-                            }}
-                            className="px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onChange={(event) => handleDisplayChange(Number(event.target.value))}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            disabled={loading}
                         >
                             <option value={10}>10개</option>
                             <option value={20}>20개</option>
                             <option value={30}>30개</option>
                             <option value={50}>50개</option>
                         </select>
-                    </div>
-
-                    {news.length > 0 && (
-                        <div className="ml-auto text-sm text-slate-600">
-                            총 <span className="font-semibold text-blue-600">{news.length}</span>개의 뉴스
-                        </div>
-                    )}
+                    </label>
                 </div>
 
-                {/* 인기 키워드 */}
                 <div>
-                    <div className="text-sm font-semibold text-slate-700 mb-2">인기 검색어:</div>
+                    <div className="mb-2 text-sm font-semibold text-slate-700">빠른 검색어</div>
                     <div className="flex flex-wrap gap-2">
-                        {["AI", "바이브코딩", "CLAUDE", "CODEX", "엔트로픽"].map((keyword) => (
+                        {quickKeywords.map((keyword) => (
                             <button
                                 key={keyword}
-                                onClick={() => {
-                                    setSearchInput(keyword);
-                                    setQuery(keyword);
-                                    fetchNews(keyword, sortBy, display);
-                                }}
-                                className="px-3 py-1.5 text-sm rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+                                type="button"
+                                onClick={() => handleKeywordClick(keyword)}
+                                disabled={loading}
+                                className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 #{keyword}
                             </button>
@@ -182,91 +174,75 @@ export const News = () => {
                 </div>
             </div>
 
-            {/* 로딩 및 에러 */}
-            {loading && <LoadingSpinner text="뉴스를 검색하는 중..." />}
-            {error && !loading && <ErrorMessage message={error} />}
+            {loading ? <LoadingSpinner text="뉴스를 검색하는 중..." /> : null}
+            {!loading && error ? <ErrorMessage message={error} onRetry={retry} /> : null}
 
-            {/* 뉴스 리스트 */}
-            {!loading && !error && news.length > 0 && (
+            {!loading && !error && news.length > 0 ? (
                 <div className="space-y-4">
-                    {news.map((item, index) => (
-                        <NewsCard key={index} item={item} cleanHtml={cleanHtml} formatDate={formatDate} />
+                    {news.map((item) => (
+                        <NewsCard key={item.id} item={item} />
                     ))}
                 </div>
-            )}
+            ) : null}
 
-            {/* 빈 상태 */}
-            {!loading && !error && news.length === 0 && (
+            {!loading && !error && news.length === 0 ? (
                 <div className="card p-12 text-center">
-                    <Newspaper className="h-16 w-16 mx-auto text-slate-300 mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                        뉴스를 검색해보세요
-                    </h3>
-                    <p className="text-slate-600">
-                        관심 있는 환경 관련 키워드로 최신 뉴스를 찾아보세요.
-                    </p>
+                    <Newspaper className="mx-auto mb-4 h-16 w-16 text-slate-300" />
+                    <h3 className="mb-2 text-lg font-semibold text-slate-900">뉴스를 검색해보세요</h3>
+                    <p className="text-slate-600">관심 있는 환경 키워드로 최신 뉴스를 찾아볼 수 있습니다.</p>
                 </div>
-            )}
+            ) : null}
         </div>
     );
 };
 
-// 뉴스 카드 컴포넌트
-const NewsCard = ({ item, cleanHtml, formatDate }) => {
-    return (
-        <div className="card p-6 hover:shadow-lg transition-all group">
-            <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                    {/* 제목 */}
-                    <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors line-clamp-2">
+const formatDate = (dateString) => {
+    if (!dateString) return "날짜 정보 없음";
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return dateString;
+    return formatRelativeTime(date);
+};
+
+const NewsCard = ({ item }) => (
+    <article className="card p-6 transition-all hover:shadow-lg">
+        <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="min-w-0 flex-1">
+                <h3 className="mb-2 line-clamp-2 text-lg font-bold text-slate-900 transition-colors hover:text-emerald-700">
+                    <a href={item.link} target="_blank" rel="noopener noreferrer">
+                        {item.title}
+                    </a>
+                </h3>
+                <p className="mb-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{item.description}</p>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {formatDate(item.pubDate)}
+                    </span>
+                    {item.originalLink ? (
                         <a
-                            href={item.link}
+                            href={item.originalLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="hover:underline"
+                            className="flex items-center gap-1 text-emerald-700 hover:underline"
                         >
-                            {cleanHtml(item.title)}
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            원문 보기
                         </a>
-                    </h3>
-
-                    {/* 설명 */}
-                    <p className="text-slate-600 text-sm mb-3 line-clamp-3">
-                        {cleanHtml(item.description)}
-                    </p>
-
-                    {/* 메타 정보 */}
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                        <div className="flex items-center gap-1">
-                            <Calendar className="h-3.5 w-3.5" />
-                            <span>{formatDate(item.pubDate)}</span>
-                        </div>
-                        {item.originallink && (
-                            <a
-                                href={item.originallink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
-                            >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                                <span>원문 보기</span>
-                            </a>
-                        )}
-                    </div>
-                </div>
-
-                {/* 네이버 뉴스 링크 버튼 */}
-                <div className="flex sm:flex-col gap-2">
-                    <a
-                        href={item.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-primary whitespace-nowrap text-sm px-4 py-2"
-                    >
-                        <ExternalLink className="h-4 w-4 inline mr-1" />
-                        읽기
-                    </a>
+                    ) : null}
                 </div>
             </div>
+
+            <a
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary inline-flex h-10 items-center justify-center whitespace-nowrap px-4 text-sm"
+            >
+                <ExternalLink className="mr-1 h-4 w-4" />
+                읽기
+            </a>
         </div>
-    );
-};
+    </article>
+);
+
+export default News;

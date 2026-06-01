@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -11,8 +11,8 @@ import { BottomNav } from "./components/BottomNav.jsx";
 import { CustomCursor } from "./components/CustomCursor.jsx";
 import { GlobalNetworkIndicator } from "./components/GlobalNetworkIndicator.jsx";
 import { PageGuideButton } from "./common/PageGuideButton.jsx";
+import { FloatingChatEntry } from "./components/FloatingChatEntry.jsx";
 
-const FloatingChat = lazy(() => import("./components/FloatingChat.jsx").then((module) => ({ default: module.FloatingChat })));
 const Home = lazy(() => import("./pages/home/Home.jsx").then((module) => ({ default: module.Home })));
 const BoardList = lazy(() => import("./pages/boards/BoardList.jsx").then((module) => ({ default: module.BoardList })));
 const BoardDetail = lazy(() => import("./pages/boards/BoardDetail.jsx").then((module) => ({ default: module.BoardDetail })));
@@ -60,9 +60,7 @@ const AppLayout = ({ children }) => {
             <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8 relative z-10">
                 {children}
             </main>
-            <Suspense fallback={null}>
-                <FloatingChat />
-            </Suspense>
+            <FloatingChatEntry />
             <BottomNav />
         </div>
     );

@@ -1,17 +1,29 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import toast from "react-hot-toast";
 import { CheckCircle2, Crown, MessageSquare, Play, TimerReset } from "lucide-react";
-import api from "../../utils/api.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import { buildTalkPayload, chatAdapter, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
+import { buildStompConnectHeaders } from "../../adapters/realtimeAdapter.js";
+import {
+  buildNoThanksActionPayload,
+  getNoThanksChatRoomId,
+  getNoThanksPlayerId,
+  getNoThanksRoomId,
+  isNoThanksReadyPlayer,
+  noThanksGameAdapter,
+  noThanksGameErrorMessage,
+  noThanksRoomStatusLabel,
+  normalizeNoThanksState,
+} from "../../adapters/noThanksGameAdapter.js";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
 
-const roomIdOf = (room) => room?.room_id || room?.roomId || null;
-const chatRoomIdOf = (room) => room?.chat_room_id || room?.chatRoomId || room?.room_id || room?.roomId || room?.id || null;
+const roomIdOf = getNoThanksRoomId;
+const chatRoomIdOf = getNoThanksChatRoomId;
 const parseIntSafe = (value, fallback = 0) => {
   const parsed = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -27,8 +39,8 @@ const clampNumberText = (raw, min, max, fallback) => {
   const clamped = Math.min(max, Math.max(min, parseIntSafe(normalized, fallback)));
   return String(clamped);
 };
-const isReadyPlayer = (player) => Boolean(player?.ready ?? player?.is_ready ?? player?.isReady);
-const playerIdOf = (player) => Number(player?.member_id || player?.memberId || 0);
+const isReadyPlayer = isNoThanksReadyPlayer;
+const playerIdOf = (player) => Number(getNoThanksPlayerId(player) || 0);
 const cardsLabel = (cards) => (Array.isArray(cards) && cards.length ? cards.join(", ") : "-");
 
 export const NoThanksGame = () => {
@@ -41,12 +53,13 @@ export const NoThanksGame = () => {
   const [joinCode, setJoinCode] = useState("");
   const [secondsLeft, setSecondsLeft] = useState(null);
   const [chipAnimations, setChipAnimations] = useState([]);
-  const [createForm, setCreateForm] = useState({ title: "", start_chip_count: "11", turn_time_seconds: "15" });
-  const [settingsForm, setSettingsForm] = useState({ start_chip_count: "11", turn_time_seconds: "15" });
+  const [createForm, setCreateForm] = useState({ title: "", startChipCount: "11", turnTimeSeconds: "15" });
+  const [settingsForm, setSettingsForm] = useState({ startChipCount: "11", turnTimeSeconds: "15" });
 
   const stompRef = useRef(null);
   const gameSubRef = useRef(null);
   const chatSubRef = useRef(null);
+  const realtimeRoomRef = useRef(null);
   const chatScrollRef = useRef(null);
   const audioContextRef = useRef(null);
   const isActionSoundPlayingRef = useRef(false);
@@ -54,19 +67,19 @@ export const NoThanksGame = () => {
   const chipAnimationIdRef = useRef(0);
   const lastReadMarkAtRef = useRef(0);
 
-  const myMemberId = Number(user?.member_id || user?.memberId || user?.id || 0);
-  const roomStatus = gameState?.room_status || gameState?.roomStatus || selectedRoom?.room_status || selectedRoom?.roomStatus || null;
+  const myMemberId = Number(getMemberId(user) || user?.id || 0);
+  const roomStatus = gameState?.roomStatus || selectedRoom?.roomStatus || null;
   const statePlayers = Array.isArray(gameState?.players) ? gameState.players : [];
   const roomPlayers = Array.isArray(selectedRoom?.players) ? selectedRoom.players : [];
   const players = statePlayers.length ? statePlayers : roomPlayers;
-  const hostMemberId = Number(selectedRoom?.host_member_id || selectedRoom?.hostMemberId || 0);
+  const hostMemberId = Number(selectedRoom?.hostMemberId || 0);
   const isHost = Boolean(selectedRoom && hostMemberId === myMemberId);
-  const turnMemberId = Number(gameState?.turn_member_id || gameState?.turnMemberId || 0);
+  const turnMemberId = Number(gameState?.turnMemberId || 0);
   const isMyTurn = Boolean(myMemberId && turnMemberId === myMemberId);
-  const currentCard = gameState?.current_card || gameState?.currentCard || null;
-  const potChips = parseIntSafe(gameState?.pot_chips || gameState?.potChips, 0);
-  const deckRemaining = parseIntSafe(gameState?.deck_remaining_count || gameState?.deckRemainingCount, 0);
-  const winnerMemberId = Number(gameState?.winner_member_id || gameState?.winnerMemberId || 0);
+  const currentCard = gameState?.currentCard ?? null;
+  const potChips = parseIntSafe(gameState?.potChips, 0);
+  const deckRemaining = parseIntSafe(gameState?.deckRemainingCount, 0);
+  const winnerMemberId = Number(gameState?.winnerMemberId || 0);
   const chatRoomId = chatRoomIdOf(gameState) || chatRoomIdOf(selectedRoom);
   const myPlayer = players.find((player) => playerIdOf(player) === myMemberId) || null;
   const myChips = parseIntSafe(myPlayer?.chips, 0);
@@ -167,31 +180,39 @@ export const NoThanksGame = () => {
 
   const ensureSocket = () => {
     if (stompRef.current) return stompRef.current;
+    const connectHeaders = buildStompConnectHeaders();
+    if (!connectHeaders.Authorization) return null;
     const client = new Client({
       webSocketFactory: () => new SockJS("/ws/chat"),
-      connectHeaders: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+      connectHeaders,
       reconnectDelay: 3000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
       onStompError: () => toast.error("실시간 연결 오류"),
     });
+    client.beforeConnect = () => {
+      client.connectHeaders = buildStompConnectHeaders();
+    };
+    client.onConnect = () => {
+      bindLatestRealtimeRoom(client);
+    };
     client.activate();
     stompRef.current = client;
     return client;
   };
 
   const fetchRooms = async () => {
-    const response = await api.get("/game/no-thanks/rooms");
-    setRooms(response.data || []);
+    setRooms(await noThanksGameAdapter.fetchRooms());
   };
 
   const fetchState = async (roomId) => {
-    const response = await api.get(`/game/no-thanks/rooms/${roomId}/state`);
-    setGameState(response.data || null);
-    return response.data || null;
+    const snapshot = await noThanksGameAdapter.fetchRoomState(roomId);
+    setGameState(snapshot);
+    return snapshot;
   };
 
   const fetchMyRooms = async () => {
-    const response = await api.get("/game/no-thanks/rooms/me");
-    return response.data || [];
+    return noThanksGameAdapter.fetchMyActiveRooms();
   };
 
   const refreshSelectedRoom = async (roomId) => {
@@ -203,9 +224,7 @@ export const NoThanksGame = () => {
 
   const fetchChatMessages = async (roomId) => {
     try {
-      const response = await api.get(`/chat/room/${roomId}/messages`);
-      const rows = response?.data?.data || response?.data?.content || response?.data || [];
-      setChatMessages(Array.isArray(rows) ? [...rows].reverse() : []);
+      setChatMessages(await chatAdapter.fetchRoomMessages(roomId));
     } catch {
       setChatMessages([]);
     }
@@ -216,15 +235,21 @@ export const NoThanksGame = () => {
     const now = Date.now();
     if (now - lastReadMarkAtRef.current < 1000) return;
     lastReadMarkAtRef.current = now;
-    await api.patch(`/chat/room/${roomId}/read`);
+    await chatAdapter.markRoomRead(roomId);
     window.dispatchEvent(new CustomEvent(CHAT_ROOM_READ_EVENT, { detail: { roomId: String(roomId) } }));
   };
 
   const subscribeGameRoom = (client, roomId) => {
     if (gameSubRef.current) gameSubRef.current.unsubscribe();
     gameSubRef.current = client.subscribe(`/sub/game/no-thanks/room/${roomId}`, (message) => {
-      const payload = JSON.parse(message.body || "{}");
-      setGameState(payload);
+      let payload;
+      try {
+        payload = JSON.parse(message.body || "{}");
+      } catch {
+        fetchState(roomId).catch(() => {});
+        return;
+      }
+      setGameState(normalizeNoThanksState(payload));
       refreshSelectedRoom(roomId).catch(() => {});
     });
   };
@@ -232,10 +257,29 @@ export const NoThanksGame = () => {
   const subscribeChatRoom = (client, roomId) => {
     if (chatSubRef.current) chatSubRef.current.unsubscribe();
     chatSubRef.current = client.subscribe(`/sub/chat/room/${roomId}`, (message) => {
-      const payload = JSON.parse(message.body || "{}");
-      setChatMessages((prev) => [...prev, payload]);
+      let payload;
+      try {
+        payload = JSON.parse(message.body || "{}");
+      } catch {
+        fetchChatMessages(roomId).catch(() => {});
+        return;
+      }
+      const normalized = normalizeMessage(payload);
+      if (normalized) setChatMessages((prev) => [...prev, normalized]);
       markChatRoomAsRead(roomId).catch(() => {});
     });
+  };
+
+  const bindRealtimeRoom = (client, roomId, targetChatRoomId) => {
+    if (!client?.connected || !roomId) return;
+    subscribeGameRoom(client, roomId);
+    if (targetChatRoomId) subscribeChatRoom(client, targetChatRoomId);
+  };
+
+  const bindLatestRealtimeRoom = (client) => {
+    const target = realtimeRoomRef.current;
+    if (!target) return;
+    bindRealtimeRoom(client, target.roomId, target.chatRoomId);
   };
 
   const openRoom = async (room) => {
@@ -244,24 +288,19 @@ export const NoThanksGame = () => {
     if (!roomId) return;
     localStorage.setItem(ROOM_STORAGE_KEY, String(roomId));
 
+    const snapshot = await fetchState(roomId);
+    const snapshotChatRoomId = chatRoomIdOf(snapshot) || chatRoomIdOf(room);
+    if (snapshotChatRoomId) {
+      await fetchChatMessages(snapshotChatRoomId);
+      await markChatRoomAsRead(snapshotChatRoomId);
+    } else {
+      setChatMessages([]);
+    }
+    realtimeRoomRef.current = { roomId, chatRoomId: snapshotChatRoomId };
     const client = ensureSocket();
-    const bind = async () => {
-      subscribeGameRoom(client, roomId);
-      const snapshot = await fetchState(roomId);
-      const snapshotChatRoomId = chatRoomIdOf(snapshot) || chatRoomIdOf(room);
-      if (snapshotChatRoomId) {
-        subscribeChatRoom(client, snapshotChatRoomId);
-        await fetchChatMessages(snapshotChatRoomId);
-        await markChatRoomAsRead(snapshotChatRoomId);
-      } else {
-        setChatMessages([]);
-      }
-    };
-
-    if (client.connected) await bind();
-    else client.onConnect = () => {
-      bind().catch(() => toast.error("방 정보를 불러오지 못했습니다."));
-    };
+    if (client?.connected) {
+      bindRealtimeRoom(client, roomId, snapshotChatRoomId);
+    }
   };
 
   useEffect(() => {
@@ -283,24 +322,24 @@ export const NoThanksGame = () => {
   useEffect(() => {
     if (!selectedRoom) return;
     setSettingsForm({
-      start_chip_count: String(selectedRoom.start_chip_count || selectedRoom.startChipCount || 11),
-      turn_time_seconds: String(selectedRoom.turn_time_seconds || selectedRoom.turnTimeSeconds || 15),
+      startChipCount: String(selectedRoom.startChipCount || 11),
+      turnTimeSeconds: String(selectedRoom.turnTimeSeconds || 15),
     });
   }, [selectedRoom]);
 
   useEffect(() => {
-    if (!gameState?.turn_deadline_at) {
+    if (!gameState?.turnDeadlineAt) {
       setSecondsLeft(null);
       return;
     }
     const tick = () => {
-      const ms = new Date(gameState.turn_deadline_at).getTime() - Date.now();
+      const ms = new Date(gameState.turnDeadlineAt).getTime() - Date.now();
       setSecondsLeft(Math.max(0, Math.ceil(ms / 1000)));
     };
     tick();
     const timer = setInterval(tick, 500);
     return () => clearInterval(timer);
-  }, [gameState?.turn_deadline_at]);
+  }, [gameState?.turnDeadlineAt]);
 
   useEffect(() => {
     if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
@@ -355,32 +394,33 @@ export const NoThanksGame = () => {
     if (gameSubRef.current) gameSubRef.current.unsubscribe();
     if (chatSubRef.current) chatSubRef.current.unsubscribe();
     if (stompRef.current) stompRef.current.deactivate();
+    realtimeRoomRef.current = null;
   }, []);
 
   const createRoom = async (event) => {
     event.preventDefault();
     try {
-      const response = await api.post("/game/no-thanks/rooms", {
+      const room = await noThanksGameAdapter.createRoom({
         title: createForm.title,
-        start_chip_count: parseIntSafe(createForm.start_chip_count, 11),
-        turn_time_seconds: parseIntSafe(createForm.turn_time_seconds, 15),
+        startChipCount: parseIntSafe(createForm.startChipCount, 11),
+        turnTimeSeconds: parseIntSafe(createForm.turnTimeSeconds, 15),
       });
-      await openRoom(response.data);
+      await openRoom(room);
       await fetchRooms();
       toast.success("방 생성 완료");
-    } catch {
-      toast.error("방 생성 실패");
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "방 생성 실패"));
     }
   };
 
   const joinRoom = async (roomId) => {
     try {
-      const response = await api.post(`/game/no-thanks/rooms/${roomId}/join`);
-      await openRoom(response.data);
+      const room = await noThanksGameAdapter.joinRoom(roomId);
+      await openRoom(room);
       await fetchRooms();
       toast.success("방 입장 완료");
-    } catch {
-      toast.error("방 입장 실패");
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "방 입장 실패"));
     }
   };
 
@@ -392,58 +432,58 @@ export const NoThanksGame = () => {
       return;
     }
     try {
-      const response = await api.post("/game/no-thanks/rooms/join-by-code", { room_code: code });
+      const room = await noThanksGameAdapter.joinByCode(code);
       setJoinCode("");
-      await openRoom(response.data);
+      await openRoom(room);
       await fetchRooms();
       toast.success("방 코드로 입장했습니다.");
-    } catch {
-      toast.error("방 코드 입장 실패");
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "방 코드 입장 실패"));
     }
   };
 
   const saveSettings = async () => {
     if (!selectedRoom) return;
     try {
-      const response = await api.patch(`/game/no-thanks/rooms/${roomIdOf(selectedRoom)}/settings`, {
-        start_chip_count: parseIntSafe(settingsForm.start_chip_count, 11),
-        turn_time_seconds: parseIntSafe(settingsForm.turn_time_seconds, 15),
+      const room = await noThanksGameAdapter.updateSettings(roomIdOf(selectedRoom), {
+        startChipCount: parseIntSafe(settingsForm.startChipCount, 11),
+        turnTimeSeconds: parseIntSafe(settingsForm.turnTimeSeconds, 15),
       });
-      setSelectedRoom(response.data);
+      setSelectedRoom(room);
       await fetchRooms();
       toast.success("방 설정 저장 완료");
-    } catch {
-      toast.error("방 설정 저장 실패");
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "방 설정 저장 실패"));
     }
   };
 
   const toggleReady = async () => {
     if (!selectedRoom) return;
     try {
-      await api.post(`/game/no-thanks/rooms/${roomIdOf(selectedRoom)}/ready`);
-    } catch {
-      toast.error("준비 상태 변경 실패");
+      await noThanksGameAdapter.toggleReady(roomIdOf(selectedRoom));
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "준비 상태 변경 실패"));
     }
   };
 
   const startGame = async () => {
     if (!selectedRoom) return;
     try {
-      await api.post(`/game/no-thanks/rooms/${roomIdOf(selectedRoom)}/start`);
-    } catch {
-      toast.error("게임 시작 실패");
+      await noThanksGameAdapter.startGame(roomIdOf(selectedRoom));
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "게임 시작 실패"));
     }
   };
 
   const rematchGame = async () => {
     if (!selectedRoom) return;
     try {
-      const response = await api.post(`/game/no-thanks/rooms/${roomIdOf(selectedRoom)}/rematch`);
-      setSelectedRoom(response.data);
+      const room = await noThanksGameAdapter.rematch(roomIdOf(selectedRoom));
+      setSelectedRoom(room);
       await fetchRooms();
       toast.success("방이 다시 열렸습니다.");
-    } catch {
-      toast.error("방 다시 열기 실패");
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "방 다시 열기 실패"));
     }
   };
 
@@ -456,63 +496,58 @@ export const NoThanksGame = () => {
     });
     if (!confirmed) return;
     try {
-      const response = await api.post(`/game/no-thanks/rooms/${roomIdOf(selectedRoom)}/force-finish`);
-      setSelectedRoom(response.data);
+      const room = await noThanksGameAdapter.forceFinish(roomIdOf(selectedRoom));
+      setSelectedRoom(room);
       await fetchRooms();
       toast.success("게임 종료 완료");
-    } catch {
-      toast.error("게임 종료 실패");
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "게임 종료 실패"));
     }
   };
 
   const leaveRoom = async () => {
     if (!selectedRoom) return;
     try {
-      await api.post(`/game/no-thanks/rooms/${roomIdOf(selectedRoom)}/leave`);
+      await noThanksGameAdapter.leaveRoom(roomIdOf(selectedRoom));
       setSelectedRoom(null);
       setGameState(null);
       setChatMessages([]);
       localStorage.removeItem(ROOM_STORAGE_KEY);
+      realtimeRoomRef.current = null;
       if (gameSubRef.current) gameSubRef.current.unsubscribe();
       if (chatSubRef.current) chatSubRef.current.unsubscribe();
       await fetchRooms();
       toast.success("방 퇴장 완료");
-    } catch {
-      toast.error("방 퇴장 실패");
+    } catch (error) {
+      toast.error(noThanksGameErrorMessage(error, "방 퇴장 실패"));
     }
   };
 
   const publishAction = (actionType) => {
     if (!selectedRoom) return;
     const client = ensureSocket();
-    if (!client.connected) {
+    if (!client?.connected) {
       toast.error("실시간 연결이 아직 준비되지 않았습니다.");
       return;
     }
     playActionSound(actionType);
     client.publish({
       destination: `/pub/game/no-thanks/${roomIdOf(selectedRoom)}/action`,
-      body: JSON.stringify({ action_type: actionType, member_id: myMemberId }),
+      body: JSON.stringify(buildNoThanksActionPayload({ actionType })),
     });
   };
 
   const sendChat = () => {
     if (!chatInput.trim() || !chatRoomId || !myMemberId) return;
     const client = ensureSocket();
-    if (!client.connected) {
+    if (!client?.connected) {
       toast.error("채팅 연결이 아직 준비되지 않았습니다.");
       return;
     }
     const message = chatInput.trim();
     client.publish({
       destination: "/pub/chat/message",
-      body: JSON.stringify({
-        roomId: Number(chatRoomId),
-        chatRoomId: Number(chatRoomId),
-        senderId: Number(myMemberId),
-        type: "TALK",
-        message,
-      }),
+      body: JSON.stringify(buildTalkPayload({ roomId: chatRoomId, senderId: myMemberId, message })),
       headers: { "content-type": "application/json" },
     });
     setChatInput("");
@@ -557,10 +592,10 @@ export const NoThanksGame = () => {
             <div className="mt-4 space-y-3">
               <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="방 제목" value={createForm.title} onChange={(e) => setCreateForm((prev) => ({ ...prev, title: e.target.value }))} />
               <div className="grid grid-cols-2 gap-3">
-                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="토큰 개수" value={createForm.start_chip_count} onChange={(e) => setCreateForm((prev) => ({ ...prev, start_chip_count: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeCreateField("start_chip_count", 5, 20, 11)} />
-                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="제한 시간(초)" value={createForm.turn_time_seconds} onChange={(e) => setCreateForm((prev) => ({ ...prev, turn_time_seconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeCreateField("turn_time_seconds", 5, 60, 15)} />
+                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="토큰 개수" value={createForm.startChipCount} onChange={(e) => setCreateForm((prev) => ({ ...prev, startChipCount: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeCreateField("startChipCount", 5, 20, 11)} />
+                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="제한 시간(초)" value={createForm.turnTimeSeconds} onChange={(e) => setCreateForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeCreateField("turnTimeSeconds", 5, 60, 15)} />
               </div>
-              <button className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white">노땡스 방 만들기</button>
+              <button type="submit" className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white">노땡스 방 만들기</button>
             </div>
           </form>
 
@@ -571,7 +606,7 @@ export const NoThanksGame = () => {
             </div>
             <form onSubmit={joinByCode} className="mt-4 flex gap-2">
               <input className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase" placeholder="방 코드로 입장" value={joinCode} maxLength={8} onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
-              <button className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white">입장</button>
+              <button type="submit" className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white">입장</button>
             </form>
             <div className="mt-4 space-y-2.5">
               {!rooms.length && <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-400">대기 중인 방이 없습니다.</div>}
@@ -579,7 +614,7 @@ export const NoThanksGame = () => {
                 <div key={roomIdOf(room)} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                   <div>
                     <div className="text-sm font-black text-slate-900">{room.title}</div>
-                    <div className="text-xs text-slate-500">코드 {room.room_code || room.roomCode} | {(room.players || []).length}/6명 | 시작 칩 {room.start_chip_count || room.startChipCount}</div>
+                    <div className="text-xs text-slate-500">코드 {room.roomCode} | {room.memberCount}/{room.maxPlayers}명 | 시작 칩 {room.startChipCount}</div>
                   </div>
                   <button className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-black text-white" onClick={() => joinRoom(roomIdOf(room))}>입장</button>
                 </div>
@@ -595,7 +630,7 @@ export const NoThanksGame = () => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-lg font-black text-slate-900">{selectedRoom.title}</div>
-                <div className="text-xs text-slate-500">방 코드 {selectedRoom.room_code || selectedRoom.roomCode}</div>
+                <div className="text-xs text-slate-500">방 코드 {selectedRoom.roomCode}</div>
               </div>
               <div className="flex flex-wrap gap-2">
                 {isHost && roomStatus === "PLAYING" && <button className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700" onClick={forceFinishGame}>강제 종료</button>}
@@ -613,16 +648,16 @@ export const NoThanksGame = () => {
 
             <div className="mt-3 grid grid-cols-1 gap-2 text-xs md:grid-cols-5">
               <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">방장</div><div className="text-slate-500">{hostNickname}</div></div>
-              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">방 코드</div><div className="text-slate-500">{selectedRoom.room_code || selectedRoom.roomCode}</div></div>
-              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">시작 칩</div><div className="text-slate-500">{parseIntSafe(selectedRoom.start_chip_count || selectedRoom.startChipCount, 11)}</div></div>
-              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">턴 시간</div><div className="text-slate-500">{parseIntSafe(selectedRoom.turn_time_seconds || selectedRoom.turnTimeSeconds, 15)}초</div></div>
-              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">상태</div><div className="text-slate-500">{roomStatus || "-"}</div></div>
+              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">방 코드</div><div className="text-slate-500">{selectedRoom.roomCode}</div></div>
+              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">시작 칩</div><div className="text-slate-500">{parseIntSafe(selectedRoom.startChipCount, 11)}</div></div>
+              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">턴 시간</div><div className="text-slate-500">{parseIntSafe(selectedRoom.turnTimeSeconds, 15)}초</div></div>
+              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">상태</div><div className="text-slate-500">{noThanksRoomStatusLabel(roomStatus)}</div></div>
             </div>
 
             {isHost && roomStatus === "WAITING" && (
               <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
-                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.start_chip_count} onChange={(e) => setSettingsForm((prev) => ({ ...prev, start_chip_count: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("start_chip_count", 5, 20, 11)} />
-                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turn_time_seconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turn_time_seconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("turn_time_seconds", 5, 60, 15)} />
+                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.startChipCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, startChipCount: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("startChipCount", 5, 20, 11)} />
+                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("turnTimeSeconds", 5, 60, 15)} />
                 <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white md:col-span-2" onClick={saveSettings}>설정 저장</button>
               </div>
             )}
@@ -725,8 +760,8 @@ export const NoThanksGame = () => {
               <div ref={chatScrollRef} className="mb-3 h-[420px] space-y-2 overflow-auto rounded-2xl bg-slate-50 p-3 text-xs">
                 {!chatMessages.length && <div className="text-slate-400">채팅 내역이 없습니다.</div>}
                 {chatMessages.map((message, index) => (
-                  <div key={`${message.created_at || message.createdAt || index}-${index}`} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                    <div className="font-black text-slate-800">{message.sender_name || message.senderName || "SYSTEM"}</div>
+                  <div key={`${message.createdAt || index}-${index}`} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                    <div className="font-black text-slate-800">{message.senderName || "SYSTEM"}</div>
                     <div className="mt-0.5 text-slate-700">{message.message || ""}</div>
                   </div>
                 ))}

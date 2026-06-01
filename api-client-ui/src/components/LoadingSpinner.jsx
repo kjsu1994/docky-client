@@ -18,7 +18,7 @@ export const LoadingSpinner = ({ size = "md", text = "" }) => {
 export const LoadingPage = () => {
     return (
         <div className="min-h-screen flex items-center justify-center">
-            <LoadingSpinner size="lg" text="로딩 중..." />
+            <LoadingSpinner size="lg" text="불러오는 중..." />
         </div>
     );
 };

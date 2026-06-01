@@ -3,10 +3,10 @@ if (typeof global === 'undefined') { window.global = window; }
 import { 
     Dices, Trophy, Play, RefreshCcw, Coins, Info, Award, Lock, Unlock, AlertCircle, TrendingUp
 } from "lucide-react";
-import api from "../../utils/api.js";
 import toast from "react-hot-toast";
 import { formatNumber } from "../../utils/helpers.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
+import { luckyPlinkoAdapter, luckyPlinkoErrorMessage } from "../../adapters/luckyPlinkoAdapter.js";
 
 // Audio assets
 const ROLL_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3";
@@ -155,7 +155,7 @@ export const LuckyPlinko = () => {
         setPlinkoResult(pendingPlinkoResult);
         setPendingPlinkoResult(null);
         setPlayInProgress(false);
-        toast.success(`${formatNumber(pendingPlinkoResult.earnedPoint)} points earned!`);
+        toast.success(`${formatNumber(pendingPlinkoResult.earnedPoint)}포인트를 획득했습니다.`);
     }, [landedCount, totalToLand, pendingPlinkoResult, playInProgress]);
 
     useEffect(() => {
@@ -483,19 +483,17 @@ export const LuckyPlinko = () => {
         rollAudio.current.currentTime = 0;
         rollAudio.current.play().catch(() => {});
         try {
-            const response = await api.post('/game/dice/roll');
-            const data = response.data?.data || response.data;
-            const normalized = { ...data, rankName: data.rank_name || data.rankName || 'NONE' };
+            const normalized = await luckyPlinkoAdapter.rollDice();
             const elapsed = performance.now() - rollStartedAt;
             if (elapsed < MIN_ROLL_MS) await wait(MIN_ROLL_MS - elapsed);
-            setDice(data.dice);
+            setDice(normalized.dice);
             setGameResult(normalized);
-            setMarbles(data.marbles);
+            setMarbles(normalized.marbles);
             setRolling(false);
             setStep(2);
         } catch (error) {
             setRolling(false);
-            toast.error('Error occurred');
+            toast.error(luckyPlinkoErrorMessage(error, "주사위를 굴리지 못했습니다."));
         }
     };
     const rerollDice = async () => {
@@ -505,39 +503,30 @@ export const LuckyPlinko = () => {
         rollAudio.current.currentTime = 0;
         rollAudio.current.play().catch(() => {});
         try {
-            const response = await api.post('/game/dice/reroll', heldIndices);
-            const data = response.data?.data || response.data;
-            const normalized = { ...data, rankName: data.rank_name || data.rankName || 'NONE' };
+            const normalized = await luckyPlinkoAdapter.rerollDice(heldIndices);
             const elapsed = performance.now() - rollStartedAt;
             if (elapsed < MIN_ROLL_MS) await wait(MIN_ROLL_MS - elapsed);
-            setDice(data.dice);
+            setDice(normalized.dice);
             setGameResult(normalized);
-            setMarbles(data.marbles);
+            setMarbles(normalized.marbles);
             setRolling(false);
             setStep(3);
         } catch (error) {
             setRolling(false);
-            toast.error('Reroll failed');
+            toast.error(luckyPlinkoErrorMessage(error, "주사위를 다시 굴리지 못했습니다."));
         }
     };
     const playPlinko = async () => {
         if (marbles <= 0 || playInProgress) return;
         try {
             setPlayInProgress(true);
-            const response = await api.post("/game/plinko/play");
-            const data = response.data?.data || response.data;
-            const normalized = { 
-                ...data, 
-                landingSlots: data.landing_slots || data.landingSlots || [], 
-                earnedPoint: data.earned_point !== undefined ? data.earned_point : data.earnedPoint,
-                totalPoint: data.total_point !== undefined ? data.total_point : data.totalPoint
-            };
+            const normalized = await luckyPlinkoAdapter.playPlinko();
             setStep(4);
             if (normalized.landingSlots.length === 0) {
                 setPlinkoResult(normalized);
                 setPendingPlinkoResult(null);
                 setPlayInProgress(false);
-                toast.success(`${formatNumber(normalized.earnedPoint)} points earned!`);
+                toast.success(`${formatNumber(normalized.earnedPoint)}포인트를 획득했습니다.`);
                 return;
             }
             setPlinkoResult(null);
@@ -564,7 +553,7 @@ export const LuckyPlinko = () => {
             newParticles.forEach((p, i) => setTimeout(() => particlesRef.current.push(p), i * 180));
         } catch (error) {
             setPlayInProgress(false);
-            toast.error("Plinko error");
+            toast.error(luckyPlinkoErrorMessage(error, "플링코를 실행하지 못했습니다."));
         }
     };
 
@@ -637,7 +626,7 @@ export const LuckyPlinko = () => {
                             </div>
                             {gameResult && (
                                 <div className="text-center animate-slide-up bg-white/5 w-full py-8 rounded-[2.5rem] border border-white/10 shadow-lg">
-                                    <div className="text-4xl font-black text-amber-400 italic mb-1 uppercase drop-shadow-md">{gameResult.rankName}</div>
+                                    <div className="text-4xl font-black text-amber-400 italic mb-1 drop-shadow-md">{gameResult.rankLabel}</div>
                                     <div className="text-xs text-slate-500 font-bold tracking-widest mb-2">획득 구슬</div>
                                     <div className="text-7xl font-black text-white tabular-nums tracking-tighter">{marbles}</div>
                                 </div>

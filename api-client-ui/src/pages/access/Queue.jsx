@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Timer, Users, Loader2, AlertCircle } from "lucide-react";
-import api from "../../utils/api.js";
 import toast from "react-hot-toast";
+import { extractQueueErrorMessage, isQueueUnauthorizedError, queueAdapter, resolveQueuePollIntervalMs } from "../../adapters/queueAdapter.js";
 
 const WAITING_UI_DELAY_MS = 700;
-const POLL_INTERVAL_MS = 1200;
+const FALLBACK_POLL_INTERVAL_MS = 3000;
+const MAX_POLL_INTERVAL_MS = 10000;
+const POLL_JITTER_MS = 500;
 
 export const Queue = () => {
     const [queueInfo, setQueueInfo] = useState({
@@ -20,10 +22,11 @@ export const Queue = () => {
     const navigate = useNavigate();
     const pollTimerRef = useRef(null);
     const waitingUiTimerRef = useRef(null);
+    const mountedRef = useRef(false);
 
     const clearTimers = () => {
         if (pollTimerRef.current) {
-            clearInterval(pollTimerRef.current);
+            clearTimeout(pollTimerRef.current);
             pollTimerRef.current = null;
         }
         if (waitingUiTimerRef.current) {
@@ -32,7 +35,23 @@ export const Queue = () => {
         }
     };
 
+    const resolvePollIntervalMs = (data) => resolveQueuePollIntervalMs(data, {
+        fallbackMs: FALLBACK_POLL_INTERVAL_MS,
+        maxMs: MAX_POLL_INTERVAL_MS,
+    });
+
+    const scheduleNextPoll = (data) => {
+        if (!mountedRef.current) return;
+        if (pollTimerRef.current) {
+            clearTimeout(pollTimerRef.current);
+        }
+        const interval = resolvePollIntervalMs(data);
+        const jitter = Math.floor(Math.random() * POLL_JITTER_MS);
+        pollTimerRef.current = setTimeout(fetchQueueStatus, interval + jitter);
+    };
+
     const startWaitingUiDelay = () => {
+        if (!mountedRef.current) return;
         if (showWaitingUi || waitingUiTimerRef.current) return;
         waitingUiTimerRef.current = setTimeout(() => {
             setShowWaitingUi(true);
@@ -42,8 +61,7 @@ export const Queue = () => {
 
     const fetchQueueStatus = async () => {
         try {
-            const response = await api.get("/api/queue/status");
-            const data = response.data?.data || response.data;
+            const data = await queueAdapter.fetchStatus();
             setQueueInfo(data);
             setLoading(false);
             setError("");
@@ -55,23 +73,36 @@ export const Queue = () => {
                 return;
             }
 
+            if (data.status === "BLOCKED") {
+                clearTimers();
+                setShowWaitingUi(true);
+                setError("현재 접속 대기열 이용이 제한되었습니다. 잠시 후 다시 시도해 주세요.");
+                return;
+            }
+
             // WAITING일 때도 잠깐 지속되는 경우에만 대기 UI 노출
             startWaitingUiDelay();
+            scheduleNextPoll(data);
         } catch (err) {
             console.error("Failed to fetch queue status:", err);
             setLoading(false);
-            setError(err?.response?.data?.message || "대기열 정보를 가져오는데 실패했습니다.");
-            if (err?.response?.status === 401) {
+            setError(extractQueueErrorMessage(err, "대기열 정보를 가져오는데 실패했습니다."));
+            if (isQueueUnauthorizedError(err)) {
                 clearTimers();
                 navigate("/login", { replace: true });
+                return;
             }
+            scheduleNextPoll({ poll_interval_seconds: 5 });
         }
     };
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchQueueStatus();
-        pollTimerRef.current = setInterval(fetchQueueStatus, POLL_INTERVAL_MS);
-        return () => clearTimers();
+        return () => {
+            mountedRef.current = false;
+            clearTimers();
+        };
     }, [navigate]);
 
     const formatTime = (seconds) => {

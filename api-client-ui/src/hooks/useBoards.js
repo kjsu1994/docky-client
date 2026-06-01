@@ -1,39 +1,14 @@
-import { useState, useEffect, useRef } from "react";
-import api from "../utils/api.js";
+import { useEffect, useRef, useState } from "react";
+import { boardAdapter, boardErrorMessage } from "../adapters/boardAdapter.js";
 
-const getBodyData = (response) => response?.data?.data ?? response?.data;
+export const useBoards = (kind, page = 1, size = 10, reloadKey = 0, options = {}) => {
+    const {
+        enabled = true,
+        searchType = "ALL",
+        searchValue = "",
+        sortBy = "latest",
+    } = options;
 
-const fetchAllBoardsWithoutMeta = async (kind) => {
-    const collected = [];
-    const fetchSize = 100;
-    const maxPages = 3; // 무한 루프 방지를 위해 최대 페이지 탐색 수 제한
-    
-    for (let index = 0; index < maxPages; index += 1) {
-        try {
-            const response = await api.get("/boards", {
-                params: { kind: (Array.isArray(kind) ? kind[0] : kind), page: index, size: fetchSize }
-            });
-            const data = getBodyData(response);
-            const items = Array.isArray(data) ? data : (data?.content || []);
-            
-            if (items.length === 0) break; // 데이터가 없으면 즉시 중단
-
-            const taggedItems = items.map(item => ({
-                ...item,
-                kind_of_board: item.kind_of_board || item.kindOfBoard || (Array.isArray(kind) ? kind[0] : kind)
-            }));
-            
-            collected.push(...taggedItems);
-            if (items.length < fetchSize) break;
-        } catch (err) {
-            console.error("Fallback fetch error:", err);
-            break;
-        }
-    }
-    return collected;
-};
-
-export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
     const [boards, setBoards] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -50,14 +25,32 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
         const safePage = Math.max(Number(page) || 1, 1);
         const safeSize = Math.max(Number(size) || 10, 1);
         const apiPage = safePage - 1;
-        
-        const kindKey = Array.isArray(kind) ? kind.join(",") : kind;
-        const fetchKey = `${kindKey}-${apiPage}-${safeSize}-${reloadKey}`;
+        const normalizedSearchValue = String(searchValue || "").trim();
+        const requestOptions = {
+            searchType,
+            searchValue: normalizedSearchValue,
+            sortBy,
+        };
 
-        // 중복 방지 (이미 해당 키로 요청을 시도했거나 데이터가 없는 상태에서 키가 같다면 차단)
+        const kindKey = Array.isArray(kind) ? kind.join(",") : kind;
+        const fetchKey = `${kindKey}-${apiPage}-${safeSize}-${reloadKey}-${searchType}-${normalizedSearchValue}-${sortBy}-${enabled}`;
+
+        if (!enabled || !kindKey) {
+            setBoards([]);
+            setError(null);
+            setLoading(false);
+            setPageInfo({
+                totalPages: 1,
+                totalElements: 0,
+                currentPage: safePage,
+            });
+            lastFetchKeyRef.current = "";
+            return () => { isMounted = false; };
+        }
+
         if (lastFetchKeyRef.current === fetchKey) {
             setLoading(false);
-            return;
+            return () => { isMounted = false; };
         }
 
         const fetchBoards = async () => {
@@ -70,21 +63,19 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
                 let totalPages = 0;
 
                 if (Array.isArray(kind)) {
-                    // 다중 카테고리 조회
                     const results = await Promise.allSettled(
-                        kind.map(k => api.get("/boards", { params: { kind: k, page: 0, size: 50 } }))
+                        kind.map((item) => boardAdapter.fetchBoardPage({
+                            kind: item,
+                            page: 0,
+                            size: 50,
+                            ...requestOptions,
+                        }))
                     );
-                    
-                    results.forEach((result, index) => {
-                        if (result.status === 'fulfilled') {
-                            const data = getBodyData(result.value);
-                            const items = Array.isArray(data) ? data : (data?.content || []);
-                            
-                            const taggedItems = items.map(item => ({
-                                ...item,
-                                kind_of_board: item.kind_of_board || item.kindOfBoard || kind[index]
-                            }));
-                            allFetchedBoards.push(...taggedItems);
+
+                    results.forEach((result) => {
+                        if (result.status === "fulfilled") {
+                            allFetchedBoards.push(...result.value.items);
+                            totalElements += result.value.pageInfo.totalElements;
                         }
                     });
 
@@ -93,40 +84,30 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
                         const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
                         return dateB - dateA;
                     });
-                    
-                    totalElements = allFetchedBoards.length;
+
+                    totalElements = totalElements || allFetchedBoards.length;
                     totalPages = Math.ceil(totalElements / safeSize) || 1;
                     const startIndex = (safePage - 1) * safeSize;
                     allFetchedBoards = allFetchedBoards.slice(startIndex, startIndex + safeSize);
                 } else {
-                    // 단일 카테고리 조회
-                    const response = await api.get("/boards", {
-                        params: { kind, page: apiPage, size: safeSize }
+                    const result = await boardAdapter.fetchBoardPage({
+                        kind,
+                        page: apiPage,
+                        size: safeSize,
+                        ...requestOptions,
                     });
 
-                    const data = getBodyData(response);
-                    let rawItems = [];
-                    if (data && typeof data === "object" && Array.isArray(data.content)) {
-                        rawItems = data.content;
-                        totalElements = data.totalElements;
-                        totalPages = data.totalPages;
-                    } else if (Array.isArray(data)) {
-                        rawItems = data;
-                        totalElements = data.length;
-                        totalPages = Math.ceil(totalElements / safeSize);
+                    if (result.recognized) {
+                        allFetchedBoards = result.items;
+                        totalElements = result.pageInfo.totalElements;
+                        totalPages = result.pageInfo.totalPages;
                     } else {
-                        const fallbackData = await fetchAllBoardsWithoutMeta(kind);
-                        rawItems = fallbackData;
+                        const fallbackData = await boardAdapter.fetchBoardFallbackList(kind, requestOptions);
                         totalElements = fallbackData.length;
                         totalPages = Math.ceil(totalElements / safeSize);
                         const startIndex = (safePage - 1) * safeSize;
-                        rawItems = fallbackData.slice(startIndex, startIndex + safeSize);
+                        allFetchedBoards = fallbackData.slice(startIndex, startIndex + safeSize);
                     }
-
-                    allFetchedBoards = rawItems.map(item => ({
-                        ...item,
-                        kind_of_board: item.kind_of_board || item.kindOfBoard || kind
-                    }));
                 }
 
                 if (!isMounted) return;
@@ -138,13 +119,12 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
                     totalElements: totalElements || allFetchedBoards.length,
                     currentPage: safePage,
                 });
-
             } catch (err) {
                 if (isMounted) {
                     console.error("[useBoards] Fetch Error:", err);
-                    setError(err.response?.data?.message || "데이터 로딩 실패");
+                    setError(boardErrorMessage(err, "게시글 목록을 불러오지 못했습니다."));
                     setBoards([]);
-                    lastFetchKeyRef.current = fetchKey; // 에러가 나도 키를 저장하여 무한 재요청 방지
+                    lastFetchKeyRef.current = fetchKey;
                 }
             } finally {
                 if (isMounted) setLoading(false);
@@ -153,7 +133,7 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0) => {
 
         fetchBoards();
         return () => { isMounted = false; };
-    }, [kind, page, size, reloadKey]);
+    }, [kind, page, size, reloadKey, enabled, searchType, searchValue, sortBy]);
 
     return { boards, loading, error, pageInfo };
 };

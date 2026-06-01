@@ -1,11 +1,11 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bath, LocateFixed, RefreshCw, Search, DatabaseZap, X } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "../../utils/api.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
+import { extractFacilityErrorMessage, facilityAdapter } from "../../adapters/facilityAdapter.js";
 
 const INITIAL_CENTER = { latitude: 37.5665, longitude: 126.9780 };
 const toNumber = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -207,20 +207,17 @@ export const RestroomFinder = () => {
     const fetchLots = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await api.get("/restrooms/lots", {
-                params: {
-                    latitude: center.latitude,
-                    longitude: center.longitude,
-                    radius_km: parseRadius(),
-                    open_type: openType,
-                    sort,
-                    limit: parseLimit(),
-                },
+            const result = await facilityAdapter.fetchRestroomLots({
+                latitude: center.latitude,
+                longitude: center.longitude,
+                radiusKm: parseRadius(),
+                openType,
+                sort,
+                limit: parseLimit(),
             });
-            const rows = res?.data?.data?.items ?? [];
-            setFetchedItems(Array.isArray(rows) ? rows : []);
+            setFetchedItems(result.items);
         } catch (err) {
-            toast.error(err?.response?.data?.message || "화장실 목록을 불러오지 못했습니다.");
+            toast.error(extractFacilityErrorMessage(err, "화장실 목록을 불러오지 못했습니다."));
             setFetchedItems([]);
         } finally {
             setLoading(false);
@@ -493,12 +490,12 @@ export const RestroomFinder = () => {
     const handleImport = async () => {
         setImporting(true);
         try {
-            const res = await api.post("/admin/restroom/import", null, { params: { csvPath: csvPath?.trim() || undefined } });
-            const count = res?.data?.data?.imported_count ?? res?.data?.data?.importedCount ?? 0;
+            const data = await facilityAdapter.importRestroomLots(csvPath);
+            const count = data.importedCount;
             toast.success(`CSV 재적재 완료 (${count}건)`);
             await fetchLots();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "CSV 재적재에 실패했습니다.");
+            toast.error(extractFacilityErrorMessage(err, "CSV 재적재에 실패했습니다."));
         } finally {
             setImporting(false);
         }

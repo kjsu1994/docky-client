@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Clock, Map as MapIcon, MapPin, Navigation, Plus, Users, X } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "../../utils/api.js";
+import { extractOptimizerErrorMessage, optimizerAdapter } from "../../adapters/optimizerAdapter.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 
 const loadDaumPostcodeScript = () =>
@@ -99,12 +99,6 @@ export const MeetingOptimizer = () => {
         const values = result.user_results.map((v) => Number(v?.travel_time)).filter((v) => Number.isFinite(v));
         return values.length ? Math.max(...values) : null;
     }, [result]);
-
-    const roundMinutes = (value) => {
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return value;
-        return Math.round(numeric);
-    };
 
     useEffect(() => {
         mapTargetIndexRef.current = mapTargetIndex;
@@ -370,22 +364,13 @@ export const MeetingOptimizer = () => {
 
         setLoading(true);
         try {
-            const response = await api.post("/api/optimizer/optimize", normalizedAddresses);
-            const data = response?.data?.data || response?.data || {};
-            const roundedData = {
-                ...data,
-                avg_travel_time: roundMinutes(data?.avg_travel_time),
-                travel_time_std_dev: roundMinutes(data?.travel_time_std_dev),
-                user_results: Array.isArray(data?.user_results)
-                    ? data.user_results.map((user) => ({ ...user, travel_time: roundMinutes(user?.travel_time) }))
-                    : [],
-            };
-            setResult(roundedData);
+            const data = await optimizerAdapter.optimizeMeetingPoint(normalizedAddresses);
+            setResult(data);
             setSelectedCandidateIndex(0);
-            setTimeout(() => renderMarkers(roundedData), 100);
+            setTimeout(() => renderMarkers(data), 100);
             toast.success("중간장소 계산이 완료되었습니다.");
         } catch (error) {
-            const message = error?.response?.data?.message || "중간장소 계산에 실패했습니다.";
+            const message = extractOptimizerErrorMessage(error, "중간장소 계산에 실패했습니다.");
             toast.error(`계산 실패: ${message}`);
         } finally {
             setLoading(false);

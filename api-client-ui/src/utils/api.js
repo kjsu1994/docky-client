@@ -36,9 +36,16 @@ const isPublicAuthRequest = (config) => {
     return PUBLIC_AUTH_PATHS.some((path) => url === path || url.startsWith(`${path}?`));
 };
 
+const stripBearerToken = (value) => {
+    return typeof value === "string" ? value.replace(/^Bearer\s+/i, "") : null;
+};
+
 const extractBearerToken = (headers) => {
-    const authHeader = headers?.authorization || headers?.Authorization;
-    return typeof authHeader === "string" ? authHeader.replace(/^Bearer\s+/i, "") : null;
+    return stripBearerToken(headers?.authorization || headers?.Authorization);
+};
+
+const extractRefreshToken = (headers) => {
+    return stripBearerToken(headers?.refresh || headers?.Refresh || headers?.refreshtoken || headers?.RefreshToken);
 };
 
 const clearStoredAuth = () => {
@@ -70,8 +77,9 @@ const refreshAccessToken = async () => {
 
     beginNetworkActivity();
     refreshPromise = axios
-        .get("/api/auth/reissue", {
+        .post("/api/auth/reissue", null, {
             headers: {
+                Refresh: refreshToken,
                 Authorization: `Bearer ${refreshToken}`,
             },
         })
@@ -80,7 +88,11 @@ const refreshAccessToken = async () => {
             if (!accessToken) {
                 throw new Error("재발급 토큰을 찾을 수 없습니다.");
             }
+            const nextRefreshToken = extractRefreshToken(response.headers);
             localStorage.setItem("accessToken", accessToken);
+            if (nextRefreshToken) {
+                localStorage.setItem("refreshToken", nextRefreshToken);
+            }
             sessionExpiredNotified = false;
             return accessToken;
         })
@@ -161,6 +173,37 @@ api.interceptors.response.use(
         }
     }
 );
+
+export const getApiErrorMessage = (error, fallbackMessage = "요청 처리 중 오류가 발생했습니다.") => {
+    const fallback = fallbackMessage || "요청 처리 중 오류가 발생했습니다.";
+    const data = error?.response?.data;
+    const serverMessage = data?.message;
+
+    if (typeof serverMessage === "string" && serverMessage.trim()) {
+        return serverMessage.trim();
+    }
+    if (Array.isArray(data?.fieldErrors) && data.fieldErrors.length > 0) {
+        return data.fieldErrors.map((item) => `${item.field}: ${item.reason}`).join(", ");
+    }
+    if (Array.isArray(data?.violationErrors) && data.violationErrors.length > 0) {
+        return data.violationErrors.map((item) => `${item.propertyPath}: ${item.reason}`).join(", ");
+    }
+
+    if (!error?.response) {
+        return fallbackMessage || "서버와 연결하지 못했습니다. 네트워크 상태를 확인해주세요.";
+    }
+
+    const status = Number(error.response.status || 0);
+    if (status === 400) return "요청 값을 확인해주세요.";
+    if (status === 401) return "로그인이 필요합니다.";
+    if (status === 403) return "접근 권한이 없습니다.";
+    if (status === 404) return "요청한 정보를 찾을 수 없습니다.";
+    if (status === 413) return "요청한 파일 또는 데이터가 허용 크기를 초과했습니다.";
+    if (status === 429) return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.";
+    if (status >= 500) return "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+
+    return fallback;
+};
 
 export default api;
 

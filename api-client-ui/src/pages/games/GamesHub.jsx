@@ -278,6 +278,8 @@ const games = [
     to: "/app/plinko",
     tone: "from-emerald-500 via-teal-500 to-cyan-500",
     players: "1인",
+    minPlayers: 1,
+    maxPlayers: 1,
     mode: "싱글",
     preview: "plinko",
     highlights: ["즉시 플레이", "혼자 진행"],
@@ -290,6 +292,8 @@ const games = [
     to: "/app/games/las-vegas",
     tone: "from-amber-500 via-orange-500 to-rose-500",
     players: "2~6인",
+    minPlayers: 2,
+    maxPlayers: 6,
     mode: "방 입장",
     preview: "dice",
     highlights: ["실시간 방", "주사위 배팅"],
@@ -302,6 +306,8 @@ const games = [
     to: "/app/games/no-thanks",
     tone: "from-slate-700 via-slate-900 to-emerald-700",
     players: "3~6인",
+    minPlayers: 3,
+    maxPlayers: 6,
     mode: "카드",
     preview: "cards",
     highlights: ["실시간 방", "카드 선택"],
@@ -314,6 +320,8 @@ const games = [
     to: "/app/games/catan",
     tone: "from-amber-500 via-lime-500 to-sky-500",
     players: "3~6인",
+    minPlayers: 3,
+    maxPlayers: 6,
     mode: "전략",
     preview: "catan",
     highlights: ["기본판", "5~6인", "공식 확장"],
@@ -326,6 +334,8 @@ const games = [
     to: "/app/games/blokus",
     tone: "from-cyan-500 via-blue-500 to-fuchsia-500",
     players: "2~4인",
+    minPlayers: 2,
+    maxPlayers: 4,
     mode: "배치",
     preview: "blokus",
     highlights: ["본게임", "듀오", "팀전"],
@@ -338,6 +348,8 @@ const games = [
     to: "/app/games/mahe",
     tone: "from-emerald-500 via-teal-500 to-yellow-400",
     players: "2~7인",
+    minPlayers: 2,
+    maxPlayers: 7,
     mode: "경주",
     preview: "mahe",
     highlights: ["본게임", "업고 가기", "확률 안내"],
@@ -350,6 +362,8 @@ const games = [
     to: "/app/games/dalmuti",
     tone: "from-violet-500 via-rose-500 to-amber-500",
     players: "4~8인",
+    minPlayers: 4,
+    maxPlayers: 8,
     mode: "계급 카드",
     preview: "dalmuti",
     highlights: ["본게임", "세금", "혁명"],
@@ -376,16 +390,16 @@ const preloadGameRoute = (to) => {
   preload().catch(() => preloadedRoutes.delete(to));
 };
 
+const gamesByPlayerCount = [...games].sort((left, right) => (
+  left.minPlayers - right.minPlayers ||
+  left.maxPlayers - right.maxPlayers
+));
+
 const gameSections = [
   {
-    title: "신규 보드게임",
-    description: "공식 규칙과 확장 선택, 방 만들기와 코드 입장 흐름을 갖춘 보드게임입니다.",
-    games: games.filter((game) => game.featured),
-  },
-  {
-    title: "기존 게임",
-    description: "가볍게 바로 시작하거나 기존 실시간 방 흐름으로 즐기는 게임입니다.",
-    games: games.filter((game) => !game.featured),
+    title: "게임 목록",
+    description: "혼자부터 함께 즐길 수 있는 다양한 게임들이 있습니다.",
+    games: gamesByPlayerCount,
   },
 ];
 
@@ -398,6 +412,8 @@ const GameCard = ({ game, onOpenManual }) => {
     <article
       className={`group relative min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br ${game.tone} p-[1px] shadow-lg transition-transform duration-300 hover:-translate-y-0.5`}
       onPointerEnter={() => preloadGameRoute(game.to)}
+      data-smoke="game-card"
+      data-game-title={game.title}
     >
       <Link
         to={game.to}

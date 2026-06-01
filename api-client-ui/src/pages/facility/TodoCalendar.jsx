@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
     addDays,
@@ -25,10 +25,11 @@ import {
     Trash2,
     X,
 } from "lucide-react";
-import api from "../../utils/api.js";
+import { todoAdapter, todoErrorMessage, TODO_STATUS } from "../../adapters/todoAdapter.js";
 import { EmptyState } from "../../components/EmptyState.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
+import { confirmAction } from "../../common/confirmAction.jsx";
 
 const VIEW_MODE = {
     WEEK: "week",
@@ -37,15 +38,14 @@ const VIEW_MODE = {
 };
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
-
-const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
+const TODO_TITLE_MAX_LENGTH = 200;
 
 const toDateOnly = (value) => format(typeof value === "string" ? parseISO(value) : value, "yyyy-MM-dd");
 
 const sortTodos = (items) =>
     [...items].sort((left, right) => {
-        const leftDone = left.status === "DONE";
-        const rightDone = right.status === "DONE";
+        const leftDone = left.status === TODO_STATUS.DONE;
+        const rightDone = right.status === TODO_STATUS.DONE;
         if (leftDone !== rightDone) return leftDone ? 1 : -1;
         return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
     });
@@ -95,21 +95,20 @@ const moveAnchorDate = (anchorDate, viewMode, direction) => {
     return addDays(anchorDate, direction * 7);
 };
 
-const normalizeTodo = (item) => ({
-    todo_id: item.todo_id ?? item.todoId,
-    title: item.title ?? "",
-    status: item.status ?? "TODO",
-    due_date: item.due_date ?? item.dueDate,
-    completed_at: item.completed_at ?? item.completedAt,
-    created_at: item.created_at ?? item.createdAt,
-    modified_at: item.modified_at ?? item.modifiedAt,
-});
+const getTodoId = (todo) => todo?.todo_id ?? todo?.todoId;
+
+const isTodoInRange = (todo, period) => {
+    if (!todo?.due_date) return false;
+    const dueDate = parseISO(todo.due_date);
+    return dueDate >= period.from && dueDate <= period.to;
+};
 
 export const TodoCalendar = () => {
     const [viewMode, setViewMode] = useState(VIEW_MODE.WEEK);
     const [anchorDate, setAnchorDate] = useState(new Date());
     const [todos, setTodos] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
     const [creating, setCreating] = useState(false);
     const [mutatingTodoId, setMutatingTodoId] = useState(null);
@@ -119,6 +118,8 @@ export const TodoCalendar = () => {
     const [editingTodoId, setEditingTodoId] = useState(null);
     const [editTitle, setEditTitle] = useState("");
     const [editDueDate, setEditDueDate] = useState("");
+    const fetchSeqRef = useRef(0);
+    const loadedOnceRef = useRef(false);
 
     const period = useMemo(() => getRangeByView(viewMode, anchorDate), [viewMode, anchorDate]);
     const selectedDate = useMemo(() => toDateOnly(anchorDate), [anchorDate]);
@@ -137,30 +138,46 @@ export const TodoCalendar = () => {
         return grouped;
     }, [todos]);
 
-    const fetchTodos = async () => {
-        setLoading(true);
+    const fetchTodos = useCallback(async ({ silent = loadedOnceRef.current } = {}) => {
+        const requestSeq = fetchSeqRef.current + 1;
+        fetchSeqRef.current = requestSeq;
+
+        if (silent) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
         setError("");
         try {
-            const response = await api.get("/todos", {
-                params: {
-                    from_date: toDateOnly(period.from),
-                    to_date: toDateOnly(period.to),
-                },
+            const result = await todoAdapter.fetchTodos({
+                fromDate: toDateOnly(period.from),
+                toDate: toDateOnly(period.to),
             });
-            const data = unwrapData(response);
-            const items = Array.isArray(data?.items) ? data.items.map(normalizeTodo) : [];
-            setTodos(items);
+
+            if (fetchSeqRef.current !== requestSeq) return;
+
+            setTodos(result.items);
+            loadedOnceRef.current = true;
         } catch (fetchError) {
+            if (fetchSeqRef.current !== requestSeq) return;
             console.error("Todo fetch failed:", fetchError);
-            setError("할 일 목록을 불러오지 못했습니다.");
+            const message = todoErrorMessage(fetchError, "할 일 목록을 불러오지 못했습니다.");
+            if (silent && loadedOnceRef.current) {
+                toast.error(message);
+            } else {
+                setError(message);
+            }
         } finally {
-            setLoading(false);
+            if (fetchSeqRef.current === requestSeq) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
-    };
+    }, [period.from, period.to]);
 
     useEffect(() => {
         fetchTodos();
-    }, [viewMode, anchorDate]);
+    }, [fetchTodos]);
 
     useEffect(() => {
         if (dateChoice === "today") {
@@ -178,60 +195,108 @@ export const TodoCalendar = () => {
         setDraftDueDate(toDateOnly(new Date()));
     };
 
+    const mergeVisibleTodo = (nextTodo) => {
+        if (!isTodoInRange(nextTodo, period)) {
+            setTodos((prev) => prev.filter((todo) => getTodoId(todo) !== getTodoId(nextTodo)));
+            return;
+        }
+
+        setTodos((prev) => {
+            const withoutTarget = prev.filter((todo) => getTodoId(todo) !== getTodoId(nextTodo));
+            return [...withoutTarget, nextTodo].sort((left, right) => {
+                const dateCompare = String(left.due_date || "").localeCompare(String(right.due_date || ""));
+                if (dateCompare !== 0) return dateCompare;
+                const leftDone = left.status === TODO_STATUS.DONE;
+                const rightDone = right.status === TODO_STATUS.DONE;
+                if (leftDone !== rightDone) return leftDone ? 1 : -1;
+                return new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime();
+            });
+        });
+    };
+
     const handleCreateTodo = async () => {
+        if (creating) return;
         const trimmedTitle = draftTitle.trim();
         if (!trimmedTitle) {
             toast.error("할 일 제목을 입력해 주세요.");
             return;
         }
+        if (!draftDueDate) {
+            toast.error("날짜를 선택해 주세요.");
+            return;
+        }
 
         setCreating(true);
         try {
-            await api.post("/todos", {
+            const createdTodo = await todoAdapter.createTodo({
                 title: trimmedTitle,
-                due_date: draftDueDate,
+                dueDate: draftDueDate,
             });
             resetComposer();
-            await fetchTodos();
-            toast.success("할 일이 추가되었습니다.");
+            const visibleInCurrentRange = isTodoInRange(createdTodo, period);
+            mergeVisibleTodo(createdTodo);
+            toast.success(visibleInCurrentRange
+                ? "할 일이 추가되었습니다."
+                : "할 일이 추가되었습니다. 선택한 기간 밖에 있어 목록에는 표시되지 않습니다.");
         } catch (createError) {
             console.error("Todo create failed:", createError);
-            toast.error("할 일을 추가하지 못했습니다.");
+            toast.error(todoErrorMessage(createError, "할 일을 추가하지 못했습니다."));
         } finally {
             setCreating(false);
         }
     };
 
     const handleToggleTodo = async (todo) => {
-        setMutatingTodoId(todo.todo_id);
+        const todoId = getTodoId(todo);
+        const nextStatus = todo.status === TODO_STATUS.DONE ? TODO_STATUS.TODO : TODO_STATUS.DONE;
+        const previousTodo = { ...todo };
+        const optimisticTodo = {
+            ...todo,
+            status: nextStatus,
+            completed_at: nextStatus === TODO_STATUS.DONE ? new Date().toISOString() : null,
+            completedAt: nextStatus === TODO_STATUS.DONE ? new Date().toISOString() : null,
+        };
+
+        setMutatingTodoId(todoId);
+        mergeVisibleTodo(optimisticTodo);
         try {
-            await api.patch(`/todos/${todo.todo_id}`, {
-                status: todo.status === "DONE" ? "TODO" : "DONE",
+            const updatedTodo = await todoAdapter.updateTodo(todoId, {
+                status: nextStatus,
             });
-            await fetchTodos();
+            mergeVisibleTodo(updatedTodo);
         } catch (toggleError) {
+            mergeVisibleTodo(previousTodo);
             console.error("Todo toggle failed:", toggleError);
-            toast.error("완료 상태를 변경하지 못했습니다.");
+            toast.error(todoErrorMessage(toggleError, "완료 상태를 변경하지 못했습니다."));
         } finally {
             setMutatingTodoId(null);
         }
     };
     const handleDeleteTodo = async (todoId) => {
+        const confirmed = await confirmAction({
+            title: "할 일을 삭제할까요?",
+            description: "삭제한 할 일은 되돌릴 수 없습니다.",
+            confirmText: "삭제",
+        });
+        if (!confirmed) return;
+
+        const previousTodos = todos;
         setMutatingTodoId(todoId);
+        setTodos((prev) => prev.filter((todo) => getTodoId(todo) !== todoId));
         try {
-            await api.delete(`/todos/${todoId}`);
-            await fetchTodos();
+            await todoAdapter.deleteTodo(todoId);
             toast.success("할 일이 삭제되었습니다.");
         } catch (deleteError) {
+            setTodos(previousTodos);
             console.error("Todo delete failed:", deleteError);
-            toast.error("할 일을 삭제하지 못했습니다.");
+            toast.error(todoErrorMessage(deleteError, "할 일을 삭제하지 못했습니다."));
         } finally {
             setMutatingTodoId(null);
         }
     };
 
     const beginEditTodo = (todo) => {
-        setEditingTodoId(todo.todo_id);
+        setEditingTodoId(getTodoId(todo));
         setEditTitle(todo.title);
         setEditDueDate(todo.due_date);
     };
@@ -243,38 +308,55 @@ export const TodoCalendar = () => {
     };
 
     const handleSaveTodo = async (todoId) => {
+        if (mutatingTodoId === todoId) return;
         const trimmedTitle = editTitle.trim();
         if (!trimmedTitle) {
             toast.error("할 일 제목을 입력해 주세요.");
             return;
         }
+        if (!editDueDate) {
+            toast.error("날짜를 선택해 주세요.");
+            return;
+        }
 
-        setMutatingTodoId(todoId);
-        try {
-            await api.patch(`/todos/${todoId}`, {
+        const previousTodo = todos.find((todo) => getTodoId(todo) === todoId);
+        const optimisticTodo = previousTodo
+            ? {
+                ...previousTodo,
                 title: trimmedTitle,
                 due_date: editDueDate,
+                dueDate: editDueDate,
+            }
+            : null;
+        setMutatingTodoId(todoId);
+        if (optimisticTodo) mergeVisibleTodo(optimisticTodo);
+        try {
+            const updatedTodo = await todoAdapter.updateTodo(todoId, {
+                title: trimmedTitle,
+                dueDate: editDueDate,
             });
             cancelEditTodo();
-            await fetchTodos();
+            mergeVisibleTodo(updatedTodo);
             toast.success("할 일이 수정되었습니다.");
         } catch (saveError) {
+            if (previousTodo) mergeVisibleTodo(previousTodo);
             console.error("Todo save failed:", saveError);
-            toast.error("할 일을 수정하지 못했습니다.");
+            toast.error(todoErrorMessage(saveError, "할 일을 수정하지 못했습니다."));
         } finally {
             setMutatingTodoId(null);
         }
     };
 
     const renderTodoRow = (todo, variant = "default") => {
-        const isEditing = editingTodoId === todo.todo_id;
-        const isPending = mutatingTodoId === todo.todo_id;
-        const isDone = todo.status === "DONE";
+        const todoId = getTodoId(todo);
+        const isEditing = editingTodoId === todoId;
+        const isPending = mutatingTodoId === todoId;
+        const isDone = todo.status === TODO_STATUS.DONE;
         const isCompact = variant === "week";
 
         return (
             <div
-                key={todo.todo_id}
+                key={todoId}
                 className={`${isCompact ? "rounded-[1.25rem] px-3 py-3" : "rounded-[1.75rem] px-4 py-4"} border transition-all ${
                     isDone
                         ? "border-slate-100 bg-slate-50/80 text-slate-400"
@@ -286,6 +368,7 @@ export const TodoCalendar = () => {
                         type="button"
                         onClick={() => handleToggleTodo(todo)}
                         disabled={isPending}
+                        aria-busy={isPending}
                         className={`${isCompact ? "mt-0.5 h-5 w-5" : "mt-0.5 h-6 w-6"} flex flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                             isDone
                                 ? "border-emerald-400 bg-emerald-500 text-white"
@@ -304,12 +387,18 @@ export const TodoCalendar = () => {
                                     onChange={(event) => setEditTitle(event.target.value)}
                                     className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-primary-400"
                                     placeholder="할 일 제목"
+                                    maxLength={TODO_TITLE_MAX_LENGTH}
+                                    disabled={isPending}
                                 />
+                                <div className="text-right text-[11px] font-bold text-slate-400">
+                                    {editTitle.length} / {TODO_TITLE_MAX_LENGTH}
+                                </div>
                                 <input
                                     type="date"
                                     value={editDueDate}
                                     onChange={(event) => setEditDueDate(event.target.value)}
                                     className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-primary-400"
+                                    disabled={isPending}
                                 />
                             </div>
                         ) : (
@@ -338,8 +427,9 @@ export const TodoCalendar = () => {
                             <>
                                 <button
                                     type="button"
-                                    onClick={() => handleSaveTodo(todo.todo_id)}
+                                    onClick={() => handleSaveTodo(todoId)}
                                     disabled={isPending}
+                                    aria-busy={isPending}
                                     className={`rounded-xl bg-primary-600 ${isCompact ? "px-2.5 py-1.5 text-[11px]" : "px-3 py-2 text-xs"} font-black text-white transition-colors hover:bg-primary-700`}
                                 >
                                     저장
@@ -347,6 +437,7 @@ export const TodoCalendar = () => {
                                 <button
                                     type="button"
                                     onClick={cancelEditTodo}
+                                    disabled={isPending}
                                     className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition-colors hover:text-slate-700"
                                     aria-label="편집 취소"
                                 >
@@ -365,8 +456,9 @@ export const TodoCalendar = () => {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => handleDeleteTodo(todo.todo_id)}
+                                    onClick={() => handleDeleteTodo(todoId)}
                                     disabled={isPending}
+                                    aria-busy={isPending}
                                     className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition-colors hover:text-rose-600"
                                     aria-label="할 일 삭제"
                                 >
@@ -397,7 +489,7 @@ export const TodoCalendar = () => {
     };
 
     if (loading) return <LoadingSpinner text="할 일 목록을 불러오는 중입니다..." />;
-    if (error) return <ErrorMessage message={error} onRetry={fetchTodos} />;
+    if (error) return <ErrorMessage message={error} onRetry={() => fetchTodos({ silent: false })} />;
 
     return (
         <div className="animate-fade-in space-y-6 pb-10">
@@ -424,7 +516,7 @@ export const TodoCalendar = () => {
                             <div className="rounded-[1.75rem] border border-slate-200 bg-white/80 px-4 py-3">
                                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">남은 할 일</div>
                                 <div className="mt-1 text-base font-black text-slate-900">
-                                    {todos.filter((todo) => todo.status !== "DONE").length} 개
+                                    {todos.filter((todo) => todo.status !== TODO_STATUS.DONE).length} 개
                                 </div>
                             </div>
                         </div>
@@ -482,6 +574,11 @@ export const TodoCalendar = () => {
                             <div className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white">
                                 {formatPeriodLabel(viewMode, anchorDate)}
                             </div>
+                            {refreshing && (
+                                <div className="rounded-2xl bg-primary-50 px-3 py-2 text-xs font-black text-primary-700" role="status">
+                                    동기화 중...
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -496,17 +593,23 @@ export const TodoCalendar = () => {
                                 }
                             }}
                             placeholder="무엇을 해야 하나요?"
+                            maxLength={TODO_TITLE_MAX_LENGTH}
+                            disabled={creating}
                             className="w-full rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition-colors focus:border-primary-300 focus:bg-white"
                         />
                         <button
                             type="button"
                             onClick={handleCreateTodo}
                             disabled={creating}
+                            aria-busy={creating}
                             className="inline-flex items-center justify-center gap-2 rounded-[1.75rem] bg-primary-600 px-5 py-3 text-sm font-black text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-primary-300"
                         >
                             <Plus className="h-4 w-4" />
                             {creating ? "추가 중..." : "추가"}
                         </button>
+                    </div>
+                    <div className="-mt-2 text-right text-xs font-bold text-slate-400">
+                        {draftTitle.length} / {TODO_TITLE_MAX_LENGTH}
                     </div>
 
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -550,6 +653,7 @@ export const TodoCalendar = () => {
                                 setDateChoice("custom");
                                 setDraftDueDate(event.target.value);
                             }}
+                            disabled={creating}
                             className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-primary-300"
                         />
                     </div>
@@ -637,8 +741,8 @@ export const TodoCalendar = () => {
                             {monthDays.map((date) => {
                                 const key = toDateOnly(date);
                                 const items = todosByDate.get(key) || [];
-                                const incompleteCount = items.filter((todo) => todo.status !== "DONE").length;
-                                const hasDone = items.some((todo) => todo.status === "DONE");
+                                const incompleteCount = items.filter((todo) => todo.status !== TODO_STATUS.DONE).length;
+                                const hasDone = items.some((todo) => todo.status === TODO_STATUS.DONE);
                                 const dayOfWeek = date.getDay();
                                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                                 const isSunday = dayOfWeek === 0;
@@ -680,9 +784,9 @@ export const TodoCalendar = () => {
                                         <div className="mt-3 space-y-1">
                                             {items.slice(0, 2).map((todo) => (
                                                 <div
-                                                    key={todo.todo_id}
+                                                    key={getTodoId(todo)}
                                                     className={`truncate rounded-full px-2 py-1 text-[10px] font-bold ${
-                                                        todo.status === "DONE"
+                                                        todo.status === TODO_STATUS.DONE
                                                             ? "bg-slate-100 text-slate-400 line-through"
                                                             : "bg-slate-900 text-white"
                                                     }`}

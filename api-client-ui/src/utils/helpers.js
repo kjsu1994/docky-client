@@ -164,6 +164,172 @@ export const normalizeContentImageUrls = (html) => {
     });
 };
 
+const BOARD_CONTENT_ALLOWED_TAGS = new Set([
+    "a",
+    "b",
+    "blockquote",
+    "br",
+    "code",
+    "div",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "hr",
+    "i",
+    "img",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "s",
+    "span",
+    "strong",
+    "u",
+    "ul",
+]);
+
+const BOARD_CONTENT_DROP_TAGS = new Set([
+    "button",
+    "embed",
+    "form",
+    "iframe",
+    "input",
+    "link",
+    "math",
+    "meta",
+    "object",
+    "script",
+    "select",
+    "style",
+    "svg",
+    "textarea",
+    "template",
+]);
+
+const isSafeBoardContentUrl = (value, { image = false } = {}) => {
+    if (!value) return false;
+    const raw = String(value).trim();
+    if (!raw) return false;
+    const compact = raw.replace(/[\u0000-\u001F\u007F\s]+/g, "").toLowerCase();
+    if (
+        compact.startsWith("javascript:") ||
+        compact.startsWith("vbscript:") ||
+        compact.startsWith("data:")
+    ) {
+        return false;
+    }
+    if (raw.startsWith("#")) return !image;
+    if (raw.startsWith("/") && !raw.startsWith("//")) return true;
+
+    try {
+        const parsed = new URL(raw, window.location.origin);
+        if (image) {
+            return parsed.protocol === "http:" || parsed.protocol === "https:";
+        }
+        return ["http:", "https:", "mailto:"].includes(parsed.protocol);
+    } catch {
+        return false;
+    }
+};
+
+const unwrapNode = (node) => {
+    const parent = node.parentNode;
+    if (!parent) return;
+    while (node.firstChild) {
+        parent.insertBefore(node.firstChild, node);
+    }
+    parent.removeChild(node);
+};
+
+const sanitizeBoardContentElement = (element) => {
+    const tagName = element.tagName.toLowerCase();
+    if (BOARD_CONTENT_DROP_TAGS.has(tagName)) {
+        element.remove();
+        return;
+    }
+
+    Array.from(element.childNodes).forEach(sanitizeBoardContentNode);
+
+    if (!BOARD_CONTENT_ALLOWED_TAGS.has(tagName)) {
+        unwrapNode(element);
+        return;
+    }
+
+    Array.from(element.attributes).forEach((attribute) => {
+        const name = attribute.name.toLowerCase();
+        if (
+            name.startsWith("on") ||
+            name === "style" ||
+            name === "srcdoc" ||
+            name === "formaction" ||
+            name.startsWith("xmlns") ||
+            name.includes(":")
+        ) {
+            element.removeAttribute(attribute.name);
+            return;
+        }
+
+        const isAllowed =
+            name === "title" ||
+            (tagName === "a" && ["href", "target", "rel"].includes(name)) ||
+            (tagName === "img" && ["src", "alt", "width", "height", "loading", "decoding"].includes(name));
+
+        if (!isAllowed) {
+            element.removeAttribute(attribute.name);
+        }
+    });
+
+    if (tagName === "a") {
+        const href = element.getAttribute("href");
+        if (href && isSafeBoardContentUrl(href)) {
+            element.setAttribute("target", "_blank");
+            element.setAttribute("rel", "noopener noreferrer");
+        } else {
+            element.removeAttribute("href");
+            element.removeAttribute("target");
+            element.removeAttribute("rel");
+        }
+    }
+
+    if (tagName === "img") {
+        const src = element.getAttribute("src");
+        if (!src || !isSafeBoardContentUrl(src, { image: true })) {
+            element.remove();
+            return;
+        }
+        ["width", "height"].forEach((name) => {
+            const value = element.getAttribute(name);
+            if (value && !/^\d{1,4}$/.test(value)) {
+                element.removeAttribute(name);
+            }
+        });
+        element.setAttribute("loading", "lazy");
+        element.setAttribute("decoding", "async");
+    }
+};
+
+function sanitizeBoardContentNode(node) {
+    if (node.nodeType === 1) {
+        sanitizeBoardContentElement(node);
+        return;
+    }
+    if (node.nodeType !== 3) {
+        node.remove();
+    }
+}
+
+export const sanitizeBoardContentHtml = (html) => {
+    if (!html) return "";
+    if (typeof document === "undefined") return String(html);
+
+    const template = document.createElement("template");
+    template.innerHTML = String(html);
+    Array.from(template.content.childNodes).forEach(sanitizeBoardContentNode);
+    return template.innerHTML;
+};
+
 export const formatNumber = (num) => {
     if (num === null || num === undefined) return "0";
     return num.toLocaleString("ko-KR");

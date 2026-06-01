@@ -1,12 +1,12 @@
 ﻿
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Car, LocateFixed, RefreshCw, Search, CreditCard, Clock3, DatabaseZap, X } from "lucide-react";
-import api from "../../utils/api.js";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
+import { extractFacilityErrorMessage, facilityAdapter } from "../../adapters/facilityAdapter.js";
 
 const INITIAL_CENTER = { latitude: 37.5665, longitude: 126.9780 };
 
@@ -279,24 +279,23 @@ export const ParkingFinder = () => {
         try {
             const radiusKm = parseRadiusKm();
             const limit = parseLimit();
-            const response = await api.get("/parking/lots", {
-                params: {
-                    latitude: center.latitude,
-                    longitude: center.longitude,
-                    radius_km: radiusKm,
-                    limit,
-                },
+            const result = await facilityAdapter.fetchParkingLots({
+                latitude: center.latitude,
+                longitude: center.longitude,
+                radiusKm,
+                limit,
+                paidOnly: feeFilter === "paid",
+                keyword,
+                sort,
             });
-            const payload = response?.data?.data ?? response?.data ?? {};
-            const nextItems = payload?.items ?? [];
-            const normalized = Array.isArray(nextItems) ? nextItems : [];
-            setFetchedItems(normalized);
+            setFetchedItems(result.items);
+            setTotalCount(result.totalCount);
         } catch (err) {
             setFetchedItems([]);
             setItems([]);
             setTotalCount(0);
             setSelectedLotId(null);
-            toast.error(err?.response?.data?.message || "주차장 목록을 불러오지 못했습니다.");
+            toast.error(extractFacilityErrorMessage(err, "주차장 목록을 불러오지 못했습니다."));
         } finally {
             setLoading(false);
         }
@@ -404,17 +403,12 @@ export const ParkingFinder = () => {
     const handleImport = async () => {
         setImporting(true);
         try {
-            const response = await api.post("/admin/parking/import", null, {
-                params: {
-                    csvPath: csvPath?.trim() || undefined,
-                },
-            });
-            const data = response?.data?.data ?? {};
-            const count = data?.imported_count ?? data?.importedCount ?? 0;
+            const data = await facilityAdapter.importParkingLots(csvPath);
+            const count = data.importedCount;
             toast.success(`CSV 재적재 완료 (${count}건)`);
             await fetchLots();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "CSV 재적재에 실패했습니다.");
+            toast.error(extractFacilityErrorMessage(err, "CSV 재적재에 실패했습니다."));
         } finally {
             setImporting(false);
         }

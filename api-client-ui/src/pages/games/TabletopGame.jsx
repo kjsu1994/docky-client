@@ -15,7 +15,18 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-import api from "../../utils/api.js";
+import {
+  getTabletopMemberId,
+  getTabletopRoomCode,
+  getTabletopRoomId,
+  getTabletopRoomStatus,
+  getTabletopSeatNo,
+  isTabletopStateAccessError,
+  isTabletopReadyPlayer,
+  normalizeTabletopStatePayload,
+  tabletopGameAdapter,
+} from "../../adapters/tabletopGameAdapter.js";
+import { buildStompConnectHeaders } from "../../adapters/realtimeAdapter.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 
 const gameConfigs = {
@@ -613,27 +624,27 @@ const catanColorFill = {
   BROWN: "#92400e",
 };
 
-const get = (obj, snake, camel, fallback = undefined) => obj?.[snake] ?? obj?.[camel] ?? fallback;
-const idOf = (room) => get(room, "room_id", "roomId", null);
-const codeOf = (room) => get(room, "room_code", "roomCode", "");
-const statusOf = (room) => get(room, "room_status", "roomStatus", "WAITING");
+const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
+const idOf = getTabletopRoomId;
+const codeOf = getTabletopRoomCode;
+const statusOf = getTabletopRoomStatus;
 const playersOf = (room) => (Array.isArray(room?.players) ? room.players : []);
-const memberIdOf = (player) => Number(get(player, "member_id", "memberId", 0));
-const seatNoOf = (player) => Number(get(player, "seat_no", "seatNo", 0));
-const isReady = (player) => Boolean(player?.ready ?? player?.is_ready ?? player?.isReady);
-const variantNameOf = (room) => get(room, "variant_name", "variantName", "");
-const variantCodeOf = (room) => get(room, "variant_code", "variantCode", "BASE");
-const variantSummaryOf = (room) => get(room, "variant_summary", "variantSummary", "");
-const maxPlayersOf = (room) => Number(get(room, "max_players", "maxPlayers", 0));
-const minPlayersOf = (room) => Number(get(room, "min_players", "minPlayers", 0));
-const hostMemberIdOf = (room) => Number(get(room, "host_member_id", "hostMemberId", 0));
-const turnSecondsOf = (room) => Number(get(room, "turn_time_seconds", "turnTimeSeconds", 30));
+const memberIdOf = (player) => Number(getTabletopMemberId(player) || 0);
+const seatNoOf = (player) => Number(getTabletopSeatNo(player) || 0);
+const isReady = isTabletopReadyPlayer;
+const variantNameOf = (room) => room?.variantName || "";
+const variantCodeOf = (room) => room?.variantCode || "BASE";
+const variantSummaryOf = (room) => room?.variantSummary || "";
+const maxPlayersOf = (room) => Number(room?.maxPlayers || 0);
+const minPlayersOf = (room) => Number(room?.minPlayers || 0);
+const hostMemberIdOf = (room) => Number(room?.hostMemberId || 0);
+const turnSecondsOf = (room) => Number(room?.turnTimeSeconds || 30);
 
-const variantDisplayName = (variant) => get(variant, "display_name", "displayName", variant?.code || "");
-const variantExpansion = (variant) => Boolean(get(variant, "expansion", "expansion", false));
-const variantMinPlayers = (variant) => Number(get(variant, "min_players", "minPlayers", 0));
-const variantMaxPlayers = (variant) => Number(get(variant, "max_players", "maxPlayers", 0));
-const variantSummary = (variant) => get(variant, "summary", "summary", "");
+const variantDisplayName = (variant) => variant?.displayName || variant?.code || "";
+const variantExpansion = (variant) => Boolean(variant?.expansion);
+const variantMinPlayers = (variant) => Number(variant?.minPlayers || 0);
+const variantMaxPlayers = (variant) => Number(variant?.maxPlayers || 0);
+const variantSummary = (variant) => variant?.summary || "";
 const variantPlayerLabel = (variant) => {
   const minPlayers = variantMinPlayers(variant);
   const maxPlayers = variantMaxPlayers(variant);
@@ -918,7 +929,7 @@ const variantForRoom = (room, variants) => {
     code,
     displayName: variantNameOf(room),
     summary: variantSummaryOf(room),
-    featureTags: get(room, "variant_feature_tags", "variantFeatureTags", []),
+    featureTags: room?.variantFeatureTags || [],
     expansion: false,
     minPlayers: minPlayersOf(room),
     maxPlayers: maxPlayersOf(room),
@@ -6671,8 +6682,8 @@ export const TabletopGame = ({ game }) => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [roomsRefreshing, setRoomsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [createForm, setCreateForm] = useState({ title: "", variant_code: "BASE", turn_time_seconds: "30" });
-  const [settingsForm, setSettingsForm] = useState({ variant_code: "BASE", turn_time_seconds: "30" });
+  const [createForm, setCreateForm] = useState({ title: "", variantCode: "BASE", turnTimeSeconds: "30" });
+  const [settingsForm, setSettingsForm] = useState({ variantCode: "BASE", turnTimeSeconds: "30" });
   const stompRef = useRef(null);
   const gameSubRef = useRef(null);
   const busyRef = useRef(false);
@@ -6720,8 +6731,8 @@ export const TabletopGame = ({ game }) => {
   const startStatusText = canStart
     ? "시작 가능"
     : startChecks.find((check) => !check.done)?.detail || "시작 대기";
-  const selectedVariant = useMemo(() => variants.find((variant) => variant.code === createForm.variant_code) || variants[0], [variants, createForm.variant_code]);
-  const selectedSettingsVariant = useMemo(() => variants.find((variant) => variant.code === settingsForm.variant_code), [variants, settingsForm.variant_code]);
+  const selectedVariant = useMemo(() => variants.find((variant) => variant.code === createForm.variantCode) || variants[0], [variants, createForm.variantCode]);
+  const selectedSettingsVariant = useMemo(() => variants.find((variant) => variant.code === settingsForm.variantCode), [variants, settingsForm.variantCode]);
   const selectedRoomVariant = useMemo(() => variantForRoom(selectedRoom, variants), [selectedRoom, variants]);
   const selectedRoomVariantName = variantNameOf(selectedRoom) || variantDisplayName(selectedRoomVariant) || "선택한 규칙";
   const selectedRoomVariantTags = variantFeatureTags(game, selectedRoomVariant);
@@ -6754,24 +6765,24 @@ export const TabletopGame = ({ game }) => {
 
   const isLatestLobbyLoad = (seq) => mountedRef.current && seq === lobbyLoadSeqRef.current;
   const isLatestRoomOpen = (seq) => mountedRef.current && seq === roomOpenSeqRef.current;
+  const realtimeRoomRef = useRef(null);
 
   const fetchVariants = async (seq = lobbyLoadSeqRef.current) => {
-    const response = await api.get(`/game/${game}/variants`);
-    const nextVariants = response.data || [];
+    const nextVariants = await tabletopGameAdapter.fetchVariants(game);
     if (!isLatestLobbyLoad(seq)) return;
     setVariants(nextVariants);
     if (nextVariants.length) {
       setCreateForm((prev) => {
-        const exists = nextVariants.some((variant) => variant.code === prev.variant_code);
-        return { ...prev, variant_code: exists ? prev.variant_code : nextVariants[0].code };
+        const exists = nextVariants.some((variant) => variant.code === prev.variantCode);
+        return { ...prev, variantCode: exists ? prev.variantCode : nextVariants[0].code };
       });
     }
   };
 
   const fetchRooms = async (seq = lobbyLoadSeqRef.current) => {
-    const response = await api.get(`/game/${game}/rooms`);
+    const nextRooms = await tabletopGameAdapter.fetchRooms(game);
     if (!isLatestLobbyLoad(seq)) return;
-    setRooms(response.data || []);
+    setRooms(nextRooms);
   };
 
   const refreshRooms = async () => {
@@ -6803,12 +6814,12 @@ export const TabletopGame = ({ game }) => {
   };
 
   const fetchMyRooms = async () => {
-    const response = await api.get(`/game/${game}/rooms/me`);
-    return response.data || [];
+    return tabletopGameAdapter.fetchMyRooms(game);
   };
 
   const clearRoomSelection = (roomId) => {
     roomOpenSeqRef.current += 1;
+    realtimeRoomRef.current = null;
     setSelectedRoom(null);
     setGameState(null);
     const storedId = localStorage.getItem(config.storageKey);
@@ -6822,8 +6833,7 @@ export const TabletopGame = ({ game }) => {
   };
 
   const handleStateLoadError = (error, roomId, fallbackMessage) => {
-    const statusCode = Number(error?.response?.status || 0);
-    if (statusCode === 403 || statusCode === 404) {
+    if (isTabletopStateAccessError(error)) {
       clearRoomSelection(roomId);
       toast.error("방 참가자만 상태를 볼 수 있습니다. 다시 입장해주세요.");
       return;
@@ -6832,23 +6842,71 @@ export const TabletopGame = ({ game }) => {
   };
 
   const fetchState = async (roomId, roomSeq = null) => {
-    const response = await api.get(`/game/${game}/rooms/${roomId}/state`);
+    const payload = await tabletopGameAdapter.fetchState(game, roomId);
     if (!mountedRef.current) return null;
     if (roomSeq !== null && !isLatestRoomOpen(roomSeq)) return null;
-    const room = response.data?.room || null;
+    const room = payload?.room || null;
     if (room) setSelectedRoom(room);
-    setGameState(response.data?.game_state || response.data?.gameState || null);
+    setGameState(payload?.gameState || null);
     return room;
+  };
+
+  const bindRealtimeRoom = async (client, roomId, roomSeq) => {
+    if (!client?.connected || !isLatestRoomOpen(roomSeq)) return;
+    if (gameSubRef.current) gameSubRef.current.unsubscribe();
+    gameSubRef.current = client.subscribe(`/sub/game/${game}/room/${roomId}`, (message) => {
+      if (!isLatestRoomOpen(roomSeq)) return;
+      let payload;
+      try {
+        payload = normalizeTabletopStatePayload(JSON.parse(message.body || "{}"));
+      } catch {
+        fetchState(roomId, roomSeq).catch((error) => {
+          if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "방 정보를 갱신하지 못했습니다.");
+        });
+        return;
+      }
+      if (payload.room) setSelectedRoom(payload.room);
+      if ((game === "dalmuti" || game === "catan") && payload.gameState) {
+        fetchState(roomId, roomSeq).catch((error) => {
+          if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 정보를 갱신하지 못했습니다.");
+        });
+      } else {
+        setGameState(payload.gameState || null);
+      }
+      if (payload.message) toast(payload.message);
+    });
+    await fetchState(roomId, roomSeq);
+  };
+
+  const bindLatestRealtimeRoom = async (client) => {
+    const target = realtimeRoomRef.current;
+    if (!target) return;
+    await bindRealtimeRoom(client, target.roomId, target.roomSeq);
   };
 
   const ensureSocket = () => {
     if (stompRef.current) return stompRef.current;
+    const connectHeaders = buildStompConnectHeaders();
+    if (!connectHeaders.Authorization) return null;
     const client = new Client({
       webSocketFactory: () => new SockJS("/ws/chat"),
-      connectHeaders: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+      connectHeaders,
       reconnectDelay: 3000,
-      onStompError: () => toast.error("실시간 연결 오류"),
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
     });
+    client.beforeConnect = () => {
+      client.connectHeaders = buildStompConnectHeaders();
+    };
+    client.onConnect = () => {
+      bindLatestRealtimeRoom(client).catch((error) => {
+        const target = realtimeRoomRef.current;
+        if (target && isLatestRoomOpen(target.roomSeq)) {
+          handleStateLoadError(error, target.roomId, "방 정보를 불러오지 못했습니다.");
+        }
+      });
+    };
+    client.onStompError = () => toast.error("실시간 연결 오류");
     client.activate();
     stompRef.current = client;
     return client;
@@ -6862,37 +6920,22 @@ export const TabletopGame = ({ game }) => {
     if (!roomId) return;
     localStorage.setItem(config.storageKey, String(roomId));
     setSettingsForm({
-      variant_code: get(room, "variant_code", "variantCode", "BASE"),
-      turn_time_seconds: String(turnSecondsOf(room)),
+      variantCode: variantCodeOf(room),
+      turnTimeSeconds: String(turnSecondsOf(room)),
     });
 
+    realtimeRoomRef.current = { roomId, roomSeq };
     const client = ensureSocket();
-    const bind = async () => {
+    await fetchState(roomId, roomSeq).catch((error) => {
       if (!isLatestRoomOpen(roomSeq)) return;
-      if (gameSubRef.current) gameSubRef.current.unsubscribe();
-      gameSubRef.current = client.subscribe(`/sub/game/${game}/room/${roomId}`, (message) => {
-        if (!isLatestRoomOpen(roomSeq)) return;
-        const payload = JSON.parse(message.body || "{}");
-        if (payload.room) setSelectedRoom(payload.room);
-        if ((game === "dalmuti" || game === "catan") && (payload.game_state || payload.gameState)) {
-          fetchState(roomId, roomSeq).catch((error) => {
-            if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 정보를 갱신하지 못했습니다.");
-          });
-        } else {
-          setGameState(payload.game_state || payload.gameState || null);
-        }
-        if (payload.message) toast(payload.message);
-      });
-      await fetchState(roomId, roomSeq).catch((error) => {
-        if (!isLatestRoomOpen(roomSeq)) return;
-        handleStateLoadError(error, roomId, "방 정보를 불러오지 못했습니다.");
-        throw error;
-      });
-    };
-    if (client.connected) await bind();
-    else client.onConnect = () => bind().catch(() => {
-      if (isLatestRoomOpen(roomSeq)) toast.error("방 정보를 불러오지 못했습니다.");
+      handleStateLoadError(error, roomId, "방 정보를 불러오지 못했습니다.");
+      throw error;
     });
+    if (client?.connected) {
+      await bindRealtimeRoom(client, roomId, roomSeq).catch((error) => {
+        if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "방 정보를 불러오지 못했습니다.");
+      });
+    }
   };
 
   useEffect(() => {
@@ -6944,6 +6987,7 @@ export const TabletopGame = ({ game }) => {
       active = false;
       if (gameSubRef.current) gameSubRef.current.unsubscribe();
       if (stompRef.current) stompRef.current.deactivate();
+      realtimeRoomRef.current = null;
       stompRef.current = null;
       gameSubRef.current = null;
     };
@@ -6958,12 +7002,12 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      const response = await api.post(`/game/${game}/rooms`, {
+      const room = await tabletopGameAdapter.createRoom(game, {
         title: createForm.title,
-        variant_code: createForm.variant_code,
-        turn_time_seconds: Number(createForm.turn_time_seconds || 30),
+        variantCode: createForm.variantCode,
+        turnTimeSeconds: Number(createForm.turnTimeSeconds || 30),
       });
-      await openRoom(response.data);
+      await openRoom(room);
       await fetchRooms();
       toast.success("방 생성 완료");
     } catch {
@@ -6982,8 +7026,8 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      const response = await api.post(`/game/${game}/rooms/${roomId}/join`);
-      await openRoom(response.data);
+      const room = await tabletopGameAdapter.joinRoom(game, roomId);
+      await openRoom(room);
       await fetchRooms();
       toast.success("방 입장 완료");
     } catch {
@@ -7008,9 +7052,9 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      const response = await api.post(`/game/${game}/rooms/join-by-code`, { room_code: code });
+      const room = await tabletopGameAdapter.joinByCode(game, code);
       setJoinCode("");
-      await openRoom(response.data);
+      await openRoom(room);
       await fetchRooms();
       toast.success("방 코드로 입장했습니다.");
     } catch {
@@ -7034,11 +7078,11 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      const response = await api.patch(`/game/${game}/rooms/${idOf(selectedRoom)}/settings`, {
-        variant_code: settingsForm.variant_code,
-        turn_time_seconds: Number(settingsForm.turn_time_seconds || 30),
+      const room = await tabletopGameAdapter.updateSettings(game, idOf(selectedRoom), {
+        variantCode: settingsForm.variantCode,
+        turnTimeSeconds: Number(settingsForm.turnTimeSeconds || 30),
       });
-      setSelectedRoom(response.data);
+      setSelectedRoom(room);
       setGameState(null);
       await fetchRooms();
       toast.success("방 설정 저장 완료");
@@ -7059,7 +7103,7 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      await api.post(`/game/${game}/rooms/${idOf(selectedRoom)}/ready`);
+      await tabletopGameAdapter.toggleReady(game, idOf(selectedRoom));
     } catch {
       toast.error("준비 상태 변경 실패");
     } finally {
@@ -7077,7 +7121,7 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      await api.post(`/game/${game}/rooms/${idOf(selectedRoom)}/start`);
+      await tabletopGameAdapter.startGame(game, idOf(selectedRoom));
       await fetchState(idOf(selectedRoom));
       toast.success("게임 시작");
     } catch {
@@ -7097,10 +7141,10 @@ export const TabletopGame = ({ game }) => {
     actionBusyRef.current = true;
     setActionBusy(true);
     try {
-      const response = await api.post(`/game/${game}/rooms/${idOf(selectedRoom)}/actions`, payload);
-      if (response.data?.room) setSelectedRoom(response.data.room);
-      setGameState(response.data?.game_state || response.data?.gameState || null);
-      return response.data;
+      const result = await tabletopGameAdapter.sendAction(game, idOf(selectedRoom), payload);
+      if (result?.room) setSelectedRoom(result.room);
+      setGameState(result?.gameState || null);
+      return result;
     } finally {
       actionBusyRef.current = false;
       setActionBusy(false);
@@ -7116,8 +7160,8 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      const response = await api.post(`/game/${game}/rooms/${idOf(selectedRoom)}/force-finish`);
-      setSelectedRoom(response.data);
+      const room = await tabletopGameAdapter.forceFinish(game, idOf(selectedRoom));
+      setSelectedRoom(room);
       setGameState(null);
       toast.success("대기방으로 돌아왔습니다.");
     } catch {
@@ -7137,8 +7181,8 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      const response = await api.post(`/game/${game}/rooms/${idOf(selectedRoom)}/rematch`);
-      setSelectedRoom(response.data);
+      const room = await tabletopGameAdapter.rematch(game, idOf(selectedRoom));
+      setSelectedRoom(room);
       setGameState(null);
       toast.success("다시 준비합니다.");
     } catch {
@@ -7159,7 +7203,7 @@ export const TabletopGame = ({ game }) => {
     try {
       setBusy(true);
       const roomId = idOf(selectedRoom);
-      await api.post(`/game/${game}/rooms/${roomId}/leave`);
+      await tabletopGameAdapter.leaveRoom(game, roomId);
       clearRoomSelection(roomId);
       await fetchRooms();
       toast.success("방 퇴장 완료");
@@ -7217,10 +7261,10 @@ export const TabletopGame = ({ game }) => {
               />
               <select
                 className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
-                value={createForm.variant_code}
+                value={createForm.variantCode}
                 aria-label={`${config.title} 규칙 선택`}
                 disabled={initialLoading || !variants.length}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, variant_code: event.target.value }))}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, variantCode: event.target.value }))}
               >
                 <VariantOptions game={game} variants={variants} />
               </select>
@@ -7228,8 +7272,8 @@ export const TabletopGame = ({ game }) => {
                 <VariantChoiceGrid
                   game={game}
                   variants={variants}
-                  value={createForm.variant_code}
-                  onChange={(variantCode) => setCreateForm((prev) => ({ ...prev, variant_code: variantCode }))}
+                  value={createForm.variantCode}
+                  onChange={(variantCode) => setCreateForm((prev) => ({ ...prev, variantCode }))}
                 />
               ) : (
                 <div className="rounded-xl bg-slate-50 px-3 py-4 text-sm font-bold leading-relaxed text-slate-500" role="status" aria-live="polite">
@@ -7242,9 +7286,9 @@ export const TabletopGame = ({ game }) => {
                 className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm"
                 placeholder="턴 시간(초)"
                 aria-label="턴 시간 초"
-                value={createForm.turn_time_seconds}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, turn_time_seconds: event.target.value.replace(/[^\d]/g, "") }))}
-                onBlur={() => setCreateForm((prev) => ({ ...prev, turn_time_seconds: clampDigits(prev.turn_time_seconds, 5, 180, 30) }))}
+                value={createForm.turnTimeSeconds}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, turnTimeSeconds: event.target.value.replace(/[^\d]/g, "") }))}
+                onBlur={() => setCreateForm((prev) => ({ ...prev, turnTimeSeconds: clampDigits(prev.turnTimeSeconds, 5, 180, 30) }))}
               />
               {selectedVariant && (
                 <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
@@ -7257,7 +7301,7 @@ export const TabletopGame = ({ game }) => {
                   <VariantFeatureTags game={game} variant={selectedVariant} className="mt-2" />
                 </div>
               )}
-              <button className="min-h-11 rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:opacity-50" disabled={busy || initialLoading || !variants.length} aria-label={`${config.title} ${variantDisplayName(selectedVariant)} 방 만들기`}>
+              <button type="submit" className="min-h-11 rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:opacity-50" disabled={busy || initialLoading || !variants.length} aria-label={`${config.title} ${variantDisplayName(selectedVariant)} 방 만들기`}>
                 {initialLoading ? "준비 중" : "방 만들기"}
               </button>
             </div>
@@ -7293,7 +7337,7 @@ export const TabletopGame = ({ game }) => {
                 maxLength={8}
                 onChange={(event) => setJoinCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
               />
-              <button className="min-h-11 rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={busy || initialLoading || !joinCode.trim()} aria-label={`${joinCode.trim() || "입력한"} 방 코드로 입장`}>
+              <button type="submit" className="min-h-11 rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={busy || initialLoading || !joinCode.trim()} aria-label={`${joinCode.trim() || "입력한"} 방 코드로 입장`}>
                 입장
               </button>
             </form>
@@ -7432,9 +7476,9 @@ export const TabletopGame = ({ game }) => {
               <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-[1fr_140px_140px]">
                 <select
                   className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
-                  value={settingsForm.variant_code}
+                  value={settingsForm.variantCode}
                   aria-label="방 규칙 변경"
-                  onChange={(event) => setSettingsForm((prev) => ({ ...prev, variant_code: event.target.value }))}
+                  onChange={(event) => setSettingsForm((prev) => ({ ...prev, variantCode: event.target.value }))}
                 >
                   <VariantOptions game={game} variants={variants} disabledCodes={settingsDisabledVariantCodes} />
                 </select>
@@ -7442,10 +7486,10 @@ export const TabletopGame = ({ game }) => {
                   type="text"
                   inputMode="numeric"
                   className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                  value={settingsForm.turn_time_seconds}
+                  value={settingsForm.turnTimeSeconds}
                   aria-label="방 턴 시간 초 변경"
-                  onChange={(event) => setSettingsForm((prev) => ({ ...prev, turn_time_seconds: event.target.value.replace(/[^\d]/g, "") }))}
-                  onBlur={() => setSettingsForm((prev) => ({ ...prev, turn_time_seconds: clampDigits(prev.turn_time_seconds, 5, 180, 30) }))}
+                  onChange={(event) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: event.target.value.replace(/[^\d]/g, "") }))}
+                  onBlur={() => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: clampDigits(prev.turnTimeSeconds, 5, 180, 30) }))}
                 />
                 <button className="min-h-11 rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40" disabled={selectedSettingsTooManyPlayers || busy} onClick={saveSettings} type="button" aria-label={selectedSettingsTooManyPlayers ? "현재 인원 때문에 방 설정 저장 불가" : "방 설정 저장"} title={selectedSettingsTooManyPlayers ? "현재 인원이 선택한 규칙의 최대 인원을 초과합니다." : "방 설정 저장"}>
                   설정 저장
@@ -7454,11 +7498,11 @@ export const TabletopGame = ({ game }) => {
                   <VariantChoiceGrid
                     game={game}
                     variants={variants}
-                    value={settingsForm.variant_code}
+                    value={settingsForm.variantCode}
                     compact
                     disabledCodes={settingsDisabledVariantCodes}
                     disabledReasonByCode={settingsDisabledReasonByCode}
-                    onChange={(variantCode) => setSettingsForm((prev) => ({ ...prev, variant_code: variantCode }))}
+                    onChange={(variantCode) => setSettingsForm((prev) => ({ ...prev, variantCode }))}
                   />
                 </div>
                 {selectedSettingsVariant && (

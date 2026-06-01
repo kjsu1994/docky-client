@@ -1,12 +1,10 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Film, RefreshCw, Upload, Trash2, AlertTriangle, Clapperboard, LoaderCircle, Server, WandSparkles, FolderSearch, CheckSquare } from "lucide-react";
 import toast from "react-hot-toast";
-import api, { uploadFiles } from "../../utils/api.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
-
-const unwrap = (payload) => payload?.data?.data ?? payload?.data ?? payload ?? null;
+import { streamingAdapter, streamingErrorMessage } from "../../adapters/streamingAdapter.js";
 
 const statusTone = {
     READY: "bg-emerald-100 text-emerald-700",
@@ -37,6 +35,8 @@ const phaseMeta = {
 };
 
 const formatFileSizeInMb = (size) => `${Math.max(1, Math.round(size / 1024 / 1024))}MB`;
+const ADMIN_LIST_PAGE_SIZE = 50;
+const MAX_STREAMING_BATCH_FILES = 8;
 
 export const AdminStreamingStudio = () => {
     const { user } = useAuth();
@@ -46,6 +46,10 @@ export const AdminStreamingStudio = () => {
     const [description, setDescription] = useState("");
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [videos, setVideos] = useState([]);
+    const [videoPage, setVideoPage] = useState(1);
+    const [totalVideoCount, setTotalVideoCount] = useState(0);
+    const [hasMoreVideos, setHasMoreVideos] = useState(false);
+    const [loadingMoreVideos, setLoadingMoreVideos] = useState(false);
     const [inboxFiles, setInboxFiles] = useState([]);
     const [selectedInboxFiles, setSelectedInboxFiles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -56,6 +60,7 @@ export const AdminStreamingStudio = () => {
     const [uploadPhase, setUploadPhase] = useState("idle");
     const [error, setError] = useState("");
     const lastProgressAtRef = useRef(0);
+    const videoRequestSeqRef = useRef(0);
 
     const isSingleUpload = selectedFiles.length <= 1;
     const hasQueueWork = useMemo(
@@ -67,23 +72,41 @@ export const AdminStreamingStudio = () => {
         [inboxFiles]
     );
 
-    const fetchVideos = async ({ silent = false } = {}) => {
-        if (!silent) {
+    const fetchVideos = async ({ silent = false, page = 1, append = false } = {}) => {
+        const requestId = videoRequestSeqRef.current + 1;
+        videoRequestSeqRef.current = requestId;
+        if (append) {
+            setLoadingMoreVideos(true);
+        } else if (!silent) {
             setLoading(true);
         }
         setError("");
         try {
-            const response = await api.get("/admin/streaming/videos", {
-                meta: { trackNetwork: !silent },
+            const result = await streamingAdapter.fetchAdminVideos({ silent, page, size: ADMIN_LIST_PAGE_SIZE });
+            if (videoRequestSeqRef.current !== requestId) return;
+            setVideos((currentVideos) => {
+                if (!append) return result.items;
+                const merged = new Map(currentVideos.map((video) => [video.videoId, video]));
+                result.items.forEach((video) => merged.set(video.videoId, video));
+                return Array.from(merged.values());
             });
-            const payload = unwrap(response.data);
-            setVideos(Array.isArray(payload?.items) ? payload.items : []);
+            setVideoPage(result.page);
+            setTotalVideoCount(result.totalElements);
+            setHasMoreVideos(result.hasMore);
         } catch (err) {
-            setVideos([]);
-            setError(err?.response?.data?.message || "스트리밍 관리 목록을 불러오지 못했습니다.");
+            if (videoRequestSeqRef.current !== requestId) return;
+            if (!append) {
+                setVideos([]);
+                setTotalVideoCount(0);
+                setHasMoreVideos(false);
+            }
+            setError(streamingErrorMessage(err, "스트리밍 관리 목록을 불러오지 못했습니다."));
         } finally {
-            if (!silent) {
+            if (videoRequestSeqRef.current === requestId && !silent) {
                 setLoading(false);
+            }
+            if (videoRequestSeqRef.current === requestId) {
+                setLoadingMoreVideos(false);
             }
         }
     };
@@ -93,16 +116,12 @@ export const AdminStreamingStudio = () => {
             setInboxLoading(true);
         }
         try {
-            const response = await api.get("/admin/streaming/videos/inbox", {
-                meta: { trackNetwork: !silent },
-            });
-            const payload = unwrap(response.data);
-            const items = Array.isArray(payload?.items) ? payload.items : [];
+            const items = await streamingAdapter.fetchAdminInboxFiles({ silent });
             setInboxFiles(items);
-            setSelectedInboxFiles((prev) => prev.filter((fileName) => items.some((item) => item.file_name === fileName && item.ready)));
+            setSelectedInboxFiles((prev) => prev.filter((fileName) => items.some((item) => item.fileName === fileName && item.ready)));
         } catch (err) {
             if (!silent) {
-                toast.error(err?.response?.data?.message || "inbox 파일 목록을 불러오지 못했습니다.");
+                toast.error(streamingErrorMessage(err, "inbox 파일 목록을 불러오지 못했습니다."));
             }
             setInboxFiles([]);
             setSelectedInboxFiles([]);
@@ -163,19 +182,26 @@ export const AdminStreamingStudio = () => {
         if (fileInput) fileInput.value = "";
     };
 
+    const handleFileSelection = (event) => {
+        const files = Array.from(event.target.files || []);
+        if (files.length > MAX_STREAMING_BATCH_FILES) {
+            toast.error(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 등록할 수 있습니다.`);
+            setSelectedFiles(files.slice(0, MAX_STREAMING_BATCH_FILES));
+            return;
+        }
+        setSelectedFiles(files);
+    };
+
     const handleUpload = async (e) => {
         e.preventDefault();
         if (!selectedFiles.length) {
             toast.error("업로드할 영상 파일을 선택해주세요.");
             return;
         }
-
-        const formData = new FormData();
-        if (title.trim()) {
-            formData.append("title", title.trim());
+        if (selectedFiles.length > MAX_STREAMING_BATCH_FILES) {
+            toast.error(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 등록할 수 있습니다.`);
+            return;
         }
-        formData.append("description", description.trim());
-        selectedFiles.forEach((file) => formData.append("files", file));
 
         setUploading(true);
         setUploadProgress(0);
@@ -183,7 +209,10 @@ export const AdminStreamingStudio = () => {
         lastProgressAtRef.current = Date.now();
 
         try {
-            const response = await uploadFiles("/admin/streaming/videos/batch", formData, "post", {
+            const items = await streamingAdapter.uploadAdminVideos({
+                title,
+                description,
+                files: selectedFiles,
                 onUploadProgress: (event) => {
                     lastProgressAtRef.current = Date.now();
                     if (uploadPhase !== "uploading") {
@@ -193,8 +222,7 @@ export const AdminStreamingStudio = () => {
                     setUploadProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
                 },
             });
-            const payload = unwrap(response.data);
-            const createdCount = Array.isArray(payload?.items) ? payload.items.length : selectedFiles.length;
+            const createdCount = items.length || selectedFiles.length;
             setUploadPhase("processing");
             setUploadProgress(100);
             toast.success(`${createdCount}개 영상 업로드가 등록되었습니다. 서버에서 변환을 시작합니다.`);
@@ -203,7 +231,7 @@ export const AdminStreamingStudio = () => {
         } catch (err) {
             setUploadPhase("idle");
             setUploadProgress(0);
-            toast.error(err?.response?.data?.message || "영상 업로드에 실패했습니다.");
+            toast.error(streamingErrorMessage(err, "영상 업로드에 실패했습니다."));
         } finally {
             setUploading(false);
         }
@@ -219,12 +247,11 @@ export const AdminStreamingStudio = () => {
         setUploadPhase("processing");
         setUploadProgress(100);
         try {
-            const response = await api.post("/admin/streaming/videos/inbox/import", {
-                file_names: selectedInboxFiles,
-                description: description.trim() || null,
+            const items = await streamingAdapter.importAdminInboxFiles({
+                fileNames: selectedInboxFiles,
+                description,
             });
-            const payload = unwrap(response.data);
-            const importedCount = Array.isArray(payload?.items) ? payload.items.length : selectedInboxFiles.length;
+            const importedCount = items.length || selectedInboxFiles.length;
             toast.success(`${importedCount}개 inbox 영상 가져오기가 시작되었습니다.`);
             setSelectedInboxFiles([]);
             await Promise.all([
@@ -234,16 +261,23 @@ export const AdminStreamingStudio = () => {
         } catch (err) {
             setUploadPhase("idle");
             setUploadProgress(0);
-            toast.error(err?.response?.data?.message || "inbox 파일 가져오기에 실패했습니다.");
+            toast.error(streamingErrorMessage(err, "inbox 파일 가져오기에 실패했습니다."));
         } finally {
             setImportingInbox(false);
         }
     };
 
     const toggleInboxSelection = (fileName) => {
-        setSelectedInboxFiles((prev) => prev.includes(fileName)
-            ? prev.filter((item) => item !== fileName)
-            : [...prev, fileName]);
+        setSelectedInboxFiles((prev) => {
+            if (prev.includes(fileName)) {
+                return prev.filter((item) => item !== fileName);
+            }
+            if (prev.length >= MAX_STREAMING_BATCH_FILES) {
+                toast.error(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 가져올 수 있습니다.`);
+                return prev;
+            }
+            return [...prev, fileName];
+        });
     };
 
     const handleDelete = async (videoId) => {
@@ -255,11 +289,11 @@ export const AdminStreamingStudio = () => {
         if (!confirmed) return;
         const toastId = toast.loading("영상을 삭제하는 중입니다...");
         try {
-            await api.delete(`/admin/streaming/videos/${videoId}`);
+            await streamingAdapter.deleteAdminVideo(videoId);
             await fetchVideos({ silent: true });
             toast.success("영상이 삭제되었습니다.", { id: toastId });
         } catch (err) {
-            toast.error(err?.response?.data?.message || "영상 삭제에 실패했습니다.", { id: toastId });
+            toast.error(streamingErrorMessage(err, "영상 삭제에 실패했습니다."), { id: toastId });
         }
     };
 
@@ -270,7 +304,7 @@ export const AdminStreamingStudio = () => {
                     <AlertTriangle className="h-8 w-8 text-rose-500" />
                 </div>
                 <h1 className="text-xl font-black">관리자 전용 페이지</h1>
-                <p className="text-sm font-medium opacity-70">ROLE_ADMIN 또는 ROLE_MASTER 권한이 필요합니다.</p>
+                <p className="text-sm font-medium opacity-70">관리자 또는 마스터 권한이 필요합니다.</p>
             </section>
         );
     }
@@ -347,7 +381,7 @@ export const AdminStreamingStudio = () => {
                                     type="file"
                                     multiple
                                     accept=".mp4,.mov,.mkv,.webm,video/mp4,video/quicktime,video/x-matroska,video/webm"
-                                    onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
+                                    onChange={handleFileSelection}
                                     className="block w-full text-sm font-semibold text-slate-600 file:mr-4 file:rounded-2xl file:border-0 file:bg-primary-600 file:px-4 file:py-2.5 file:font-black file:text-white hover:file:bg-primary-700"
                                 />
                                 {selectedFiles.length ? (
@@ -365,7 +399,7 @@ export const AdminStreamingStudio = () => {
                                 ) : null}
                             </div>
                             <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
-                                파일 1개: 제목을 직접 입력할 수 있습니다. 파일 여러 개: 제목을 비워두면 파일명으로 각각 자동 등록됩니다.
+                                파일 1개: 제목을 직접 입력할 수 있습니다. 파일 여러 개: 제목을 비워두면 파일명으로 각각 자동 등록됩니다. 한 번에 최대 {MAX_STREAMING_BATCH_FILES}개까지 등록할 수 있습니다.
                             </div>
                         </div>
 
@@ -403,9 +437,9 @@ export const AdminStreamingStudio = () => {
                         ) : (
                             <div className="space-y-3 max-h-[320px] overflow-auto pr-1">
                                 {inboxFiles.map((file) => {
-                                    const selected = selectedInboxFiles.includes(file.file_name);
+                                    const selected = selectedInboxFiles.includes(file.fileName);
                                     return (
-                                        <label key={file.file_name} className={`block rounded-[1.5rem] border p-4 transition-all ${selected ? "border-primary-200 bg-primary-50/50" : "border-slate-100 bg-slate-50/40"}`}>
+                                        <label key={file.fileName} className={`block rounded-[1.5rem] border p-4 transition-all ${selected ? "border-primary-200 bg-primary-50/50" : "border-slate-100 bg-slate-50/40"}`}>
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex min-w-0 items-start gap-3">
                                                     <input
@@ -413,14 +447,14 @@ export const AdminStreamingStudio = () => {
                                                         className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600"
                                                         checked={selected}
                                                         disabled={!file.ready}
-                                                        onChange={() => toggleInboxSelection(file.file_name)}
+                                                        onChange={() => toggleInboxSelection(file.fileName)}
                                                     />
                                                     <div className="min-w-0">
-                                                        <div className="truncate text-sm font-black text-slate-900">{file.file_name}</div>
-                                                        <div className="mt-1 text-xs font-semibold text-slate-500">제목: {file.title} · {file.source_extension?.toUpperCase() || "-"} · {file.file_size ? formatFileSizeInMb(file.file_size) : "-"}</div>
+                                                        <div className="truncate text-sm font-black text-slate-900">{file.fileName}</div>
+                                                        <div className="mt-1 text-xs font-semibold text-slate-500">제목: {file.title} · {file.sourceExtension?.toUpperCase() || "-"} · {file.fileSize ? formatFileSizeInMb(file.fileSize) : "-"}</div>
                                                         {!file.ready ? (
                                                             <div className="mt-2 rounded-2xl border border-amber-100 bg-amber-50/80 px-3 py-2 text-xs font-semibold text-amber-700">
-                                                                {file.blocked_reason || "현재 가져올 수 없는 파일입니다."}
+                                                                {file.blockedReason || "현재 가져올 수 없는 파일입니다."}
                                                             </div>
                                                         ) : null}
                                                     </div>
@@ -434,7 +468,7 @@ export const AdminStreamingStudio = () => {
                         )}
 
                         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
-                            <div>가져오기 가능 파일 {readyInboxFiles.length}개 / 선택 {selectedInboxFiles.length}개</div>
+                            <div>가져오기 가능 파일 {readyInboxFiles.length}개 / 선택 {selectedInboxFiles.length}개 / 1회 최대 {MAX_STREAMING_BATCH_FILES}개</div>
                             <button
                                 type="button"
                                 onClick={handleImportInbox}
@@ -454,7 +488,9 @@ export const AdminStreamingStudio = () => {
                             <h2 className="text-lg font-black text-slate-900">업로드/변환 현황</h2>
                             <p className="mt-1 text-sm font-medium text-slate-400">원본 보관, HLS 변환, 썸네일 생성 상태를 확인합니다.</p>
                         </div>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">{videos.length}개</span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+                            {totalVideoCount > videos.length ? `${videos.length}/${totalVideoCount}개` : `${videos.length}개`}
+                        </span>
                     </div>
 
                     {loading ? (
@@ -468,41 +504,56 @@ export const AdminStreamingStudio = () => {
                             <p className="mt-2 text-sm font-medium text-slate-400">왼쪽 폼에서 첫 영상을 등록하거나 inbox에서 가져오면 상태가 여기에 표시됩니다.</p>
                         </div>
                     ) : (
-                        <div className="space-y-3 max-h-[980px] overflow-auto pr-1">
-                            {videos.map((video) => (
-                                <div key={video.video_id} className="rounded-[1.75rem] border border-slate-100 bg-slate-50/30 p-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div className="flex min-w-0 items-start gap-4">
-                                            {video.thumbnail_url ? (
-                                                <img src={video.thumbnail_url} alt={video.title} className="h-24 w-40 rounded-2xl object-contain bg-slate-100 p-2" />
-                                            ) : (
-                                                <div className="flex h-24 w-40 items-center justify-center rounded-2xl bg-slate-100 text-slate-300">
-                                                    <Film className="h-6 w-6" />
-                                                </div>
-                                            )}
-                                            <div className="min-w-0">
-                                                <div className="line-clamp-2 text-base font-black text-slate-900">{video.title}</div>
-                                                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
-                                                    <span className={`rounded-full px-2.5 py-1 font-black ${statusTone[video.status] || "bg-slate-100 text-slate-600"}`}>{video.status}</span>
-                                                    <span>{video.source_extension?.toUpperCase()}</span>
-                                                    <span>{video.file_size ? formatFileSizeInMb(video.file_size) : "-"}</span>
-                                                    <span>{video.duration_seconds ? `${video.duration_seconds}초` : "재생시간 미확정"}</span>
-                                                </div>
-                                                {video.failure_reason ? (
-                                                    <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50/70 px-3 py-2 text-xs font-semibold text-rose-700">
-                                                        실패 사유: {video.failure_reason}
+                        <>
+                            <div className="space-y-3 max-h-[980px] overflow-auto pr-1">
+                                {videos.map((video) => (
+                                    <div key={video.videoId} className="rounded-[1.75rem] border border-slate-100 bg-slate-50/30 p-4">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div className="flex min-w-0 items-start gap-4">
+                                                {video.thumbnailUrl ? (
+                                                    <img src={video.thumbnailUrl} alt={video.title} className="h-24 w-40 rounded-2xl object-contain bg-slate-100 p-2" />
+                                                ) : (
+                                                    <div className="flex h-24 w-40 items-center justify-center rounded-2xl bg-slate-100 text-slate-300">
+                                                        <Film className="h-6 w-6" />
                                                     </div>
-                                                ) : null}
+                                                )}
+                                                <div className="min-w-0">
+                                                    <div className="line-clamp-2 text-base font-black text-slate-900">{video.title}</div>
+                                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
+                                                        <span className={`rounded-full px-2.5 py-1 font-black ${statusTone[video.status] || "bg-slate-100 text-slate-600"}`}>{video.statusLabel}</span>
+                                                        <span>{video.sourceExtension?.toUpperCase()}</span>
+                                                        <span>{video.fileSize ? formatFileSizeInMb(video.fileSize) : "-"}</span>
+                                                        <span>{video.durationSeconds ? `${video.durationSeconds}초` : "재생시간 미확정"}</span>
+                                                    </div>
+                                                    {video.failureReason ? (
+                                                        <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50/70 px-3 py-2 text-xs font-semibold text-rose-700">
+                                                            실패 사유: {video.failureReason}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
                                             </div>
+                                            <button type="button" onClick={() => handleDelete(video.videoId)} className="inline-flex items-center gap-2 rounded-2xl bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition-colors hover:bg-rose-100">
+                                                <Trash2 className="h-4 w-4" />
+                                                삭제
+                                            </button>
                                         </div>
-                                        <button type="button" onClick={() => handleDelete(video.video_id)} className="inline-flex items-center gap-2 rounded-2xl bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition-colors hover:bg-rose-100">
-                                            <Trash2 className="h-4 w-4" />
-                                            삭제
-                                        </button>
                                     </div>
+                                ))}
+                            </div>
+                            {hasMoreVideos ? (
+                                <div className="mt-6 flex justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => fetchVideos({ silent: true, page: videoPage + 1, append: true })}
+                                        disabled={loadingMoreVideos}
+                                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-60"
+                                    >
+                                        <RefreshCw className={`h-4 w-4 ${loadingMoreVideos ? "animate-spin" : ""}`} />
+                                        {loadingMoreVideos ? "불러오는 중..." : "더 보기"}
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
+                            ) : null}
+                        </>
                     )}
                 </div>
             </div>

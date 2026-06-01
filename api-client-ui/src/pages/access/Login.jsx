@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Mail, Lock, Leaf } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import toast from "react-hot-toast";
-import api from "../../utils/api.js";
+import { authAdapter, extractAccountLockInfo, extractAuthErrorMessage } from "../../adapters/authAdapter.js";
 
 export const Login = () => {
     const [oauthProcessing, setOauthProcessing] = useState(() => {
@@ -11,7 +11,7 @@ export const Login = () => {
         return Boolean(
             params.get("accessToken") ||
             params.get("access_token") ||
-            params.get("error")
+            params.has("error")
         );
     });
     const [email, setEmail] = useState("");
@@ -38,10 +38,11 @@ export const Login = () => {
         const params = new URLSearchParams(window.location.search);
         const accessToken = params.get("accessToken") || params.get("access_token");
         const refreshToken = params.get("refreshToken") || params.get("refresh_token");
-        const oauthError = params.get("error");
+        const oauthError = params.has("error");
 
         if (oauthError) {
-            toast.error("구글 로그인에 실패했습니다.");
+            window.history.replaceState({}, document.title, window.location.pathname);
+            toast.error("구글 로그인에 실패했습니다. 다시 시도해주세요.");
             oauthHandledRef.current = true;
             setOauthProcessing(false);
             return;
@@ -61,7 +62,7 @@ export const Login = () => {
                 await loginWithTokens({ accessToken, refreshToken });
                 toast.success("구글 로그인 성공!");
             } catch (error) {
-                toast.error(error.response?.data?.message || "구글 로그인 처리에 실패했습니다.");
+                toast.error(extractAuthErrorMessage(error, "구글 로그인 처리에 실패했습니다."));
                 oauthHandledRef.current = false;
                 setOauthProcessing(false);
             } finally {
@@ -111,14 +112,9 @@ export const Login = () => {
         try {
             await login(email, password);
         } catch (error) {
-            const data = error?.response?.data;
-            if (data?.code === "ACCOUNT_LOCKED") {
-                setLockInfo({
-                    email,
-                    reason: data?.sanction_info?.reason || "사유가 제공되지 않았습니다.",
-                    startsAt: data?.sanction_info?.startsAt || data?.sanction_info?.starts_at || null,
-                    endsAt: data?.sanction_info?.endsAt || data?.sanction_info?.ends_at || null,
-                });
+            const nextLockInfo = extractAccountLockInfo(error, email);
+            if (nextLockInfo) {
+                setLockInfo(nextLockInfo);
             }
             console.error("Login error:", error);
         } finally {
@@ -132,14 +128,11 @@ export const Login = () => {
         const toastId = toast.loading("해제 요청을 제출하는 중...");
         setReleaseLoading(true);
         try {
-            await api.post("/sanctions/release-request", {
-                email: lockInfo.email,
-                request_reason: releaseReason.trim() || undefined,
-            });
+            await authAdapter.requestSanctionRelease({ email: lockInfo.email, reason: releaseReason });
             toast.success("해제 요청이 제출되었습니다.", { id: toastId });
             setReleaseReason("");
         } catch (error) {
-            toast.error(error?.response?.data?.message || "해제 요청 제출에 실패했습니다.", { id: toastId });
+            toast.error(extractAuthErrorMessage(error, "해제 요청 제출에 실패했습니다."), { id: toastId });
         } finally {
             setReleaseLoading(false);
         }
@@ -175,7 +168,7 @@ export const Login = () => {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="input-base pl-12 h-14 bg-white font-bold"
-                                    placeholder="your@email.com"
+                                    placeholder="이메일 주소"
                                     required
                                 />
                             </div>
@@ -223,8 +216,8 @@ export const Login = () => {
                                 data-busy-indicator="true"
                                 className="btn-secondary w-full h-14 flex items-center justify-center gap-3 border-slate-100 hover:border-slate-200"
                             >
-                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="h-5 w-5" />
-                                <span className="tracking-tight">{googleLoading ? "이동 중..." : "Google로 로그인"}</span>
+                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="구글" className="h-5 w-5" />
+                                <span className="tracking-tight">{googleLoading ? "이동 중..." : "구글로 로그인"}</span>
                             </button>
                         </div>
                     </form>

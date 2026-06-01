@@ -224,8 +224,8 @@ export const Header = () => {
                                 </div>
                                 <span className="hidden md:inline">{user?.name || user?.email || "내 정보"}</span>
                                 {isAdmin && (
-                                    <span className="hidden rounded-lg bg-primary-100 px-2 py-0.5 text-[9px] font-black uppercase text-primary-700 md:inline-block">
-                                        ADMIN
+                                    <span className="hidden rounded-lg bg-primary-100 px-2 py-0.5 text-[9px] font-black text-primary-700 md:inline-block">
+                                        관리자
                                     </span>
                                 )}
                             </NavLink>

@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin, Search } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "../utils/api";
+import { addressSearchAdapter, extractAddressSearchErrorMessage } from "../adapters/addressSearchAdapter.js";
 
 const loadDaumPostcodeScript = () =>
     new Promise((resolve, reject) => {
@@ -75,14 +75,10 @@ export const AddressSearchBox = ({
             lastSuggestedKeywordRef.current = keyword;
 
             try {
-                const response = await api.get("/addresses/suggest", {
-                    params: { query: keyword, limit: 5 },
-                });
+                const result = await addressSearchAdapter.suggestAddresses({ query: keyword, limit: 5 });
                 if (cancelled) return;
 
-                const payload = response?.data?.data ?? response?.data ?? {};
-                const items = Array.isArray(payload?.items) ? payload.items : [];
-                setSuggestions(items);
+                setSuggestions(result.items);
                 setOpen(true);
             } catch (err) {
                 if (!cancelled) {
@@ -110,12 +106,8 @@ export const AddressSearchBox = ({
 
         setLoadingResolve(true);
         try {
-            const response = await api.get("/addresses/geocode", {
-                params: { address },
-            });
-            const payload = response?.data?.data ?? response?.data ?? {};
-            const latitude = Number(payload?.latitude);
-            const longitude = Number(payload?.longitude);
+            const payload = await addressSearchAdapter.geocodeAddress(address);
+            const { latitude, longitude } = payload;
 
             if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
                 throw new Error("Invalid coordinates");
@@ -129,14 +121,14 @@ export const AddressSearchBox = ({
 
             onResolved?.({
                 address: normalizedAddress,
-                roadAddress: payload?.road_address ?? payload?.roadAddress ?? additional.roadAddress ?? null,
-                jibunAddress: payload?.jibun_address ?? payload?.jibunAddress ?? additional.jibunAddress ?? null,
+                roadAddress: payload?.roadAddress ?? additional.roadAddress ?? null,
+                jibunAddress: payload?.jibunAddress ?? additional.jibunAddress ?? null,
                 zonecode: additional.zonecode ?? null,
                 latitude,
                 longitude,
             });
         } catch (err) {
-            toast.error(err?.response?.data?.message || "주소 좌표를 찾지 못했습니다.");
+            toast.error(extractAddressSearchErrorMessage(err, "주소 좌표를 찾지 못했습니다."));
         } finally {
             setLoadingResolve(false);
         }
@@ -250,9 +242,9 @@ export const AddressSearchBox = ({
                         <div className="px-3 py-2 text-xs font-semibold text-slate-400">일치하는 주소가 없습니다.</div>
                     ) : (
                         suggestions.map((item, index) => {
-                            const address = item?.address ?? item?.road_address ?? item?.roadAddress ?? item?.jibun_address ?? item?.jibunAddress;
-                            const road = item?.road_address ?? item?.roadAddress;
-                            const jibun = item?.jibun_address ?? item?.jibunAddress;
+                            const address = item?.address;
+                            const road = item?.roadAddress;
+                            const jibun = item?.jibunAddress;
 
                             return (
                                 <button

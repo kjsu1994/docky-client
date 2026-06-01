@@ -3,24 +3,32 @@ import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import toast from "react-hot-toast";
 import { CheckCircle2, Crown, Dices, MessageSquare, Play, TimerReset, Users } from "lucide-react";
-import api from "../../utils/api.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { DiceCountBadge, DiceFace, MoneyCard } from "../../common/LasVegasVisuals.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import { buildTalkPayload, chatAdapter, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
+import { buildStompConnectHeaders } from "../../adapters/realtimeAdapter.js";
+import {
+    buildLasVegasActionPayload,
+    getLasVegasChatRoomId,
+    getLasVegasPlayerId,
+    getLasVegasRoomId,
+    isLasVegasReadyPlayer,
+    lasVegasGameAdapter,
+    normalizeLasVegasState,
+} from "../../adapters/lasVegasGameAdapter.js";
 
 const ROOM_STORAGE_KEY = "las_vegas_last_room_id";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
 
-const normalizeRoomId = (room) => room?.room_id || room?.roomId;
-const normalizeChatRoomId = (roomOrState) =>
-    roomOrState?.chat_room_id || roomOrState?.chatRoomId || roomOrState?.room_id || roomOrState?.roomId || roomOrState?.id;
-const isReadyPlayer = (player) =>
-    Boolean(player?.ready ?? player?.is_ready ?? player?.isReady ?? player?.ready_status ?? player?.readyStatus);
+const normalizeRoomId = getLasVegasRoomId;
+const normalizeChatRoomId = getLasVegasChatRoomId;
+const isReadyPlayer = isLasVegasReadyPlayer;
 const extractReadyMemberIds = (players) =>
     new Set(
         (Array.isArray(players) ? players : [])
             .filter((player) => isReadyPlayer(player))
-            .map((player) => Number(player.member_id || player.memberId))
+            .map((player) => Number(getLasVegasPlayerId(player)))
             .filter((memberId) => Number.isFinite(memberId) && memberId > 0)
     );
 const formatWon = (value) => `${Number(value || 0).toLocaleString("ko-KR")}원`;
@@ -47,15 +55,15 @@ const casinoName = {
 };
 
 const CasinoPanel = ({ casino, statePlayers, isHot, isLastPlaced }) => {
-    const casinoNo = toPlainInt(casino.casino_no || casino.casinoNo, 0);
-    const total = casino.total_money || casino.totalMoney || 0;
-    const moneyCards = casino.money_cards || casino.moneyCards || [];
-    const diceByPlayer = casino.dice_by_player || casino.diceByPlayer || {};
+    const casinoNo = toPlainInt(casino.casinoNo, 0);
+    const total = casino.totalMoney || 0;
+    const moneyCards = casino.moneyCards || [];
+    const diceByPlayer = casino.diceByPlayer || {};
     const diceEntries = Object.entries(diceByPlayer).sort((a, b) => Number(b[1]) - Number(a[1]));
     const playerMap = useMemo(() => {
         const map = new Map();
         (statePlayers || []).forEach((player) => {
-            map.set(Number(player.member_id || player.memberId), player.nickname);
+            map.set(Number(player.memberId), player.nickname);
         });
         return map;
     }, [statePlayers]);
@@ -113,38 +121,39 @@ export const LasVegasGame = () => {
     const [secondsLeft, setSecondsLeft] = useState(null);
     const [createForm, setCreateForm] = useState({
         title: "",
-        round_count: "3",
-        turn_time_seconds: "50",
+        roundCount: "3",
+        turnTimeSeconds: "50",
     });
     const [joinCode, setJoinCode] = useState("");
     const [settingsForm, setSettingsForm] = useState({
-        round_count: "3",
-        turn_time_seconds: "50",
+        roundCount: "3",
+        turnTimeSeconds: "50",
     });
     const [hotCasinoNo, setHotCasinoNo] = useState(null);
 
     const stompRef = useRef(null);
     const gameSubRef = useRef(null);
     const chatSubRef = useRef(null);
+    const realtimeRoomRef = useRef(null);
     const chatScrollRef = useRef(null);
     const prevCasinoSignatureRef = useRef("");
     const lastReadMarkAtRef = useRef(0);
     const audioContextRef = useRef(null);
     const isBetSoundPlayingRef = useRef(false);
 
-    const myMemberId = user?.member_id || user?.memberId || user?.id || null;
+    const myMemberId = getMemberId(user) || user?.id || null;
     const chatRoomId = normalizeChatRoomId(state) || normalizeChatRoomId(selectedRoom) || null;
-    const roomStatus = state?.room_status || state?.roomStatus || selectedRoom?.room_status || selectedRoom?.roomStatus || null;
+    const roomStatus = state?.roomStatus || selectedRoom?.roomStatus || null;
     const isFinished = roomStatus === "FINISHED";
 
     const isHost = selectedRoom && myMemberId &&
-        Number(selectedRoom.host_member_id || selectedRoom.hostMemberId) === Number(myMemberId);
+        Number(selectedRoom.hostMemberId) === Number(myMemberId);
     const myTurn = state && myMemberId &&
-        Number(state.turn_member_id || state.turnMemberId) === Number(myMemberId);
-    const canRoll = !isFinished && myTurn && (!state?.current_roll || state.current_roll.length === 0);
-    const canBet = !isFinished && myTurn && (state?.current_roll?.length || 0) > 0;
+        Number(state.turnMemberId) === Number(myMemberId);
+    const canRoll = !isFinished && myTurn && (!state?.currentRoll || state.currentRoll.length === 0);
+    const canBet = !isFinished && myTurn && (state?.currentRoll?.length || 0) > 0;
 
-    const currentRoll = state?.current_roll || [];
+    const currentRoll = state?.currentRoll || [];
     const currentRollCountByFace = useMemo(() => {
         const count = {};
         currentRoll.forEach((value) => {
@@ -158,28 +167,28 @@ export const LasVegasGame = () => {
     const players = livePlayers.length > 0 ? livePlayers : roomPlayers;
     const readyMemberIds = useMemo(() => extractReadyMemberIds(players), [players]);
     const hostNickname = useMemo(() => {
-        const hostId = Number(selectedRoom?.host_member_id || selectedRoom?.hostMemberId || 0);
-        return roomPlayers.find((player) => Number(player.member_id || player.memberId) === hostId)?.nickname || "-";
+        const hostId = Number(selectedRoom?.hostMemberId || 0);
+        return roomPlayers.find((player) => Number(player.memberId) === hostId)?.nickname || "-";
     }, [roomPlayers, selectedRoom]);
     const sortedPlayers = [...players].sort((a, b) => {
-        const aMoney = a.total_money || a.totalMoney || 0;
-        const bMoney = b.total_money || b.totalMoney || 0;
+        const aMoney = a.totalMoney || 0;
+        const bMoney = b.totalMoney || 0;
         return bMoney - aMoney;
     });
-    const winnerMemberId = state?.winner_member_id || state?.winnerMemberId || null;
+    const winnerMemberId = state?.winnerMemberId || null;
     const winnerNickname = winnerMemberId
-        ? players.find((player) => Number(player.member_id || player.memberId) === Number(winnerMemberId))?.nickname || `플레이어 ${winnerMemberId}`
+        ? players.find((player) => Number(player.memberId) === Number(winnerMemberId))?.nickname || `플레이어 ${winnerMemberId}`
         : null;
-    const currentTurnMemberId = state?.turn_member_id || state?.turnMemberId || null;
+    const currentTurnMemberId = state?.turnMemberId || null;
     const currentRollPlayer = currentTurnMemberId
-        ? players.find((player) => Number(player.member_id || player.memberId) === Number(currentTurnMemberId))
+        ? players.find((player) => Number(player.memberId) === Number(currentTurnMemberId))
         : null;
     const currentRollPlayerName = currentRollPlayer?.nickname || (currentTurnMemberId ? `플레이어 ${currentTurnMemberId}` : "-");
-    const lastPlacedMemberId = state?.last_placed_member_id || state?.lastPlacedMemberId || null;
-    const lastPlacedCasinoNo = toPlainInt(state?.last_placed_casino_no || state?.lastPlacedCasinoNo, 0);
-    const lastPlacedDiceCount = toPlainInt(state?.last_placed_dice_count || state?.lastPlacedDiceCount, 0);
+    const lastPlacedMemberId = state?.lastPlacedMemberId || null;
+    const lastPlacedCasinoNo = toPlainInt(state?.lastPlacedCasinoNo, 0);
+    const lastPlacedDiceCount = toPlainInt(state?.lastPlacedDiceCount, 0);
     const lastPlacedPlayer = lastPlacedMemberId
-        ? players.find((player) => Number(player.member_id || player.memberId) === Number(lastPlacedMemberId))
+        ? players.find((player) => Number(player.memberId) === Number(lastPlacedMemberId))
         : null;
     const lastPlacedText = lastPlacedCasinoNo
         ? `${lastPlacedPlayer?.nickname || `플레이어 ${lastPlacedMemberId}`}님이 ${casinoName[lastPlacedCasinoNo] || `${lastPlacedCasinoNo}번`}에 주사위 ${lastPlacedDiceCount}개를 배팅했습니다.`
@@ -187,12 +196,22 @@ export const LasVegasGame = () => {
 
     const ensureSocket = () => {
         if (stompRef.current) return stompRef.current;
+        const connectHeaders = buildStompConnectHeaders();
+        if (!connectHeaders.Authorization) return null;
         const client = new Client({
             webSocketFactory: () => new SockJS("/ws/chat"),
-            connectHeaders: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+            connectHeaders,
             reconnectDelay: 3000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000,
             onStompError: () => toast.error("실시간 연결 오류"),
         });
+        client.beforeConnect = () => {
+            client.connectHeaders = buildStompConnectHeaders();
+        };
+        client.onConnect = () => {
+            bindLatestRealtimeRoom(client);
+        };
         client.activate();
         stompRef.current = client;
         return client;
@@ -201,7 +220,13 @@ export const LasVegasGame = () => {
     const subscribeGameRoom = (client, roomId) => {
         if (gameSubRef.current) gameSubRef.current.unsubscribe();
         gameSubRef.current = client.subscribe(`/sub/game/las-vegas/room/${roomId}`, (msg) => {
-            const payload = JSON.parse(msg.body || "{}");
+            let payload;
+            try {
+                payload = normalizeLasVegasState(JSON.parse(msg.body || "{}"));
+            } catch {
+                fetchState(roomId).catch(() => {});
+                return;
+            }
             setState(payload);
             refreshSelectedRoom(roomId).catch(() => {});
             if (payload.message) toast(payload.message);
@@ -209,8 +234,8 @@ export const LasVegasGame = () => {
     };
 
     const refreshSelectedRoom = async (roomId) => {
-        const response = await api.get("/game/las-vegas/rooms/me");
-        const matchedRoom = (response.data || []).find((room) => Number(normalizeRoomId(room)) === Number(roomId));
+        const myRooms = await lasVegasGameAdapter.fetchMyActiveRooms();
+        const matchedRoom = myRooms.find((room) => Number(normalizeRoomId(room)) === Number(roomId));
         if (matchedRoom) setSelectedRoom(matchedRoom);
         return matchedRoom || null;
     };
@@ -218,28 +243,31 @@ export const LasVegasGame = () => {
     const subscribeChatRoom = (client, roomId) => {
         if (chatSubRef.current) chatSubRef.current.unsubscribe();
         chatSubRef.current = client.subscribe(`/sub/chat/room/${roomId}`, (msg) => {
-            const payload = JSON.parse(msg.body || "{}");
-            setChatMessages((prev) => [...prev, payload]);
+            let payload;
+            try {
+                payload = normalizeMessage(JSON.parse(msg.body || "{}"));
+            } catch {
+                fetchChatMessages(roomId).catch(() => {});
+                return;
+            }
+            if (payload) setChatMessages((prev) => [...prev, payload]);
             markChatRoomAsRead(roomId).catch(() => {});
         });
     };
 
     const fetchRooms = async () => {
-        const response = await api.get("/game/las-vegas/rooms");
-        setRooms(response.data || []);
+        setRooms(await lasVegasGameAdapter.fetchRooms());
     };
 
     const fetchState = async (roomId) => {
-        const response = await api.get(`/game/las-vegas/rooms/${roomId}/state`);
-        setState(response.data);
-        return response.data;
+        const snapshot = await lasVegasGameAdapter.fetchRoomState(roomId);
+        setState(snapshot);
+        return snapshot;
     };
 
     const fetchChatMessages = async (roomId) => {
         try {
-            const response = await api.get(`/chat/room/${roomId}/messages`);
-            const rows = response?.data?.data || response?.data?.content || response?.data || [];
-            setChatMessages(Array.isArray(rows) ? [...rows].reverse() : []);
+            setChatMessages(await chatAdapter.fetchRoomMessages(roomId));
         } catch {
             setChatMessages([]);
         }
@@ -250,8 +278,20 @@ export const LasVegasGame = () => {
         const now = Date.now();
         if (now - lastReadMarkAtRef.current < 1000) return;
         lastReadMarkAtRef.current = now;
-        await api.patch(`/chat/room/${roomId}/read`);
+        await chatAdapter.markRoomRead(roomId);
         window.dispatchEvent(new CustomEvent(CHAT_ROOM_READ_EVENT, { detail: { roomId: String(roomId) } }));
+    };
+
+    const bindRealtimeRoom = (client, roomId, targetChatRoomId) => {
+        if (!client?.connected || !roomId) return;
+        subscribeGameRoom(client, roomId);
+        if (targetChatRoomId) subscribeChatRoom(client, targetChatRoomId);
+    };
+
+    const bindLatestRealtimeRoom = (client) => {
+        const target = realtimeRoomRef.current;
+        if (!target) return;
+        bindRealtimeRoom(client, target.roomId, target.chatRoomId);
     };
 
     const hydrateRoomContext = async (room) => {
@@ -273,20 +313,10 @@ export const LasVegasGame = () => {
         };
         const snapshotChatRoomId = await loadSnapshot();
 
+        realtimeRoomRef.current = { roomId, chatRoomId: snapshotChatRoomId };
         const client = ensureSocket();
-        const subscribeAll = () => {
-            subscribeGameRoom(client, roomId);
-            if (snapshotChatRoomId) {
-                subscribeChatRoom(client, snapshotChatRoomId);
-            }
-        };
-
-        if (client.connected) {
-            subscribeAll();
-        } else {
-            client.onConnect = () => {
-                subscribeAll();
-            };
+        if (client?.connected) {
+            bindRealtimeRoom(client, roomId, snapshotChatRoomId);
         }
     };
 
@@ -297,8 +327,7 @@ export const LasVegasGame = () => {
     useEffect(() => {
         const restore = async () => {
             try {
-                const response = await api.get("/game/las-vegas/rooms/me");
-                const myRooms = response.data || [];
+                const myRooms = await lasVegasGameAdapter.fetchMyActiveRooms();
                 const storedId = Number(localStorage.getItem(ROOM_STORAGE_KEY) || 0);
                 const preferred = myRooms.find((room) => Number(normalizeRoomId(room)) === storedId) || myRooms[0];
                 if (preferred) {
@@ -314,24 +343,24 @@ export const LasVegasGame = () => {
     useEffect(() => {
         if (!selectedRoom) return;
         setSettingsForm({
-            round_count: String(selectedRoom.round_count || selectedRoom.roundCount || 4),
-            turn_time_seconds: String(selectedRoom.turn_time_seconds || selectedRoom.turnTimeSeconds || 25),
+            roundCount: String(selectedRoom.roundCount || 4),
+            turnTimeSeconds: String(selectedRoom.turnTimeSeconds || 25),
         });
     }, [selectedRoom]);
 
     useEffect(() => {
-        if (!state?.turn_deadline_at) {
+        if (!state?.turnDeadlineAt) {
             setSecondsLeft(null);
             return;
         }
         const tick = () => {
-            const ms = new Date(state.turn_deadline_at).getTime() - Date.now();
+            const ms = new Date(state.turnDeadlineAt).getTime() - Date.now();
             setSecondsLeft(Math.max(0, Math.ceil(ms / 1000)));
         };
         tick();
         const timer = setInterval(tick, 500);
         return () => clearInterval(timer);
-    }, [state?.turn_deadline_at]);
+    }, [state?.turnDeadlineAt]);
 
     useEffect(() => {
         if (chatScrollRef.current) {
@@ -362,8 +391,8 @@ export const LasVegasGame = () => {
         const casinos = state?.casinos || [];
         if (!casinos.length) return;
         const signatureParts = casinos.map((casino) => {
-            const casinoNo = casino.casino_no || casino.casinoNo;
-            const diceByPlayer = casino.dice_by_player || casino.diceByPlayer || {};
+            const casinoNo = casino.casinoNo;
+            const diceByPlayer = casino.diceByPlayer || {};
             const totalDice = Object.values(diceByPlayer).reduce((sum, value) => sum + Number(value || 0), 0);
             return `${casinoNo}:${totalDice}`;
         });
@@ -395,6 +424,7 @@ export const LasVegasGame = () => {
             if (gameSubRef.current) gameSubRef.current.unsubscribe();
             if (chatSubRef.current) chatSubRef.current.unsubscribe();
             if (stompRef.current) stompRef.current.deactivate();
+            realtimeRoomRef.current = null;
         };
     }, []);
 
@@ -402,13 +432,12 @@ export const LasVegasGame = () => {
         e.preventDefault();
         try {
             setCreating(true);
-            const payload = {
+            const room = await lasVegasGameAdapter.createRoom({
                 title: createForm.title,
-                round_count: toPlainInt(createForm.round_count, 4),
-                turn_time_seconds: toPlainInt(createForm.turn_time_seconds, 25),
-            };
-            const response = await api.post("/game/las-vegas/rooms", payload);
-            await hydrateRoomContext(response.data);
+                roundCount: toPlainInt(createForm.roundCount, 4),
+                turnTimeSeconds: toPlainInt(createForm.turnTimeSeconds, 25),
+            });
+            await hydrateRoomContext(room);
             await fetchRooms();
             toast.success("방 생성 완료");
         } catch {
@@ -421,8 +450,8 @@ export const LasVegasGame = () => {
     const joinRoom = async (roomId) => {
         try {
             setLoading(true);
-            const response = await api.post(`/game/las-vegas/rooms/${roomId}/join`);
-            await hydrateRoomContext(response.data);
+            const room = await lasVegasGameAdapter.joinRoom(roomId);
+            await hydrateRoomContext(room);
             await fetchRooms();
             toast.success("입장 완료");
         } catch {
@@ -441,11 +470,9 @@ export const LasVegasGame = () => {
         }
         try {
             setLoading(true);
-            const response = await api.post("/game/las-vegas/rooms/join-by-code", {
-                room_code: normalizedCode,
-            });
+            const room = await lasVegasGameAdapter.joinByCode(normalizedCode);
             setJoinCode("");
-            await hydrateRoomContext(response.data);
+            await hydrateRoomContext(room);
             await fetchRooms();
             toast.success("방코드로 입장했습니다.");
         } catch {
@@ -580,11 +607,7 @@ export const LasVegasGame = () => {
         playActionSound(actionType);
         stompRef.current.publish({
             destination: `/pub/game/las-vegas/${roomId}/action`,
-            body: JSON.stringify({
-                action_type: actionType,
-                member_id: Number(myMemberId),
-                casino_no: casinoNo,
-            }),
+            body: JSON.stringify(buildLasVegasActionPayload({ actionType, casinoNo })),
             headers: { "content-type": "application/json" },
         });
     };
@@ -594,13 +617,7 @@ export const LasVegasGame = () => {
         const message = chatInput.trim();
         stompRef.current.publish({
             destination: "/pub/chat/message",
-            body: JSON.stringify({
-                roomId: Number(chatRoomId),
-                chatRoomId: Number(chatRoomId),
-                senderId: Number(myMemberId),
-                type: "TALK",
-                message,
-            }),
+            body: JSON.stringify(buildTalkPayload({ roomId: chatRoomId, senderId: myMemberId, message })),
             headers: { "content-type": "application/json" },
         });
         setChatInput("");
@@ -610,11 +627,11 @@ export const LasVegasGame = () => {
         if (!selectedRoom) return;
         const roomId = normalizeRoomId(selectedRoom);
         try {
-            const response = await api.patch(`/game/las-vegas/rooms/${roomId}/settings`, {
-                round_count: toPlainInt(settingsForm.round_count, 4),
-                turn_time_seconds: toPlainInt(settingsForm.turn_time_seconds, 25),
+            const room = await lasVegasGameAdapter.updateSettings(roomId, {
+                roundCount: toPlainInt(settingsForm.roundCount, 4),
+                turnTimeSeconds: toPlainInt(settingsForm.turnTimeSeconds, 25),
             });
-            setSelectedRoom(response.data);
+            setSelectedRoom(room);
             toast.success("설정 저장 완료");
         } catch {
             toast.error("설정 저장 실패");
@@ -629,7 +646,7 @@ export const LasVegasGame = () => {
         }
         const roomId = normalizeRoomId(selectedRoom);
         try {
-            await api.post(`/game/las-vegas/rooms/${roomId}/ready`);
+            await lasVegasGameAdapter.toggleReady(roomId);
             toast.success("준비 상태 반영");
         } catch {
             toast.error("준비 상태 변경 실패");
@@ -644,7 +661,7 @@ export const LasVegasGame = () => {
         }
         const roomId = normalizeRoomId(selectedRoom);
         try {
-            await api.post(`/game/las-vegas/rooms/${roomId}/start`);
+            await lasVegasGameAdapter.startGame(roomId);
             toast.success("게임 시작");
         } catch {
             toast.error("게임 시작 실패");
@@ -656,8 +673,8 @@ export const LasVegasGame = () => {
         const roomId = normalizeRoomId(selectedRoom);
         try {
             setRematching(true);
-            const response = await api.post(`/game/las-vegas/rooms/${roomId}/rematch`);
-            setSelectedRoom(response.data);
+            const room = await lasVegasGameAdapter.rematch(roomId);
+            setSelectedRoom(room);
             await fetchState(roomId);
             await fetchRooms();
             toast.success("같은 방에서 새 판 준비를 시작했습니다.");
@@ -679,8 +696,8 @@ export const LasVegasGame = () => {
         const roomId = normalizeRoomId(selectedRoom);
         try {
             setForceFinishing(true);
-            const response = await api.post(`/game/las-vegas/rooms/${roomId}/force-finish`);
-            setSelectedRoom(response.data);
+            const room = await lasVegasGameAdapter.forceFinish(roomId);
+            setSelectedRoom(room);
             await fetchState(roomId);
             await fetchRooms();
             toast.success("현재 게임을 종료하고 대기 상태로 돌아갔습니다.");
@@ -695,11 +712,12 @@ export const LasVegasGame = () => {
         if (!selectedRoom) return;
         const roomId = normalizeRoomId(selectedRoom);
         try {
-            await api.post(`/game/las-vegas/rooms/${roomId}/leave`);
+            await lasVegasGameAdapter.leaveRoom(roomId);
             setSelectedRoom(null);
             setState(null);
             setChatMessages([]);
             localStorage.removeItem(ROOM_STORAGE_KEY);
+            realtimeRoomRef.current = null;
             if (gameSubRef.current) gameSubRef.current.unsubscribe();
             if (chatSubRef.current) chatSubRef.current.unsubscribe();
             await fetchRooms();
@@ -753,15 +771,15 @@ export const LasVegasGame = () => {
                         className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
                         type="text"
                         inputMode="numeric"
-                        value={createForm.round_count}
-                        onChange={(e) => setCreateForm((prev) => ({ ...prev, round_count: normalizeNumericText(e.target.value, 1, 10) }))}
+                        value={createForm.roundCount}
+                        onChange={(e) => setCreateForm((prev) => ({ ...prev, roundCount: normalizeNumericText(e.target.value, 1, 10) }))}
                     />
                     <input
                         className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
                         type="text"
                         inputMode="numeric"
-                        value={createForm.turn_time_seconds}
-                        onChange={(e) => setCreateForm((prev) => ({ ...prev, turn_time_seconds: normalizeNumericText(e.target.value, 5, 180) }))}
+                        value={createForm.turnTimeSeconds}
+                        onChange={(e) => setCreateForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumericText(e.target.value, 5, 180) }))}
                     />
                     <button type="submit" className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={creating}>
                         {creating ? "생성 중..." : "방 만들기"}
@@ -784,7 +802,7 @@ export const LasVegasGame = () => {
                             maxLength={8}
                             onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
                         />
-                        <button className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={loading}>
+                        <button type="submit" className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={loading}>
                             코드 입장
                         </button>
                     </form>
@@ -792,13 +810,13 @@ export const LasVegasGame = () => {
                         {!rooms.length && <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-400">대기 중인 방이 없습니다.</div>}
                         {rooms.map((room) => {
                             const roomId = normalizeRoomId(room);
-                            const playersCount = (room.players || []).length;
+                            const playersCount = room.memberCount || 0;
                             return (
                                 <div key={roomId} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                                     <div>
                                         <div className="text-sm font-black text-slate-900">{room.title}</div>
                                         <div className="text-xs text-slate-500">
-                                            코드 {room.room_code || room.roomCode} | {playersCount}/6명 | 라운드 {room.round_count || room.roundCount}
+                                            코드 {room.roomCode} | {playersCount}/{room.maxPlayers}명 | 라운드 {room.roundCount}
                                         </div>
                                     </div>
                                     <button className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50" disabled={loading} onClick={() => joinRoom(roomId)}>
@@ -817,7 +835,7 @@ export const LasVegasGame = () => {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <div className="text-lg font-black text-slate-900">{selectedRoom.title}</div>
-                                <div className="text-xs text-slate-500">방 코드 {selectedRoom.room_code || selectedRoom.roomCode}</div>
+                                <div className="text-xs text-slate-500">방 코드 {selectedRoom.roomCode}</div>
                                 {isHost && roomStatus === "PLAYING" && (
                                     <button
                                         className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700 disabled:opacity-50"
@@ -856,22 +874,22 @@ export const LasVegasGame = () => {
                             </div>
                             <div className="rounded-xl bg-slate-50 px-3 py-2">
                                 <div className="font-black text-slate-700">방코드</div>
-                                <div className="text-slate-500">{selectedRoom.room_code || selectedRoom.roomCode}</div>
+                                <div className="text-slate-500">{selectedRoom.roomCode}</div>
                             </div>
                             <div className="rounded-xl bg-slate-50 px-3 py-2">
                                 <div className="font-black text-slate-700">라운드 수</div>
-                                <div className="text-slate-500">{toPlainInt(selectedRoom.round_count || selectedRoom.roundCount, 0)} 라운드</div>
+                                <div className="text-slate-500">{toPlainInt(selectedRoom.roundCount, 0)} 라운드</div>
                             </div>
                             <div className="rounded-xl bg-slate-50 px-3 py-2">
                                 <div className="font-black text-slate-700">턴 시간</div>
-                                <div className="text-slate-500">{toPlainInt(selectedRoom.turn_time_seconds || selectedRoom.turnTimeSeconds, 0)}초</div>
+                                <div className="text-slate-500">{toPlainInt(selectedRoom.turnTimeSeconds, 0)}초</div>
                             </div>
                         </div>
 
                         {isHost && roomStatus === "WAITING" && (
                             <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
-                                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.round_count} onChange={(e) => setSettingsForm((prev) => ({ ...prev, round_count: normalizeNumericText(e.target.value, 1, 10) }))} />
-                                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turn_time_seconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turn_time_seconds: normalizeNumericText(e.target.value, 5, 180) }))} />
+                                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.roundCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, roundCount: normalizeNumericText(e.target.value, 1, 10) }))} />
+                                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumericText(e.target.value, 5, 180) }))} />
                                 <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white md:col-span-2" onClick={updateSettings}>방 설정 저장</button>
                             </div>
                         )}
@@ -885,9 +903,9 @@ export const LasVegasGame = () => {
                                     : "border-white/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800"
                             }`}>
                                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-black text-emerald-50">
-                                    <span className="rounded-full bg-white/20 px-2.5 py-1">라운드 {state?.round_no || state?.roundNo || 0} / {state?.round_count || state?.roundCount || 0}</span>
+                                    <span className="rounded-full bg-white/20 px-2.5 py-1">라운드 {state?.roundNo || 0} / {state?.roundCount || 0}</span>
                                     <span className="rounded-full bg-white/20 px-2.5 py-1">
-                                        차례 {state?.players?.find((p) => Number(p.member_id || p.memberId) === Number(state.turn_member_id || state.turnMemberId))?.nickname || "-"}
+                                        차례 {state?.players?.find((p) => Number(p.memberId) === Number(state.turnMemberId))?.nickname || "-"}
                                     </span>
                                     {myTurn && (
                                         <span className="animate-pulse rounded-full bg-sky-100 px-2.5 py-1 text-sky-700 ring-2 ring-sky-200">
@@ -960,11 +978,11 @@ export const LasVegasGame = () => {
                                 <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-3">
                                     {(state?.casinos || []).map((casino) => (
                                         <CasinoPanel
-                                            key={casino.casino_no || casino.casinoNo}
+                                            key={casino.casinoNo}
                                             casino={casino}
                                             statePlayers={state?.players}
-                                            isHot={Number(casino.casino_no || casino.casinoNo) === Number(hotCasinoNo)}
-                                            isLastPlaced={Number(casino.casino_no || casino.casinoNo) === Number(lastPlacedCasinoNo)}
+                                            isHot={Number(casino.casinoNo) === Number(hotCasinoNo)}
+                                            isLastPlaced={Number(casino.casinoNo) === Number(lastPlacedCasinoNo)}
                                         />
                                     ))}
                                 </div>
@@ -977,8 +995,8 @@ export const LasVegasGame = () => {
                                 </div>
                                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                     {sortedPlayers.map((player) => {
-                                        const memberId = player.member_id || player.memberId;
-                                        const isCurrent = Number(memberId) === Number(state?.turn_member_id || state?.turnMemberId);
+                                        const memberId = player.memberId;
+                                        const isCurrent = Number(memberId) === Number(state?.turnMemberId);
                                         const isReady = readyMemberIds.has(Number(memberId));
                                         return (
                                             <div key={`player-${memberId}`} className={`rounded-xl border p-3 ${isCurrent ? "border-primary-400 bg-primary-50" : "border-slate-100 bg-slate-50"}`}>
@@ -992,7 +1010,7 @@ export const LasVegasGame = () => {
                                                     )}
                                                 </div>
                                                 <div className="mt-1 text-xs font-bold text-slate-600">
-                                                    보유금 {formatWon(player.total_money || player.totalMoney || 0)} | 남은 주사위 {player.remaining_dice || player.remainingDice || 8}
+                                                    보유금 {formatWon(player.totalMoney || 0)} | 남은 주사위 {player.remainingDice || 8}
                                                 </div>
                                             </div>
                                         );
@@ -1023,8 +1041,8 @@ export const LasVegasGame = () => {
                             <div ref={chatScrollRef} className="mb-3 h-[420px] space-y-2 overflow-auto rounded-2xl bg-slate-50 p-3 text-xs">
                                 {!chatMessages.length && <div className="text-slate-400">채팅 내역이 없습니다.</div>}
                                 {chatMessages.map((msg, idx) => (
-                                    <div key={`${msg.created_at || msg.createdAt || idx}-${idx}`} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                                        <div className="font-black text-slate-800">{msg.sender_name || msg.senderName || "SYSTEM"}</div>
+                                    <div key={`${msg.createdAt || idx}-${idx}`} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                                        <div className="font-black text-slate-800">{msg.senderName || "SYSTEM"}</div>
                                         <div className="mt-0.5 text-slate-700">{msg.message || ""}</div>
                                     </div>
                                 ))}

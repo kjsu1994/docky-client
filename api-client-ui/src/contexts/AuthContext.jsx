@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../utils/api";
 import toast from "react-hot-toast";
+import { authAdapter, extractAuthErrorMessage, isAccountLockedError } from "../adapters/authAdapter.js";
+import { queueAdapter } from "../adapters/queueAdapter.js";
 
 const AuthContext = createContext(null);
 
@@ -43,8 +44,7 @@ export const AuthProvider = ({ children }) => {
             const token = localStorage.getItem("accessToken");
             if (token) {
                 try {
-                    const response = await api.get("/members");
-                    const data = response.data.data || response.data;
+                    const data = await authAdapter.fetchCurrentMember();
                     setUser(withRolesFallback(data, parseStoredRoles()));
                 } catch (error) {
                     console.error("Failed to fetch user:", error);
@@ -59,49 +59,47 @@ export const AuthProvider = ({ children }) => {
         initAuth();
     }, []);
 
+    const routeAfterQueue = useCallback(async ({ replace = false } = {}) => {
+        try {
+            const queueData = await queueAdapter.join();
+            if (queueData.status === "WAITING" || queueData.status === "BLOCKED") {
+                navigate("/queue", { replace: true });
+                return;
+            }
+        } catch (err) {
+            console.error("Queue join failed, proceeding anyway:", err);
+        }
+
+        navigate("/app", { replace });
+    }, [navigate]);
+
     const login = async (email, password) => {
         try {
-            const response = await api.post("/members/login", { email, password });
-            const loginBody = response.data?.data || response.data;
-            const loginRoles = Array.isArray(loginBody?.roles) ? loginBody.roles : null;
-
-            const authHeader = response.headers?.authorization || response.headers?.Authorization;
-            const refreshHeader = response.headers?.refresh || response.headers?.Refresh;
-
-            const accessToken = authHeader?.replace(/^Bearer\s+/i, "");
-            const refreshToken = refreshHeader?.replace(/^Bearer\s+/i, "");
+            const { accessToken, refreshToken, roles: loginRoles } = await authAdapter.loginWithPassword({ email, password });
 
             if (!accessToken) throw new Error("로그인 토큰을 찾을 수 없습니다.");
 
             localStorage.setItem("accessToken", accessToken);
-            localStorage.setItem("refreshToken", refreshToken);
+            if (refreshToken) {
+                localStorage.setItem("refreshToken", refreshToken);
+            } else {
+                localStorage.removeItem("refreshToken");
+            }
             if (loginRoles) {
                 localStorage.setItem("userRoles", JSON.stringify(loginRoles));
             }
 
-            const userResponse = await api.get("/members");
-            const userData = userResponse.data.data || userResponse.data;
+            const userData = await authAdapter.fetchCurrentMember();
             setUser(withRolesFallback(userData, loginRoles || parseStoredRoles()));
 
             toast.success("로그인 성공!");
 
-            try {
-                const queueResponse = await api.post("/api/queue/join");
-                const queueData = queueResponse.data?.data || queueResponse.data;
-                if (queueData.status === "WAITING") {
-                    navigate("/queue", { replace: true });
-                    return;
-                }
-            } catch (err) {
-                console.error("Queue join failed, proceeding anyway:", err);
-            }
-
-            navigate("/app");
+            await routeAfterQueue();
         } catch (error) {
-            if (error?.response?.data?.code === "ACCOUNT_LOCKED") {
+            if (isAccountLockedError(error)) {
                 throw error;
             }
-            toast.error(error.response?.data?.message || "로그인 실패");
+            toast.error(extractAuthErrorMessage(error, "로그인 실패"));
             throw error;
         }
     };
@@ -116,8 +114,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem("refreshToken", refreshToken);
         }
 
-        const userResponse = await api.get("/members");
-        const userData = userResponse.data.data || userResponse.data;
+        const userData = await authAdapter.fetchCurrentMember();
         setUser(withRolesFallback(userData, parseStoredRoles()));
 
         const postOauthRedirect = localStorage.getItem("postOauthRedirect");
@@ -127,19 +124,8 @@ export const AuthProvider = ({ children }) => {
             return;
         }
 
-        try {
-            const queueResponse = await api.post("/api/queue/join");
-            const queueData = queueResponse.data?.data || queueResponse.data;
-            if (queueData.status === "WAITING") {
-                navigate("/queue", { replace: true });
-                return;
-            }
-        } catch (err) {
-            console.error("Queue join failed, proceeding anyway:", err);
-        }
-
-        navigate("/app", { replace: true });
-    }, [navigate]);
+        await routeAfterQueue({ replace: true });
+    }, [navigate, routeAfterQueue]);
 
     const logout = async (options = {}) => {
         if (options && typeof options.preventDefault === "function") {
@@ -149,7 +135,7 @@ export const AuthProvider = ({ children }) => {
 
         if (!skipApi) {
             try {
-                await api.post("/members/logout");
+                await authAdapter.logout();
             } catch (error) {
                 console.error("Failed to logout from server:", error);
             }
@@ -168,11 +154,11 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (userData) => {
         try {
-            await api.post("/members", userData);
+            await authAdapter.registerMember(userData);
             toast.success("회원가입 성공! 로그인해주세요.");
             navigate("/login");
         } catch (error) {
-            toast.error(error.response?.data?.message || "회원가입 실패");
+            toast.error(extractAuthErrorMessage(error, "회원가입 실패"));
             throw error;
         }
     };

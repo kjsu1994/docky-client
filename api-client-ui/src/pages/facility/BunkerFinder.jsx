@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DatabaseZap, LocateFixed, RefreshCw, Search, Shield, Users, X } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "../../utils/api.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
+import { extractFacilityErrorMessage, facilityAdapter } from "../../adapters/facilityAdapter.js";
 
 const INITIAL_CENTER = { latitude: 37.5665, longitude: 126.9780 };
-const ACTIVE_STATUS = "\uC0AC\uC6A9\uC911";
+const ACTIVE_STATUS = "사용중";
 const toNumber = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const getId = (item) => item?.bunker_lot_id ?? item?.bunkerLotId ?? item?.management_no ?? item?.managementNo;
 
@@ -158,7 +158,7 @@ export const BunkerFinder = () => {
         recentPickRef.current = { ts: now, latitude: point.latitude, longitude: point.longitude };
         setPickedCenterMarker(point.latitude, point.longitude);
         setCenter(point);
-        toast.success(`${modeLabel} \uC704\uCE58\uB97C \uAE30\uC900\uC810\uC73C\uB85C \uC124\uC815\uD588\uC2B5\uB2C8\uB2E4.`);
+        toast.success(`${modeLabel} 위치를 기준점으로 설정했습니다.`);
     }, [normalizeCoord, setPickedCenterMarker]);
 
     const pickCenterByClientPoint = useCallback((clientX, clientY, modeLabel) => {
@@ -195,21 +195,18 @@ export const BunkerFinder = () => {
     const fetchLots = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await api.get("/bunkers/lots", {
-                params: {
-                    latitude: center.latitude,
-                    longitude: center.longitude,
-                    radius_km: parseRadiusKm(),
-                    limit: parseLimit(),
-                },
+            const result = await facilityAdapter.fetchBunkerLots({
+                latitude: center.latitude,
+                longitude: center.longitude,
+                radiusKm: parseRadiusKm(),
+                limit: parseLimit(),
             });
-            const rows = response?.data?.data?.items ?? [];
-            setFetchedItems(Array.isArray(rows) ? rows : []);
+            setFetchedItems(result.items);
         } catch (err) {
             setFetchedItems([]);
             setItems([]);
             setSelectedId(null);
-            toast.error(err?.response?.data?.message || "\uB300\uD53C\uC18C \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+            toast.error(extractFacilityErrorMessage(err, "대피소 목록을 불러오지 못했습니다."));
         } finally {
             setLoading(false);
         }
@@ -231,9 +228,9 @@ export const BunkerFinder = () => {
 
     const handleLocate = () => {
         if (locatingCurrent) return;
-        if (!navigator.geolocation) return toast.error("\uBE0C\uB77C\uC6B0\uC800 \uC704\uCE58 \uAE30\uB2A5\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+        if (!navigator.geolocation) return toast.error("브라우저 위치 기능을 사용할 수 없습니다.");
         setLocatingCurrent(true);
-        const tid = toast.loading("\uD604\uC7AC \uC704\uCE58 \uD655\uC778 \uC911...");
+        const tid = toast.loading("현재 위치 확인 중...");
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 toast.dismiss(tid);
@@ -251,13 +248,13 @@ export const BunkerFinder = () => {
                     mapRef.current.setZoom(15);
                 }
                 toast.success(Number.isFinite(accuracy)
-                    ? `\uD604\uC7AC \uC704\uCE58\uB85C \uAE30\uC900\uC810\uC744 \uBCC0\uACBD\uD588\uC2B5\uB2C8\uB2E4. (\uC815\uD655\uB3C4 \u00B1${Math.round(accuracy)}m)`
-                    : "\uD604\uC7AC \uC704\uCE58\uB85C \uAE30\uC900\uC810\uC744 \uBCC0\uACBD\uD588\uC2B5\uB2C8\uB2E4.");
+                    ? `현재 위치로 기준점을 변경했습니다. (정확도 ±${Math.round(accuracy)}m)`
+                    : "현재 위치로 기준점을 변경했습니다.");
                 setLocatingCurrent(false);
             },
             () => {
                 toast.dismiss(tid);
-                toast.error("\uC704\uCE58 \uAD8C\uD55C\uC774 \uC5C6\uC5B4 \uAE30\uBCF8 \uC704\uCE58(\uC11C\uC6B8\uC2DC\uCCAD)\uB97C \uC0AC\uC6A9\uD569\uB2C8\uB2E4.");
+                toast.error("위치 권한이 없어 기본 위치(서울시청)를 사용합니다.");
                 setLocatingCurrent(false);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -274,18 +271,18 @@ export const BunkerFinder = () => {
             mapRef.current.setCenter(new window.naver.maps.LatLng(nextCenter.latitude, nextCenter.longitude));
             mapRef.current.setZoom(14);
         }
-        toast.success(`"${address}" \uAE30\uC900 \uC704\uCE58\uB85C \uC774\uB3D9\uD588\uC2B5\uB2C8\uB2E4.`);
+        toast.success(`"${address}" 기준 위치로 이동했습니다.`);
     };
 
     const handleImport = async () => {
         setImporting(true);
         try {
-            const response = await api.post("/admin/bunker/import", null, { params: { csvPath: csvPath?.trim() || undefined } });
-            const count = response?.data?.data?.imported_count ?? response?.data?.data?.importedCount ?? 0;
-            toast.success(`CSV \uC7AC\uC801\uC7AC \uC644\uB8CC (${count}\uAC74)`);
+            const data = await facilityAdapter.importBunkerLots(csvPath);
+            const count = data.importedCount;
+            toast.success(`CSV 재적재 완료 (${count}건)`);
             await fetchLots();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "CSV \uC7AC\uC801\uC7AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+            toast.error(extractFacilityErrorMessage(err, "CSV 재적재에 실패했습니다."));
         } finally {
             setImporting(false);
         }
@@ -339,7 +336,7 @@ export const BunkerFinder = () => {
             const marker = new window.naver.maps.Marker({
                 position,
                 map: mapRef.current,
-                title: item?.facility_name ?? item?.facilityName ?? "\uB300\uD53C\uC18C",
+                title: item?.facility_name ?? item?.facilityName ?? "대피소",
                 icon: {
                     content: '<div style="width:14px;height:14px;border-radius:9999px;background:#0f766e;border:2px solid #fff;box-shadow:0 2px 8px rgba(15,118,110,0.45)"></div>',
                     anchor: new window.naver.maps.Point(7, 7),
@@ -348,9 +345,9 @@ export const BunkerFinder = () => {
             const infoWindow = new window.naver.maps.InfoWindow({
                 content: `
                     <button type="button" onclick="window.__bunkerFinderOpenLotDetail && window.__bunkerFinderOpenLotDetail('${safeId}')" ontouchend="window.__bunkerFinderOpenLotDetail && window.__bunkerFinderOpenLotDetail('${safeId}')" style="padding:10px;min-width:210px;border:0;background:#fff;text-align:left;cursor:pointer;font-family:Arial,sans-serif;">
-                      <div style="font-weight:800;font-size:13px;color:#0f172a;">${item?.facility_name ?? item?.facilityName ?? "\uB300\uD53C\uC18C"}</div>
-                      <div style="font-size:11px;color:#64748b;margin-top:4px;">${item?.road_address ?? item?.roadAddress ?? item?.full_address ?? item?.fullAddress ?? "\uC8FC\uC18C \uC5C6\uC74C"}</div>
-                      <div style="font-size:10px;color:#0f766e;margin-top:6px;font-weight:700;">\uD130\uCE58\uD574\uC11C \uC0C1\uC138 \uBCF4\uAE30</div>
+                      <div style="font-weight:800;font-size:13px;color:#0f172a;">${item?.facility_name ?? item?.facilityName ?? "대피소"}</div>
+                      <div style="font-size:11px;color:#64748b;margin-top:4px;">${item?.road_address ?? item?.roadAddress ?? item?.full_address ?? item?.fullAddress ?? "주소 없음"}</div>
+                      <div style="font-size:10px;color:#0f766e;margin-top:6px;font-weight:700;">터치해서 상세 보기</div>
                     </button>
                 `,
             });
@@ -385,7 +382,7 @@ export const BunkerFinder = () => {
         setPickedCenterMarker(center.latitude, center.longitude);
 
         const rightClickListener = window.naver.maps.Event.addListener(mapRef.current, "rightclick", (event) => {
-            applyPickedCenter(event?.coord || event?.overlay?.position, "\uC6B0\uD074\uB9AD");
+            applyPickedCenter(event?.coord || event?.overlay?.position, "우클릭");
         });
         interactionListenersRef.current.push(rightClickListener);
 
@@ -405,7 +402,7 @@ export const BunkerFinder = () => {
             longPressStateRef.current.moved = false;
             longPressStateRef.current.timerId = setTimeout(() => {
                 if (!longPressStateRef.current.moved) {
-                    pickCenterByClientPoint(touch.clientX, touch.clientY, "\uB871\uD504\uB808\uC2A4");
+                    pickCenterByClientPoint(touch.clientX, touch.clientY, "롱프레스");
                 }
                 clearTimer();
             }, 650);
@@ -513,8 +510,8 @@ export const BunkerFinder = () => {
                 <div className="flex items-center gap-3">
                     <div className="rounded-2xl bg-teal-50 p-3 text-teal-700"><Shield className="h-6 w-6" /></div>
                     <div>
-                        <h1 className="text-xl font-black text-slate-900">{"\uB300\uD53C\uC18C \uCC3E\uAE30"}</h1>
-                        <p className="text-sm text-slate-500">{"\uC778\uADFC \uB300\uD53C\uC18C\uB97C \uC870\uD68C\uD569\uB2C8\uB2E4."}</p>
+                        <h1 className="text-xl font-black text-slate-900">{"대피소 찾기"}</h1>
+                        <p className="text-sm text-slate-500">{"인근 대피소를 조회합니다."}</p>
                     </div>
                 </div>
             </div>
@@ -524,46 +521,46 @@ export const BunkerFinder = () => {
                     <div className="space-y-3 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
                         <AddressSearchBox
                             onResolved={handleAddressResolved}
-                            placeholder={"\uC608: \uC11C\uC6B8\uC2DC\uCCAD, \uAC15\uB0A8\uC5ED, \uD310\uAD50\uC5ED"}
-                            primaryButtonLabel={"\uC8FC\uC18C\uCC3E\uAE30"}
-                            secondaryButtonLabel={"\uC870\uD68C"}
+                            placeholder={"예: 서울시청, 강남역, 판교역"}
+                            primaryButtonLabel={"주소찾기"}
+                            secondaryButtonLabel={"조회"}
                             primaryAction="postcode"
                             secondaryAction="resolve"
                         />
                         <div className="grid grid-cols-2 gap-2">
-                            <button onClick={handleLocate} disabled={locatingCurrent} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-black text-slate-700 disabled:opacity-60"><LocateFixed className="h-3.5 w-3.5" />{"\uB0B4 \uC704\uCE58"}</button>
-                            <button onClick={fetchLots} disabled={loading} className="flex items-center justify-center gap-1 rounded-xl bg-primary-600 px-3 py-2.5 text-xs font-black text-white disabled:opacity-60">{loading ? <LoadingSpinner size="sm" text="" /> : <Search className="h-3.5 w-3.5" />}{"\uAC80\uC0C9"}</button>
+                            <button onClick={handleLocate} disabled={locatingCurrent} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-black text-slate-700 disabled:opacity-60"><LocateFixed className="h-3.5 w-3.5" />{"내 위치"}</button>
+                            <button onClick={fetchLots} disabled={loading} className="flex items-center justify-center gap-1 rounded-xl bg-primary-600 px-3 py-2.5 text-xs font-black text-white disabled:opacity-60">{loading ? <LoadingSpinner size="sm" text="" /> : <Search className="h-3.5 w-3.5" />}{"검색"}</button>
                         </div>
-                        <input value={keyword} onChange={(e) => setKeyword(e.target.value)} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" placeholder={"\uD0A4\uC6CC\uB4DC(\uC2DC\uC124\uBA85/\uC8FC\uC18C)"} />
+                        <input value={keyword} onChange={(e) => setKeyword(e.target.value)} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" placeholder={"키워드(시설명/주소)"} />
                         <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-slate-400">{"\uBC18\uACBD(km)"}</label>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-400">{"반경(km)"}</label>
                                 <input type="text" inputMode="decimal" value={radiusKmInput} onChange={handleRadiusInputChange} onBlur={() => setRadiusKmInput(String(parseRadiusKm()))} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
                             </div>
                             <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-slate-400">{"\uCD5C\uB300\uAC1C\uC218"}</label>
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-400">{"최대개수"}</label>
                                 <input type="text" inputMode="numeric" value={limitInput} onChange={handleLimitInputChange} onBlur={() => setLimitInput(String(parseLimit()))} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
                             </div>
                         </div>
                         <div>
-                            <label className="block text-xs font-black uppercase tracking-wider text-slate-400">{"\uC6B4\uC601\uC0C1\uD0DC"}</label>
+                            <label className="block text-xs font-black uppercase tracking-wider text-slate-400">{"운영상태"}</label>
                             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
-                                {statusOptions.map((value) => <option key={value} value={value}>{value === "all" ? "\uC804\uCCB4" : value}</option>)}
+                                {statusOptions.map((value) => <option key={value} value={value}>{value === "all" ? "전체" : value}</option>)}
                             </select>
                         </div>
                     </div>
 
                     <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-                        <div className="text-xs font-black uppercase tracking-wider text-slate-400">{"\uAC80\uC0C9 \uC694\uC57D"}</div>
-                        <div className="mt-2 text-sm font-bold text-slate-800">{`\uCD1D ${items.length}\uAC74 / \uC218\uC6A9 \uC778\uC6D0 ${summary.totalCapacity.toLocaleString("ko-KR")}\uBA85 / \uC0AC\uC6A9\uC911 ${summary.activeCount}\uAC74`}</div>
-                        <div className="mt-3 text-xs font-semibold text-slate-500">{`\uAE30\uC900 \uC88C\uD45C: ${center.latitude}, ${center.longitude}`}</div>
+                        <div className="text-xs font-black uppercase tracking-wider text-slate-400">{"검색 요약"}</div>
+                        <div className="mt-2 text-sm font-bold text-slate-800">{`총 ${items.length}건 / 수용 인원 ${summary.totalCapacity.toLocaleString("ko-KR")}명 / 사용중 ${summary.activeCount}건`}</div>
+                        <div className="mt-3 text-xs font-semibold text-slate-500">{`기준 좌표: ${center.latitude}, ${center.longitude}`}</div>
                     </div>
 
                     {adminMode && (
                         <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
-                            <div className="mb-3 flex items-center gap-2 text-amber-800"><DatabaseZap className="h-4 w-4" /><span className="text-sm font-black">{"\uAD00\uB9AC\uC790 CSV \uC7AC\uC801\uC7AC"}</span></div>
-                            <input value={csvPath} onChange={(e) => setCsvPath(e.target.value)} className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" placeholder={"\u0043\u0053\u0056 \uACBD\uB85C"} />
-                            <button onClick={handleImport} disabled={importing} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 py-2.5 text-xs font-black text-white disabled:opacity-60">{importing ? <LoadingSpinner size="sm" text="" /> : <RefreshCw className="h-3.5 w-3.5" />}{"CSV \uB2E4\uC2DC \uC801\uC7AC"}</button>
+                            <div className="mb-3 flex items-center gap-2 text-amber-800"><DatabaseZap className="h-4 w-4" /><span className="text-sm font-black">{"관리자 CSV 재적재"}</span></div>
+                            <input value={csvPath} onChange={(e) => setCsvPath(e.target.value)} className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" placeholder={"CSV 경로"} />
+                            <button onClick={handleImport} disabled={importing} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 py-2.5 text-xs font-black text-white disabled:opacity-60">{importing ? <LoadingSpinner size="sm" text="" /> : <RefreshCw className="h-3.5 w-3.5" />}{"CSV 다시 적재"}</button>
                         </div>
                     )}
                 </div>
@@ -571,24 +568,24 @@ export const BunkerFinder = () => {
                 <div className="space-y-4 lg:col-span-8">
                     <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
                         <div className="mb-3 flex items-center justify-between">
-                            <h2 className="text-lg font-black text-slate-900">{"\uB124\uC774\uBC84 \uC9C0\uB3C4"}</h2>
+                            <h2 className="text-lg font-black text-slate-900">{"네이버 지도"}</h2>
                             <div className="flex items-center gap-2">
-                                <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700">{`\uACB0\uACFC ${items.length}\uAC74`}</span>
-                                <button type="button" onClick={fetchLots} disabled={loading} className="flex items-center gap-1 rounded-xl bg-primary-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-60">{loading ? <LoadingSpinner size="sm" text="" /> : <RefreshCw className="h-3.5 w-3.5" />}{"\uAC80\uC0C9\uD558\uAE30"}</button>
+                                <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700">{`결과 ${items.length}건`}</span>
+                                <button type="button" onClick={fetchLots} disabled={loading} className="flex items-center gap-1 rounded-xl bg-primary-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-60">{loading ? <LoadingSpinner size="sm" text="" /> : <RefreshCw className="h-3.5 w-3.5" />}{"검색하기"}</button>
                             </div>
                         </div>
-                        <div className="mb-3 text-xs font-semibold text-slate-500">{"PC\uB294 \uC6B0\uD074\uB9AD, \uBAA8\uBC14\uC77C\uC740 \uAE38\uAC8C \uB20C\uB7EC \uAE30\uC900 \uC704\uCE58\uB97C \uC9C1\uC811 \uC120\uD0DD\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."}</div>
+                        <div className="mb-3 text-xs font-semibold text-slate-500">{"PC는 우클릭, 모바일은 길게 눌러 기준 위치를 직접 선택할 수 있습니다."}</div>
                         <div className="relative h-[360px] overflow-hidden rounded-2xl bg-slate-100">
                             <div ref={mapContainerRef} className="h-full w-full" onContextMenu={(event) => event.preventDefault()} />
-                            {!mapLoaded && !mapError && <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 text-white"><LoadingSpinner text={"\uC9C0\uB3C4\uB97C \uC900\uBE44\uD558\uB294 \uC911..."} /></div>}
-                            {mapError && <div className="absolute inset-0 flex items-center justify-center bg-slate-900/70 text-sm font-bold text-white">{"\uC9C0\uB3C4 SDK \uB85C\uB4DC \uC2E4\uD328"}</div>}
+                            {!mapLoaded && !mapError && <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 text-white"><LoadingSpinner text={"지도를 준비하는 중..."} /></div>}
+                            {mapError && <div className="absolute inset-0 flex items-center justify-center bg-slate-900/70 text-sm font-bold text-white">{"지도 SDK 로드 실패"}</div>}
                         </div>
                     </div>
 
                     {selectedItem && (
                         <div className="hidden rounded-3xl border border-teal-100 bg-gradient-to-br from-teal-50/50 to-white p-5 shadow-sm lg:block">
                             <div className="mb-3 flex items-center justify-between">
-                                <h2 className="text-lg font-black text-slate-900">{"\uC120\uD0DD \uB300\uD53C\uC18C \uC0C1\uC138"}</h2>
+                                <h2 className="text-lg font-black text-slate-900">{"선택 대피소 상세"}</h2>
                                 <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-teal-700">{`ID ${getId(selectedItem)}`}</span>
                             </div>
                             <div className="mb-3">
@@ -597,16 +594,16 @@ export const BunkerFinder = () => {
                             </div>
                             <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                                 <div className="rounded-xl bg-white p-3">
-                                    <div className="text-xs font-black text-slate-400">{"\uC6B4\uC601 \uC815\uBCF4"}</div>
+                                    <div className="text-xs font-black text-slate-400">{"운영 정보"}</div>
                                     <div className="mt-1 font-bold text-slate-800">{selectedItem?.operation_status ?? selectedItem?.operationStatus ?? "-"}</div>
-                                    <div className="text-slate-800">{`\uC2DC\uC124\uAD6C\uBD84: ${selectedItem?.facility_category ?? selectedItem?.facilityCategory ?? "-"}`}</div>
-                                    <div className="text-slate-800">{`\uC2DC\uC124\uC704\uCE58: ${selectedItem?.facility_location ?? selectedItem?.facilityLocation ?? "-"}`}</div>
+                                    <div className="text-slate-800">{`시설구분: ${selectedItem?.facility_category ?? selectedItem?.facilityCategory ?? "-"}`}</div>
+                                    <div className="text-slate-800">{`시설위치: ${selectedItem?.facility_location ?? selectedItem?.facilityLocation ?? "-"}`}</div>
                                 </div>
                                 <div className="rounded-xl bg-white p-3">
-                                    <div className="text-xs font-black text-slate-400">{"\uC218\uC6A9 \uC815\uBCF4"}</div>
-                                    <div className="mt-1 flex items-center gap-1 text-slate-800"><Users className="h-3.5 w-3.5" />{`\uCD5C\uB300 \uC218\uC6A9 \uC778\uC6D0 ${toNumber(selectedItem?.max_capacity ?? selectedItem?.maxCapacity).toLocaleString("ko-KR")}\uBA85`}</div>
-                                    <div className="text-slate-800">{`\uBA74\uC801: ${toNumber(selectedItem?.facility_area_square_meter ?? selectedItem?.facilityAreaSquareMeter).toLocaleString("ko-KR")}\u33A1`}</div>
-                                    <div className="text-slate-800">{`\uAC70\uB9AC: ${toNumber(selectedItem?.distance_km ?? selectedItem?.distanceKm).toFixed(2)}km`}</div>
+                                    <div className="text-xs font-black text-slate-400">{"수용 정보"}</div>
+                                    <div className="mt-1 flex items-center gap-1 text-slate-800"><Users className="h-3.5 w-3.5" />{`최대 수용 인원 ${toNumber(selectedItem?.max_capacity ?? selectedItem?.maxCapacity).toLocaleString("ko-KR")}명`}</div>
+                                    <div className="text-slate-800">{`면적: ${toNumber(selectedItem?.facility_area_square_meter ?? selectedItem?.facilityAreaSquareMeter).toLocaleString("ko-KR")}㎡`}</div>
+                                    <div className="text-slate-800">{`거리: ${toNumber(selectedItem?.distance_km ?? selectedItem?.distanceKm).toFixed(2)}km`}</div>
                                 </div>
                             </div>
                         </div>
@@ -614,9 +611,9 @@ export const BunkerFinder = () => {
 
                     <div className="space-y-3">
                         {loading ? (
-                            <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center"><LoadingSpinner text={"\uB300\uD53C\uC18C \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911..."} /></div>
+                            <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center"><LoadingSpinner text={"대피소 데이터를 불러오는 중..."} /></div>
                         ) : items.length === 0 ? (
-                            <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center text-sm font-bold text-slate-400">{"\uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."}</div>
+                            <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center text-sm font-bold text-slate-400">{"검색 결과가 없습니다."}</div>
                         ) : (
                             items.map((item) => {
                                 const id = getId(item);
@@ -629,25 +626,25 @@ export const BunkerFinder = () => {
                                             <div>
                                                 <h3 className="text-base font-black text-slate-900">{name}</h3>
                                                 <p className="mt-1 text-sm text-slate-500">{address || "-"}</p>
-                                                <p className="mt-1 text-xs font-semibold text-slate-400">{item?.facility_location ?? item?.facilityLocation ?? "\uC704\uCE58 \uC815\uBCF4 \uC5C6\uC74C"}</p>
+                                                <p className="mt-1 text-xs font-semibold text-slate-400">{item?.facility_location ?? item?.facilityLocation ?? "위치 정보 없음"}</p>
                                             </div>
                                             <div className="flex flex-wrap gap-2 text-xs font-black">
-                                                <span className="rounded-xl bg-sky-50 px-2.5 py-1 text-sky-700">{`\uAC70\uB9AC ${toNumber(item?.distance_km ?? item?.distanceKm).toFixed(2)}km`}</span>
-                                                <span className="rounded-xl bg-teal-50 px-2.5 py-1 text-teal-700">{item?.operation_status ?? item?.operationStatus ?? "\uC0C1\uD0DC\uC5C6\uC74C"}</span>
+                                                <span className="rounded-xl bg-sky-50 px-2.5 py-1 text-sky-700">{`거리 ${toNumber(item?.distance_km ?? item?.distanceKm).toFixed(2)}km`}</span>
+                                                <span className="rounded-xl bg-teal-50 px-2.5 py-1 text-teal-700">{item?.operation_status ?? item?.operationStatus ?? "상태없음"}</span>
                                             </div>
                                         </div>
                                         <div className="mt-4 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                                             <div className="rounded-xl bg-slate-50 p-3">
-                                                <div className="text-xs font-black text-slate-400">{"\uC2DC\uC124\uAD6C\uBD84"}</div>
+                                                <div className="text-xs font-black text-slate-400">{"시설구분"}</div>
                                                 <div className="mt-1 text-base font-black text-slate-800">{item?.facility_category ?? item?.facilityCategory ?? "-"}</div>
                                             </div>
                                             <div className="rounded-xl bg-slate-50 p-3">
-                                                <div className="flex items-center gap-1 text-xs font-black text-slate-400"><Users className="h-3.5 w-3.5" />{"\uC218\uC6A9 \uC778\uC6D0"}</div>
-                                                <div className="mt-1 text-base font-black text-slate-800">{`${toNumber(item?.max_capacity ?? item?.maxCapacity).toLocaleString("ko-KR")}\uBA85`}</div>
+                                                <div className="flex items-center gap-1 text-xs font-black text-slate-400"><Users className="h-3.5 w-3.5" />{"수용 인원"}</div>
+                                                <div className="mt-1 text-base font-black text-slate-800">{`${toNumber(item?.max_capacity ?? item?.maxCapacity).toLocaleString("ko-KR")}명`}</div>
                                             </div>
                                             <div className="rounded-xl bg-slate-50 p-3">
-                                                <div className="text-xs font-black text-slate-400">{"\uBA74\uC801"}</div>
-                                                <div className="mt-1 text-base font-black text-slate-800">{`${toNumber(item?.facility_area_square_meter ?? item?.facilityAreaSquareMeter).toLocaleString("ko-KR")}\u33A1`}</div>
+                                                <div className="text-xs font-black text-slate-400">{"면적"}</div>
+                                                <div className="mt-1 text-base font-black text-slate-800">{`${toNumber(item?.facility_area_square_meter ?? item?.facilityAreaSquareMeter).toLocaleString("ko-KR")}㎡`}</div>
                                             </div>
                                         </div>
                                     </button>
@@ -662,23 +659,23 @@ export const BunkerFinder = () => {
                 <div className="fixed inset-0 z-[9999] bg-slate-900/55 p-3 lg:hidden">
                     <div className="h-full w-full overflow-auto rounded-3xl bg-white p-5 shadow-2xl">
                         <div className="mb-4 flex items-center justify-between">
-                            <h2 className="text-lg font-black text-slate-900">{"\uB300\uD53C\uC18C \uC0C1\uC138"}</h2>
-                            <button type="button" className="rounded-xl bg-slate-100 p-2 text-slate-600" onClick={() => setMobileDetailOpen(false)} aria-label={"\uC0C1\uC138 \uB2EB\uAE30"}><X className="h-4 w-4" /></button>
+                            <h2 className="text-lg font-black text-slate-900">{"대피소 상세"}</h2>
+                            <button type="button" className="rounded-xl bg-slate-100 p-2 text-slate-600" onClick={() => setMobileDetailOpen(false)} aria-label={"상세 닫기"}><X className="h-4 w-4" /></button>
                         </div>
                         <div className="mb-3 text-base font-black text-slate-900">{selectedItem?.facility_name ?? selectedItem?.facilityName ?? "-"}</div>
                         <div className="mb-4 text-sm text-slate-600">{selectedItem?.road_address ?? selectedItem?.roadAddress ?? selectedItem?.full_address ?? selectedItem?.fullAddress ?? "-"}</div>
                         <div className="space-y-2 text-sm">
                             <div className="rounded-xl bg-slate-50 p-3">
-                                <div className="text-xs font-black text-slate-400">{"\uC6B4\uC601 \uC815\uBCF4"}</div>
-                                <div className="mt-1 text-slate-800">{`\uC6B4\uC601\uC0C1\uD0DC: ${selectedItem?.operation_status ?? selectedItem?.operationStatus ?? "-"}`}</div>
-                                <div className="text-slate-800">{`\uC2DC\uC124\uAD6C\uBD84: ${selectedItem?.facility_category ?? selectedItem?.facilityCategory ?? "-"}`}</div>
-                                <div className="text-slate-800">{`\uC2DC\uC124\uC704\uCE58: ${selectedItem?.facility_location ?? selectedItem?.facilityLocation ?? "-"}`}</div>
+                                <div className="text-xs font-black text-slate-400">{"운영 정보"}</div>
+                                <div className="mt-1 text-slate-800">{`운영상태: ${selectedItem?.operation_status ?? selectedItem?.operationStatus ?? "-"}`}</div>
+                                <div className="text-slate-800">{`시설구분: ${selectedItem?.facility_category ?? selectedItem?.facilityCategory ?? "-"}`}</div>
+                                <div className="text-slate-800">{`시설위치: ${selectedItem?.facility_location ?? selectedItem?.facilityLocation ?? "-"}`}</div>
                             </div>
                             <div className="rounded-xl bg-slate-50 p-3">
-                                <div className="text-xs font-black text-slate-400">{"\uC218\uC6A9 \uC815\uBCF4"}</div>
-                                <div className="mt-1 text-slate-800">{`\uCD5C\uB300 \uC218\uC6A9 \uC778\uC6D0: ${toNumber(selectedItem?.max_capacity ?? selectedItem?.maxCapacity).toLocaleString("ko-KR")}\uBA85`}</div>
-                                <div className="text-slate-800">{`\uBA74\uC801: ${toNumber(selectedItem?.facility_area_square_meter ?? selectedItem?.facilityAreaSquareMeter).toLocaleString("ko-KR")}\u33A1`}</div>
-                                <div className="text-slate-800">{`\uAC70\uB9AC: ${toNumber(selectedItem?.distance_km ?? selectedItem?.distanceKm).toFixed(2)}km`}</div>
+                                <div className="text-xs font-black text-slate-400">{"수용 정보"}</div>
+                                <div className="mt-1 text-slate-800">{`최대 수용 인원: ${toNumber(selectedItem?.max_capacity ?? selectedItem?.maxCapacity).toLocaleString("ko-KR")}명`}</div>
+                                <div className="text-slate-800">{`면적: ${toNumber(selectedItem?.facility_area_square_meter ?? selectedItem?.facilityAreaSquareMeter).toLocaleString("ko-KR")}㎡`}</div>
+                                <div className="text-slate-800">{`거리: ${toNumber(selectedItem?.distance_km ?? selectedItem?.distanceKm).toFixed(2)}km`}</div>
                             </div>
                         </div>
                     </div>

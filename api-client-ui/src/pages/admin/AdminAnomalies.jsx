@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     AlertTriangle,
     RefreshCw,
@@ -22,23 +22,15 @@ import {
     ArrowRight,
     X,
 } from "lucide-react";
-import api from "../../utils/api.js";
+import {
+    adminAnomaliesAdapter,
+    adminAnomaliesErrorMessage,
+} from "../../adapters/adminAnomaliesAdapter.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { hasRole, isAdminUser } from "../../utils/authorization.js";
 import toast from "react-hot-toast";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
-
-const unwrapData = (payload) => payload?.data?.data ?? payload?.data ?? payload ?? null;
-
-// Normalize mixed backend response shapes (data/items/content) into a stable event list.
-const toEventList = (payload) => {
-    const root = payload?.data ?? payload;
-    if (Array.isArray(root)) return root;
-    if (Array.isArray(root?.data)) return root.data;
-    if (Array.isArray(root?.items)) return root.items;
-    if (Array.isArray(root?.content)) return root.content;
-    return [];
-};
+import { promptAction } from "../../common/promptAction.jsx";
 
 const toNumber = (value) => {
     const parsed = Number(value);
@@ -127,6 +119,11 @@ const ROLE_ACCESS_LABELS = {
     MASTER: "마스터 권한",
     ADMIN: "관리자 권한",
 };
+const ROLE_LABELS = {
+    ROLE_MASTER: "마스터",
+    ROLE_ADMIN: "관리자",
+    ROLE_USER: "회원",
+};
 const MEMBER_STATUS_LABELS = {
     ACTIVE: "활성",
     DORMANT: "휴면",
@@ -134,6 +131,21 @@ const MEMBER_STATUS_LABELS = {
     BANNED: "차단",
 };
 const labelOf = (labels, value, fallback = "-") => labels?.[value] || value || fallback;
+const roleLabelOf = (role) => ROLE_LABELS[role] || "알 수 없는 권한";
+const roleListLabelOf = (roles) => {
+    if (Array.isArray(roles)) {
+        const labels = roles.map((role) => roleLabelOf(String(role || "").trim())).filter(Boolean);
+        return labels.length ? labels.join(", ") : "-";
+    }
+    const value = String(roles || "").trim();
+    if (!value) return "-";
+    if (!value.includes("ROLE_") && !value.includes(",")) return value;
+    return value
+        .split(/[,\s]+/)
+        .filter(Boolean)
+        .map((role) => roleLabelOf(role.trim()))
+        .join(", ");
+};
 
 const StatCard = ({ icon: Icon, label, value, tone = "slate" }) => {
     const toneClass = {
@@ -180,6 +192,7 @@ export const AdminAnomalies = () => {
     const [notifications, setNotifications] = useState([]);
     const [releaseRequests, setReleaseRequests] = useState({ items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 });
     const [releaseRequestLoading, setReleaseRequestLoading] = useState(false);
+    const [reportDownloading, setReportDownloading] = useState(false);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
     const [reportList, setReportList] = useState({ items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 });
     const [reportStatusFilter, setReportStatusFilter] = useState("ALL");
@@ -228,10 +241,7 @@ export const AdminAnomalies = () => {
         return ids;
     }, [sanctions]);
     const fetchIncidents = async (nextStatus = statusFilter, nextPage = page) => {
-        const response = await api.get("/admin/anomalies/incidents", {
-            params: { status: nextStatus, page: nextPage, size: 20 },
-        });
-        const payload = unwrapData(response.data) || { items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 };
+        const payload = await adminAnomaliesAdapter.fetchIncidents(nextStatus, nextPage, 20);
         setIncidentList(payload);
         setIncidentDrafts(
             (payload.items || []).reduce((acc, item) => {
@@ -246,43 +256,27 @@ export const AdminAnomalies = () => {
     };
 
     const fetchDetail = async (incidentId) => {
-        const response = await api.get(`/admin/anomalies/incidents/${incidentId}`);
-        setSelectedDetail(unwrapData(response.data));
+        setSelectedDetail(await adminAnomaliesAdapter.fetchIncidentDetail(incidentId));
     };
 
     const fetchNotifications = async () => {
-        const response = await api.get("/admin/notifications", {
-            params: { readYn: false, page: 1, size: 8 },
-        });
-        const payload = unwrapData(response.data);
+        const payload = await adminAnomaliesAdapter.fetchNotifications({ readYn: false, page: 1, size: 8 });
         setNotifications(payload?.items || []);
         setNotificationUnreadCount(payload?.unreadCount || 0);
     };
 
     const fetchReports = async (status = reportStatusFilter) => {
-        const response = await api.get("/admin/reports", {
-            params: { status, page: 1, size: 10 },
-        });
-        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-        setReportList(payload);
+        setReportList(await adminAnomaliesAdapter.fetchReports({ status, page: 1, size: 10 }));
     };
 
     const fetchSanctions = async (status = sanctionStatusFilter) => {
-        const response = await api.get("/admin/sanctions", {
-            params: { status, page: 1, size: 10 },
-        });
-        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-        setSanctions(payload);
+        setSanctions(await adminAnomaliesAdapter.fetchSanctions({ status, page: 1, size: 10 }));
     };
 
     const fetchReleaseRequests = async () => {
         setReleaseRequestLoading(true);
         try {
-            const response = await api.get("/admin/sanctions/release-requests", {
-                params: { page: 1, size: 50 },
-            });
-            const payload = unwrapData(response.data) || { items: [], page: 1, size: 50, totalElements: 0, totalPages: 0 };
-            setReleaseRequests(payload);
+            setReleaseRequests(await adminAnomaliesAdapter.fetchReleaseRequests({ page: 1, size: 50 }));
         } finally {
             setReleaseRequestLoading(false);
         }
@@ -299,113 +293,68 @@ export const AdminAnomalies = () => {
         setSanctionMemberLoading(true);
         setSanctionSearchError("");
         try {
-            const response = await api.get("/members/list", {
-                params: { keyword: trimmedKeyword, page: 0, size: 20 },
-            });
-            const payload = unwrapData(response.data);
-            const items = payload?.items || payload?.content || payload?.data || payload || [];
-            setSanctionMemberResults(Array.isArray(items) ? items : []);
+            setSanctionMemberResults(await adminAnomaliesAdapter.searchMembers({ keyword: trimmedKeyword, page: 0, size: 20 }));
         } catch (err) {
             setSanctionMemberResults([]);
-            setSanctionSearchError(err?.response?.data?.message || "회원을 검색하지 못했습니다.");
+            setSanctionSearchError(adminAnomaliesErrorMessage(err, "회원을 검색하지 못했습니다."));
         } finally {
             setSanctionMemberLoading(false);
         }
     };
 
     const fetchModerationBoards = async (hidden = moderationHiddenFilter) => {
-        const hiddenYn = hidden === "ALL" ? undefined : hidden === "HIDDEN";
-        const response = await api.get("/admin/moderation/boards", {
-            params: { hiddenYn, page: 1, size: 8 },
-        });
-        const payload = unwrapData(response.data) || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
-        setModerationBoards(payload);
+        setModerationBoards(await adminAnomaliesAdapter.fetchModerationBoards({ hidden, page: 1, size: 8 }));
     };
 
     const fetchModerationComments = async (hidden = moderationHiddenFilter) => {
-        const hiddenYn = hidden === "ALL" ? undefined : hidden === "HIDDEN";
-        const response = await api.get("/admin/moderation/comments", {
-            params: { hiddenYn, page: 1, size: 8 },
-        });
-        const payload = unwrapData(response.data) || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
-        setModerationComments(payload);
+        setModerationComments(await adminAnomaliesAdapter.fetchModerationComments({ hidden, page: 1, size: 8 }));
     };
 
     const fetchAudits = async (type = auditTypeFilter) => {
-        const response = await api.get("/admin/audits", {
-            params: { type, page: 1, size: 10 },
-        });
-        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-        setAuditItems(payload);
+        setAuditItems(await adminAnomaliesAdapter.fetchAudits({ type, page: 1, size: 10 }));
     };
 
     const fetchRoleMembers = async (keyword = roleKeyword) => {
         if (!isMaster) return;
-        const response = await api.get("/admin/roles/members", {
-            params: { keyword: keyword || undefined, page: 1, size: 10 },
-        });
-        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-        setRoleMembers(payload);
+        setRoleMembers(await adminAnomaliesAdapter.fetchRoleMembers({ keyword, page: 1, size: 10 }));
     };
 
     const fetchRoleAudits = async () => {
         if (!isMaster) return;
-        const response = await api.get("/admin/roles/audits", {
-            params: { page: 1, size: 10 },
-        });
-        const payload = unwrapData(response.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-        setRoleAudits(payload);
+        setRoleAudits(await adminAnomaliesAdapter.fetchRoleAudits({ page: 1, size: 10 }));
     };
 
     const fetchDashboard = async (nextStatus = statusFilter, nextPage = page) => {
         setLoading(true);
         setError("");
         try {
-            // 관리자 대시보드의 요약, KPI, 규칙, 사건, 이벤트를 병렬로 불러온다.
-            const roleMembersPromise = isMaster
-                ? api.get("/admin/roles/members", { params: { keyword: roleKeyword || undefined, page: 1, size: 10 } })
-                : Promise.resolve({ data: { data: { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 } } });
-            const roleAuditsPromise = isMaster
-                ? api.get("/admin/roles/audits", { params: { page: 1, size: 10 } })
-                : Promise.resolve({ data: { data: { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 } } });
+            const dashboard = await adminAnomaliesAdapter.fetchDashboard({
+                isMaster,
+                roleKeyword,
+                reportStatus: reportStatusFilter,
+                sanctionStatus: sanctionStatusFilter,
+                moderationHidden: moderationHiddenFilter,
+                auditType: auditTypeFilter,
+                incidentStatus: nextStatus,
+                incidentPage: nextPage,
+            });
 
-            const [summaryRes, eventsRes, kpiRes, rulesRes, incidentsRes, notificationsRes, reportsRes, sanctionsRes, releaseRequestsRes, moderationBoardsRes, moderationCommentsRes, auditsRes, roleMembersRes, roleAuditsRes] = await Promise.all([
-                api.get("/stats/summary"),
-                api.get("/stats/anomalies", { params: { limit: 50 } }),
-                api.get("/admin/anomalies/kpi", { params: { days: 7 } }),
-                api.get("/admin/anomalies/rules"),
-                api.get("/admin/anomalies/incidents", { params: { status: nextStatus, page: nextPage, size: 20 } }),
-                api.get("/admin/notifications", { params: { readYn: false, page: 1, size: 8 } }),
-                api.get("/admin/reports", { params: { status: reportStatusFilter, page: 1, size: 10 } }),
-                api.get("/admin/sanctions", { params: { status: sanctionStatusFilter, page: 1, size: 10 } }),
-                api.get("/admin/sanctions/release-requests", { params: { page: 1, size: 50 } }),
-                api.get("/admin/moderation/boards", {
-                    params: { hiddenYn: moderationHiddenFilter === "ALL" ? undefined : moderationHiddenFilter === "HIDDEN", page: 1, size: 8 },
-                }),
-                api.get("/admin/moderation/comments", {
-                    params: { hiddenYn: moderationHiddenFilter === "ALL" ? undefined : moderationHiddenFilter === "HIDDEN", page: 1, size: 8 },
-                }),
-                api.get("/admin/audits", { params: { type: auditTypeFilter, page: 1, size: 10 } }),
-                roleMembersPromise,
-                roleAuditsPromise,
-            ]);
-
-            const nextRules = unwrapData(rulesRes.data) || [];
-            const nextIncidents = unwrapData(incidentsRes.data) || { items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 };
-            setSummary(unwrapData(summaryRes.data));
-            setEvents(toEventList(eventsRes.data));
-            setKpi(unwrapData(kpiRes.data));
+            const nextRules = dashboard.rules || [];
+            const nextIncidents = dashboard.incidents || { items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 };
+            setSummary(dashboard.summary);
+            setEvents(dashboard.events || []);
+            setKpi(dashboard.kpi);
             setRules(nextRules);
             setIncidentList(nextIncidents);
-            const nextNotifications = unwrapData(notificationsRes.data) || { items: [], unreadCount: 0 };
-            const nextReports = unwrapData(reportsRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-            const nextSanctions = unwrapData(sanctionsRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-            const nextReleaseRequests = unwrapData(releaseRequestsRes.data) || { items: [], page: 1, size: 50, totalElements: 0, totalPages: 0 };
-            const nextModerationBoards = unwrapData(moderationBoardsRes.data) || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
-            const nextModerationComments = unwrapData(moderationCommentsRes.data) || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
-            const nextAudits = unwrapData(auditsRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-            const nextRoleMembers = unwrapData(roleMembersRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
-            const nextRoleAudits = unwrapData(roleAuditsRes.data) || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextNotifications = dashboard.notifications || { items: [], unreadCount: 0 };
+            const nextReports = dashboard.reports || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextSanctions = dashboard.sanctions || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextReleaseRequests = dashboard.releaseRequests || { items: [], page: 1, size: 50, totalElements: 0, totalPages: 0 };
+            const nextModerationBoards = dashboard.moderationBoards || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
+            const nextModerationComments = dashboard.moderationComments || { items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 };
+            const nextAudits = dashboard.audits || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextRoleMembers = dashboard.roleMembers || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextRoleAudits = dashboard.roleAudits || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
             setNotifications(nextNotifications.items || []);
             setNotificationUnreadCount(nextNotifications.unreadCount || 0);
             setReportList(nextReports);
@@ -439,7 +388,7 @@ export const AdminAnomalies = () => {
                 }, {})
             );
         } catch (err) {
-            setError(err?.response?.data?.message || "관리자 대시보드를 불러오지 못했습니다.");
+            setError(adminAnomaliesErrorMessage(err, "관리자 대시보드를 불러오지 못했습니다."));
         } finally {
             setLoading(false);
         }
@@ -482,11 +431,7 @@ export const AdminAnomalies = () => {
 
         setSavingIncidentId(incidentId);
         try {
-            await api.patch(`/admin/anomalies/incidents/${incidentId}`, {
-                incident_status: draft.incidentStatus,
-                assignee: draft.assignee,
-                note: draft.note,
-            });
+            await adminAnomaliesAdapter.updateIncident(incidentId, draft);
             await fetchIncidents(statusFilter, page);
             if (selectedDetail?.incident?.incidentId === incidentId) {
                 await fetchDetail(incidentId);
@@ -498,17 +443,30 @@ export const AdminAnomalies = () => {
     };
 
     const applyAction = async (incidentId, actionType) => {
-        const description = window.prompt("조치 설명을 입력하세요.", "");
+        const description = await promptAction({
+            title: "조치 설명",
+            label: "설명",
+            placeholder: "조치 내용을 입력하세요",
+            maxLength: 500,
+        });
         if (description === null) return;
 
-        const payload = { action_type: actionType, description };
+        const payload = { actionType, description };
         if (actionType === "BLOCK_QUEUE_USER") {
-            const blockMinutesInput = window.prompt("차단 시간(분, 1-1440)", "30");
+            const blockMinutesInput = await promptAction({
+                title: "큐 차단 시간",
+                label: "차단 시간(분)",
+                initialValue: "30",
+                placeholder: "1-1440",
+                inputMode: "numeric",
+                required: true,
+                maxLength: 4,
+            });
             if (blockMinutesInput === null) return;
-            payload.block_minutes = Math.max(1, Math.min(1440, Number(blockMinutesInput) || 30));
+            payload.blockMinutes = Math.max(1, Math.min(1440, Number(blockMinutesInput) || 30));
         }
 
-        await api.post(`/admin/anomalies/incidents/${incidentId}/actions`, payload);
+        await adminAnomaliesAdapter.applyIncidentAction(incidentId, payload);
         await fetchIncidents(statusFilter, page);
         await fetchDetail(incidentId);
         await fetchDashboard(statusFilter, page);
@@ -520,7 +478,7 @@ export const AdminAnomalies = () => {
             toast.error("알림 ID가 올바르지 않습니다.");
             return;
         }
-        await api.patch(`/admin/notifications/${normalizedId}/read`, { read_yn: true });
+        await adminAnomaliesAdapter.markNotificationRead(normalizedId);
         setNotifications((prev) =>
             (prev || []).filter((item) => Number(item?.notificationId ?? item?.notification_id) !== normalizedId)
         );
@@ -533,14 +491,20 @@ export const AdminAnomalies = () => {
     };
 
     const markAllNotificationsRead = async () => {
-        await api.post("/admin/notifications/read-all");
+        await adminAnomaliesAdapter.markAllNotificationsRead();
         await fetchNotifications();
         await fetchReleaseRequests();
     };
 
     const updateReportStatus = async (reportId, reportStatus) => {
-        const adminNote = window.prompt("관리자 메모를 입력하세요.", "") || "";
-        await api.patch(`/admin/reports/${reportId}`, { report_status: reportStatus, admin_note: adminNote });
+        const adminNote = await promptAction({
+            title: "신고 처리 메모",
+            label: "관리자 메모",
+            placeholder: "처리 내용을 입력하세요",
+            maxLength: 2000,
+        });
+        if (adminNote === null) return;
+        await adminAnomaliesAdapter.updateReportStatus(reportId, { reportStatus, adminNote });
         await fetchReports(reportStatusFilter);
         await fetchNotifications();
     };
@@ -566,11 +530,7 @@ export const AdminAnomalies = () => {
         const toastId = toast.loading("제재를 등록하는 중입니다...");
         setCreatingSanction(true);
         try {
-            await api.post("/admin/sanctions", {
-                member_id: selectedMemberId,
-                reason,
-                days: Number.isFinite(days) && days > 0 ? days : undefined,
-            });
+            await adminAnomaliesAdapter.createSanction({ memberId: selectedMemberId, reason, days });
             toast.success("제재를 등록했습니다.", { id: toastId });
             setSanctionReasonInput("");
             setSanctionDaysInput("");
@@ -581,7 +541,7 @@ export const AdminAnomalies = () => {
             await fetchNotifications();
             await fetchAudits(auditTypeFilter);
         } catch (err) {
-            toast.error(err?.response?.data?.message || "제재 등록에 실패했습니다.", { id: toastId });
+            toast.error(adminAnomaliesErrorMessage(err, "제재 등록에 실패했습니다."), { id: toastId });
         } finally {
             setCreatingSanction(false);
         }
@@ -600,10 +560,10 @@ export const AdminAnomalies = () => {
         const toastId = toast.loading("제재를 해제하는 중입니다...");
         setReleasingSanctionId(sanctionId);
         try {
-            await api.patch(`/admin/sanctions/${sanctionId}/release`, { reason });
+            await adminAnomaliesAdapter.releaseSanction(sanctionId, { reason });
             const notificationId = Number(options.notificationId);
             if (Number.isFinite(notificationId) && notificationId > 0) {
-                await api.patch(`/admin/notifications/${notificationId}/read`, { read_yn: true });
+                await adminAnomaliesAdapter.markNotificationRead(notificationId);
             }
             toast.success("제재를 해제했습니다.", { id: toastId });
             await fetchSanctions(sanctionStatusFilter);
@@ -612,7 +572,7 @@ export const AdminAnomalies = () => {
             await fetchAudits(auditTypeFilter);
             return true;
         } catch (err) {
-            toast.error(err?.response?.data?.message || "제재 해제에 실패했습니다.", { id: toastId });
+            toast.error(adminAnomaliesErrorMessage(err, "제재 해제에 실패했습니다."), { id: toastId });
             return false;
         } finally {
             setReleasingSanctionId(null);
@@ -655,14 +615,20 @@ export const AdminAnomalies = () => {
             return;
         }
 
-        const reason = window.prompt(normalizedHiddenYn ? "숨김 사유를 입력하세요." : "복구 사유를 입력하세요.", "") || "";
+        const reason = await promptAction({
+            title: normalizedHiddenYn ? "게시글 숨김 사유" : "게시글 복구 사유",
+            label: "사유",
+            placeholder: normalizedHiddenYn ? "숨김 사유를 입력하세요" : "복구 사유를 입력하세요",
+            maxLength: 500,
+        });
+        if (reason === null) return;
         try {
-            await api.patch(`/admin/moderation/boards/${normalizedBoardId}`, { hidden_yn: normalizedHiddenYn, reason });
+            await adminAnomaliesAdapter.updateBoardHidden(normalizedBoardId, { hiddenYn: normalizedHiddenYn, reason });
             toast.success(normalizedHiddenYn ? "게시글을 숨김 처리했습니다." : "게시글을 복구했습니다.");
             await fetchModerationBoards(moderationHiddenFilter);
             await fetchAudits(auditTypeFilter);
         } catch (err) {
-            toast.error(err?.response?.data?.message || "게시글 표시 상태 변경에 실패했습니다.");
+            toast.error(adminAnomaliesErrorMessage(err, "게시글 표시 상태 변경에 실패했습니다."));
         }
     };
 
@@ -678,14 +644,20 @@ export const AdminAnomalies = () => {
             return;
         }
 
-        const reason = window.prompt(normalizedHiddenYn ? "숨김 사유를 입력하세요." : "복구 사유를 입력하세요.", "") || "";
+        const reason = await promptAction({
+            title: normalizedHiddenYn ? "댓글 숨김 사유" : "댓글 복구 사유",
+            label: "사유",
+            placeholder: normalizedHiddenYn ? "숨김 사유를 입력하세요" : "복구 사유를 입력하세요",
+            maxLength: 500,
+        });
+        if (reason === null) return;
         try {
-            await api.patch(`/admin/moderation/comments/${normalizedCommentId}`, { hidden_yn: normalizedHiddenYn, reason });
+            await adminAnomaliesAdapter.updateCommentHidden(normalizedCommentId, { hiddenYn: normalizedHiddenYn, reason });
             toast.success(normalizedHiddenYn ? "댓글을 숨김 처리했습니다." : "댓글을 복구했습니다.");
             await fetchModerationComments(moderationHiddenFilter);
             await fetchAudits(auditTypeFilter);
         } catch (err) {
-            toast.error(err?.response?.data?.message || "댓글 표시 상태 변경에 실패했습니다.");
+            toast.error(adminAnomaliesErrorMessage(err, "댓글 표시 상태 변경에 실패했습니다."));
         }
     };
 
@@ -722,23 +694,22 @@ export const AdminAnomalies = () => {
             ? currentRoles.filter((role) => role !== "ROLE_ADMIN")
             : Array.from(new Set([...currentRoles, "ROLE_ADMIN"]));
 
-        const reason = window.prompt(
-            hasAdmin ? "관리자 권한 해제 사유를 입력하세요." : "관리자 권한 부여 사유를 입력하세요.",
-            ""
-        );
+        const reason = await promptAction({
+            title: hasAdmin ? "관리자 권한 해제 사유" : "관리자 권한 부여 사유",
+            label: "사유",
+            placeholder: hasAdmin ? "권한 해제 사유를 입력하세요" : "권한 부여 사유를 입력하세요",
+            maxLength: 300,
+        });
         if (reason === null) return;
 
         try {
-            await api.patch(`/admin/roles/members/${memberId}`, {
-                roles: nextRoles,
-                reason,
-            });
+            await adminAnomaliesAdapter.updateMemberAdminRole(memberId, { roles: nextRoles, reason });
             await fetchRoleMembers(roleKeyword);
             await fetchRoleAudits();
             await fetchNotifications();
             toast.success(hasAdmin ? "관리자 권한을 해제했습니다." : "관리자 권한을 부여했습니다.");
         } catch (err) {
-            const message = err?.response?.data?.message || "관리자 권한 변경에 실패했습니다.";
+            const message = adminAnomaliesErrorMessage(err, "관리자 권한 변경에 실패했습니다.");
             toast.error(message);
             console.error("Failed to update member admin role:", err);
         }
@@ -748,14 +719,13 @@ export const AdminAnomalies = () => {
         try {
             await fetchRoleMembers(roleKeyword);
         } catch (err) {
-            toast.error(err?.response?.data?.message || "회원을 검색하지 못했습니다.");
+            toast.error(adminAnomaliesErrorMessage(err, "회원을 검색하지 못했습니다."));
             console.error("Failed to search role members:", err);
         }
     };
 
     const refreshRules = async () => {
-        const rulesRes = await api.get("/admin/anomalies/rules");
-        const nextRules = unwrapData(rulesRes.data) || [];
+        const nextRules = await adminAnomaliesAdapter.fetchRules();
         setRules(nextRules);
         setRuleDrafts(
             nextRules.reduce((acc, rule) => {
@@ -773,12 +743,7 @@ export const AdminAnomalies = () => {
         const draft = ruleDrafts[metric];
         if (!draft) return;
 
-        await api.put("/admin/anomalies/rules", {
-            metric,
-            hard_limit_per_minute: Number(draft.hardLimitPerMinute) || 1,
-            z_score_threshold: Number(draft.zScoreThreshold) || 1,
-            enabled: Boolean(draft.enabled),
-        });
+        await adminAnomaliesAdapter.saveRule(metric, draft);
 
         await refreshRules();
     };
@@ -789,10 +754,10 @@ export const AdminAnomalies = () => {
             return;
         }
 
-        await api.put("/admin/anomalies/rules", {
+        await adminAnomaliesAdapter.createRule({
             metric: newRule.metric.trim(),
-            hard_limit_per_minute: Number(newRule.hardLimitPerMinute) || 1,
-            z_score_threshold: Number(newRule.zScoreThreshold) || 1,
+            hardLimitPerMinute: Number(newRule.hardLimitPerMinute) || 1,
+            zScoreThreshold: Number(newRule.zScoreThreshold) || 1,
             enabled: Boolean(newRule.enabled),
         });
 
@@ -801,20 +766,26 @@ export const AdminAnomalies = () => {
     };
 
     const downloadReport = async () => {
-        const response = await api.get("/admin/anomalies/report", {
-            params: { days: 7 },
-            responseType: "blob",
-        });
-
-        const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `anomaly-report-${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
+        if (reportDownloading) return;
+        setReportDownloading(true);
+        const toastId = toast.loading("보고서를 준비하는 중입니다...");
+        try {
+            const blobData = await adminAnomaliesAdapter.downloadReport(7);
+            const blob = new Blob([blobData], { type: "text/csv;charset=utf-8;" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `anomaly-report-${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success("보고서를 다운로드했습니다.", { id: toastId });
+        } catch (err) {
+            toast.error(adminAnomaliesErrorMessage(err, "보고서 다운로드에 실패했습니다."), { id: toastId });
+        } finally {
+            setReportDownloading(false);
+        }
     };
 
     if (!isAdmin) {
@@ -824,7 +795,7 @@ export const AdminAnomalies = () => {
                     <ShieldAlert className="h-8 w-8 text-rose-500" />
                 </div>
                 <h1 className="text-xl font-black">관리자 전용</h1>
-                <p className="text-sm font-medium opacity-70">ROLE_ADMIN 권한이 필요한 대시보드입니다.</p>
+                <p className="text-sm font-medium opacity-70">관리자 권한이 필요한 대시보드입니다.</p>
             </div>
         );
     }
@@ -865,9 +836,11 @@ export const AdminAnomalies = () => {
                     </button>
                     <button
                         onClick={downloadReport}
+                        disabled={reportDownloading}
                         className="btn-primary"
                     >
-                        <Download className="mr-2 h-4 w-4" /> 보고서 다운로드
+                        {reportDownloading ? <LoadingSpinner size="sm" text="" /> : <Download className="mr-2 h-4 w-4" />}
+                        {reportDownloading ? "준비 중..." : "보고서 다운로드"}
                     </button>
                 </div>
             </div>
@@ -1373,7 +1346,7 @@ export const AdminAnomalies = () => {
                     </div>
                     {!isMaster && (
                         <div className="mb-6 rounded-2xl bg-amber-50 p-4 text-[11px] font-bold text-amber-700 leading-relaxed">
-                            ROLE_MASTER만 관리자 권한을 부여하거나 회수할 수 있습니다.
+                            마스터 권한만 관리자 권한을 부여하거나 회수할 수 있습니다.
                         </div>
                     )}
                     <div className="mb-8 flex gap-3">
@@ -1406,7 +1379,7 @@ export const AdminAnomalies = () => {
                                     <div className="mb-6 flex flex-wrap gap-1.5">
                                         {(member.roles || []).map((role) => (
                                             <span key={`${getMemberIdValue(member)}-${role}`} className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500 uppercase tracking-tighter">
-                                                {role}
+                                                {roleLabelOf(role)}
                                             </span>
                                         ))}
                                     </div>
@@ -1447,7 +1420,7 @@ export const AdminAnomalies = () => {
                                     </div>
                                     <div className="mb-4 flex items-center gap-3 py-3 px-4 rounded-2xl bg-white shadow-sm font-black text-xs">
                                         <ArrowRight className="h-3 w-3 text-primary-400" />
-                                        <span className="text-primary-600">{audit.afterRoles}</span>
+                                        <span className="text-primary-600">{roleListLabelOf(audit.afterRoles)}</span>
                                     </div>
                                     <div className="text-[12px] font-bold text-slate-500 italic"><span className="text-slate-300 font-medium">사유:</span> {audit.changeReason || "(없음)"}</div>
                                 </div>
@@ -1665,7 +1638,7 @@ export const AdminAnomalies = () => {
                         <p className="text-[10px] font-black text-slate-400 tracking-[0.2em] mb-2 ml-1">지표 이름</p>
                         <input
                             className="input-base border-0 shadow-sm rounded-2xl font-bold"
-                            placeholder="e.g. login.attempt"
+                            placeholder="예: login.attempt"
                             value={newRule.metric}
                             onChange={(e) => setNewRule((prev) => ({ ...prev, metric: e.target.value }))}
                         />

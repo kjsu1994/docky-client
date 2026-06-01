@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     TrendingUp,
     TrendingDown,
@@ -11,23 +11,11 @@ import {
     Eye,
     Calendar,
 } from "lucide-react";
-import api from "../../utils/api.js";
+import toast from "react-hot-toast";
+import { statsAdapter, statsErrorMessage } from "../../adapters/statsAdapter.js";
 import { formatNumber } from "../../utils/helpers.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
-
-// API 응답에서 실제 데이터를 추출하는 헬퍼 함수
-const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
-
-// 기간별 추이 데이터 정규화 함수
-const normalizeTrend = (response) => {
-    const data = unwrapData(response);
-    if (!data) return { days: 7, items: [] };
-    return {
-        days: data.days || 7,
-        items: Array.isArray(data.items) ? data.items : [],
-    };
-};
 
 // 증감률을 숫자형으로 변환하는 함수
 const toChangeRate = (value) => {
@@ -58,62 +46,61 @@ export const Statistics = () => {
     const [loading, setLoading] = useState(true);
     const [trendLoading, setTrendLoading] = useState(false);
     const [error, setError] = useState("");
+    const [trendError, setTrendError] = useState("");
 
     // 기간별 추이 데이터를 비동기적으로 가져오는 함수
-    const fetchTrend = async (selectedDays) => {
+    const fetchTrend = useCallback(async (selectedDays) => {
         setTrendLoading(true);
+        setTrendError("");
         try {
-            const trendRes = await api.get("/stats/trend", {
-                params: { days: selectedDays },
-            });
-            setTrend(normalizeTrend(trendRes));
+            setTrend(await statsAdapter.fetchTrend(selectedDays));
         } catch (trendError) {
             console.error("Failed to fetch stats trend:", trendError);
+            const message = statsErrorMessage(trendError, "추이 데이터를 불러오지 못했습니다.");
+            setTrendError(message);
+            toast.error(message);
         } finally {
             setTrendLoading(false);
         }
-    };
+    }, []);
 
     // 컴포넌트 마운트 시 통계 데이터를 가져오는 효과
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            setError("");
-            try {
-                const [summaryRes, visitorsRes, trendRes] = await Promise.all([
-                    api.get("/stats/summary"),
-                    api.get("/stats/visitors/compare"),
-                    api.get("/stats/trend", { params: { days: 7 } }),
-                ]);
-
-                setSummary(unwrapData(summaryRes));
-                setVisitorsCompare(unwrapData(visitorsRes));
-                setTrend(normalizeTrend(trendRes));
-            } catch (fetchError) {
-                console.error("Failed to fetch statistics data:", fetchError);
-                setError(fetchError?.response?.data?.message || "통계 데이터를 불러오지 못했습니다.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        setError("");
+        setTrendError("");
+        try {
+            const result = await statsAdapter.fetchDashboard({ days: 7 });
+            setSummary(result.summary);
+            setVisitorsCompare(result.visitorsCompare);
+            setTrend(result.trend);
+            setDays(result.trend.days || 7);
+        } catch (fetchError) {
+            console.error("Failed to fetch statistics data:", fetchError);
+            setError(statsErrorMessage(fetchError, "통계 데이터를 불러오지 못했습니다."));
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     // 'days' 상태가 변경될 때마다 새로운 추이 데이터를 가져오는 효과
     useEffect(() => {
         if (days === trend.days) return;
         fetchTrend(days);
-    }, [days]);
+    }, [days, fetchTrend, trend.days]);
 
-    const changeRate = toChangeRate(visitorsCompare?.day_over_day_change_rate || visitorsCompare?.dayOverDayChangeRate);
+    const changeRate = toChangeRate(visitorsCompare?.dayOverDayChangeRate);
     const isGrowth = changeRate >= 0;
 
     // 추이 데이터의 최대값을 계산 (차트 렌더링에 사용)
     const trendMax = useMemo(() => {
         const maxValue = trend.items.reduce((max, item) => {
-            const boardCount = Number(item.new_boards || item.newBoards || 0);
-            const commentCount = Number(item.new_comments || item.newComments || 0);
+            const boardCount = Number(item.newBoards || 0);
+            const commentCount = Number(item.newComments || 0);
             const visitors = Number(item.visitors || 0);
             return Math.max(max, boardCount, commentCount, visitors);
         }, 0);
@@ -125,7 +112,7 @@ export const Statistics = () => {
     }
 
     if (error) {
-        return <ErrorMessage message={error} />;
+        return <ErrorMessage message={error} onRetry={fetchData} />;
     }
 
     return (
@@ -134,12 +121,12 @@ export const Statistics = () => {
 
             {summary && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                    <StatCard icon={Users} label="전체 회원" value={formatNumber(summary.total_members || summary.totalMembers || 0)} color="blue" />
-                    <StatCard icon={UserCheck} label="활성 회원" value={formatNumber(summary.active_members || summary.activeMembers || 0)} color="green" />
-                    <StatCard icon={UserX} label="탈퇴 회원" value={formatNumber(summary.quit_members || summary.quitMembers || 0)} color="rose" />
-                    <StatCard icon={MessageSquare} label="전체 게시글" value={formatNumber(summary.total_boards || summary.totalBoards || 0)} color="emerald" />
-                    <StatCard icon={Award} label="전체 댓글" value={formatNumber(summary.total_comments || summary.totalComments || 0)} color="purple" />
-                    <StatCard icon={Eye} label="오늘 방문자" value={formatNumber(summary.today_visitors || summary.todayVisitors || 0)} color="orange" />
+                    <StatCard icon={Users} label="전체 회원" value={formatNumber(summary.totalMembers)} color="blue" />
+                    <StatCard icon={UserCheck} label="활성 회원" value={formatNumber(summary.activeMembers)} color="green" />
+                    <StatCard icon={UserX} label="탈퇴 회원" value={formatNumber(summary.quitMembers)} color="rose" />
+                    <StatCard icon={MessageSquare} label="전체 게시글" value={formatNumber(summary.totalBoards)} color="emerald" />
+                    <StatCard icon={Award} label="전체 댓글" value={formatNumber(summary.totalComments)} color="purple" />
+                    <StatCard icon={Eye} label="오늘 방문자" value={formatNumber(summary.todayVisitors)} color="orange" />
                 </div>
             )}
 
@@ -160,8 +147,8 @@ export const Statistics = () => {
                         </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
-                        <MetricTile label="오늘 방문자" value={formatNumber(visitorsCompare.today_visitors || visitorsCompare.todayVisitors || 0)} />
-                        <MetricTile label="어제 방문자" value={formatNumber(visitorsCompare.yesterday_visitors || visitorsCompare.yesterdayVisitors || 0)} />
+                        <MetricTile label="오늘 방문자" value={formatNumber(visitorsCompare.todayVisitors)} />
+                        <MetricTile label="어제 방문자" value={formatNumber(visitorsCompare.yesterdayVisitors)} />
                     </div>
                 </div>
             )}
@@ -189,14 +176,16 @@ export const Statistics = () => {
 
                 {trendLoading ? (
                     <LoadingSpinner size="sm" text="추이 데이터 로딩 중..." />
+                ) : trendError ? (
+                    <ErrorMessage message={trendError} onRetry={() => fetchTrend(days)} />
                 ) : trend.items.length === 0 ? (
                     <div className="text-sm text-slate-500">표시할 추이 데이터가 없습니다.</div>
                 ) : (
                     <div className="space-y-3">
                         {trend.items.map((item) => {
                             const visitors = Number(item.visitors || 0);
-                            const boards = Number(item.new_boards || item.newBoards || 0);
-                            const comments = Number(item.new_comments || item.newComments || 0);
+                            const boards = Number(item.newBoards || 0);
+                            const comments = Number(item.newComments || 0);
                             return (
                                 <div key={item.date} className="rounded-xl border border-slate-200 p-4">
                                     <div className="flex items-center justify-between mb-3">

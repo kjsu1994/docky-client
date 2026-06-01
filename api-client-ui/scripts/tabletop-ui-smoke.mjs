@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -15,7 +15,7 @@ if (!chromePath) {
   throw new Error("Chrome or Edge executable was not found. Set CHROME_PATH to run this smoke test.");
 }
 
-const port = Number(process.env.CHROME_DEBUG_PORT || 9337);
+const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "tabletop-ui-smoke-"));
 const viewports = [
   { name: "desktop", width: 1366, height: 900, mobile: false },
@@ -26,7 +26,7 @@ const cases = [
   {
     path: "/app/games",
     label: "game hub",
-    expectedTexts: ["신규 보드게임", "카탄", "블로커스", "마헤", "달무티"],
+    expectedTexts: ["게임 목록", "카탄", "블로커스", "마헤", "달무티"],
   },
   {
     path: "/app/games/catan",
@@ -87,12 +87,98 @@ const variantCreateCases = [
   { game: "dalmuti", variantCode: "FIRST_DEAL_REVOLUTION" },
 ];
 
-let nextMessageId = 1;
 const mockState = {
   nextRoomId: 1000,
   activeRoomsByGame: new Map(),
   requests: [],
 };
+
+function assertTabletopRealtimeSource() {
+  const source = readFileSync("src/pages/games/TabletopGame.jsx", "utf8");
+  const requiredSnippets = [
+    ["realtimeRoomRef.current = { roomId, roomSeq }", "tracks the latest opened realtime room"],
+    ["client.onConnect = () => {", "binds after STOMP CONNECT"],
+    ["bindLatestRealtimeRoom(client)", "resubscribes the latest room after reconnect"],
+    ["client.beforeConnect = () =>", "refreshes STOMP auth headers before reconnect"],
+    ["await fetchState(roomId, roomSeq).catch", "loads a REST snapshot before relying on realtime"],
+    ["client.subscribe(`/sub/game/${game}/room/${roomId}`", "subscribes to the active tabletop room topic"],
+  ];
+  for (const [snippet, description] of requiredSnippets) {
+    if (!source.includes(snippet)) {
+      throw new Error(`tabletop-ui-smoke: TabletopGame realtime source must ${description}.`);
+    }
+  }
+  if (source.includes("else client.onConnect = () =>")) {
+    throw new Error("tabletop-ui-smoke: openRoom must not overwrite STOMP onConnect per room.");
+  }
+}
+
+class PipeCdp {
+  constructor(chrome) {
+    this.chrome = chrome;
+    this.nextMessageId = 1;
+    this.buffer = Buffer.alloc(0);
+    this.pending = new Map();
+    this.messageHandlers = [];
+    this.sessionId = null;
+
+    chrome.stdio[4].on("data", (chunk) => this.handleData(chunk));
+    chrome.once("exit", (code) => {
+      const error = new Error(`Chrome exited before CDP command completed${code === null ? "" : `: ${code}`}`);
+      for (const waiter of this.pending.values()) {
+        clearTimeout(waiter.timeoutId);
+        waiter.reject(error);
+      }
+      this.pending.clear();
+    });
+  }
+
+  onMessage(handler) {
+    this.messageHandlers.push(handler);
+  }
+
+  send(method, params = {}, sessionId = null, timeoutMs = 10000) {
+    const id = this.nextMessageId++;
+    const message = sessionId ? { id, method, params, sessionId } : { id, method, params };
+    if (debug) console.log("cdp send", id, method, sessionId || "browser");
+    this.chrome.stdio[3].write(`${JSON.stringify(message)}\0`);
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`${method}: timed out waiting for Chrome DevTools response`));
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, method, timeoutId });
+    });
+  }
+
+  handleData(chunk) {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    let frameEnd = this.buffer.indexOf(0);
+    while (frameEnd !== -1) {
+      const raw = this.buffer.subarray(0, frameEnd).toString("utf8");
+      this.buffer = this.buffer.subarray(frameEnd + 1);
+      frameEnd = this.buffer.indexOf(0);
+      if (!raw) continue;
+
+      const message = JSON.parse(raw);
+      if (debug) console.log("cdp recv", message.id || message.method, message.sessionId || "browser");
+      if (message.id && this.pending.has(message.id)) {
+        const waiter = this.pending.get(message.id);
+        this.pending.delete(message.id);
+        clearTimeout(waiter.timeoutId);
+        if (message.error) {
+          waiter.reject(new Error(`${waiter.method}: ${message.error.message}`));
+        } else {
+          waiter.resolve(message);
+        }
+        continue;
+      }
+      for (const handler of this.messageHandlers) {
+        handler(message);
+      }
+    }
+  }
+}
 const gameNames = {
   catan: "카탄",
   blokus: "블로커스",
@@ -489,31 +575,9 @@ function recordRequest(kind, game, pathname, body) {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function waitForJson(url, timeoutMs = 10000) {
-  const started = Date.now();
-  let lastError;
-  while (Date.now() - started < timeoutMs) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) return response.json();
-      lastError = new Error(`${response.status} ${response.statusText}`);
-    } catch (error) {
-      lastError = error;
-    }
-    await delay(120);
-  }
-  throw lastError || new Error(`Timed out waiting for ${url}`);
+function send(cdp, method, params = {}) {
+  return cdp.send(method, params, cdp.sessionId);
 }
-
-function send(ws, method, params = {}) {
-  const id = nextMessageId++;
-  ws.send(JSON.stringify({ id, method, params }));
-  return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject, method });
-  });
-}
-
-const pending = new Map();
 
 function decodeResponseBody(value) {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64");
@@ -521,8 +585,12 @@ function decodeResponseBody(value) {
 
 function routeMock(url, method, postData = "") {
   const parsed = new URL(url);
+  const hostname = parsed.hostname;
   const pathname = parsed.pathname;
   const body = parseJson(postData);
+  if (method === "GET" && hostname === "oapi.map.naver.com") {
+    return { status: 200, contentType: "application/javascript; charset=utf-8", bodyText: "" };
+  }
   if (method === "GET" && pathname === "/api/members") {
     return {
       status: 200,
@@ -629,6 +697,7 @@ function routeMock(url, method, postData = "") {
 
 async function handleFetchRequest(ws, event) {
   const { requestId, request } = event.params;
+  if (debug) console.log("fetch", request.method, request.url);
   const mock = routeMock(request.url, request.method, request.postData);
   if (!mock) {
     await send(ws, "Fetch.continueRequest", { requestId });
@@ -638,10 +707,10 @@ async function handleFetchRequest(ws, event) {
     requestId,
     responseCode: mock.status,
     responseHeaders: [
-      { name: "Content-Type", value: "application/json; charset=utf-8" },
+      { name: "Content-Type", value: mock.contentType || "application/json; charset=utf-8" },
       { name: "Cache-Control", value: "no-store" },
     ],
-    body: decodeResponseBody(mock.body),
+    body: mock.bodyText !== undefined ? Buffer.from(mock.bodyText, "utf8").toString("base64") : decodeResponseBody(mock.body),
   });
 }
 
@@ -667,7 +736,12 @@ async function waitForExpression(ws, expression, label, timeoutMs = 6000) {
     if (await evaluate(ws, expression)) return;
     await delay(120);
   }
-  throw new Error(`Timed out waiting for ${label}`);
+  const pageState = await evaluate(ws, `(() => ({
+    href: location.href,
+    readyState: document.readyState,
+    bodyText: document.body?.innerText?.slice(0, 700) || "",
+  }))()`).catch(() => null);
+  throw new Error(`Timed out waiting for ${label}${pageState ? `; page: ${JSON.stringify(pageState)}` : ""}`);
 }
 
 async function waitForText(ws, text) {
@@ -902,16 +976,19 @@ async function inspectPage(ws, testCase, viewport) {
 }
 
 async function main() {
+  assertTabletopRealtimeSource();
   const chrome = spawn(chromePath, [
     "--headless=new",
-    `--remote-debugging-port=${port}`,
+    "--remote-debugging-pipe",
     `--user-data-dir=${userDataDir}`,
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
     "--disable-gpu",
     "--disable-dev-shm-usage",
     "--no-first-run",
     "--no-default-browser-check",
     "about:blank",
-  ], { stdio: ["ignore", "ignore", "pipe"] });
+  ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"] });
 
   chrome.stderr.on("data", () => {});
   const waitForChromeExit = () => new Promise((resolve) => {
@@ -922,28 +999,19 @@ async function main() {
     chrome.once("exit", resolve);
   });
   try {
-    await waitForJson(`http://127.0.0.1:${port}/json/version`);
-    const targetResponse = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" });
-    if (!targetResponse.ok) {
-      throw new Error(`Could not open Chrome target: ${targetResponse.status} ${targetResponse.statusText}`);
-    }
-    const target = await targetResponse.json();
-    const ws = new WebSocket(target.webSocketDebuggerUrl);
+    const cdp = new PipeCdp(chrome);
+    await cdp.send("Browser.getVersion");
+    const targetResponse = await cdp.send("Target.createTarget", { url: "about:blank" });
+    const targetId = targetResponse.result?.targetId;
+    if (!targetId) throw new Error("Could not create Chrome target for tabletop smoke test.");
+    const attachResponse = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
+    cdp.sessionId = attachResponse.result?.sessionId;
+    if (!cdp.sessionId) throw new Error("Could not attach to Chrome target for tabletop smoke test.");
     const runtimeErrors = [];
-    ws.addEventListener("message", (event) => {
-      const message = JSON.parse(event.data);
-      if (message.id && pending.has(message.id)) {
-        const waiter = pending.get(message.id);
-        pending.delete(message.id);
-        if (message.error) {
-          waiter.reject(new Error(`${waiter.method}: ${message.error.message}`));
-        } else {
-          waiter.resolve(message);
-        }
-        return;
-      }
+    cdp.onMessage((message) => {
+      if (message.sessionId !== cdp.sessionId) return;
       if (message.method === "Fetch.requestPaused") {
-        handleFetchRequest(ws, message).catch((error) => {
+        handleFetchRequest(cdp, message).catch((error) => {
           if (!String(error.message || "").includes("Invalid InterceptionId")) {
             runtimeErrors.push(error.message);
           }
@@ -952,11 +1020,16 @@ async function main() {
         runtimeErrors.push(message.params?.exceptionDetails?.text || "Runtime exception");
       }
     });
-    await new Promise((resolve) => ws.addEventListener("open", resolve, { once: true }));
-    await send(ws, "Page.enable");
-    await send(ws, "Runtime.enable");
-    await send(ws, "Fetch.enable", { patterns: [{ urlPattern: "*://localhost/api/*", requestStage: "Request" }] });
-    await send(ws, "Page.addScriptToEvaluateOnNewDocument", {
+    await send(cdp, "Page.enable");
+    await send(cdp, "Runtime.enable");
+    await send(cdp, "Fetch.enable", {
+      patterns: [
+        { urlPattern: "*://localhost*/api/*", requestStage: "Request" },
+        { urlPattern: "*://127.0.0.1*/api/*", requestStage: "Request" },
+        { urlPattern: "https://oapi.map.naver.com/*", requestStage: "Request" },
+      ],
+    });
+    await send(cdp, "Page.addScriptToEvaluateOnNewDocument", {
       source: `
         localStorage.setItem("accessToken", "smoke-access-token");
         localStorage.setItem("refreshToken", "smoke-refresh-token");
@@ -967,16 +1040,16 @@ async function main() {
     const results = [];
     for (const testCase of cases) {
       for (const viewport of viewports) {
-        results.push(await inspectPage(ws, testCase, viewport));
+        results.push(await inspectPage(cdp, testCase, viewport));
       }
     }
     const flowResults = [];
     for (const game of ["catan", "blokus", "mahe", "dalmuti"]) {
-      flowResults.push(await runRoomFlowSmoke(ws, game));
+      flowResults.push(await runRoomFlowSmoke(cdp, game));
     }
     const variantResults = [];
     for (const item of variantCreateCases) {
-      variantResults.push(await runVariantCreateSmoke(ws, item));
+      variantResults.push(await runVariantCreateSmoke(cdp, item));
     }
     const expectedPageChecks = cases.length * viewports.length;
     if (results.length !== expectedPageChecks || flowResults.length !== 4 || variantResults.length !== variantCreateCases.length) {

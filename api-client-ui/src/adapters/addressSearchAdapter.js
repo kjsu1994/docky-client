@@ -1,0 +1,52 @@
+import api, { getApiErrorMessage } from "../utils/api.js";
+
+const unwrapAddressData = (response) => response?.data?.data ?? response?.data ?? response ?? {};
+
+const normalizeCoordinate = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
+export const normalizeAddressItem = (item = {}) => {
+    const roadAddress = item.road_address ?? item.roadAddress ?? null;
+    const jibunAddress = item.jibun_address ?? item.jibunAddress ?? null;
+    const address = item.address ?? roadAddress ?? jibunAddress ?? "";
+
+    return {
+        address,
+        roadAddress,
+        jibunAddress,
+        latitude: normalizeCoordinate(item.latitude),
+        longitude: normalizeCoordinate(item.longitude),
+    };
+};
+
+export const normalizeAddressSuggestResponse = (response) => {
+    const data = unwrapAddressData(response);
+    const items = Array.isArray(data?.items) ? data.items.map(normalizeAddressItem) : [];
+
+    return {
+        totalCount: Number(data?.total_count ?? data?.totalCount ?? items.length) || 0,
+        items,
+    };
+};
+
+export const normalizeGeocodeResponse = (response) => normalizeAddressItem(unwrapAddressData(response));
+
+export const extractAddressSearchErrorMessage = (error, fallbackMessage) => getApiErrorMessage(error, fallbackMessage);
+
+export const addressSearchAdapter = {
+    async suggestAddresses({ query, limit = 5 }) {
+        const response = await api.get("/addresses/suggest", {
+            params: { query, limit },
+        });
+        return normalizeAddressSuggestResponse(response);
+    },
+
+    async geocodeAddress(address) {
+        const response = await api.get("/addresses/geocode", {
+            params: { address },
+        });
+        return normalizeGeocodeResponse(response);
+    },
+};

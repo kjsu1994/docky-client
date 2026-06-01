@@ -1,207 +1,202 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Trophy, TrendingUp, Heart, Award, Crown, Medal, Star } from "lucide-react";
-import api from "../../utils/api.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
+import { EmptyState } from "../../components/EmptyState.jsx";
 import { formatNumber } from "../../utils/helpers.js";
 import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
+import { BOARD_RANK_TYPES, rankErrorMessage, ranksAdapter } from "../../adapters/ranksAdapter.js";
 
-const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
-
-const normalizeList = (response) => {
-    const data = unwrapData(response);
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.content)) return data.content;
-    if (Array.isArray(data.items)) return data.items;
-    if (Array.isArray(data.ranks)) return data.ranks;
-    return [];
-};
-
-const getErrorMessage = (error, fallbackMessage) => {
-    const status = error?.response?.status;
-    const message = error?.response?.data?.message;
-    if (status) {
-        return `${fallbackMessage} (HTTP ${status}${message ? `: ${message}` : ""})`;
-    }
-    return fallbackMessage;
-};
-
-const fetchWithFallbackEndpoints = async (endpoints) => {
-    let lastError = null;
-    for (const endpoint of endpoints) {
-        try {
-            const response = await api.get(endpoint);
-            return normalizeList(response);
-        } catch (error) {
-            lastError = error;
-            const status = error?.response?.status;
-            if (status === 404) continue;
-            if (endpoints[endpoints.length - 1] !== endpoint) continue;
-            throw error;
-        }
-    }
-    if (lastError) throw lastError;
-    return [];
-};
+const tabs = [
+    { key: "boards", label: "게시판 랭킹", icon: TrendingUp },
+    { key: "level", label: "레벨 랭킹", icon: Award },
+    { key: "donation", label: "기부 랭킹", icon: Heart },
+];
 
 export const Ranks = () => {
     const [activeTab, setActiveTab] = useState("boards");
     const [boardRankType, setBoardRankType] = useState("FREE_BOARD");
-    const [boardRanks, setBoardRanks] = useState([]);
-    const [levelRanks, setLevelRanks] = useState([]);
-    const [donationRanks, setDonationRanks] = useState([]);
+    const [ranks, setRanks] = useState({ boards: [], level: [], donation: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [retryKey, setRetryKey] = useState(0);
-    
-    const lastBoardFetchRef = useRef("");
-    const lastLevelFetchRef = useRef(-1);
-    const lastDonationFetchRef = useRef(-1);
+    const requestSeqRef = useRef(0);
 
-    useEffect(() => {
-        if (activeTab !== "boards") return;
-        const currentFetchKey = `${boardRankType}-${retryKey}`;
-        if (lastBoardFetchRef.current === currentFetchKey) return;
+    const activeLabel = useMemo(() => {
+        if (activeTab === "boards") {
+            return BOARD_RANK_TYPES.find((type) => type.value === boardRankType)?.label || "게시판";
+        }
+        return tabs.find((tab) => tab.key === activeTab)?.label || "랭킹";
+    }, [activeTab, boardRankType]);
 
-        const fetchBoardRanks = async () => {
-            setLoading(true);
-            setError("");
-            try {
-                try {
-                    const response = await api.get("/boards/rankBoards", { params: { kind: boardRankType } });
-                    lastBoardFetchRef.current = currentFetchKey;
-                    setBoardRanks(normalizeList(response));
-                } catch (primaryError) {
-                    if (primaryError?.response?.status !== 404) throw primaryError;
-                    let fallbackEndpoint = "";
-                    switch (boardRankType) {
-                        case "FREE_BOARD": fallbackEndpoint = "/boards/rankFreeBoards"; break;
-                        case "ADMIN_NOTICE": fallbackEndpoint = "/boards/rankNoticeBoards"; break;
-                        case "QUESTION_ANSWER": fallbackEndpoint = "/boards/rankEcoBoards"; break;
-                        default: fallbackEndpoint = "/boards/rankFreeBoards"; break;
-                    }
-                    const fallbackResponse = await api.get(fallbackEndpoint);
-                    lastBoardFetchRef.current = currentFetchKey;
-                    setBoardRanks(normalizeList(fallbackResponse));
+    const fetchRanks = useCallback(async () => {
+        const requestId = requestSeqRef.current + 1;
+        requestSeqRef.current = requestId;
+        setLoading(true);
+        setError("");
+        try {
+            if (activeTab === "boards") {
+                const items = await ranksAdapter.fetchBoardRanks(boardRankType);
+                if (requestSeqRef.current === requestId) {
+                    setRanks((current) => ({ ...current, boards: items }));
                 }
-            } catch (err) {
-                setError(getErrorMessage(err, "게시판 랭킹 로딩 실패"));
-            } finally { setLoading(false); }
-        };
-        fetchBoardRanks();
-    }, [activeTab, boardRankType, retryKey]);
+                return;
+            }
+            if (activeTab === "level") {
+                const items = await ranksAdapter.fetchLevelRanks();
+                if (requestSeqRef.current === requestId) {
+                    setRanks((current) => ({ ...current, level: items }));
+                }
+                return;
+            }
+            const items = await ranksAdapter.fetchDonationRanks();
+            if (requestSeqRef.current === requestId) {
+                setRanks((current) => ({ ...current, donation: items }));
+            }
+        } catch (err) {
+            if (requestSeqRef.current !== requestId) return;
+            const fallback = activeTab === "boards" ? "게시판 랭킹을 불러오지 못했습니다."
+                : activeTab === "level" ? "레벨 랭킹을 불러오지 못했습니다."
+                    : "기부 랭킹을 불러오지 못했습니다.";
+            setError(rankErrorMessage(err, fallback));
+        } finally {
+            if (requestSeqRef.current === requestId) {
+                setLoading(false);
+            }
+        }
+    }, [activeTab, boardRankType]);
 
     useEffect(() => {
-        if (activeTab !== "level") return;
-        if (lastLevelFetchRef.current === retryKey) return;
-        const fetchLevelRanks = async () => {
-            setLoading(true); setError("");
-            try {
-                const ranks = await fetchWithFallbackEndpoints(["/members/levelRanks", "/members/level-ranks"]);
-                lastLevelFetchRef.current = retryKey;
-                setLevelRanks(ranks);
-            } catch (err) { setError(getErrorMessage(err, "레벨 랭킹 로딩 실패")); }
-            finally { setLoading(false); }
-        };
-        fetchLevelRanks();
-    }, [activeTab, retryKey]);
+        fetchRanks();
+    }, [fetchRanks]);
 
-    useEffect(() => {
-        if (activeTab !== "donation") return;
-        if (lastDonationFetchRef.current === retryKey) return;
-        const fetchDonationRanks = async () => {
-            setLoading(true); setError("");
-            try {
-                const response = await api.get("/members/donationRanks");
-                lastDonationFetchRef.current = retryKey;
-                setDonationRanks(normalizeList(response));
-            } catch (err) { setError(getErrorMessage(err, "기부 랭킹 로딩 실패")); }
-            finally { setLoading(false); }
-        };
-        fetchDonationRanks();
-    }, [activeTab, retryKey]);
-
-    const getRankIcon = (rank) => {
-        if (rank === 1) return <Crown className="h-6 w-6 text-yellow-500" />;
-        if (rank === 2) return <Medal className="h-6 w-6 text-slate-400" />;
-        if (rank === 3) return <Medal className="h-6 w-6 text-orange-600" />;
-        return <Star className="h-5 w-5 text-slate-400" />;
-    };
-
-    const getRankBadgeColor = (rank) => {
-        if (rank === 1) return "bg-gradient-to-r from-yellow-400 to-yellow-600 text-white";
-        if (rank === 2) return "bg-gradient-to-r from-slate-300 to-slate-500 text-white";
-        if (rank === 3) return "bg-gradient-to-r from-orange-400 to-orange-600 text-white";
-        return "bg-slate-100 text-slate-700";
-    };
+    const currentRanks = activeTab === "boards" ? ranks.boards
+        : activeTab === "level" ? ranks.level
+            : ranks.donation;
 
     return (
         <div className="space-y-6">
-            <div className="card p-6 bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-                <div className="flex items-center gap-3 mb-2">
-                    <Trophy className="h-8 w-8" />
-                    <h1 className="text-3xl font-bold">랭킹</h1>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                            <Trophy className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">랭킹</h1>
+                            <p className="text-sm font-medium text-slate-500">커뮤니티 인기 게시글과 활발한 멤버를 확인하세요.</p>
+                        </div>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
+                        {activeLabel} {currentRanks.length ? `${currentRanks.length}건` : "조회 중"}
+                    </div>
                 </div>
-                <p className="text-purple-100">커뮤니티 TOP 멤버와 인기 게시글을 확인하세요</p>
             </div>
 
             <div className="card p-2">
-                <div className="flex gap-2">
-                    <TabButton active={activeTab === "boards"} onClick={() => setActiveTab("boards")} icon={TrendingUp}>게시판 랭킹</TabButton>
-                    <TabButton active={activeTab === "level"} onClick={() => setActiveTab("level")} icon={Award}>레벨 랭킹</TabButton>
-                    <TabButton active={activeTab === "donation"} onClick={() => setActiveTab("donation")} icon={Heart}>기부 랭킹</TabButton>
+                <div className="grid grid-cols-3 gap-2">
+                    {tabs.map((tab) => (
+                        <TabButton
+                            key={tab.key}
+                            active={activeTab === tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            icon={tab.icon}
+                        >
+                            {tab.label}
+                        </TabButton>
+                    ))}
                 </div>
             </div>
 
-            {activeTab === "boards" && (
-                <div className="card p-4">
-                    <div className="flex gap-2">
-                        <BoardTypeButton active={boardRankType === "FREE_BOARD"} onClick={() => setBoardRankType("FREE_BOARD")}>사용자게시판</BoardTypeButton>
-                        <BoardTypeButton active={boardRankType === "ADMIN_NOTICE"} onClick={() => setBoardRankType("ADMIN_NOTICE")}>공지사항</BoardTypeButton>
-                        <BoardTypeButton active={boardRankType === "QUESTION_ANSWER"} onClick={() => setBoardRankType("QUESTION_ANSWER")}>Q&A 게시판</BoardTypeButton>
+            {activeTab === "boards" ? (
+                <div className="card p-3">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {BOARD_RANK_TYPES.map((type) => (
+                            <BoardTypeButton
+                                key={type.value}
+                                active={boardRankType === type.value}
+                                onClick={() => setBoardRankType(type.value)}
+                            >
+                                {type.label}
+                            </BoardTypeButton>
+                        ))}
                     </div>
                 </div>
-            )}
+            ) : null}
 
-            {loading && <LoadingSpinner text="로딩 중..." />}
-            {error && <ErrorMessage message={error} onRetry={() => { setError(""); setRetryKey(prev => prev + 1); }} />}
+            {loading ? <LoadingSpinner text="랭킹을 불러오는 중..." /> : null}
+            {!loading && error ? <ErrorMessage message={error} onRetry={fetchRanks} /> : null}
 
-            {!loading && !error && (
+            {!loading && !error ? (
                 <div className="card overflow-hidden">
-                    {activeTab === "boards" && <BoardRankList ranks={boardRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />}
-                    {activeTab === "level" && <LevelRankList ranks={levelRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />}
-                    {activeTab === "donation" && <DonationRankList ranks={donationRanks} getRankIcon={getRankIcon} getRankBadgeColor={getRankBadgeColor} />}
+                    {activeTab === "boards" ? <BoardRankList ranks={ranks.boards} /> : null}
+                    {activeTab === "level" ? <LevelRankList ranks={ranks.level} /> : null}
+                    {activeTab === "donation" ? <DonationRankList ranks={ranks.donation} /> : null}
                 </div>
-            )}
+            ) : null}
         </div>
     );
 };
 
 const TabButton = ({ active, onClick, icon: Icon, children }) => (
-    <button onClick={onClick} className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${active ? "bg-purple-600 text-white shadow-lg" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
-        <Icon className="h-5 w-5" /><span className="hidden sm:inline">{children}</span>
+    <button
+        type="button"
+        onClick={onClick}
+        className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-3 text-xs font-semibold transition-all sm:gap-2 sm:px-3 sm:text-sm ${
+            active ? "bg-slate-900 text-white shadow-lg" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+        }`}
+    >
+        <Icon className="h-4 w-4 flex-shrink-0 sm:h-5 sm:w-5" />
+        <span className="truncate">{children}</span>
     </button>
 );
 
 const BoardTypeButton = ({ active, onClick, children }) => (
-    <button onClick={onClick} className={`flex-1 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${active ? "bg-purple-100 text-purple-700 border-2 border-purple-600" : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"}`}>{children}</button>
+    <button
+        type="button"
+        onClick={onClick}
+        className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-all ${
+            active ? "border-amber-500 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+        }`}
+    >
+        {children}
+    </button>
 );
 
-const BoardRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    if (!ranks?.length) return <div className="p-12 text-center text-slate-500">데이터가 없습니다.</div>;
+const RankBadge = ({ rank }) => {
+    const icon = rank === 1 ? <Crown className="h-5 w-5" />
+        : rank === 2 || rank === 3 ? <Medal className="h-5 w-5" />
+            : <Star className="h-4 w-4" />;
+    const color = rank === 1 ? "bg-amber-500 text-white"
+        : rank === 2 ? "bg-slate-400 text-white"
+            : rank === 3 ? "bg-orange-500 text-white"
+                : "bg-slate-100 text-slate-700";
     return (
-        <div className="divide-y">
+        <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-sm ${color}`}>
+            {rank <= 3 ? icon : rank}
+        </div>
+    );
+};
+
+const BoardRankList = ({ ranks }) => {
+    if (!ranks.length) {
+        return <EmptyRank message="랭킹에 표시할 게시글이 없습니다." />;
+    }
+    return (
+        <div className="divide-y divide-slate-100">
             {ranks.map((board, index) => (
-                <Link key={board.board_id || board.boardId} to={`/app/boards/${board.kind_of_board || board.kindOfBoard || "FREE_BOARD"}/${board.board_id || board.boardId}`} className={`p-6 transition-colors ${index < 3 ? "bg-gradient-to-r from-slate-50 to-transparent" : "hover:bg-slate-50"} block`}>
+                <Link
+                    key={board.id}
+                    to={`/app/boards/${board.kind}/${board.id}`}
+                    className={`block p-5 transition-colors ${index < 3 ? "bg-amber-50/40" : "hover:bg-slate-50"}`}
+                >
                     <div className="flex items-start gap-4">
-                        <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-2">{board.title}</h3>
-                            <div className="flex items-center gap-4 text-sm text-slate-600">
-                                <div className="flex items-center gap-1"><Heart className="h-4 w-4 text-red-500" /><span>{formatNumber(board.like_count || board.likeCount)}</span></div>
-                                <div className="flex items-center gap-1"><TrendingUp className="h-4 w-4 text-blue-500" /><span>{formatNumber(board.view_count || board.viewCount)}</span></div>
+                        <RankBadge rank={index + 1} />
+                        <div className="min-w-0 flex-1">
+                            <h3 className="mb-2 line-clamp-2 text-lg font-bold text-slate-900">{board.title}</h3>
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+                                <span className="flex items-center gap-1"><Heart className="h-4 w-4 text-rose-500" />좋아요 {formatNumber(board.likeCount)}</span>
+                                <span className="flex items-center gap-1"><TrendingUp className="h-4 w-4 text-blue-500" />조회 {formatNumber(board.viewCount)}</span>
                             </div>
                         </div>
                     </div>
@@ -211,49 +206,86 @@ const BoardRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
     );
 };
 
-const LevelRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    if (!ranks?.length) return <div className="p-12 text-center text-slate-500">데이터가 없습니다.</div>;
+const LevelRankList = ({ ranks }) => {
+    if (!ranks.length) {
+        return <EmptyRank message="랭킹에 표시할 레벨 데이터가 없습니다." />;
+    }
     return (
-        <div className="divide-y">
-            {ranks.map((member, index) => {
-                const profileUrl = member.profile_url || member.profileUrl || member.member?.profile_url || member.member?.profileUrl || "";
-                const displayName = member.name || member.user_name || member.userName || member.member?.name || member.nickname || member.member?.nickname || "익명";
-                return (
-                <div key={index} className={`p-6 transition-colors ${index < 3 ? "bg-gradient-to-r from-slate-50 to-transparent" : "hover:bg-slate-50"}`}>
-                    <div className="flex items-center gap-4">
-                        <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
-                        <div className="flex-shrink-0">
-                            {normalizeProfileImageUrl(profileUrl) ? <img src={normalizeProfileImageUrl(profileUrl)} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold">{displayName.charAt(0)}</div>}
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-slate-900 text-lg mb-1">{displayName}</h3>
-                            <div className="flex items-center gap-4 text-sm"><div className="flex items-center gap-1"><Award className="h-4 w-4 text-purple-500" /><span className="font-semibold text-purple-700">Lv. {member.level}</span></div><div className="text-slate-600">EXP: {formatNumber(member.total_exp || member.totalExp)}</div></div>
-                        </div>
-                    </div>
-                </div>
-            )})}
-        </div>
-    );
-};
-
-const DonationRankList = ({ ranks, getRankIcon, getRankBadgeColor }) => {
-    if (!ranks?.length) return <div className="p-12 text-center text-slate-500">데이터가 없습니다.</div>;
-    return (
-        <div className="divide-y">
+        <div className="divide-y divide-slate-100">
             {ranks.map((member, index) => (
-                <div key={index} className={`p-6 transition-colors ${index < 3 ? "bg-gradient-to-r from-green-50 to-transparent" : "hover:bg-slate-50"}`}>
-                    <div className="flex items-center gap-4">
-                        <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${getRankBadgeColor(index + 1)} flex items-center justify-center font-bold text-lg shadow-md`}>{index < 3 ? getRankIcon(index + 1) : index + 1}</div>
-                        <div className="flex-shrink-0">
-                            {normalizeProfileImageUrl(member.profile_url || member.profileUrl || "") ? <img src={normalizeProfileImageUrl(member.profile_url || member.profileUrl || "")} className="w-12 h-12 rounded-full object-cover border-2" /> : <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold">{(member.name || "U").charAt(0)}</div>}
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-slate-900 text-lg mb-1">{member.name}</h3>
-                            <div className="flex items-center gap-4 text-sm"><div className="flex items-center gap-1"><Heart className="h-4 w-4 text-green-500 fill-green-500" /><span className="font-semibold text-green-700">{formatNumber(member.tree_count || member.treeCount)} Trees</span></div><div className="text-slate-600">Points: {formatNumber(member.point)}</div></div>
-                        </div>
-                    </div>
-                </div>
+                <MemberRankRow
+                    key={member.id}
+                    rank={index + 1}
+                    name={member.name}
+                    profileUrl={member.profileUrl}
+                    accent="purple"
+                    title={`Lv. ${member.level}`}
+                    detail={`누적 경험치 ${formatNumber(member.totalExp)}`}
+                    progress={member.progressPercent}
+                />
             ))}
         </div>
     );
 };
+
+const DonationRankList = ({ ranks }) => {
+    if (!ranks.length) {
+        return <EmptyRank message="랭킹에 표시할 기부 데이터가 없습니다." />;
+    }
+    return (
+        <div className="divide-y divide-slate-100">
+            {ranks.map((member, index) => (
+                <MemberRankRow
+                    key={member.id}
+                    rank={index + 1}
+                    name={member.name}
+                    profileUrl={member.profileUrl}
+                    accent="emerald"
+                    title={`나무 ${formatNumber(member.treeCount)}그루`}
+                    detail={`포인트 ${formatNumber(member.point)}`}
+                />
+            ))}
+        </div>
+    );
+};
+
+const MemberRankRow = ({ rank, name, profileUrl, title, detail, progress, accent }) => {
+    const imageUrl = normalizeProfileImageUrl(profileUrl);
+    const accentClass = accent === "emerald" ? "from-emerald-400 to-emerald-600" : "from-purple-400 to-purple-600";
+    return (
+        <div className={`p-5 transition-colors ${rank <= 3 ? "bg-slate-50" : "hover:bg-slate-50"}`}>
+            <div className="flex items-center gap-4">
+                <RankBadge rank={rank} />
+                <div className="flex-shrink-0">
+                    {imageUrl ? (
+                        <img src={imageUrl} alt="" className="h-12 w-12 rounded-full border-2 border-white object-cover shadow-sm" />
+                    ) : (
+                        <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${accentClass} font-bold text-white`}>
+                            {String(name || "익").charAt(0)}
+                        </div>
+                    )}
+                </div>
+                <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-lg font-bold text-slate-900">{name}</h3>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                        <span className="font-semibold text-slate-800">{title}</span>
+                        <span>{detail}</span>
+                    </div>
+                    {Number.isFinite(progress) && progress > 0 ? (
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-purple-500" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const EmptyRank = ({ message }) => (
+    <div className="p-8">
+        <EmptyState message={message} subMessage="활동이 쌓이면 이곳에 자동으로 표시됩니다." />
+    </div>
+);
+
+export default Ranks;

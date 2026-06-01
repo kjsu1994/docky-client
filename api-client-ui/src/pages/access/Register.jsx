@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Lock, User, Phone, MapPin, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
-import api from "../../utils/api.js";
 import toast from "react-hot-toast";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
+import { authAdapter, extractAuthErrorMessage, getAuthErrorCode } from "../../adapters/authAdapter.js";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 const MAX_CONFIRM_FAILURES = 5;
@@ -133,9 +133,8 @@ export const Register = () => {
 
         setCheckingEmail(true);
         try {
-            const response = await api.get("/members/check-email", { params: { email: normalizedEmail } });
-            const payload = response.data?.data || response.data;
-            const available = !!payload?.available;
+            const payload = await authAdapter.checkEmailAvailability(normalizedEmail);
+            const available = payload.available;
 
             setCheckedEmail(normalizedEmail);
             setEmailAvailable(available);
@@ -152,7 +151,7 @@ export const Register = () => {
             setCheckedEmail("");
             setEmailAvailable(null);
             resetVerificationState();
-            const message = error?.response?.data?.message || "이메일 확인에 실패했습니다.";
+            const message = extractAuthErrorMessage(error, "이메일 확인에 실패했습니다.");
             setErrors((prev) => ({ ...prev, email: message }));
             toast.error(message);
         } finally {
@@ -173,7 +172,7 @@ export const Register = () => {
 
         setSendingVerification(true);
         try {
-            await api.post("/members/email-verification/send", { email: normalizedEmail });
+            await authAdapter.sendEmailVerification(normalizedEmail);
             setVerifiedEmail("");
             setRemainingAttempts(MAX_CONFIRM_FAILURES);
             setResendCooldown(RESEND_COOLDOWN_SECONDS);
@@ -181,8 +180,8 @@ export const Register = () => {
             setErrors((prev) => ({ ...prev, verificationCode: "" }));
             toast.success("인증번호를 보냈습니다.");
         } catch (error) {
-            const message = error?.response?.data?.message || "인증번호 전송에 실패했습니다.";
-            if (error?.response?.data?.code === "EMAIL_VERIFICATION_REQUEST_RATE_LIMITED") {
+            const message = extractAuthErrorMessage(error, "인증번호 전송에 실패했습니다.");
+            if (getAuthErrorCode(error) === "EMAIL_VERIFICATION_REQUEST_RATE_LIMITED") {
                 const waitSeconds = parseRetrySeconds(message);
                 setResendCooldown(waitSeconds);
             }
@@ -206,18 +205,15 @@ export const Register = () => {
 
         setConfirmingVerification(true);
         try {
-            await api.post("/members/email-verification/confirm", {
-                email: normalizedEmail,
-                code,
-            });
+            await authAdapter.confirmEmailVerification({ email: normalizedEmail, code });
             setVerifiedEmail(normalizedEmail);
             setRemainingAttempts(MAX_CONFIRM_FAILURES);
             setVerificationStatus("이메일 인증이 완료되었습니다.");
             setErrors((prev) => ({ ...prev, verificationCode: "" }));
             toast.success("이메일 인증이 완료되었습니다.");
         } catch (error) {
-            const codeValue = error?.response?.data?.code;
-            const message = error?.response?.data?.message || "인증번호 확인에 실패했습니다.";
+            const codeValue = getAuthErrorCode(error);
+            const message = extractAuthErrorMessage(error, "인증번호 확인에 실패했습니다.");
             setVerifiedEmail("");
 
             if (codeValue === "EMAIL_VERIFICATION_CODE_INVALID") {
@@ -325,9 +321,6 @@ export const Register = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
-            <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary-100/50 rounded-full blur-3xl opacity-50" />
-            <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-sky-100/50 rounded-full blur-3xl opacity-50" />
-
             <div className="w-full max-w-md relative z-10 py-10">
                 <div className="text-center mb-10">
                     <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-primary-600 to-primary-400 text-white mb-6 shadow-2xl shadow-primary-200 group hover:scale-110 transition-transform duration-500">
@@ -350,7 +343,7 @@ export const Register = () => {
                                         value={formData.email}
                                         onChange={handleChange}
                                         className={`input-base pl-12 h-14 bg-white font-bold ${errors.email ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
-                                        placeholder="your@email.com"
+                                        placeholder="이메일 주소"
                                     />
                                 </div>
                                 <button

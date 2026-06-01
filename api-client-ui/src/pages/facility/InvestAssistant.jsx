@@ -1,12 +1,10 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { ArrowUpRight, Bot, CircleAlert, Globe2, Landmark, RefreshCw, Search, Sparkles } from "lucide-react";
-import api from "../../utils/api.js";
+import { extractInvestErrorMessage, findUsProviderWarningLimitation, investAdapter } from "../../adapters/investAdapter.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { formatDate } from "../../utils/helpers.js";
-
-const unwrapData = (response) => response?.data?.data ?? response?.data ?? null;
 
 const MARKETS = [
     { value: "KR", label: "국내", helper: "KIS 시세, DART 재무, 네이버 뉴스", icon: Landmark },
@@ -928,21 +926,10 @@ const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
         const timer = setTimeout(async () => {
             setLoading(true);
             try {
-                const response = await api.get("/invest/symbols/suggest", {
-                    params: { market, query: keyword, limit: 5 },
-                });
+                const suggestions = await investAdapter.fetchSymbolSuggestions({ market, query: keyword, limit: 5 });
                 if (!cancelled) {
-                    const responseItems = Array.isArray(unwrapData(response)?.items) ? unwrapData(response).items : [];
-                    const rankedItems = [...responseItems].sort((left, right) => {
-                        const leftScore = Number(left?.match_score);
-                        const rightScore = Number(right?.match_score);
-                        if (Number.isFinite(leftScore) && Number.isFinite(rightScore) && leftScore !== rightScore) {
-                            return rightScore - leftScore;
-                        }
-                        return 0;
-                    });
-                    setItems(rankedItems.slice(0, SYMBOL_SUGGEST_DISPLAY_LIMIT));
-                    setOpen(true);
+                    setItems(suggestions.items.slice(0, SYMBOL_SUGGEST_DISPLAY_LIMIT));
+                    setOpen(suggestions.items.length > 0);
                 }
             } catch {
                 if (!cancelled) setItems([]);
@@ -1012,9 +999,7 @@ export const InvestAssistant = () => {
     const krQuarterlyEarnings = v3?.kr_quarterly_earnings || [];
     const dividend = v3?.dividend_snapshot;
     const dividendCurrency = market === "US" ? "USD" : "KRW";
-    const usProviderWarning = !isKr && !summary
-        ? limitations.find((item) => /alpha vantage|provider issue|api key/i.test(item))
-        : "";
+    const usProviderWarning = findUsProviderWarningLimitation({ isKr, hasSummary: !!summary, limitations });
     const indicatorAnalysis = useMemo(() => analyzeIndicatorState(chartData?.points), [chartData?.points]);
     const indicatorSnapshot = useMemo(() => buildIndicatorSnapshot(chartData?.points), [chartData?.points]);
     const indicatorMessages = indicatorAnalysis.messages || [];
@@ -1022,8 +1007,7 @@ export const InvestAssistant = () => {
     const fetchChart = async (nextMarket, symbol, interval, fallbackSource = {}) => {
         setChartLoading(true);
         try {
-            const response = await api.get("/invest/chart", { params: { market: nextMarket, symbol, interval } });
-            const nextChart = unwrapData(response);
+            const nextChart = await investAdapter.fetchChart({ market: nextMarket, symbol, interval });
             if (Array.isArray(nextChart?.points) && nextChart.points.length) {
                 setChartData(nextChart);
                 return;
@@ -1033,10 +1017,10 @@ export const InvestAssistant = () => {
             const fallbackChart = buildFallbackChart({ market: nextMarket, symbol, interval, priceSnapshot: fallbackSource.priceSnapshot, currency: fallbackSource.currency, source: fallbackSource.source });
             if (fallbackChart) {
                 setChartData(fallbackChart);
-                toast.error(fetchError?.response?.data?.message || "차트 히스토리를 불러오지 못해 현재가 기준으로 대체 표시합니다.");
+                toast.error(extractInvestErrorMessage(fetchError, "차트 히스토리를 불러오지 못해 현재가 기준으로 대체 표시합니다."));
             } else {
                 setChartData(null);
-                toast.error(fetchError?.response?.data?.message || "차트 데이터를 불러오지 못했습니다.");
+                toast.error(extractInvestErrorMessage(fetchError, "차트 데이터를 불러오지 못했습니다."));
             }
         } finally {
             setChartLoading(false);
@@ -1054,15 +1038,7 @@ export const InvestAssistant = () => {
         setError("");
 
         try {
-            const [r1, r2, r3] = await Promise.all([
-                api.get("/invest/analysis", { params: { market, symbol } }),
-                api.get("/invest/analysis/v2", { params: { market, symbol } }),
-                api.get("/invest/analysis/v3", { params: { market, symbol } }),
-            ]);
-
-            const nextV1 = unwrapData(r1);
-            const nextV2 = unwrapData(r2);
-            const nextV3 = unwrapData(r3);
+            const { v1: nextV1, v2: nextV2, v3: nextV3 } = await investAdapter.fetchAnalysisBundle({ market, symbol });
             const nextPrice = nextV3?.price_snapshot || nextV2?.price_snapshot || nextV1?.price_snapshot;
             const nextSummary = nextV3?.financial_summary || nextV2?.financial_summary || nextV1?.financial_summary;
 
@@ -1085,7 +1061,7 @@ export const InvestAssistant = () => {
             setV2(null);
             setV3(null);
             setChartData(null);
-            setError(fetchError?.response?.data?.message || "투자 분석 데이터를 불러오지 못했습니다.");
+            setError(extractInvestErrorMessage(fetchError, "투자 분석 데이터를 불러오지 못했습니다."));
         } finally {
             setLoading(false);
         }
@@ -1253,7 +1229,7 @@ export const InvestAssistant = () => {
                             </Card>
                         ) : null}
 
-                        <Card title="추천 레이어" subtitle="v3 recommendation">
+                        <Card title="추천 레이어" subtitle="v3 추천 모델">
                             {recommendation ? (
                                 <>
                                     <div className="flex flex-wrap gap-2">
@@ -1286,7 +1262,7 @@ export const InvestAssistant = () => {
 
                     <div className={`grid gap-5 ${isKr ? "xl:grid-cols-[1.05fr_0.95fr]" : ""}`}>
                         {isKr ? (
-                            <Card title="뉴스 / 이슈" subtitle="v2/v3 issue 카드">
+                            <Card title="뉴스 / 이슈" subtitle="v2/v3 이슈 카드">
                                 <div className="space-y-3">
                                     {newsIssues.length ? newsIssues.map((item, index) => (
                                         <article key={`${item.url || item.title || "news"}-${index}`} className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
@@ -1305,7 +1281,7 @@ export const InvestAssistant = () => {
                             </Card>
                         ) : null}
 
-                        <Card title="제약사항 / 섹션 상태" subtitle="provider 상태와 available sections">
+                        <Card title="제약사항 / 섹션 상태" subtitle="제공자 상태와 표시 가능한 섹션">
                             <div className="space-y-3">
                                 {limitations.length ? limitations.map((item, index) => (
                                     <div key={`${item}-${index}`} className="flex gap-3 rounded-[1.4rem] border border-amber-100 bg-amber-50/70 p-4"><CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" /><p className="text-sm font-medium leading-relaxed text-amber-900">{formatLimitation(item)}</p></div>
