@@ -316,6 +316,17 @@ function assertStaticHomeAdsenseRuntimeBoundary() {
     }
 }
 
+function assertStaticRecentBoardStableKeys() {
+    const homeSource = readFileSync("src/pages/home/Home.jsx", "utf8");
+    const adapterSource = readFileSync("src/adapters/homeAdapter.js", "utf8");
+    if (!adapterSource.includes(".filter((board) => board.id)")) {
+        throw new Error("home-ui-smoke: recent home boards must filter out rows without persistent ids.");
+    }
+    if (!homeSource.includes("key={board.id}") || homeSource.includes("recent-board-${idx}")) {
+        throw new Error("home-ui-smoke: recent board cards must use persistent board ids as React keys.");
+    }
+}
+
 async function waitForJson(url, timeoutMs = 10000) {
     const started = Date.now();
     let lastError;
@@ -1580,6 +1591,7 @@ async function main() {
     assertStaticCustomCursorRuntimeBoundary();
     assertStaticToastViewportRuntimeBoundary();
     assertStaticHomeAdsenseRuntimeBoundary();
+    assertStaticRecentBoardStableKeys();
 
     const chrome = spawn(chromePath, [
         "--headless=new",        "--remote-debugging-pipe",

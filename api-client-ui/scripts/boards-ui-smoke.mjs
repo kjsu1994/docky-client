@@ -119,6 +119,19 @@ function assertStaticCommentActionStates() {
     }
 }
 
+function assertStaticBoardAttachmentStableKeys() {
+    const source = readFileSync("src/pages/boards/BoardDetail.jsx", "utf8");
+    if (!source.includes("const getBoardFileId = (file) => file?.file_id || file?.fileId;")) {
+        throw new Error("boards-ui-smoke: board detail attachments must share the persistent file id resolver.");
+    }
+    if (!source.includes(".filter((file) => getBoardFileId(file))")) {
+        throw new Error("boards-ui-smoke: board detail attachments must skip rows without persistent file ids.");
+    }
+    if (!source.includes("key={fileId}") || source.includes("key={fileId || idx}") || source.includes("files.map((file, idx)")) {
+        throw new Error("boards-ui-smoke: board detail attachments must not use index fallback keys.");
+    }
+}
+
 function assertStaticReportDialogAccessibility() {
     const source = readFileSync("src/common/ReportDialog.jsx", "utf8");
     if (!source.includes("role=\"dialog\"") || !source.includes("aria-modal=\"true\"")) {
@@ -564,6 +577,7 @@ async function inspectBoardCreateFormControls(cdp, sessionId) {
 
 async function main() {
     assertStaticCommentActionStates();
+    assertStaticBoardAttachmentStableKeys();
     assertStaticReportDialogAccessibility();
     assertStaticBoardToastRuntimeBoundary();
 

@@ -45,15 +45,6 @@ export const normalizeLevelRanks = (response) => normalizeList(response)
         profileUrl: member.profileUrl ?? member.profile_url ?? "",
     }));
 
-export const normalizeDonationRanks = (response) => normalizeList(response)
-    .map((member, index) => ({
-        id: member.memberId ?? member.member_id ?? `donation-${index}`,
-        name: member.name ?? member.nickname ?? member.userName ?? member.user_name ?? "익명",
-        profileUrl: member.profileUrl ?? member.profile_url ?? "",
-        treeCount: toNumber(member.treeCount ?? member.tree_count),
-        point: toNumber(member.point),
-    }));
-
 export const ranksAdapter = {
     async fetchBoardRanks(kind) {
         const response = await api.get("/boards/rankBoards", {
@@ -67,13 +58,6 @@ export const ranksAdapter = {
             params: { page: 0, size: 10 },
         });
         return normalizeLevelRanks(response);
-    },
-
-    async fetchDonationRanks() {
-        const response = await api.get("/members/donationRanks", {
-            params: { page: 0, size: 10 },
-        });
-        return normalizeDonationRanks(response);
     },
 };
 

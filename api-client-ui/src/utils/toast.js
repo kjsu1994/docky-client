@@ -1,5 +1,12 @@
 export const loadToast = () => import("react-hot-toast").then((module) => module.default);
 
+const DEFAULT_TOAST_ID = "app-action-toast";
+
+const singleToastOptions = (options) => ({
+    ...(options || {}),
+    id: options?.id || DEFAULT_TOAST_ID,
+});
+
 const dispatchToast = (handler) => {
     loadToast()
         .then(handler)
@@ -7,11 +14,11 @@ const dispatchToast = (handler) => {
 };
 
 export const notifySuccess = (message, options) => {
-    dispatchToast((toast) => toast.success(message, options));
+    dispatchToast((toast) => toast.success(message, singleToastOptions(options)));
 };
 
 export const notifyError = (message, options) => {
-    dispatchToast((toast) => toast.error(message, options));
+    dispatchToast((toast) => toast.error(message, singleToastOptions(options)));
 };
 
 export const notifyLoading = async (message, options) => {
@@ -35,5 +42,5 @@ export const notifyLoading = async (message, options) => {
 };
 
 export const notify = (message, options) => {
-    dispatchToast((toast) => toast(message, options));
+    dispatchToast((toast) => toast(message, singleToastOptions(options)));
 };

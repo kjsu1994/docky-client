@@ -380,6 +380,20 @@ export const AdminAnomalies = () => {
         }
     };
 
+    const copyMemberId = async (member) => {
+        const memberId = getMemberIdValue(member);
+        if (!memberId) {
+            notifyError("회원 ID를 확인할 수 없습니다.");
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(String(memberId));
+            notifySuccess(`회원 ID #${memberId}를 복사했습니다.`);
+        } catch (err) {
+            notifyError("회원 ID를 복사하지 못했습니다.");
+        }
+    };
+
     const fetchModerationBoards = async (hidden = moderationHiddenFilter) => {
         setModerationBoards(await adminAnomaliesAdapter.fetchModerationBoards({ hidden, page: 1, size: 8 }));
     };
@@ -1246,19 +1260,32 @@ export const AdminAnomalies = () => {
                         ) : null}
                         {sanctionMemberResults.length ? (
                             <div className="max-h-40 overflow-auto rounded-2xl border border-slate-100 bg-slate-50/40 p-2 space-y-2">
-                                {sanctionMemberResults.map((member, idx) => {
+                                {sanctionMemberResults.map((member) => {
                                     const memberId = getMemberIdValue(member);
                                     const isSelected = selectedSanctionMember && getMemberIdValue(selectedSanctionMember) === memberId;
                                     return (
-                                        <button
-                                            key={memberId || `sanction-member-${idx}`}
-                                            type="button"
-                                            onClick={() => setSelectedSanctionMember(member)}
-                                            className={`w-full rounded-xl px-3 py-2 text-left text-xs font-bold transition-all ${isSelected ? "bg-primary-100 text-primary-700" : "bg-white text-slate-600 hover:bg-primary-50"}`}
+                                        <div
+                                            key={memberId}
+                                            className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all ${isSelected ? "bg-primary-100 text-primary-700" : "bg-white text-slate-600 hover:bg-primary-50"}`}
                                         >
-                                            <div>{member?.name || "(이름 없음)"} ({member?.email || "-"})</div>
-                                            <div className="text-[10px] opacity-70">#{memberId || "-"}</div>
-                                        </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedSanctionMember(member)}
+                                                className="min-w-0 flex-1 text-left"
+                                            >
+                                                <div className="truncate">{member?.name || "(이름 없음)"} ({member?.email || "-"})</div>
+                                                <div className="text-[10px] opacity-70">#{memberId}</div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => copyMemberId(member)}
+                                                className="shrink-0 rounded-lg bg-white/80 p-2 text-slate-500 hover:text-primary-700"
+                                                title="회원 ID 복사"
+                                                aria-label={`회원 ID ${memberId} 복사`}
+                                            >
+                                                <ClipboardList className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -1278,8 +1305,19 @@ export const AdminAnomalies = () => {
                             placeholder="제재 일수 (비우면 영구)"
                             className="input-base w-full"
                         />
-                        <div className="text-[11px] font-bold text-slate-500">
-                            선택 회원: {selectedSanctionMember ? `${selectedSanctionMember?.name || selectedSanctionMember?.email || "회원"} (#${getMemberIdValue(selectedSanctionMember) || "-"})` : "없음"}
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-500">
+                            <span>
+                                선택 회원: {selectedSanctionMember ? `${selectedSanctionMember?.name || selectedSanctionMember?.email || "회원"} (#${getMemberIdValue(selectedSanctionMember) || "-"})` : "없음"}
+                            </span>
+                            {selectedSanctionMember ? (
+                                <button
+                                    type="button"
+                                    onClick={() => copyMemberId(selectedSanctionMember)}
+                                    className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-primary-50 hover:text-primary-700"
+                                >
+                                    ID 복사
+                                </button>
+                            ) : null}
                         </div>
                         {selectedSanctionMember && activeSanctionMemberIds.has(getMemberIdValue(selectedSanctionMember)) ? (
                             <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">

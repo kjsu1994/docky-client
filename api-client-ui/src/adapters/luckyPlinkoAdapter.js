@@ -7,11 +7,6 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const toOptionalNumber = (value) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-};
-
 const asNumberArray = (value) => Array.isArray(value)
     ? value.map((item) => Number(item)).filter((item) => Number.isFinite(item))
     : [];
@@ -36,7 +31,6 @@ export const normalizeDiceResult = (response) => {
         rankLabel: RANK_LABELS[rankName] || rankName,
         marbles: toNumber(data.marbles),
         canReroll: Boolean(data.canReroll ?? data.can_reroll),
-        totalPoint: toOptionalNumber(data.totalPoint ?? data.total_point),
     };
 };
 
@@ -46,8 +40,7 @@ export const normalizePlinkoResult = (response) => {
         marblesUsed: toNumber(data.marblesUsed ?? data.marbles_used),
         landingSlots: asNumberArray(data.landingSlots ?? data.landing_slots),
         multipliers: asNumberArray(data.multipliers),
-        earnedPoint: toNumber(data.earnedPoint ?? data.earned_point),
-        totalPoint: toNumber(data.totalPoint ?? data.total_point),
+        score: toNumber(data.score ?? data.earnedScore ?? data.earned_score),
     };
 };
 

@@ -29,6 +29,8 @@ import { boardAdapter, boardErrorMessage, getBoardLikeCount } from "../../adapte
 import { ReportDialog } from "../../common/ReportDialog.jsx";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
 
+const getBoardFileId = (file) => file?.file_id || file?.fileId;
+
 const BoardBody = memo(({ html, files, downloadingFileIds, onDownload }) => (
     <div className="p-6">
         <div
@@ -42,13 +44,13 @@ const BoardBody = memo(({ html, files, downloadingFileIds, onDownload }) => (
                     <FileText className="h-4 w-4" /> 첨부파일 ({files.length})
                 </h3>
                 <div className="grid gap-2">
-                    {files.map((file, idx) => {
-                        const fileId = file.file_id || file.fileId;
+                    {files.map((file) => {
+                        const fileId = getBoardFileId(file);
                         const fileName = file.file_name || file.fileName || "attachment";
                         const downloading = Boolean(downloadingFileIds[fileId]);
 
                         return (
-                            <div key={fileId || idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+                            <div key={fileId} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
                                 <span className="text-sm truncate mr-4">{fileName}</span>
                                 <button
                                     onClick={() => onDownload(fileId, fileName)}
@@ -216,7 +218,7 @@ export const BoardDetail = () => {
         userName: currentUserName,
     });
 
-    const files = board.uploadDto || board.upload_dto || [];
+    const files = (board.uploadDto || board.upload_dto || []).filter((file) => getBoardFileId(file));
     const boardBodyHtml = sanitizeBoardContentHtml(normalizeContentImageUrls(board.contents || board.content || ""));
     const currentLikeCount = getBoardLikeCount(board);
     const currentViewCount = board.view_count ?? board.viewCount ?? 0;

@@ -30,6 +30,9 @@ import {
     getMemberId,
     getRoomId,
     getRoomKey,
+    hasPersistentMessageId,
+    isMatchingOptimisticMessage,
+    isSamePersistentMessage,
     MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
     normalizeMessage,
     isAiRoom,
@@ -320,10 +323,16 @@ export const Chat = () => {
             const normalized = normalizeMessage(receivedMessage);
             if (normalized) {
                 setMessages((prev) => {
-                    if (prev.find((m) => m.id === normalized.id)) return prev;
-                    if (prev.some((m) => m.key && m.key === normalized.key)) return prev;
+                    if (prev.some((message) => isSamePersistentMessage(message, normalized))) return prev;
+                    const optimisticMatch = prev.find((message) => isMatchingOptimisticMessage(message, normalized));
+                    if (optimisticMatch) {
+                        return prev
+                            .map((message) => message.id === optimisticMatch.id ? normalized : message)
+                            .sort(compareMessagesByChronology);
+                    }
+                    if (!hasPersistentMessageId(normalized) && prev.some((m) => m.key && m.key === normalized.key)) return prev;
 
-                    const hasSameFile = normalized.type === "FILE" && prev.find((m) =>
+                    const hasSameFile = !hasPersistentMessageId(normalized) && normalized.type === "FILE" && prev.find((m) =>
                         m.type === "FILE" &&
                         Number(m.senderId) === Number(normalized.senderId) &&
                         String(m.fileUrl || m.message) === String(normalized.fileUrl || normalized.message)
@@ -653,7 +662,7 @@ export const Chat = () => {
                                             ? resolveChatAttachmentUrl(normalized.fileUrl || normalized.message, normalized.fileName || normalized.message)
                                             : "";
                                         return (
-                                            <div key={normalized.key || normalized.id || idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                                            <div key={normalized.key || normalized.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                                                 <div className={`flex max-w-[80%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
                                                     {!isMe && <div className="w-8 h-8 rounded-lg bg-slate-200 flex-shrink-0 flex items-center justify-center text-xs font-bold text-slate-600">{normalized.senderName?.charAt(0).toUpperCase()}</div>}
                                                     <div className="flex flex-col">

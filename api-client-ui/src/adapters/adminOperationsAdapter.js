@@ -208,23 +208,23 @@ export const normalizeMemberCandidate = (member) => ({
     email: pick(member, "email", "email", "-"),
 });
 
-const normalizeBoardSummary = (board, index = 0) => ({
-    boardId: toPositiveNumber(pick(board, "boardId", "board_id")) || index,
+const normalizeBoardSummary = (board) => ({
+    boardId: toPositiveNumber(pick(board, "boardId", "board_id")),
     title: pick(board, "title", "title", "-"),
     hiddenYn: Boolean(pick(board, "hiddenYn", "hidden_yn", false)),
     createdAt: pick(board, "createdAt", "created_at", ""),
 });
 
-const normalizeCommentSummary = (comment, index = 0) => ({
-    commentId: toPositiveNumber(pick(comment, "commentId", "comment_id")) || index,
+const normalizeCommentSummary = (comment) => ({
+    commentId: toPositiveNumber(pick(comment, "commentId", "comment_id")),
     boardId: toPositiveNumber(pick(comment, "boardId", "board_id")),
     contents: pick(comment, "contents", "contents", "-"),
     hiddenYn: Boolean(pick(comment, "hiddenYn", "hidden_yn", false)),
     createdAt: pick(comment, "createdAt", "created_at", ""),
 });
 
-const normalizeSanctionSummary = (sanction, index = 0) => ({
-    sanctionId: toPositiveNumber(pick(sanction, "sanctionId", "sanction_id")) || index,
+const normalizeSanctionSummary = (sanction) => ({
+    sanctionId: toPositiveNumber(pick(sanction, "sanctionId", "sanction_id")),
     sanctionStatus: pick(sanction, "sanctionStatus", "sanction_status", "-"),
     sanctionStatusLabel: labelFrom(pick(sanction, "sanctionStatus", "sanction_status", "-"), SANCTION_STATUS_LABELS),
     reason: pick(sanction, "reason", "reason", ""),
@@ -233,8 +233,8 @@ const normalizeSanctionSummary = (sanction, index = 0) => ({
     createdAt: pick(sanction, "createdAt", "created_at", ""),
 });
 
-const normalizeReportSummary = (report, index = 0) => ({
-    reportId: toPositiveNumber(pick(report, "reportId", "report_id")) || index,
+const normalizeReportSummary = (report) => ({
+    reportId: toPositiveNumber(pick(report, "reportId", "report_id")),
     targetType: pick(report, "targetType", "target_type", ""),
     targetId: toPositiveNumber(pick(report, "targetId", "target_id")),
     reason: pick(report, "reason", "reason", ""),
@@ -258,18 +258,17 @@ export const normalizeMemberDetail = (response) => {
             memberStatus: pick(memberInfo, "memberStatus", "member_status", "-"),
             memberStatusLabel: labelFrom(pick(memberInfo, "memberStatus", "member_status", "-"), MEMBER_STATUS_LABELS),
             point: toNumber(pick(memberInfo, "point", "point", 0)),
-            treeCount: toNumber(pick(memberInfo, "treeCount", "tree_count", 0)),
             boardCount: toNumber(pick(memberInfo, "boardCount", "board_count", 0)),
             commentCount: toNumber(pick(memberInfo, "commentCount", "comment_count", 0)),
             createdAt: pick(memberInfo, "createdAt", "created_at", ""),
             level: toNumber(pick(memberInfo, "level", "level", 0)),
             totalExp: toNumber(pick(memberInfo, "totalExp", "total_exp", 0)),
         },
-        recentBoards: asArray(pick(data, "recentBoards", "recent_boards", [])).map(normalizeBoardSummary),
-        recentComments: asArray(pick(data, "recentComments", "recent_comments", [])).map(normalizeCommentSummary),
-        sanctions: asArray(pick(data, "sanctions", "sanctions", [])).map(normalizeSanctionSummary),
-        receivedReports: asArray(pick(data, "receivedReports", "received_reports", [])).map(normalizeReportSummary),
-        madeReports: asArray(pick(data, "madeReports", "made_reports", [])).map(normalizeReportSummary),
+        recentBoards: asArray(pick(data, "recentBoards", "recent_boards", [])).map(normalizeBoardSummary).filter((board) => board.boardId),
+        recentComments: asArray(pick(data, "recentComments", "recent_comments", [])).map(normalizeCommentSummary).filter((comment) => comment.commentId),
+        sanctions: asArray(pick(data, "sanctions", "sanctions", [])).map(normalizeSanctionSummary).filter((sanction) => sanction.sanctionId),
+        receivedReports: asArray(pick(data, "receivedReports", "received_reports", [])).map(normalizeReportSummary).filter((report) => report.reportId),
+        madeReports: asArray(pick(data, "madeReports", "made_reports", [])).map(normalizeReportSummary).filter((report) => report.reportId),
     };
 };
 

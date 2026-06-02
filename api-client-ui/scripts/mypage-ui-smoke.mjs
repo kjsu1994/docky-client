@@ -22,7 +22,7 @@ const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
     { name: "mobile", width: 390, height: 844, mobile: true },
 ];
-const profileTexts = ["검증 사용자", "누적 경험치", "보유 포인트", "심은 나무", "프로필 수정", "계정 관리"];
+const profileTexts = ["검증 사용자", "누적 경험치", "보유 포인트", "프로필 수정", "계정 관리"];
 const postsTexts = ["작성 글", "테스트 게시글", "좋아요", "조회"];
 const statsTexts = ["활동 통계", "경험치 이력", "게시글 작성 보상", "다음 레벨까지"];
 const editTexts = ["프로필 수정", "이메일", "전화번호", "주소", "주소 검색", "수정 내용 저장"];
@@ -147,7 +147,6 @@ function routeMock(url, method) {
                     phone: "010-1234-5678",
                     address: "서울특별시 중구 세종대로 110",
                     point: "6400",
-                    treeCount: "21",
                     board_count: 3,
                     comment_count: 8,
                     member_status: "MEMBER_ACTIVE",
@@ -332,6 +331,9 @@ async function inspectMypage(cdp, sessionId, viewport) {
 
 async function main() {
     assertStaticMypageToastRuntimeBoundary();
+    if (mypageSource.includes("심은 나무") || mypageSource.includes("treeCount")) {
+        throw new Error("mypage-ui-smoke: donation tree count must stay removed from mypage.");
+    }
 
     const deleteModalSnippets = [
         "role=\"dialog\"",

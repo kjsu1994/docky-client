@@ -62,7 +62,6 @@ export const normalizeMember = (response) => {
         phone: data.phone || "",
         address: data.address || "",
         point: toNumber(data.point),
-        treeCount: toNumber(getFirst(data, ["treeCount", "tree_count"])),
         boardCount: toNumber(getFirst(data, ["boardCount", "board_count"])),
         commentCount: toNumber(getFirst(data, ["commentCount", "comment_count"])),
         profileUrl: getFirst(data, ["profileUrl", "profile_url"], ""),

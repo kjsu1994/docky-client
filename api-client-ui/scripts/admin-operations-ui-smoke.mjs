@@ -116,6 +116,35 @@ function assertStaticMemberSearchBounds() {
     if (!pageSource.includes("MEMBER_SEARCH_KEYWORD_MAX_LENGTH") || !pageSource.includes("maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH}")) {
         throw new Error("admin-operations-ui-smoke: member search input must be bounded.");
     }
+    if (adapterSource.includes("treeCount") || adapterSource.includes("tree_count") || pageSource.includes("treeCount")) {
+        throw new Error("admin-operations-ui-smoke: donation tree count must stay removed from admin member detail.");
+    }
+    if (pageSource.includes("member-candidate-${idx}") || !pageSource.includes("key={candidateId}")) {
+        throw new Error("admin-operations-ui-smoke: member search candidates must use real member ids as keys.");
+    }
+    if (!pageSource.includes("copyMemberId") || !pageSource.includes("navigator.clipboard.writeText")) {
+        throw new Error("admin-operations-ui-smoke: member detail must expose member id copy action.");
+    }
+}
+
+function assertStaticMemberDetailStableIds() {
+    const adapterSource = readFileSync("src/adapters/adminOperationsAdapter.js", "utf8");
+    const pageSource = readFileSync("src/pages/admin/AdminOperations.jsx", "utf8");
+    for (const fallback of ["|| index", "|| idx", "key={`${board.boardId || idx}", "key={`${comment.commentId || idx}", "key={`${item.sanctionId || idx}", "key={`${item.reportId || idx}"]) {
+        if (adapterSource.includes(fallback) || pageSource.includes(fallback)) {
+            throw new Error("admin-operations-ui-smoke: member detail summaries must not synthesize ids from array indexes.");
+        }
+    }
+    for (const stableKey of ["key={board.boardId}", "key={comment.commentId}", "key={item.sanctionId}", "key={item.reportId}"]) {
+        if (!pageSource.includes(stableKey)) {
+            throw new Error(`admin-operations-ui-smoke: member detail summary is missing stable key ${stableKey}.`);
+        }
+    }
+    for (const filterGuard of ["filter((board) => board.boardId)", "filter((comment) => comment.commentId)", "filter((sanction) => sanction.sanctionId)", "filter((report) => report.reportId)"]) {
+        if (!adapterSource.includes(filterGuard)) {
+            throw new Error(`admin-operations-ui-smoke: member detail summaries must filter missing ids with ${filterGuard}.`);
+        }
+    }
 }
 
 function assertStaticBannerFormBounds() {
@@ -305,7 +334,6 @@ function routeMock(url, method) {
                         roles: ["ROLE_USER"],
                         member_status: "MEMBER_ACTIVE",
                         point: 120,
-                        tree_count: 3,
                         board_count: 2,
                         comment_count: 5,
                     },
@@ -501,6 +529,7 @@ async function inspectAdminOperations(cdp, sessionId, viewport) {
 async function main() {
     assertStaticToastRuntimeSplit();
     assertStaticMemberSearchBounds();
+    assertStaticMemberDetailStableIds();
     assertStaticBannerFormBounds();
     assertStaticModerationBounds();
     const chrome = spawn(chromePath, [

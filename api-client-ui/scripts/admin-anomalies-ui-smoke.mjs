@@ -59,6 +59,20 @@ function assertStaticMemberSearchBounds() {
     }
 }
 
+function assertStaticSanctionMemberFinder() {
+    const adapterSource = readFileSync("src/adapters/adminAnomaliesAdapter.js", "utf8");
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!adapterSource.includes("normalizeMemberCandidate") || !adapterSource.includes("filter((member) => member.memberId)")) {
+        throw new Error("admin-anomalies-ui-smoke: sanction member search results must keep only real member ids.");
+    }
+    if (pageSource.includes("sanction-member-${idx}") || pageSource.includes("key={memberId ||")) {
+        throw new Error("admin-anomalies-ui-smoke: sanction member search results must not use index fallback keys.");
+    }
+    if (!pageSource.includes("key={memberId}") || !pageSource.includes("copyMemberId") || !pageSource.includes("navigator.clipboard.writeText")) {
+        throw new Error("admin-anomalies-ui-smoke: sanction member finder must expose stable ids and copy action.");
+    }
+}
+
 function assertStaticActionTextBounds() {
     const adapterSource = readFileSync("src/adapters/adminAnomaliesAdapter.js", "utf8");
     const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
@@ -696,6 +710,7 @@ async function main() {
     assertStaticToastRuntimeSplit();
     assertStaticSafeDiagnostics();
     assertStaticMemberSearchBounds();
+    assertStaticSanctionMemberFinder();
     assertStaticActionTextBounds();
     assertStaticAuditRequestNormalization();
     assertStaticAuditInteractionStates();

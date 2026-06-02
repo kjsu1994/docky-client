@@ -94,6 +94,38 @@ export const getMessageKey = (msg) => {
     return `${sender}-${text}-${fuzzyTime}`;
 };
 
+const toIdentityString = (value) => hasStableValue(value) ? String(value) : "";
+
+export const isOptimisticMessage = (msg) => {
+    const identity = toIdentityString(getFirst(msg, ["messageId", "message_id", "id", "tempId", "temp_id"], ""));
+    return identity.startsWith("temp-");
+};
+
+export const hasPersistentMessageId = (msg) => {
+    const identity = toIdentityString(getFirst(msg, ["messageId", "message_id", "id"], ""));
+    if (!identity || identity.startsWith("temp-")) return false;
+    return identity !== toIdentityString(msg?.key);
+};
+
+export const isSamePersistentMessage = (left, right) =>
+    hasPersistentMessageId(left)
+    && hasPersistentMessageId(right)
+    && toIdentityString(getFirst(left, ["messageId", "message_id", "id"], ""))
+        === toIdentityString(getFirst(right, ["messageId", "message_id", "id"], ""));
+
+export const isMatchingOptimisticMessage = (optimistic, incoming) => {
+    if (!isOptimisticMessage(optimistic)) return false;
+    if (Number(getFirst(optimistic, ["senderId", "sender_id"], NaN)) !== Number(getFirst(incoming, ["senderId", "sender_id"], NaN))) {
+        return false;
+    }
+    if (String(getFirst(optimistic, ["type", "messageType", "message_type"], "TALK")) !== String(getFirst(incoming, ["type", "messageType", "message_type"], "TALK"))) {
+        return false;
+    }
+    const optimisticBody = getFirst(optimistic, ["fileUrl", "file_url", "message", "content"], "");
+    const incomingBody = getFirst(incoming, ["fileUrl", "file_url", "message", "content"], "");
+    return String(optimisticBody || "") === String(incomingBody || "");
+};
+
 const compareMessageIdentity = (left, right) => {
     const leftValue = hasStableValue(left) ? String(left) : "";
     const rightValue = hasStableValue(right) ? String(right) : "";

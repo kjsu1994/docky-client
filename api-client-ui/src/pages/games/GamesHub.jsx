@@ -414,6 +414,8 @@ const GameCard = ({ game, onOpenManual }) => {
       onPointerEnter={() => preloadGameRoute(game.to)}
       data-smoke="game-card"
       data-game-title={game.title}
+      data-min-players={game.minPlayers}
+      data-max-players={game.maxPlayers}
     >
       <Link
         to={game.to}

@@ -124,6 +124,22 @@ function assertTabletopRealtimeSource() {
   }
 }
 
+function assertActionToastSingleton() {
+  const toastSource = readFileSync("src/utils/toast.js", "utf8");
+  const requiredSnippets = [
+    "const DEFAULT_TOAST_ID = \"app-action-toast\"",
+    "const singleToastOptions = (options) => ({",
+    "id: options?.id || DEFAULT_TOAST_ID",
+    "toast.success(message, singleToastOptions(options))",
+    "toast.error(message, singleToastOptions(options))",
+    "toast(message, singleToastOptions(options))",
+  ];
+  const missing = requiredSnippets.filter((snippet) => !toastSource.includes(snippet));
+  if (missing.length) {
+    throw new Error(`tabletop-ui-smoke: action toasts must replace the same bottom-left slot instead of stacking: ${missing.join(", ")}`);
+  }
+}
+
 class PipeCdp {
   constructor(chrome) {
     this.chrome = chrome;
@@ -959,6 +975,11 @@ async function inspectPage(ws, testCase, viewport) {
         scrollWidth: root.scrollWidth,
         bodyWidth: body ? body.scrollWidth : 0,
         overflowNodes,
+        gameCards: Array.from(document.querySelectorAll('[data-smoke="game-card"]')).map((card) => ({
+          title: card.getAttribute("data-game-title") || "",
+          minPlayers: Number(card.getAttribute("data-min-players")),
+          maxPlayers: Number(card.getAttribute("data-max-players")),
+        })),
       };
     })()`,
   });
@@ -977,6 +998,24 @@ async function inspectPage(ws, testCase, viewport) {
   if (overflow > 3) {
     throw new Error(`${testCase.label} ${viewport.name}: horizontal overflow ${overflow}px ${JSON.stringify(value.overflowNodes)}`);
   }
+  if (testCase.label === "game hub") {
+    if (!value.gameCards.length) {
+      throw new Error(`${testCase.label} ${viewport.name}: game cards were not rendered with smoke metadata`);
+    }
+    const unsortedPair = value.gameCards.find((card, index, cards) => {
+      const next = cards[index + 1];
+      if (!next) return false;
+      if (!Number.isFinite(card.minPlayers) || !Number.isFinite(card.maxPlayers)
+          || !Number.isFinite(next.minPlayers) || !Number.isFinite(next.maxPlayers)) {
+        return true;
+      }
+      return card.minPlayers > next.minPlayers
+        || (card.minPlayers === next.minPlayers && card.maxPlayers > next.maxPlayers);
+    });
+    if (unsortedPair) {
+      throw new Error(`${testCase.label} ${viewport.name}: game cards must be sorted by min players, then max players: ${JSON.stringify(value.gameCards)}`);
+    }
+  }
   return {
     case: testCase.label,
     viewport: viewport.name,
@@ -988,6 +1027,7 @@ async function inspectPage(ws, testCase, viewport) {
 
 async function main() {
   assertTabletopRealtimeSource();
+  assertActionToastSingleton();
   const chrome = spawn(chromePath, [
     "--headless=new",
     "--remote-debugging-pipe",

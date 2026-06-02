@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ShieldAlert, UserSearch, EyeOff, RotateCcw, RefreshCw } from "lucide-react";
+import { ShieldAlert, UserSearch, EyeOff, RotateCcw, RefreshCw, ClipboardList } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
@@ -358,6 +358,20 @@ export const AdminOperations = () => {
         await fetchMemberDetail(memberId);
     };
 
+    const copyMemberId = async (memberIdValue) => {
+        const memberId = Number(memberIdValue);
+        if (!Number.isFinite(memberId) || memberId <= 0) {
+            notifyError("회원 ID를 확인할 수 없습니다.");
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(String(memberId));
+            notifySuccess(`회원 ID #${memberId}를 복사했습니다.`);
+        } catch (err) {
+            notifyError("회원 ID를 복사하지 못했습니다.");
+        }
+    };
+
     if (!isAdmin) {
         return (
             <section className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-rose-800 text-center space-y-4">
@@ -562,11 +576,11 @@ export const AdminOperations = () => {
                         ) : null}
                         {memberCandidates.length ? (
                             <div className="max-h-44 overflow-auto rounded-2xl border border-slate-100 bg-slate-50/50 p-2 space-y-2">
-                                {memberCandidates.map((member, idx) => {
+                                {memberCandidates.map((member) => {
                                     const candidateId = member.memberId;
                                     return (
                                         <button
-                                            key={candidateId || `member-candidate-${idx}`}
+                                            key={candidateId}
                                             type="button"
                                             onClick={() => selectCandidate(member)}
                                             className="w-full rounded-xl bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-primary-50"
@@ -725,13 +739,24 @@ export const AdminOperations = () => {
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div className="card p-6 xl:col-span-1 space-y-3">
                         <h3 className="text-base font-black text-slate-900">기본 정보</h3>
-                        <div className="text-sm"><b>ID:</b> {memberInfo.memberId || "-"}</div>
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span><b>ID:</b> {memberInfo.memberId || "-"}</span>
+                            {memberInfo.memberId ? (
+                                <button
+                                    type="button"
+                                    onClick={() => copyMemberId(memberInfo.memberId)}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-primary-50 hover:text-primary-700"
+                                >
+                                    <ClipboardList className="h-3.5 w-3.5" />
+                                    ID 복사
+                                </button>
+                            ) : null}
+                        </div>
                         <div className="text-sm"><b>이메일:</b> {memberInfo.email || "-"}</div>
                         <div className="text-sm"><b>이름:</b> {memberInfo.name || "-"}</div>
                         <div className="text-sm"><b>상태:</b> {memberInfo.memberStatusLabel || "-"}</div>
                         <div className="text-sm"><b>권한:</b> {(memberInfo.roleLabels || []).join(", ") || "-"}</div>
                         <div className="text-sm"><b>포인트:</b> {memberInfo.point || 0}</div>
-                        <div className="text-sm"><b>나무:</b> {memberInfo.treeCount || 0}</div>
                         <div className="text-sm"><b>게시글:</b> {memberInfo.boardCount || 0}</div>
                         <div className="text-sm"><b>댓글:</b> {memberInfo.commentCount || 0}</div>
                     </div>
@@ -743,8 +768,8 @@ export const AdminOperations = () => {
                                 <div className="mb-2 text-xs font-black text-slate-500">최근 게시글</div>
                                 {!recentBoards.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                     <ul className="space-y-2 text-sm">
-                                        {recentBoards.map((board, idx) => (
-                                            <li key={`${board.boardId || idx}-${idx}`} className="flex items-center justify-between gap-2">
+                                        {recentBoards.map((board) => (
+                                            <li key={board.boardId} className="flex items-center justify-between gap-2">
                                                 <span className="truncate">#{board.boardId || "-"} {board.title || "-"}</span>
                                                 <span className={`text-[10px] font-black ${board.hiddenYn ? "text-rose-600" : "text-emerald-600"}`}>
                                                     {board.hiddenYn ? "숨김" : "공개"}
@@ -758,8 +783,8 @@ export const AdminOperations = () => {
                                 <div className="mb-2 text-xs font-black text-slate-500">최근 댓글</div>
                                 {!recentComments.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                     <ul className="space-y-2 text-sm">
-                                        {recentComments.map((comment, idx) => (
-                                            <li key={`${comment.commentId || idx}-${idx}`} className="flex items-center justify-between gap-2">
+                                        {recentComments.map((comment) => (
+                                            <li key={comment.commentId} className="flex items-center justify-between gap-2">
                                                 <span className="truncate">#{comment.commentId || "-"} {comment.contents || "-"}</span>
                                                 <span className={`text-[10px] font-black ${comment.hiddenYn ? "text-rose-600" : "text-emerald-600"}`}>
                                                     {comment.hiddenYn ? "숨김" : "공개"}
@@ -777,8 +802,8 @@ export const AdminOperations = () => {
                             <div className="mb-2 text-xs font-black text-slate-500">제재 이력</div>
                             {!sanctions.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                 <ul className="space-y-2 text-sm">
-                                    {sanctions.map((item, idx) => (
-                                        <li key={`${item.sanctionId || idx}-${idx}`}>
+                                    {sanctions.map((item) => (
+                                        <li key={item.sanctionId}>
                                             #{item.sanctionId || "-"} {item.sanctionStatusLabel || "-"}
                                         </li>
                                     ))}
@@ -789,8 +814,8 @@ export const AdminOperations = () => {
                             <div className="mb-2 text-xs font-black text-slate-500">받은 신고</div>
                             {!receivedReports.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                 <ul className="space-y-2 text-sm">
-                                    {receivedReports.map((item, idx) => (
-                                        <li key={`${item.reportId || idx}-${idx}`}>
+                                    {receivedReports.map((item) => (
+                                        <li key={item.reportId}>
                                             #{item.reportId || "-"} {item.reportStatusLabel || "-"}
                                         </li>
                                     ))}
@@ -801,8 +826,8 @@ export const AdminOperations = () => {
                             <div className="mb-2 text-xs font-black text-slate-500">작성한 신고</div>
                             {!madeReports.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (
                                 <ul className="space-y-2 text-sm">
-                                    {madeReports.map((item, idx) => (
-                                        <li key={`${item.reportId || idx}-${idx}`}>
+                                    {madeReports.map((item) => (
+                                        <li key={item.reportId}>
                                             #{item.reportId || "-"} {item.reportStatusLabel || "-"}
                                         </li>
                                     ))}

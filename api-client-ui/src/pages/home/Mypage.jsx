@@ -11,7 +11,6 @@ import {
     Phone,
     ShieldCheck,
     TrendingUp,
-    TreePine,
     User,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
@@ -244,10 +243,9 @@ export const Mypage = () => {
                         </button>
                     </div>
 
-                    <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
                         <SummaryCard icon={Award} label="누적 경험치" value={formatNumber(level.totalExp)} tone="sky" />
                         <SummaryCard icon={TrendingUp} label="보유 포인트" value={`${formatNumber(member.point)}P`} tone="emerald" />
-                        <SummaryCard icon={TreePine} label="심은 나무" value={`${formatNumber(member.treeCount)}그루`} tone="green" />
                         <SummaryCard icon={MessageSquare} label="작성 게시글" value={`${formatNumber(member.boardCount)}개`} tone="amber" />
                     </div>
                 </div>
@@ -355,11 +353,10 @@ const ProfileTab = ({ member, level, onDeleteAccount, deleteBusy }) => (
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
-                <TreePine className="h-5 w-5 text-emerald-600" />
-                환경 활동
+                <BarChart3 className="h-5 w-5 text-emerald-600" />
+                활동 요약
             </h2>
             <InfoRow label="보유 포인트" value={`${formatNumber(member.point)}P`} />
-            <InfoRow label="심은 나무" value={`${formatNumber(member.treeCount)}그루`} />
             <InfoRow label="작성 게시글" value={`${formatNumber(member.boardCount)}개`} />
             <InfoRow label="작성 댓글" value={`${formatNumber(member.commentCount)}개`} />
         </section>
@@ -430,12 +427,11 @@ const StatsTab = ({ member, level, history, historyLoading }) => (
                 <BarChart3 className="h-5 w-5 text-sky-600" />
                 활동 통계
             </h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <SummaryCard icon={Award} label="레벨" value={`레벨 ${level.level || 1}`} tone="sky" />
                 <SummaryCard icon={TrendingUp} label="누적 경험치" value={formatNumber(level.totalExp)} tone="emerald" />
                 <SummaryCard icon={TrendingUp} label="보유 포인트" value={`${formatNumber(member.point)}P`} tone="green" />
                 <SummaryCard icon={MessageSquare} label="작성 게시글" value={`${formatNumber(member.boardCount)}개`} tone="amber" />
-                <SummaryCard icon={TreePine} label="심은 나무" value={`${formatNumber(member.treeCount)}그루`} tone="green" />
             </div>
         </section>
 

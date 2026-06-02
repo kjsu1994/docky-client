@@ -733,7 +733,7 @@ export const Home = () => {
                             const boardTimeLabel = toBoardTimeLabel(board.createdAt);
                             return (
                                 <Link
-                                    key={board.id || `recent-board-${idx}`}
+                                    key={board.id}
                                     to={`/app/boards/${board.kind}/${board.id}`}
                                     className="card group bg-white p-7"
                                     onPointerEnter={prefetchBoardDetailRoute}

@@ -11,13 +11,12 @@ import { BOARD_RANK_TYPES, rankErrorMessage, ranksAdapter } from "../../adapters
 const tabs = [
     { key: "boards", label: "게시판 랭킹", icon: TrendingUp },
     { key: "level", label: "레벨 랭킹", icon: Award },
-    { key: "donation", label: "기부 랭킹", icon: Heart },
 ];
 
 export const Ranks = () => {
     const [activeTab, setActiveTab] = useState("boards");
     const [boardRankType, setBoardRankType] = useState("FREE_BOARD");
-    const [ranks, setRanks] = useState({ boards: [], level: [], donation: [] });
+    const [ranks, setRanks] = useState({ boards: [], level: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const requestSeqRef = useRef(0);
@@ -42,22 +41,14 @@ export const Ranks = () => {
                 }
                 return;
             }
-            if (activeTab === "level") {
-                const items = await ranksAdapter.fetchLevelRanks();
-                if (requestSeqRef.current === requestId) {
-                    setRanks((current) => ({ ...current, level: items }));
-                }
-                return;
-            }
-            const items = await ranksAdapter.fetchDonationRanks();
+            const items = await ranksAdapter.fetchLevelRanks();
             if (requestSeqRef.current === requestId) {
-                setRanks((current) => ({ ...current, donation: items }));
+                setRanks((current) => ({ ...current, level: items }));
             }
         } catch (err) {
             if (requestSeqRef.current !== requestId) return;
             const fallback = activeTab === "boards" ? "게시판 랭킹을 불러오지 못했습니다."
-                : activeTab === "level" ? "레벨 랭킹을 불러오지 못했습니다."
-                    : "기부 랭킹을 불러오지 못했습니다.";
+                : "레벨 랭킹을 불러오지 못했습니다.";
             setError(rankErrorMessage(err, fallback));
         } finally {
             if (requestSeqRef.current === requestId) {
@@ -70,9 +61,7 @@ export const Ranks = () => {
         fetchRanks();
     }, [fetchRanks]);
 
-    const currentRanks = activeTab === "boards" ? ranks.boards
-        : activeTab === "level" ? ranks.level
-            : ranks.donation;
+    const currentRanks = activeTab === "boards" ? ranks.boards : ranks.level;
 
     return (
         <div className="space-y-6">
@@ -94,7 +83,7 @@ export const Ranks = () => {
             </div>
 
             <div className="card p-2">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                     {tabs.map((tab) => (
                         <TabButton
                             key={tab.key}
@@ -131,7 +120,6 @@ export const Ranks = () => {
                 <div className="card overflow-hidden">
                     {activeTab === "boards" ? <BoardRankList ranks={ranks.boards} /> : null}
                     {activeTab === "level" ? <LevelRankList ranks={ranks.level} /> : null}
-                    {activeTab === "donation" ? <DonationRankList ranks={ranks.donation} /> : null}
                 </div>
             ) : null}
         </div>
@@ -222,27 +210,6 @@ const LevelRankList = ({ ranks }) => {
                     title={`Lv. ${member.level}`}
                     detail={`누적 경험치 ${formatNumber(member.totalExp)}`}
                     progress={member.progressPercent}
-                />
-            ))}
-        </div>
-    );
-};
-
-const DonationRankList = ({ ranks }) => {
-    if (!ranks.length) {
-        return <EmptyRank message="랭킹에 표시할 기부 데이터가 없습니다." />;
-    }
-    return (
-        <div className="divide-y divide-slate-100">
-            {ranks.map((member, index) => (
-                <MemberRankRow
-                    key={member.id}
-                    rank={index + 1}
-                    name={member.name}
-                    profileUrl={member.profileUrl}
-                    accent="emerald"
-                    title={`나무 ${formatNumber(member.treeCount)}그루`}
-                    detail={`포인트 ${formatNumber(member.point)}`}
                 />
             ))}
         </div>

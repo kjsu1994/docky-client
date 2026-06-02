@@ -58,6 +58,11 @@ function assertStaticChatAuthWiring() {
     if (chatAdapterSource.includes("Math.random().toString(36)")) {
         throw new Error("chat-ui-smoke: chat message ids must not use random fallback fingerprints.");
     }
+    if (!chatAdapterSource.includes("hasPersistentMessageId")
+        || !chatAdapterSource.includes("isSamePersistentMessage")
+        || !chatAdapterSource.includes("isMatchingOptimisticMessage")) {
+        throw new Error("chat-ui-smoke: chat adapter must separate server-id duplicates from optimistic/fingerprint fallback messages.");
+    }
     const memberSearchBoundsSource = readFileSync("src/adapters/memberSearchBounds.js", "utf8");
     if (!memberSearchBoundsSource.includes("MEMBER_SEARCH_KEYWORD_MAX_LENGTH = 80")) {
         throw new Error("chat-ui-smoke: member search keyword bound must stay at 80 characters.");
@@ -100,6 +105,16 @@ function assertStaticChatAuthWiring() {
         if ((sourcePath === "src/pages/chat/Chat.jsx" || sourcePath === "src/components/FloatingChat.jsx")
             && (source.includes("key={roomId || Math.random()}") || !source.includes("getRoomKey(room, idx)"))) {
             throw new Error(`chat-ui-smoke: ${sourcePath} must use deterministic room list keys.`);
+        }
+        if ((sourcePath === "src/pages/chat/Chat.jsx" || sourcePath === "src/components/FloatingChat.jsx")
+            && (!source.includes("key={normalized.key || normalized.id}") || source.includes("key={normalized.key || normalized.id || idx}"))) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must render chat messages with deterministic normalized keys only.`);
+        }
+        if ((sourcePath === "src/pages/chat/Chat.jsx" || sourcePath === "src/components/FloatingChat.jsx")
+            && (!source.includes("isSamePersistentMessage")
+                || !source.includes("isMatchingOptimisticMessage")
+                || !source.includes("!hasPersistentMessageId(normalized)"))) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must avoid fingerprint dedupe for server-id chat messages.`);
         }
         if ((sourcePath === "src/pages/chat/Chat.jsx" || sourcePath === "src/components/FloatingChat.jsx")
             && (!source.includes("첨부파일을 표시할 수 없습니다.") || source.includes("href={messageFileUrl || undefined}"))) {

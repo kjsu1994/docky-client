@@ -91,6 +91,17 @@ const toPositiveNumber = (value, fallback = 1) => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const normalizeMemberCandidate = (member) => ({
+    memberId: toPositiveNumber(
+        member?.memberId ?? member?.member_id ?? member?.id ?? member?.memberNo ?? member?.member_no,
+        0,
+    ),
+    name: member?.name ?? member?.memberName ?? member?.member_name ?? "",
+    email: member?.email ?? "",
+    roles: Array.isArray(member?.roles) ? member.roles : [],
+    memberStatus: member?.memberStatus ?? member?.member_status ?? "",
+});
+
 export const buildIncidentUpdatePayload = ({ incidentStatus, assignee, note } = {}) => ({
     incident_status: incidentStatus,
     assignee: toLimitedText(assignee, ADMIN_ANOMALY_TEXT_LIMITS.incidentAssignee),
@@ -146,7 +157,7 @@ export const adminAnomaliesAdapter = {
         const response = await api.get("/members/list", { params: { keyword: normalizedKeyword || undefined, page, size } });
         const payload = unwrapAdminData(response.data);
         const items = payload?.items || payload?.content || payload?.data || payload || [];
-        return Array.isArray(items) ? items : [];
+        return Array.isArray(items) ? items.map(normalizeMemberCandidate).filter((member) => member.memberId) : [];
     },
 
     async fetchModerationBoards({ hidden, page = 1, size = 8 } = {}) {

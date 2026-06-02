@@ -28,6 +28,9 @@ function assertPlinkoToastRuntimeBoundary() {
     if (source.includes('from "react-hot-toast"') || !source.includes('from "../../utils/toast.js"')) {
         throw new Error("plinko-ui-smoke: LuckyPlinko must use the dynamic toast helper instead of static react-hot-toast imports.");
     }
+    if (source.includes("plinko-point-balance") || source.includes("보유 포인트") || source.includes("PLINKO_ENTRY_COST")) {
+        throw new Error("plinko-ui-smoke: LuckyPlinko must not depend on member point balance.");
+    }
 }
 
 class PipeCdp {
@@ -115,7 +118,6 @@ function routeMock(url, method) {
                     member_id: 100,
                     email: "player@example.com",
                     name: "검증 플레이어",
-                    point: 120,
                     roles: ["ROLE_USER"],
                 },
             },
@@ -134,7 +136,6 @@ function routeMock(url, method) {
                 rank_name: "ONE PAIR",
                 marbles: 1,
                 can_reroll: true,
-                total_point: 20,
             },
         };
     }
@@ -146,8 +147,7 @@ function routeMock(url, method) {
                 marbles_used: 1,
                 landing_slots: [],
                 multipliers: [30, 10, 5, 1, 1, 5, 10, 30],
-                earned_point: 30,
-                total_point: 50,
+                score: 30,
             },
         };
     }
@@ -201,12 +201,12 @@ async function waitForText(cdp, sessionId, text, timeoutMs = 7000) {
     await waitFor(cdp, sessionId, `document.body?.innerText.includes(${JSON.stringify(text)})`, `text: ${text}`, timeoutMs);
 }
 
-async function waitForPointBalance(cdp, sessionId, value, timeoutMs = 7000) {
+async function waitForScore(cdp, sessionId, value, timeoutMs = 7000) {
     await waitFor(
         cdp,
         sessionId,
-        `document.querySelector('[data-smoke="plinko-point-balance"]')?.textContent.replace(/[^0-9]/g, "") === ${JSON.stringify(String(value))}`,
-        `plinko point balance: ${value}`,
+        `document.querySelector('[data-smoke="plinko-score"]')?.textContent.replace(/[^0-9]/g, "") === ${JSON.stringify(String(value))}`,
+        `plinko score: ${value}`,
         timeoutMs,
     );
 }
@@ -254,7 +254,7 @@ async function inspectPlinko(cdp, sessionId, viewport) {
 
     await cdp.send("Page.navigate", { url: `${baseUrl}/app/plinko` }, sessionId);
     await waitForText(cdp, sessionId, "실시간 물리 아케이드");
-    await waitForText(cdp, sessionId, "보유 포인트");
+    await waitForText(cdp, sessionId, "획득 점수");
     await waitForText(cdp, sessionId, "주사위 구역");
     await waitForText(cdp, sessionId, "플링코 보드");
 
@@ -262,11 +262,10 @@ async function inspectPlinko(cdp, sessionId, viewport) {
         await clickButtonByText(cdp, sessionId, "첫 굴림");
         await waitForText(cdp, sessionId, "원 페어", 10000);
         await waitForText(cdp, sessionId, "획득 구슬");
-        await waitForPointBalance(cdp, sessionId, 20);
         await clickButtonByText(cdp, sessionId, "바로 시작");
-        await waitForText(cdp, sessionId, "30포인트를 획득했습니다.");
-        await waitForText(cdp, sessionId, "+30 획득");
-        await waitForPointBalance(cdp, sessionId, 50);
+        await waitForText(cdp, sessionId, "30점을 기록했습니다.");
+        await waitForText(cdp, sessionId, "+30점");
+        await waitForScore(cdp, sessionId, 30);
     }
 
     await assertPageQuality(cdp, sessionId, `plinko ${viewport.name}`);

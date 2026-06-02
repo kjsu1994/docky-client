@@ -1,5 +1,5 @@
 ﻿import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createPipeSession } from "./pipe-websocket-cdp.mjs";
@@ -22,8 +22,19 @@ const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
     { name: "mobile", width: 390, height: 844, mobile: true },
 ];
-const requiredTexts = ["랭킹", "게시판 랭킹", "레벨 랭킹", "기부 랭킹", "테스트 인기글"];
+const requiredTexts = ["랭킹", "게시판 랭킹", "레벨 랭킹", "테스트 인기글"];
 const blockedTexts = ["Ranking", "Rank", "Trees", "Points", "Loading", "Error"];
+
+function assertDonationRankRemoved() {
+    const pageSource = readFileSync("src/pages/home/Ranks.jsx", "utf8");
+    const adapterSource = readFileSync("src/adapters/ranksAdapter.js", "utf8");
+    if (pageSource.includes("기부 랭킹") || pageSource.includes("DonationRankList")) {
+        throw new Error("ranks-ui-smoke: donation rank UI must stay removed.");
+    }
+    if (adapterSource.includes("donationRanks") || adapterSource.includes("fetchDonationRanks")) {
+        throw new Error("ranks-ui-smoke: donation rank API calls must stay removed.");
+    }
+}
 
 let nextMessageId = 1;
 const pending = new Map();
@@ -116,19 +127,6 @@ function routeMock(url, method) {
             ],
         };
     }
-    if (method === "GET" && pathname === "/api/members/donationRanks") {
-        return {
-            status: 200,
-            body: [
-                {
-                    member_id: 31,
-                    name: "나무 기부왕",
-                    tree_count: 128,
-                    point: 6400,
-                },
-            ],
-        };
-    }
     if (method === "GET" && pathname === "/api/chat/rooms") {
         return { status: 200, body: { data: [] } };
     }
@@ -200,10 +198,6 @@ async function inspectRanks(ws, viewport) {
     }
     await waitForText(ws, "레벨 장인");
 
-    if (await clickButtonByText(ws, "기부 랭킹") !== "clicked") {
-        throw new Error(`ranks ${viewport.name}: donation tab button missing`);
-    }
-    await waitForText(ws, "나무 기부왕");
     await delay(300);
 
     const value = await evaluate(ws, `(() => {
@@ -232,9 +226,12 @@ async function inspectRanks(ws, viewport) {
         };
     })()`);
 
-    const missing = ["랭킹", "기부 랭킹", "나무 기부왕"].filter((text) => !value.text.includes(text));
+    const missing = ["랭킹", "레벨 장인"].filter((text) => !value.text.includes(text));
     if (missing.length) {
         throw new Error(`ranks ${viewport.name}: missing text ${missing.join(", ")}`);
+    }
+    if (value.text.includes("기부 랭킹") || value.text.includes("나무 기부왕")) {
+        throw new Error(`ranks ${viewport.name}: donation rank text should not be visible`);
     }
 
     const blocked = blockedTexts.filter((text) => value.text.includes(text));
@@ -251,6 +248,8 @@ async function inspectRanks(ws, viewport) {
 }
 
 async function main() {
+    assertDonationRankRemoved();
+
     const chrome = spawn(chromePath, [
         "--headless=new",        "--remote-debugging-pipe",
         `--user-data-dir=${userDataDir}`,

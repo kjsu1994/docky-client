@@ -42,6 +42,9 @@ import {
     getRoomKey,
     getRoomPreviewText,
     getUnreadCount,
+    hasPersistentMessageId,
+    isMatchingOptimisticMessage,
+    isSamePersistentMessage,
     MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
     normalizeMessage,
     isAiRoom,
@@ -471,25 +474,19 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             if (normalized) {
                 setMessages((prev) => {
                     // 1. 서버가 내려준 실제 ID가 이미 목록에 있는지 확인한다.
-                    const existsById = prev.find(m => m.id === normalized.id && !String(m.id).startsWith('temp-'));
+                    const existsById = prev.find(m => isSamePersistentMessage(m, normalized));
                     if (existsById) return prev;
 
                     // 2. 내가 보낸 낙관적 메시지는 서버 응답으로 교체한다.
-                    const myId = Number(getMemberId(user));
-                    const isMyMessage = Number(normalized.senderId) === myId;
-                    
-                    if (isMyMessage) {
-                        const optimisticMatch = prev.find(m => 
-                            String(m.id).startsWith('temp-') && 
-                            m.message === normalized.message
-                        );
-                        if (optimisticMatch) {
-                            return prev.map(m => m.id === optimisticMatch.id ? normalized : m);
-                        }
+                    const optimisticMatch = prev.find(m => isMatchingOptimisticMessage(m, normalized));
+                    if (optimisticMatch) {
+                        return prev
+                            .map(m => m.id === optimisticMatch.id ? normalized : m)
+                            .sort(compareMessagesByChronology);
                     }
 
-                    // 3. 짧은 시간 안에 같은 내용이 중복 도착하면 무시한다.
-                    const isDuplicate = prev.some(m => m.key === normalized.key);
+                    // 3. 서버 ID가 없는 fallback 메시지만 fingerprint 기준으로 중복 제거한다.
+                    const isDuplicate = !hasPersistentMessageId(normalized) && prev.some(m => m.key === normalized.key);
                     if (isDuplicate) return prev;
 
                     return [...prev, normalized].sort(compareMessagesByChronology);
@@ -1126,7 +1123,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                 ? resolveChatAttachmentUrl(normalized.fileUrl || normalized.message, normalized.fileName || normalized.message)
                                                 : "";
                                             return (
-                                                <div key={normalized.key || normalized.id || idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                                                <div key={normalized.key || normalized.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                                                     <div className={`flex max-w-[85%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
                                                         {!isMe && <div className="w-8 h-8 rounded-xl bg-white shadow-sm border border-slate-100 shrink-0 flex items-center justify-center text-[11px] font-black text-primary-600">{normalized.senderName?.charAt(0).toUpperCase()}</div>}
                                                         <div className="flex flex-col">
