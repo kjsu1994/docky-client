@@ -26,6 +26,7 @@ import {
 } from "../../adapters/tabletopGameAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
+import { useGameSound } from "../../hooks/useGameSound.js";
 
 const gameConfigs = {
   catan: {
@@ -623,6 +624,7 @@ const catanColorFill = {
 };
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
+const listOf = (value) => (Array.isArray(value) ? value : []);
 const idOf = getTabletopRoomId;
 const codeOf = getTabletopRoomCode;
 const statusOf = getTabletopRoomStatus;
@@ -637,6 +639,41 @@ const maxPlayersOf = (room) => Number(room?.maxPlayers || 0);
 const minPlayersOf = (room) => Number(room?.minPlayers || 0);
 const hostMemberIdOf = (room) => Number(room?.hostMemberId || 0);
 const turnSecondsOf = (room) => Number(room?.turnTimeSeconds || 30);
+
+const tabletopTurnSeatForSound = (game, gameState) => {
+  if (!gameState || gameState.phase === "FINISHED") return 0;
+  if (game === "blokus") return Number(get(gameState, "current_seat_no", "currentSeatNo", 0));
+  if (game === "mahe") return Number(get(gameState, "decision_seat_no", "decisionSeatNo", 0) || get(gameState, "active_seat_no", "activeSeatNo", 0));
+  if (game === "dalmuti") {
+    const phase = gameState.phase || "";
+    if (phase === "TAX_RETURN") {
+      const exchange = listOf(get(gameState, "tax_exchanges", "taxExchanges", [])).find((item) => !item.completed);
+      return Number(get(exchange, "dalmuti_seat_no", "dalmutiSeatNo", 0));
+    }
+    if (phase === "REVOLUTION_DECISION") {
+      const declined = new Set(listOf(get(gameState, "revolution_declined_seat_nos", "revolutionDeclinedSeatNos", [])).map(Number));
+      const next = listOf(get(gameState, "revolution_eligible_seat_nos", "revolutionEligibleSeatNos", [])).map(Number).find((seatNo) => !declined.has(seatNo));
+      return Number(next || 0);
+    }
+    return Number(get(gameState, "active_seat_no", "activeSeatNo", 0));
+  }
+  return Number(get(gameState, "active_seat_no", "activeSeatNo", 0));
+};
+
+const tabletopActionSignalForSound = (game, gameState) => {
+  if (!gameState) return "";
+  const eventSource = game === "blokus" || game === "mahe"
+    ? listOf(get(gameState, "move_history", "moveHistory", []))
+    : listOf(get(gameState, "events", "events", []));
+  const last = eventSource[eventSource.length - 1];
+  if (!last) return "";
+  return [
+    game,
+    get(last, "event_no", "eventNo", get(last, "turn_number", "turnNumber", "")),
+    get(last, "event_type", "eventType", get(last, "action_type", "actionType", "")),
+    get(last, "seat_no", "seatNo", get(last, "active_seat_no", "activeSeatNo", "")),
+  ].join(":");
+};
 
 const variantDisplayName = (variant) => variant?.displayName || variant?.code || "";
 const variantExpansion = (variant) => Boolean(variant?.expansion);
@@ -6695,6 +6732,8 @@ export const TabletopGame = ({ game }) => {
   const players = playersOf(selectedRoom);
   const mySeatNo = seatNoOf(players.find((player) => memberIdOf(player) === myMemberId));
   const status = statusOf(selectedRoom);
+  const soundTurnSeatNo = tabletopTurnSeatForSound(game, gameState);
+  const soundActionSignal = tabletopActionSignalForSound(game, gameState);
   const isHost = selectedRoom && hostMemberIdOf(selectedRoom) === myMemberId;
   const guestPlayers = players.filter((player) => memberIdOf(player) !== hostMemberIdOf(selectedRoom));
   const readyGuestCount = guestPlayers.filter(isReady).length;
@@ -6733,6 +6772,10 @@ export const TabletopGame = ({ game }) => {
   const selectedVariant = useMemo(() => variants.find((variant) => variant.code === createForm.variantCode) || variants[0], [variants, createForm.variantCode]);
   const selectedSettingsVariant = useMemo(() => variants.find((variant) => variant.code === settingsForm.variantCode), [variants, settingsForm.variantCode]);
   const selectedRoomVariant = useMemo(() => variantForRoom(selectedRoom, variants), [selectedRoom, variants]);
+  useGameSound({
+    myTurn: Boolean(status === "PLAYING" && mySeatNo && soundTurnSeatNo === mySeatNo),
+    actionSignal: soundActionSignal,
+  });
   const selectedRoomVariantName = variantNameOf(selectedRoom) || variantDisplayName(selectedRoomVariant) || "선택한 규칙";
   const selectedRoomVariantTags = variantFeatureTags(game, selectedRoomVariant);
   const selectedRoomPlayerRangeText = roomMinPlayers === roomMaxPlayers

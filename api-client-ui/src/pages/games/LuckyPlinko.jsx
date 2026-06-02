@@ -8,6 +8,7 @@ import { luckyPlinkoAdapter, luckyPlinkoErrorMessage } from "../../adapters/luck
 // Audio assets
 const ROLL_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3";
 const SOFT_TAP_URL = "https://assets.mixkit.co/active_storage/sfx/1084/1084-preview.mp3"; // short tap sound
+const PLINKO_SOUND_VOLUME_MULTIPLIER = 2;
 const DICE_FACE_ANGLES = {
     1: { x: 0, y: 0, z: 0 },
     2: { x: 0, y: 180, z: 0 },
@@ -142,6 +143,21 @@ export const LuckyPlinko = () => {
     const rollAudio = useRef(new Audio(ROLL_SOUND_URL));
     const tapAudio = useRef(new Audio(SOFT_TAP_URL));
     const lastTapAtRef = useRef(0);
+
+    const playBoostedAudio = (audioRef) => {
+        const base = audioRef.current;
+        if (!base) return;
+        base.currentTime = 0;
+        base.volume = 1;
+        base.play().catch(() => {});
+
+        for (let i = 1; i < PLINKO_SOUND_VOLUME_MULTIPLIER; i += 1) {
+            const layer = base.cloneNode();
+            layer.volume = 1;
+            layer.playbackRate = base.playbackRate;
+            layer.play().catch(() => {});
+        }
+    };
 
     useEffect(() => {
         // 모든 구슬 착지가 끝난 뒤 API 최종 점수를 호출한다.
@@ -361,7 +377,10 @@ export const LuckyPlinko = () => {
                     if (now - p.lastTapAt > 80 && now - lastTapAtRef.current > 35) {
                         const s = tapAudio.current.cloneNode();
                         const speed = Math.hypot(p.vx, p.vy);
-                        s.volume = Math.min(0.035, speed / 18000);
+                        s.volume = Math.min(
+                            0.035 * PLINKO_SOUND_VOLUME_MULTIPLIER,
+                            (speed / 18000) * PLINKO_SOUND_VOLUME_MULTIPLIER
+                        );
                         s.playbackRate = 1.15 + Math.random() * 0.45;
                         s.play().catch(() => {});
                         p.lastTapAt = now;
@@ -477,8 +496,7 @@ export const LuckyPlinko = () => {
         if (rolling) return;
         setRolling(true);
         const rollStartedAt = performance.now();
-        rollAudio.current.currentTime = 0;
-        rollAudio.current.play().catch(() => {});
+        playBoostedAudio(rollAudio);
         try {
             const normalized = await luckyPlinkoAdapter.rollDice();
             const elapsed = performance.now() - rollStartedAt;
@@ -497,8 +515,7 @@ export const LuckyPlinko = () => {
         if (rolling || heldIndices.length < 1 || heldIndices.length > 4) return;
         setRolling(true);
         const rollStartedAt = performance.now();
-        rollAudio.current.currentTime = 0;
-        rollAudio.current.play().catch(() => {});
+        playBoostedAudio(rollAudio);
         try {
             const normalized = await luckyPlinkoAdapter.rerollDice(heldIndices);
             const elapsed = performance.now() - rollStartedAt;

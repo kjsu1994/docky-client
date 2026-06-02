@@ -53,6 +53,7 @@ const allMenuLinks = [
     "/app/games/blokus",
     "/app/games/mahe",
     "/app/games/dalmuti",
+    "/app/games/citadels",
     "/app/mypage",
     "/app/mypage/edit",
     "/app/admin/anomalies",
@@ -70,6 +71,7 @@ const gamesHubTexts = [
     "Lucky Plinko",
     "Las Vegas",
     "No Thanks",
+    "Citadels",
 ];
 const blockedTexts = ["Loading", "Error", "undefined", "ROLE_ADMIN", "ROLE_MASTER"];
 
@@ -290,7 +292,7 @@ async function inspectGamesHub(ws, viewport) {
     }
 
     const cardOrder = await evaluate(ws, `Array.from(document.querySelectorAll('[data-smoke="game-card"]')).map((node) => node.getAttribute("data-game-title"))`);
-    const expectedOrder = ["Lucky Plinko", "블로커스", "Las Vegas", "마헤", "No Thanks", "카탄", "달무티"];
+    const expectedOrder = ["Lucky Plinko", "블로커스", "Las Vegas", "마헤", "Citadels", "No Thanks", "카탄", "달무티"];
     if (JSON.stringify(cardOrder) !== JSON.stringify(expectedOrder)) {
         throw new Error(`games-hub ${viewport.name}: player-count order mismatch ${JSON.stringify(cardOrder)}`);
     }

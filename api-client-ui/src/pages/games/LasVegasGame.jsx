@@ -18,6 +18,7 @@ import {
 
 const ROOM_STORAGE_KEY = "las_vegas_last_room_id";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
+const LAS_VEGAS_SOUND_VOLUME_MULTIPLIER = 2;
 
 const normalizeRoomId = getLasVegasRoomId;
 const normalizeChatRoomId = getLasVegasChatRoomId;
@@ -516,7 +517,7 @@ export const LasVegasGame = () => {
 
         try {
             isBetSoundPlayingRef.current = true;
-            master.gain.setValueAtTime(0.20, now);
+            master.gain.setValueAtTime(0.20 * LAS_VEGAS_SOUND_VOLUME_MULTIPLIER, now);
             gain.gain.setValueAtTime(0.0001, now);
             gain.gain.exponentialRampToValueAtTime(0.36, now + 0.01);
             gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
@@ -566,7 +567,7 @@ export const LasVegasGame = () => {
 
         const now = context.currentTime;
         const master = context.createGain();
-        master.gain.setValueAtTime(0.40, now);
+        master.gain.setValueAtTime(0.40 * LAS_VEGAS_SOUND_VOLUME_MULTIPLIER, now);
         master.connect(context.destination);
 
         // Layer short filtered-noise bursts to mimic dice clatter across a hard table.

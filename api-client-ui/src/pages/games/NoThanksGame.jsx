@@ -16,9 +16,11 @@ import {
   noThanksRoomStatusLabel,
   normalizeNoThanksState,
 } from "../../adapters/noThanksGameAdapter.js";
+import { useGameSound } from "../../hooks/useGameSound.js";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
+const NO_THANKS_SOUND_VOLUME_MULTIPLIER = 2;
 
 const roomIdOf = getNoThanksRoomId;
 const chatRoomIdOf = getNoThanksChatRoomId;
@@ -100,6 +102,8 @@ export const NoThanksGame = () => {
     rotate: 0,
   }));
 
+  useGameSound({ myTurn: roomStatus === "PLAYING" && isMyTurn });
+
   const normalizeCreateField = (field, min, max, fallback) => {
     setCreateForm((prev) => ({ ...prev, [field]: clampNumberText(prev[field], min, max, fallback) }));
   };
@@ -133,7 +137,7 @@ export const NoThanksGame = () => {
     try {
       isActionSoundPlayingRef.current = true;
       if (actionType === "TAKE") {
-        master.gain.setValueAtTime(0.20, now);
+        master.gain.setValueAtTime(0.20 * NO_THANKS_SOUND_VOLUME_MULTIPLIER, now);
         gain.gain.setValueAtTime(0.0001, now);
         gain.gain.exponentialRampToValueAtTime(0.36, now + 0.01);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
@@ -146,7 +150,7 @@ export const NoThanksGame = () => {
         accent.frequency.setValueAtTime(1320, now);
         accent.frequency.exponentialRampToValueAtTime(990, now + 0.08);
       } else {
-        master.gain.setValueAtTime(0.14, now);
+        master.gain.setValueAtTime(0.14 * NO_THANKS_SOUND_VOLUME_MULTIPLIER, now);
         gain.gain.setValueAtTime(0.0001, now);
         gain.gain.exponentialRampToValueAtTime(0.24, now + 0.008);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);

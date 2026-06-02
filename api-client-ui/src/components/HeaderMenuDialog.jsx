@@ -79,6 +79,7 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
                     { title: "블로커스", to: "/app/games/blokus", icon: Dices },
                     { title: "마헤", to: "/app/games/mahe", icon: Dices },
                     { title: "달무티", to: "/app/games/dalmuti", icon: Dices },
+                    { title: "Citadels", to: "/app/games/citadels", icon: Dices },
                 ],
             },
             {

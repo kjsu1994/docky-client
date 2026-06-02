@@ -26,7 +26,7 @@ const cases = [
   {
     path: "/app/games",
     label: "game hub",
-    expectedTexts: ["게임 목록", "카탄", "블로커스", "마헤", "달무티"],
+    expectedTexts: ["게임 목록", "카탄", "블로커스", "마헤", "달무티", "Citadels"],
   },
   {
     path: "/app/games/catan",
@@ -47,6 +47,11 @@ const cases = [
     path: "/app/games/dalmuti",
     label: "dalmuti lobby",
     expectedTexts: ["달무티", "방 만들기", "입장", "본게임", "첫 손 세금 없음"],
+  },
+  {
+    path: "/app/games/citadels",
+    label: "citadels lobby",
+    expectedTexts: ["Citadels", "방 만들기", "입장", "본게임", "비밀 캐릭터"],
   },
   {
     path: "/app/games/las-vegas",
@@ -74,6 +79,9 @@ const variantsByGame = {
     variant("BASE", "본게임", false, 4, 8, "계급 카드와 세금", ["4~8인", "세금", "혁명"]),
     variant("STRIPPED_DECK", "줄인 덱", true, 4, 5, "4~5인 공식 선택 규칙", ["4~5인", "일부 계급 제외", "빠른 패"]),
     variant("FIRST_DEAL_REVOLUTION", "첫 손 세금 없음", true, 4, 8, "첫 판 혁명 선택 규칙", ["첫 손 세금 없음", "혁명 선택", "공식 선택 규칙"]),
+  ],
+  citadels: [
+    variant("BASE", "본게임", false, 2, 7, "기본 8개 캐릭터와 8구역 종료 조건", ["2~7인", "비밀 캐릭터", "도시 건설"]),
   ],
 };
 
@@ -211,6 +219,7 @@ const gameNames = {
   blokus: "블로커스",
   mahe: "마헤",
   dalmuti: "달무티",
+  citadels: "Citadels",
   "las-vegas": "라스베가스",
 };
 const gameCodePrefix = {
@@ -218,6 +227,7 @@ const gameCodePrefix = {
   blokus: "BLOK",
   mahe: "MAHE",
   dalmuti: "DALM",
+  citadels: "CITD",
 };
 
 function variant(code, displayName, expansion, minPlayers, maxPlayers, summary, featureTags) {
@@ -830,7 +840,7 @@ async function resetGameStorage(ws) {
     localStorage.setItem("accessToken", "smoke-access-token");
     localStorage.setItem("refreshToken", "smoke-refresh-token");
     localStorage.setItem("userRoles", JSON.stringify(["ROLE_USER"]));
-    ["catan_last_room_id", "blokus_last_room_id", "mahe_last_room_id", "dalmuti_last_room_id", "las_vegas_last_room_id"].forEach((key) => localStorage.removeItem(key));
+    ["catan_last_room_id", "blokus_last_room_id", "mahe_last_room_id", "dalmuti_last_room_id", "citadels_last_room_id", "las_vegas_last_room_id"].forEach((key) => localStorage.removeItem(key));
     return true;
   })()`);
 }
@@ -1095,7 +1105,7 @@ async function main() {
       }
     }
     const flowResults = [];
-    for (const game of ["catan", "blokus", "mahe", "dalmuti"]) {
+    for (const game of ["catan", "blokus", "mahe", "dalmuti", "citadels"]) {
       flowResults.push(await runRoomFlowSmoke(cdp, game));
     }
     const variantResults = [];
@@ -1103,8 +1113,8 @@ async function main() {
       variantResults.push(await runVariantCreateSmoke(cdp, item));
     }
     const expectedPageChecks = cases.length * viewports.length;
-    if (results.length !== expectedPageChecks || flowResults.length !== 4 || variantResults.length !== variantCreateCases.length) {
-      throw new Error(`Incomplete tabletop smoke coverage: pages ${results.length}/${expectedPageChecks}, flows ${flowResults.length}/4, variants ${variantResults.length}/${variantCreateCases.length}`);
+    if (results.length !== expectedPageChecks || flowResults.length !== 5 || variantResults.length !== variantCreateCases.length) {
+      throw new Error(`Incomplete tabletop smoke coverage: pages ${results.length}/${expectedPageChecks}, flows ${flowResults.length}/5, variants ${variantResults.length}/${variantCreateCases.length}`);
     }
     if (runtimeErrors.length) {
       throw new Error(`Runtime errors: ${runtimeErrors.join(" | ")}`);

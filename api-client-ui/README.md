@@ -2,6 +2,14 @@
 
 React + Vite 기반의 커뮤니티/게임/운영 도구 프론트엔드입니다. 운영 배포는 Docker Compose 환경에서 `C:\compose\minio-data\client\dist`를 nginx가 정적 파일로 서빙하는 구조를 기준으로 합니다.
 
+## 2026-06-03 Citadels / 게임 사운드 메모
+
+- `/app/games/citadels`는 별도 React 화면이지만 `src/adapters/tabletopGameAdapter.js`의 공통 방/상태/action 계약을 사용합니다.
+- 게임 허브, 전체 메뉴, 헤더 메뉴, 페이지 도움말에 Citadels 진입점을 추가했습니다.
+- 시타델 화면은 마헤처럼 현재 선택의 비용/이득을 짧게 보여주는 보조 UX를 포함합니다. 모바일에서는 `지금 할 일`과 핵심 수치만 먼저 보이고, 세부 캐릭터/점수 도움은 데스크톱 사이드 패널 중심으로 노출합니다.
+- `src/hooks/useGameSound.js`는 사용자 입력 뒤에만 짧은 턴/액션 알림음을 재생합니다. Las Vegas와 Lucky Plinko에는 적용하지 않았습니다.
+- 검증: `npm.cmd run build`, `npm.cmd run smoke:hub-ui`, `npm.cmd run smoke:tabletop-ui` 통과.
+
 ## 실행
 
 ```bash

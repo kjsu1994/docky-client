@@ -269,6 +269,36 @@ const gameManuals = {
       },
     ],
   },
+  citadels: {
+    subtitle: "비밀 캐릭터를 선택하고 구역을 건설해 가장 가치 있는 도시를 완성하는 카드 기반 보드게임입니다.",
+    tags: ["2~7인", "비밀 역할", "도시 건설"],
+    sections: [
+      { title: "처음 시작 순서", items: sharedRoomStartSteps },
+      {
+        title: "목표",
+        items: [
+          "금화와 구역 카드를 관리해 도시를 건설하고, 게임 종료 시 가장 높은 점수를 얻는 것이 목표입니다.",
+          "누군가 8번째 구역을 건설하면 현재 라운드까지만 진행한 뒤 점수를 계산합니다.",
+        ],
+      },
+      {
+        title: "라운드 흐름",
+        items: [
+          "왕관을 가진 플레이어부터 비밀리에 캐릭터를 고릅니다.",
+          "암살자부터 장군까지 번호 순서대로 캐릭터가 호출되고, 해당 캐릭터를 가진 플레이어가 차례를 진행합니다.",
+          "차례에는 금화 2개를 받거나 구역 카드를 뽑아 1장을 보관한 뒤, 가능한 경우 구역을 건설합니다.",
+        ],
+      },
+      {
+        title: "캐릭터 능력",
+        items: [
+          "암살자는 한 캐릭터를 쉬게 하고, 도둑은 지정한 캐릭터가 호출될 때 금화를 훔칩니다.",
+          "마술사는 손패를 교환하거나 교체하고, 왕·주교·상인·장군은 자기 색 구역에서 추가 수입을 얻습니다.",
+          "건축가는 더 많은 카드를 받고 최대 3개까지 건설할 수 있으며, 장군은 상대 구역 하나를 파괴할 수 있습니다.",
+        ],
+      },
+    ],
+  },
 };
 
 const games = [
@@ -370,6 +400,20 @@ const games = [
     manual: gameManuals.dalmuti,
     featured: true,
   },
+  {
+    title: "Citadels",
+    description: "(2~7인) 비밀 캐릭터 선택과 도시 건설을 서버 판정으로 진행합니다.",
+    to: "/app/games/citadels",
+    tone: "from-zinc-900 via-red-900 to-amber-600",
+    players: "2~7인",
+    minPlayers: 2,
+    maxPlayers: 7,
+    mode: "비밀 역할",
+    preview: "citadels",
+    highlights: ["공식 기본판", "비밀 캐릭터", "8구역 종료"],
+    manual: gameManuals.citadels,
+    featured: true,
+  },
 ];
 
 const gameRoutePreloads = {
@@ -379,6 +423,7 @@ const gameRoutePreloads = {
   "/app/games/blokus": () => import("./TabletopGame.jsx"),
   "/app/games/mahe": () => import("./TabletopGame.jsx"),
   "/app/games/dalmuti": () => import("./TabletopGame.jsx"),
+  "/app/games/citadels": () => import("./CitadelsGame.jsx"),
 };
 
 const preloadedRoutes = new Set();
@@ -584,6 +629,33 @@ const GamePreview = ({ type }) => {
           ))}
         </g>
       </svg>
+    );
+  }
+
+  if (type === "citadels") {
+    return (
+      <div className="relative h-36 w-56 max-w-full">
+        <div className="absolute inset-x-4 bottom-2 grid grid-cols-5 gap-1 rounded-2xl bg-slate-950/80 p-2 shadow-xl">
+          {["#f59e0b", "#0ea5e9", "#10b981", "#ef4444", "#8b5cf6"].map((fill, index) => (
+            <span key={fill} className="h-12 rounded-lg border border-white/30" style={{ background: fill, transform: `translateY(${index % 2 ? 6 : 0}px)` }} />
+          ))}
+        </div>
+        {[
+          { rank: "1", label: "A", tone: "from-slate-900 to-red-800", x: -46, rotate: -10 },
+          { rank: "4", label: "K", tone: "from-amber-400 to-yellow-100", x: 0, rotate: 0 },
+          { rank: "8", label: "W", tone: "from-rose-700 to-zinc-900", x: 46, rotate: 10 },
+        ].map((card) => (
+          <div
+            key={card.rank}
+            className={`absolute left-1/2 top-1 flex h-28 w-20 -translate-x-1/2 flex-col justify-between rounded-2xl border border-white/70 bg-gradient-to-br ${card.tone} p-2 text-white shadow-xl`}
+            style={{ transform: `translateX(calc(-50% + ${card.x}px)) rotate(${card.rotate}deg)` }}
+          >
+            <span className="text-xs font-black">{card.rank}</span>
+            <span className="text-center text-4xl font-black">{card.label}</span>
+            <span className="rotate-180 text-xs font-black">{card.rank}</span>
+          </div>
+        ))}
+      </div>
     );
   }
 

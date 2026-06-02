@@ -74,6 +74,7 @@ export const AllMenu = () => {
         { title: "블로커스", to: "/app/games/blokus", icon: Dices, color: "bg-blue-50 text-blue-700" },
         { title: "마헤", to: "/app/games/mahe", icon: Dices, color: "bg-emerald-50 text-emerald-700" },
         { title: "달무티", to: "/app/games/dalmuti", icon: Dices, color: "bg-rose-50 text-rose-700" },
+        { title: "Citadels", to: "/app/games/citadels", icon: Dices, color: "bg-amber-50 text-zinc-800" },
     ];
 
     const account = [
