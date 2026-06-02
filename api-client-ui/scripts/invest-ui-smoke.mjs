@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -21,7 +21,19 @@ const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
     { name: "mobile", width: 390, height: 844, mobile: true },
 ];
-const blockedTexts = ["Loading", "Error", "Failed", "undefined", "NaN"];
+const blockedTexts = ["Loading", "Error", "Failed", "undefined", "NaN", "SOURCE", "limitation", "BUY", "SELL"];
+const SYMBOL_QUERY_MAX_LENGTH = 80;
+const SYMBOL_MAX_LENGTH = 20;
+
+function assertStaticInvestToastRuntimeBoundary() {
+    const source = readFileSync("src/pages/facility/InvestAssistant.jsx", "utf8");
+    if (source.includes("from \"react-hot-toast\"") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(source)) {
+        throw new Error("invest-ui-smoke: InvestAssistant must use the dynamic toast helper instead of static react-hot-toast imports.");
+    }
+    if (!source.includes("notifyError") || !source.includes("notifySuccess")) {
+        throw new Error("invest-ui-smoke: InvestAssistant must keep success/error notifications on the dynamic toast runtime boundary.");
+    }
+}
 
 class PipeCdp {
     constructor(chrome) {
@@ -199,7 +211,7 @@ const analysisV2 = {
     },
     news_issues: [{
         title: "메모리 업황 회복 기대 확대",
-        source: "스모크뉴스",
+        source: "",
         published_at: "2026-05-29",
         summary: "주요 고객사의 재고 조정이 마무리되며 수요 회복 기대가 커지고 있습니다.",
         url: "https://example.com/invest-smoke",
@@ -428,6 +440,24 @@ async function inspectInvest(cdp, sessionId, viewport) {
     }
 
     await waitForText(cdp, sessionId, "투자 도우미");
+    const symbolControls = await evaluate(cdp, sessionId, `(() => {
+        const input = Array.from(document.querySelectorAll("input"))
+            .find((node) => (node.placeholder || "").includes("종목코드") || (node.placeholder || "").includes("티커"));
+        const helper = document.getElementById("invest-symbol-query-hint");
+        return {
+            hasInput: Boolean(input),
+            maxLength: input ? input.maxLength : null,
+            helperText: helper ? helper.innerText : "",
+        };
+    })()`);
+    if (
+        !symbolControls.hasInput
+        || symbolControls.maxLength !== SYMBOL_QUERY_MAX_LENGTH
+        || !symbolControls.helperText.includes(`${SYMBOL_QUERY_MAX_LENGTH}자`)
+        || !symbolControls.helperText.includes(`${SYMBOL_MAX_LENGTH}자`)
+    ) {
+        throw new Error(`invest ${viewport.name}: symbol input bounds missing ${JSON.stringify(symbolControls)}`);
+    }
     await clickByText(cdp, sessionId, "분석 시작");
     await waitForText(cdp, sessionId, "삼성전자");
     await waitForText(cdp, sessionId, "현재가 차트");
@@ -462,7 +492,7 @@ async function inspectInvest(cdp, sessionId, viewport) {
         };
     })()`);
 
-    for (const text of ["투자 도우미", "삼성전자", "현재가 차트", "추천 레이어", "장기 관점"]) {
+    for (const text of ["투자 도우미", "삼성전자", "현재가 차트", "추천 레이어", "장기 관점", "매수", "출처 미상"]) {
         if (!value.text.includes(text)) {
             throw new Error(`invest ${viewport.name}: missing text ${text}`);
         }
@@ -482,6 +512,8 @@ async function inspectInvest(cdp, sessionId, viewport) {
 }
 
 async function main() {
+    assertStaticInvestToastRuntimeBoundary();
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Flag, X } from "lucide-react";
 import { formatNumber } from "../utils/helpers.js";
+import { trapFocus } from "../utils/focusTrap.js";
 
 const REPORT_REASON_MAX_LENGTH = 120;
 const REPORT_DETAIL_MAX_LENGTH = 2000;
@@ -15,14 +16,47 @@ export const ReportDialog = ({
 }) => {
     const [reason, setReason] = useState(defaultReason);
     const [detail, setDetail] = useState("");
+    const dialogRef = useRef(null);
     const reasonRef = useRef(null);
+    const titleId = useId();
+    const descriptionId = useId();
+    const reasonId = useId();
+    const detailId = useId();
 
     useEffect(() => {
         if (!open) return;
         setReason(defaultReason);
         setDetail("");
-        window.setTimeout(() => reasonRef.current?.focus(), 0);
     }, [open, defaultReason]);
+
+    useEffect(() => {
+        if (!open) return undefined;
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const focusTimer = window.setTimeout(() => reasonRef.current?.focus(), 0);
+
+        return () => {
+            window.clearTimeout(focusTimer);
+            document.body.style.overflow = previousOverflow;
+            if (previousFocus?.isConnected) previousFocus.focus();
+        };
+    }, [open]);
+
+    useEffect(() => {
+        if (!open) return undefined;
+
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape" && !submitting) {
+                onClose?.();
+                return;
+            }
+            trapFocus(event, dialogRef.current);
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [open, onClose, submitting]);
 
     if (!open) return null;
 
@@ -39,16 +73,30 @@ export const ReportDialog = ({
         });
     };
 
+    const handleBackdropMouseDown = (event) => {
+        if (event.target === event.currentTarget && !submitting) {
+            onClose?.();
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/50 p-4">
-            <form onSubmit={handleSubmit} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={handleBackdropMouseDown}>
+            <form
+                ref={dialogRef}
+                onSubmit={handleSubmit}
+                className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                aria-describedby={descriptionId}
+            >
                 <div className="mb-5 flex items-start justify-between gap-4">
                     <div>
                         <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
                             <Flag className="h-5 w-5" />
                         </div>
-                        <h2 className="text-xl font-black text-slate-900">{targetLabel} 신고</h2>
-                        <p className="mt-1 text-sm font-medium text-slate-500">운영자가 검토할 내용을 입력해 주세요.</p>
+                        <h2 id={titleId} className="text-xl font-black text-slate-900">{targetLabel} 신고</h2>
+                        <p id={descriptionId} className="mt-1 text-sm font-medium text-slate-500">운영자가 검토할 내용을 입력해 주세요.</p>
                     </div>
                     <button
                         type="button"
@@ -61,8 +109,9 @@ export const ReportDialog = ({
                     </button>
                 </div>
 
-                <label className="mb-2 block text-xs font-black text-slate-500">신고 사유</label>
+                <label htmlFor={reasonId} className="mb-2 block text-xs font-black text-slate-500">신고 사유</label>
                 <input
+                    id={reasonId}
                     ref={reasonRef}
                     className="input-base mb-4 w-full"
                     value={reason}
@@ -76,8 +125,9 @@ export const ReportDialog = ({
                     {formatNumber(reasonLength)} / {formatNumber(REPORT_REASON_MAX_LENGTH)}
                 </div>
 
-                <label className="mb-2 block text-xs font-black text-slate-500">상세 내용 (선택)</label>
+                <label htmlFor={detailId} className="mb-2 block text-xs font-black text-slate-500">상세 내용 (선택)</label>
                 <textarea
+                    id={detailId}
                     className="input-base min-h-[120px] w-full resize-none"
                     value={detail}
                     onChange={(event) => setDetail(event.target.value)}

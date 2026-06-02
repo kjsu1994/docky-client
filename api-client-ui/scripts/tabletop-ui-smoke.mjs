@@ -99,6 +99,8 @@ function assertTabletopRealtimeSource() {
     ["realtimeRoomRef.current = { roomId, roomSeq }", "tracks the latest opened realtime room"],
     ["client.onConnect = () => {", "binds after STOMP CONNECT"],
     ["bindLatestRealtimeRoom(client)", "resubscribes the latest room after reconnect"],
+    ["createStompClient", "loads the STOMP runtime through the shared async adapter"],
+    ["notifyRealtimeError", "routes STOMP ERROR frames through the shared safe notifier"],
     ["client.beforeConnect = () =>", "refreshes STOMP auth headers before reconnect"],
     ["await fetchState(roomId, roomSeq).catch", "loads a REST snapshot before relying on realtime"],
     ["client.subscribe(`/sub/game/${game}/room/${roomId}`", "subscribes to the active tabletop room topic"],
@@ -110,6 +112,15 @@ function assertTabletopRealtimeSource() {
   }
   if (source.includes("else client.onConnect = () =>")) {
     throw new Error("tabletop-ui-smoke: openRoom must not overwrite STOMP onConnect per room.");
+  }
+  if (source.includes('import SockJS from "sockjs-client"') || source.includes('import { Client } from "@stomp/stompjs"')) {
+    throw new Error("tabletop-ui-smoke: TabletopGame must not statically bundle the STOMP runtime into the board-game route chunk.");
+  }
+  if (source.includes('notifyError("실시간 연결 오류")')) {
+    throw new Error("tabletop-ui-smoke: TabletopGame must not show raw repeated realtime error toasts.");
+  }
+  if (source.includes('from "react-hot-toast"') || !source.includes('from "../../utils/toast.js"')) {
+    throw new Error("tabletop-ui-smoke: TabletopGame must use the dynamic toast helper instead of static react-hot-toast imports.");
   }
 }
 

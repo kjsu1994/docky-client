@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
@@ -19,6 +19,12 @@ import { formatNumber, formatRelativeTime, stripHtmlTags } from "../../utils/hel
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { EmptyState } from "../../components/EmptyState.jsx";
 import { homeAdapter } from "../../adapters/homeAdapter.js";
+import { isAdsenseBanner, readStoredAdsConsent } from "../../utils/adsense.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+
+const HomeAdsenseRuntime = lazy(() =>
+    import("./HomeAdsenseRuntime.jsx").then((module) => ({ default: module.HomeAdsenseRuntime }))
+);
 
 const toPercentLabel = (value) => {
     const num = Number(value) || 0;
@@ -31,22 +37,6 @@ const toBoardTimeLabel = (value) => {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return "";
     return formatRelativeTime(parsed);
-};
-
-const isAdsenseMode = (banner) => banner?.renderMode === "ADSENSE" && banner?.adProvider?.toUpperCase() === "ADSENSE";
-const ADS_CONSENT_STORAGE_KEY = "ads_personalization_consent";
-
-const normalizeAdsConsent = (value) => {
-    return value === "personalized" || value === "non_personalized" ? value : null;
-};
-
-const readStoredAdsConsent = () => {
-    if (typeof window === "undefined") return null;
-    try {
-        return normalizeAdsConsent(window.localStorage.getItem(ADS_CONSENT_STORAGE_KEY));
-    } catch {
-        return null;
-    }
 };
 
 const prefersReducedMotion = () => {
@@ -102,8 +92,6 @@ export const Home = () => {
     const [adsConsent, setAdsConsent] = useState(readStoredAdsConsent);
 
     const impressionSentRef = useRef(new Set());
-    const adsenseInitializedRef = useRef(false);
-    const adsensePushKeysRef = useRef(new Set());
     const dashboardAbortRef = useRef(null);
     const bannerSectionRef = useRef(null);
     const touchStartRef = useRef({ x: 0, y: 0 });
@@ -125,15 +113,11 @@ export const Home = () => {
     }, [currentIndex, bannerCount]);
 
     const hasAdsenseBanner = useMemo(() => {
-        return heroBanners.some(
-            (banner) => banner?.renderMode === "ADSENSE" && banner?.adProvider?.toUpperCase() === "ADSENSE"
-        );
+        return heroBanners.some(isAdsenseBanner);
     }, [heroBanners]);
 
     const adsenseClientId = useMemo(() => {
-        const fromBanner = heroBanners.find((banner) =>
-            banner?.renderMode === "ADSENSE" && banner?.adProvider?.toUpperCase() === "ADSENSE" && banner?.adsenseClient
-        )?.adsenseClient;
+        const fromBanner = heroBanners.find((banner) => isAdsenseBanner(banner) && banner?.adsenseClient)?.adsenseClient;
         return fromBanner || import.meta.env.VITE_ADSENSE_CLIENT || "";
     }, [heroBanners]);
 
@@ -240,7 +224,6 @@ export const Home = () => {
         setCurrentIndex(0);
         setIsTransitioning(true);
         impressionSentRef.current = new Set();
-        adsensePushKeysRef.current = new Set();
     }, []);
 
     const applyDashboard = useCallback((result, { preserveExistingOnUnavailable = false } = {}) => {
@@ -335,7 +318,7 @@ export const Home = () => {
             if (isCanceledRequest(fetchError) || controller.signal.aborted || dashboardAbortRef.current !== controller) {
                 return;
             }
-            console.error("Home fetch failed:", fetchError);
+            logClientError("home.dashboard.fetch", fetchError);
             if (!background) {
                 setError("데이터를 불러오는 중 문제가 발생했습니다.");
             }
@@ -369,41 +352,6 @@ export const Home = () => {
         };
     }, [fetchData]);
 
-    const saveAdsConsent = (value) => {
-        const nextConsent = normalizeAdsConsent(value);
-        adsensePushKeysRef.current = new Set();
-        setAdsConsent(nextConsent);
-        try {
-            if (nextConsent) {
-                window.localStorage.setItem(ADS_CONSENT_STORAGE_KEY, nextConsent);
-            } else {
-                window.localStorage.removeItem(ADS_CONSENT_STORAGE_KEY);
-            }
-        } catch {
-            // Ignore localStorage failure
-        }
-    };
-
-    const resetAdsConsent = () => {
-        adsensePushKeysRef.current = new Set();
-        setAdsConsent(null);
-        try {
-            window.localStorage.removeItem(ADS_CONSENT_STORAGE_KEY);
-        } catch {
-            // Ignore localStorage failure
-        }
-    };
-
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const handleStorage = (event) => {
-            if (event.key !== ADS_CONSENT_STORAGE_KEY) return;
-            setAdsConsent(normalizeAdsConsent(event.newValue));
-        };
-        window.addEventListener("storage", handleStorage);
-        return () => window.removeEventListener("storage", handleStorage);
-    }, []);
-
     const sendBannerEvent = useCallback(async (banner, eventType) => {
         try {
             await homeAdapter.trackBannerEvent(banner, eventType);
@@ -413,72 +361,15 @@ export const Home = () => {
     }, []);
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
-        window.adsbygoogle = window.adsbygoogle || [];
-        window.adsbygoogle.requestNonPersonalizedAds = adsConsent === "non_personalized" ? 1 : 0;
-    }, [adsConsent]);
-
-    const pushAdsenseBanner = useCallback(() => {
-        const banner = heroBanners[bannerIndex];
-        if (!isAdsenseMode(banner) || adsConsent === null) return;
-        if (isPageHidden || !isBannerInView) return;
-        if (typeof window === "undefined") return;
-        const pushKey = [
-            banner.id ?? bannerIndex,
-            adsConsent,
-            banner.adsenseClient || adsenseClientId,
-            banner.adsenseSlot || "0000000000",
-        ].join(":");
-        if (adsensePushKeysRef.current.has(pushKey)) return;
-        adsensePushKeysRef.current.add(pushKey);
-        try {
-            (window.adsbygoogle = window.adsbygoogle || []).push({});
-        } catch {
-            adsensePushKeysRef.current.delete(pushKey);
-            // Ignore if ads script is not ready yet.
-        }
-    }, [adsConsent, adsenseClientId, bannerIndex, heroBanners, isBannerInView, isPageHidden]);
-
-    useEffect(() => {
-        if (!hasAdsenseBanner || !adsenseClientId || adsConsent === null) return;
-
-        const scriptSrc = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`;
-        const exists = Array.from(document.scripts || []).some(
-            (script) => script.src && script.src.includes("googlesyndication.com/pagead/js/adsbygoogle.js")
-        );
-
-        if (exists) {
-            adsenseInitializedRef.current = true;
-            return;
-        }
-
-        const script = document.createElement("script");
-        script.async = true;
-        script.src = scriptSrc;
-        script.crossOrigin = "anonymous";
-        script.onload = () => {
-            adsenseInitializedRef.current = true;
-            pushAdsenseBanner();
-        };
-        document.head.appendChild(script);
-        pushAdsenseBanner();
-    }, [adsConsent, adsenseClientId, hasAdsenseBanner, pushAdsenseBanner]);
-
-    useEffect(() => {
         const banner = heroBanners[bannerIndex];
         if (!banner?.id) return;
+        if (isAdsenseBanner(banner)) return;
         if (isPageHidden || !isBannerInView) return;
-        if (isAdsenseMode(banner) && adsConsent === null) return;
         const key = String(banner.id);
         if (impressionSentRef.current.has(key)) return;
         impressionSentRef.current.add(key);
         sendBannerEvent(banner, "IMPRESSION");
-    }, [adsConsent, bannerIndex, heroBanners, isBannerInView, isPageHidden, sendBannerEvent]);
-
-    useEffect(() => {
-        if (!adsenseInitializedRef.current) return;
-        pushAdsenseBanner();
-    }, [pushAdsenseBanner]);
+    }, [bannerIndex, heroBanners, isBannerInView, isPageHidden, sendBannerEvent]);
 
     const shouldLoadBannerMedia = (slideIndex) => {
         if (bannerCount <= 1) return true;
@@ -595,7 +486,7 @@ export const Home = () => {
                     <div className="min-h-[240px] bg-gradient-to-br from-slate-900 to-primary-700 p-8 text-white sm:min-h-[280px] sm:p-10" data-home-banner-loading="true" role="status" aria-live="polite" aria-label="운영 배너를 불러오는 중입니다.">
                         <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1 text-xs font-bold text-white backdrop-blur-md">
                             <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                            준비 중
+                            운영 배너 불러오는 중
                         </div>
                         <div className="mt-8 max-w-2xl space-y-4">
                             <div className="h-9 w-3/4 rounded-2xl bg-white/20" />
@@ -622,7 +513,7 @@ export const Home = () => {
                                 aria-label={`${(idx % bannerCount) + 1} / ${bannerCount}`}
                             >
                                 {(() => {
-                                    const adsense = isAdsenseMode(banner);
+                                    const adsense = isAdsenseBanner(banner);
                                     const imageUrl = String(banner?.imageUrl || "").trim();
                                     const shouldLoadMedia = shouldLoadBannerMedia(idx);
                                     const hasImageBackground = shouldLoadMedia && !adsense && Boolean(imageUrl);
@@ -886,46 +777,19 @@ export const Home = () => {
                 )}
             </section>
 
-            {hasAdsenseBanner && adsConsent !== null ? (
-                <button
-                    type="button"
-                    className="fixed right-4 top-4 z-50 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-xl transition hover:border-primary-200 hover:text-primary-700 sm:right-6"
-                    onClick={resetAdsConsent}
-                    aria-label="광고 개인화 설정 변경"
-                >
-                    광고 설정 변경
-                </button>
-            ) : null}
-
-            {hasAdsenseBanner && adsConsent === null ? (
-                <div
-                    className="fixed inset-x-4 top-4 z-50 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[420px]"
-                    role="dialog"
-                    aria-modal="false"
-                    aria-labelledby="home-ads-consent-title"
-                    aria-describedby="home-ads-consent-description"
-                >
-                    <div id="home-ads-consent-title" className="text-sm font-black text-slate-900">광고 개인화 설정</div>
-                    <p id="home-ads-consent-description" className="mt-1 text-xs text-slate-600">
-                        맞춤 광고 동의 여부를 선택해 주세요. 선택은 언제든 변경할 수 있습니다.
-                    </p>
-                    <div className="mt-3 flex gap-2">
-                        <button
-                            type="button"
-                            className="btn-primary flex-1 text-xs"
-                            onClick={() => saveAdsConsent("personalized")}
-                        >
-                            맞춤 광고 동의
-                        </button>
-                        <button
-                            type="button"
-                            className="btn-secondary flex-1 text-xs"
-                            onClick={() => saveAdsConsent("non_personalized")}
-                        >
-                            비개인화 광고
-                        </button>
-                    </div>
-                </div>
+            {hasAdsenseBanner ? (
+                <Suspense fallback={null}>
+                    <HomeAdsenseRuntime
+                        activeBanner={heroBanners[bannerIndex]}
+                        adsConsent={adsConsent}
+                        adsenseClientId={adsenseClientId}
+                        bannerIndex={bannerIndex}
+                        isBannerInView={isBannerInView}
+                        isPageHidden={isPageHidden}
+                        onConsentChange={setAdsConsent}
+                        onImpression={sendBannerEvent}
+                    />
+                </Suspense>
             ) : null}
         </div>
     );

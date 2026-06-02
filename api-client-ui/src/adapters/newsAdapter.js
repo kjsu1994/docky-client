@@ -1,8 +1,10 @@
 import api, { getApiErrorMessage } from "../utils/api.js";
+import { normalizeExternalUrl } from "../utils/helpers.js";
 
 export const NEWS_DEFAULT_QUERY = "기후위기";
 export const NEWS_DEFAULT_SORT = "sim";
 export const NEWS_DEFAULT_DISPLAY = 20;
+export const NEWS_QUERY_MAX_LENGTH = 60;
 
 const SORT_VALUES = new Set(["sim", "date"]);
 
@@ -32,7 +34,8 @@ const normalizeDisplay = (display) => {
 
 export const normalizeNewsQuery = (query) => {
     const normalized = String(query || "").trim();
-    return normalized || NEWS_DEFAULT_QUERY;
+    if (!normalized) return NEWS_DEFAULT_QUERY;
+    return normalized.slice(0, NEWS_QUERY_MAX_LENGTH);
 };
 
 export const normalizeNewsResponse = (response) => {
@@ -43,14 +46,18 @@ export const normalizeNewsResponse = (response) => {
         start: Number(payload?.start || 1),
         display: Number(payload?.display || items.length || 0),
         items: Array.isArray(items)
-            ? items.map((item, index) => ({
-                id: `${item.link || item.originallink || "news"}-${index}`,
-                title: cleanNewsText(item.title),
-                description: cleanNewsText(item.description),
-                link: item.link || item.originallink || "",
-                originalLink: item.originallink || item.originalLink || item.link || "",
-                pubDate: item.pubDate || item.pub_date || "",
-            })).filter((item) => item.title && item.link)
+            ? items.map((item, index) => {
+                const link = normalizeExternalUrl(item.link || item.originallink);
+                const originalLink = normalizeExternalUrl(item.originallink || item.originalLink || item.link);
+                return {
+                    id: `${link || originalLink || "news"}-${index}`,
+                    title: cleanNewsText(item.title),
+                    description: cleanNewsText(item.description),
+                    link,
+                    originalLink,
+                    pubDate: item.pubDate || item.pub_date || "",
+                };
+            }).filter((item) => item.title && item.link)
             : [],
     };
 };

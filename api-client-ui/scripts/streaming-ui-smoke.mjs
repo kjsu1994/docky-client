@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createPipeSession } from "./pipe-websocket-cdp.mjs";
@@ -22,9 +22,18 @@ const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
     { name: "mobile", width: 390, height: 844, mobile: true },
 ];
-const listTexts = ["영상 스트리밍 허브", "재생 목록", "테스트 강의", "상세 보기", "재생 가능"];
+const listTexts = ["영상 스트리밍 허브", "재생 목록", "테스트 강의", "외부 썸네일 차단", "상세 보기", "재생 가능"];
 const playerTexts = ["현재 재생", "재생 정보", "목록으로 돌아가기", "플레이리스트"];
 const blockedTexts = ["Loading", "Error", "READY", "PROCESSING", "FAILED", "UPLOADING", "undefined", "NaN"];
+const hlsRuntimePattern = /(?:\/assets\/hls\.light-[\w-]+\.js|hls\.js\/light|hls\.light)/i;
+
+const streamingSource = readFileSync(path.join(process.cwd(), "src/pages/streaming/StreamingHub.jsx"), "utf8");
+if (!streamingSource.includes('import("hls.js/light")')) {
+    throw new Error("StreamingHub must dynamically import hls.js/light only after playback info is ready.");
+}
+if (/import\s+[^;]+from\s+["']hls\.js(?:\/light)?["']/.test(streamingSource)) {
+    throw new Error("StreamingHub must not statically import hls.js in the route chunk.");
+}
 
 let nextMessageId = 1;
 const pending = new Map();
@@ -32,6 +41,7 @@ const pending = new Map();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const encodeJson = (value) => Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 const encodeText = (value) => Buffer.from(value, "utf8").toString("base64");
+const isHlsRuntimeRequest = (url = "") => hlsRuntimePattern.test(url);
 
 function send(ws, method, params = {}) {
     const id = nextMessageId++;
@@ -79,6 +89,15 @@ function routeMock(url, method) {
                             duration_seconds: 125,
                             thumbnail_url: "/api/streaming/videos/801/thumbnail",
                             playlist_url: "/api/streaming/videos/801/hls/index.m3u8",
+                        },
+                        {
+                            video_id: 802,
+                            title: "외부 썸네일 차단",
+                            description: "외부 썸네일 URL은 요청하지 않고 기본 썸네일로 표시합니다.",
+                            status: "READY",
+                            duration_seconds: 95,
+                            thumbnail_url: "https://example.com/streaming-thumbnail.jpg",
+                            playlist_url: "/api/streaming/videos/802/hls/index.m3u8",
                         },
                     ],
                 },
@@ -179,7 +198,10 @@ async function clickButtonByText(ws, text) {
     if (!ok) throw new Error(`Could not click button text: ${text}`);
 }
 
-async function inspectStreaming(ws, viewport) {
+async function inspectStreaming(ws, viewport, requestLog) {
+    const hadHlsBeforeViewport = requestLog.some(isHlsRuntimeRequest);
+    const viewportRequestStart = requestLog.length;
+
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
@@ -192,11 +214,27 @@ async function inspectStreaming(ws, viewport) {
         await waitForText(ws, text);
     }
 
+    const listHlsRequest = requestLog.slice(viewportRequestStart).find(isHlsRuntimeRequest);
+    if (listHlsRequest) {
+        throw new Error(`streaming ${viewport.name}: hls runtime loaded before playback: ${listHlsRequest}`);
+    }
+    const externalThumbnailRequest = requestLog.slice(viewportRequestStart)
+        .find((url) => url.includes("example.com/streaming-thumbnail.jpg"));
+    if (externalThumbnailRequest) {
+        throw new Error(`streaming ${viewport.name}: unsafe external thumbnail was requested: ${externalThumbnailRequest}`);
+    }
+
     await clickButtonByText(ws, "상세 보기");
     for (const text of playerTexts) {
         await waitForText(ws, text);
     }
     await delay(300);
+
+    const nativeHls = await evaluate(ws, `Boolean(document.createElement("video").canPlayType("application/vnd.apple.mpegurl"))`);
+    const hlsPlaybackRequest = requestLog.slice(viewportRequestStart).find(isHlsRuntimeRequest);
+    if (!nativeHls && !hadHlsBeforeViewport && !hlsPlaybackRequest) {
+        throw new Error(`streaming ${viewport.name}: hls runtime was not requested after playback started`);
+    }
 
     const value = await evaluate(ws, `(() => {
         const root = document.documentElement;
@@ -273,6 +311,7 @@ async function main() {
     try {
         const ws = await createPipeSession(chrome, { debug, testName: "streaming-ui-smoke" });
         const runtimeErrors = [];
+        const requestLog = [];
 
         ws.addEventListener("message", (event) => {
             const message = JSON.parse(event.data);
@@ -292,6 +331,8 @@ async function main() {
                         runtimeErrors.push(error.message);
                     }
                 });
+            } else if (message.method === "Network.requestWillBeSent") {
+                requestLog.push(message.params?.request?.url || "");
             } else if (message.method === "Runtime.exceptionThrown") {
                 runtimeErrors.push(message.params?.exceptionDetails?.text || "Runtime exception");
             }
@@ -299,6 +340,7 @@ async function main() {
 
         await new Promise((resolve) => ws.addEventListener("open", resolve, { once: true }));
         await send(ws, "Page.enable");
+        await send(ws, "Network.enable");
         await send(ws, "Runtime.enable");
         await send(ws, "Fetch.enable", {
             patterns: [
@@ -317,7 +359,7 @@ async function main() {
 
         const results = [];
         for (const viewport of viewports) {
-            results.push(await inspectStreaming(ws, viewport));
+            results.push(await inspectStreaming(ws, viewport, requestLog));
         }
         if (runtimeErrors.length) {
             throw new Error(`Runtime errors: ${runtimeErrors.join(" | ")}`);

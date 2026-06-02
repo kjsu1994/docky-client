@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Lock, User, Phone, MapPin, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
-import toast from "react-hot-toast";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
-import { authAdapter, extractAuthErrorMessage, getAuthErrorCode } from "../../adapters/authAdapter.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { notifyError, notifySuccess } from "../../utils/toast.js";
+
+const loadAuthAdapter = () => import("../../adapters/authAdapter.js");
 
 const RESEND_COOLDOWN_SECONDS = 60;
 const MAX_CONFIRM_FAILURES = 5;
@@ -133,6 +135,7 @@ export const Register = () => {
 
         setCheckingEmail(true);
         try {
+            const { authAdapter } = await loadAuthAdapter();
             const payload = await authAdapter.checkEmailAvailability(normalizedEmail);
             const available = payload.available;
 
@@ -142,18 +145,19 @@ export const Register = () => {
 
             if (available) {
                 setErrors((prev) => ({ ...prev, email: "" }));
-                toast.success("사용 가능한 이메일입니다.");
+                notifySuccess("사용 가능한 이메일입니다.");
             } else {
                 setErrors((prev) => ({ ...prev, email: "이미 사용 중인 이메일입니다." }));
-                toast.error("이미 사용 중인 이메일입니다.");
+                notifyError("이미 사용 중인 이메일입니다.");
             }
         } catch (error) {
             setCheckedEmail("");
             setEmailAvailable(null);
             resetVerificationState();
+            const { extractAuthErrorMessage } = await loadAuthAdapter();
             const message = extractAuthErrorMessage(error, "이메일 확인에 실패했습니다.");
             setErrors((prev) => ({ ...prev, email: message }));
-            toast.error(message);
+            notifyError(message);
         } finally {
             setCheckingEmail(false);
         }
@@ -161,32 +165,34 @@ export const Register = () => {
 
     const handleSendVerification = async () => {
         if (!emailChecked) {
-            toast.error("이메일 중복 확인을 먼저 완료해 주세요.");
+            notifyError("이메일 중복 확인을 먼저 완료해 주세요.");
             return;
         }
 
         if (resendCooldown > 0) {
-            toast.error(`${resendCooldown}초 후에 다시 보낼 수 있습니다.`);
+            notifyError(`${resendCooldown}초 후에 다시 보낼 수 있습니다.`);
             return;
         }
 
         setSendingVerification(true);
         try {
+            const { authAdapter } = await loadAuthAdapter();
             await authAdapter.sendEmailVerification(normalizedEmail);
             setVerifiedEmail("");
             setRemainingAttempts(MAX_CONFIRM_FAILURES);
             setResendCooldown(RESEND_COOLDOWN_SECONDS);
             setVerificationStatus("인증번호를 보냈습니다. 받은 편지함과 스팸함을 확인해 주세요.");
             setErrors((prev) => ({ ...prev, verificationCode: "" }));
-            toast.success("인증번호를 보냈습니다.");
+            notifySuccess("인증번호를 보냈습니다.");
         } catch (error) {
+            const { extractAuthErrorMessage, getAuthErrorCode } = await loadAuthAdapter();
             const message = extractAuthErrorMessage(error, "인증번호 전송에 실패했습니다.");
             if (getAuthErrorCode(error) === "EMAIL_VERIFICATION_REQUEST_RATE_LIMITED") {
                 const waitSeconds = parseRetrySeconds(message);
                 setResendCooldown(waitSeconds);
             }
             setVerificationStatus(message);
-            toast.error(message);
+            notifyError(message);
         } finally {
             setSendingVerification(false);
         }
@@ -195,7 +201,7 @@ export const Register = () => {
     const handleConfirmVerification = async () => {
         const code = verificationCode.trim();
         if (!emailChecked) {
-            toast.error("이메일 중복 확인을 먼저 완료해 주세요.");
+            notifyError("이메일 중복 확인을 먼저 완료해 주세요.");
             return;
         }
         if (!/^\d{6}$/.test(code)) {
@@ -205,13 +211,15 @@ export const Register = () => {
 
         setConfirmingVerification(true);
         try {
+            const { authAdapter } = await loadAuthAdapter();
             await authAdapter.confirmEmailVerification({ email: normalizedEmail, code });
             setVerifiedEmail(normalizedEmail);
             setRemainingAttempts(MAX_CONFIRM_FAILURES);
             setVerificationStatus("이메일 인증이 완료되었습니다.");
             setErrors((prev) => ({ ...prev, verificationCode: "" }));
-            toast.success("이메일 인증이 완료되었습니다.");
+            notifySuccess("이메일 인증이 완료되었습니다.");
         } catch (error) {
+            const { extractAuthErrorMessage, getAuthErrorCode } = await loadAuthAdapter();
             const codeValue = getAuthErrorCode(error);
             const message = extractAuthErrorMessage(error, "인증번호 확인에 실패했습니다.");
             setVerifiedEmail("");
@@ -229,7 +237,7 @@ export const Register = () => {
 
             setVerificationStatus(message);
             setErrors((prev) => ({ ...prev, verificationCode: message }));
-            toast.error(message);
+            notifyError(message);
         } finally {
             setConfirmingVerification(false);
         }
@@ -298,7 +306,7 @@ export const Register = () => {
                 address: mergedAddress || undefined,
             });
         } catch (error) {
-            console.error("Register error:", error);
+            logClientError("register.submit", error);
         } finally {
             setLoading(false);
         }
@@ -308,7 +316,7 @@ export const Register = () => {
         if (!address) return;
         setFormData((prev) => ({ ...prev, address }));
         setAddressModalOpen(false);
-        toast.success("주소가 입력되었습니다.");
+        notifySuccess("주소가 입력되었습니다.");
     };
 
     const confirmHelpText = emailVerified

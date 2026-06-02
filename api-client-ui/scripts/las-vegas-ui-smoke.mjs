@@ -27,6 +27,8 @@ function assertLasVegasRealtimeSource() {
     const source = readFileSync("src/pages/games/LasVegasGame.jsx", "utf8");
     const requiredSnippets = [
         ["const realtimeRoomRef = useRef(null)", "track the latest realtime room"],
+        ["createStompClient", "load the STOMP runtime through the shared async adapter"],
+        ["notifyRealtimeError", "route STOMP ERROR frames through the shared safe notifier"],
         ["client.beforeConnect = () =>", "refresh STOMP auth headers before reconnect"],
         ["bindLatestRealtimeRoom(client)", "resubscribe the latest room after reconnect"],
         ["realtimeRoomRef.current = { roomId, chatRoomId: snapshotChatRoomId }", "store the latest game/chat room"],
@@ -39,6 +41,18 @@ function assertLasVegasRealtimeSource() {
     }
     if (source.includes("subscribeAll")) {
         throw new Error("las-vegas-ui-smoke: LasVegasGame must not keep per-room onConnect subscribeAll closures.");
+    }
+    if (source.includes('import SockJS from "sockjs-client"') || source.includes('import { Client } from "@stomp/stompjs"')) {
+        throw new Error("las-vegas-ui-smoke: LasVegasGame must not statically bundle the STOMP runtime into the route chunk.");
+    }
+    if (source.includes('notifyError("실시간 연결 오류")')) {
+        throw new Error("las-vegas-ui-smoke: LasVegasGame must not show raw repeated realtime error toasts.");
+    }
+    if (source.includes('from "react-hot-toast"') || !source.includes('from "../../utils/toast.js"')) {
+        throw new Error("las-vegas-ui-smoke: LasVegasGame must use the dynamic toast helper instead of static react-hot-toast imports.");
+    }
+    if (!source.includes("key={normalized.key || normalized.id}") || source.includes("key={`${msg.createdAt || idx}-${idx}`}")) {
+        throw new Error("las-vegas-ui-smoke: LasVegasGame chat messages must use stable normalized message keys.");
     }
 }
 

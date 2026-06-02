@@ -1,11 +1,48 @@
 import api, { getApiErrorMessage } from "../utils/api.js";
+import { normalizeMemberSearchKeyword } from "./memberSearchBounds.js";
+
+export { MEMBER_SEARCH_KEYWORD_MAX_LENGTH } from "./memberSearchBounds.js";
+
+export const ADMIN_ANOMALY_TEXT_LIMITS = Object.freeze({
+    incidentAssignee: 100,
+    incidentNote: 4000,
+    incidentActionDescription: 1000,
+    reportAdminNote: 2000,
+    sanctionReason: 500,
+    moderationReason: 500,
+    roleReason: 300,
+    ruleMetric: 100,
+});
+
+export const ADMIN_AUDIT_PAGE_SIZE_MAX = 200;
+
+const ADMIN_AUDIT_TYPES = new Set(["ALL", "ROLE", "REPORT", "MODERATION", "SANCTION", "ANOMALY"]);
 
 export const unwrapAdminData = (payload) => payload?.data?.data ?? payload?.data ?? payload ?? null;
+
+const toFiniteInteger = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+};
+
+const normalizePageNumber = (value, fallback = 1) => Math.max(1, toFiniteInteger(value, fallback));
+
+const normalizePageSize = (value, fallback = 10, max = ADMIN_AUDIT_PAGE_SIZE_MAX) => {
+    const fallbackSize = Math.max(1, Math.min(max, toFiniteInteger(fallback, 10)));
+    return Math.max(1, Math.min(max, toFiniteInteger(value, fallbackSize)));
+};
+
+const toNonNegativeInteger = (value, fallback = 0) => Math.max(0, toFiniteInteger(value, fallback));
+
+export const normalizeAuditType = (value) => {
+    const normalized = String(value || "ALL").trim().toUpperCase();
+    return ADMIN_AUDIT_TYPES.has(normalized) ? normalized : "ALL";
+};
 
 export const emptyAdminPage = (size = 10) => ({
     items: [],
     page: 1,
-    size,
+    size: normalizePageSize(size),
     totalElements: 0,
     totalPages: 0,
 });
@@ -17,12 +54,12 @@ export const normalizeAdminPage = (payload, size = 10) => {
     }
     return {
         items: Array.isArray(data.items) ? data.items : Array.isArray(data.content) ? data.content : [],
-        page: Number(data.page || 1),
-        size: Number(data.size || size),
-        totalElements: Number(data.totalElements ?? data.total_elements ?? 0),
-        totalPages: Number(data.totalPages ?? data.total_pages ?? 0),
+        page: normalizePageNumber(data.page ?? 1),
+        size: normalizePageSize(data.size, size),
+        totalElements: toNonNegativeInteger(data.totalElements ?? data.total_elements ?? 0),
+        totalPages: toNonNegativeInteger(data.totalPages ?? data.total_pages ?? 0),
         ...(data.unreadCount !== undefined || data.unread_count !== undefined
-            ? { unreadCount: Number(data.unreadCount ?? data.unread_count ?? 0) }
+            ? { unreadCount: toNonNegativeInteger(data.unreadCount ?? data.unread_count ?? 0) }
             : {}),
     };
 };
@@ -42,22 +79,34 @@ const emptyMasterPageResponse = (size = 10) => ({ data: { data: emptyAdminPage(s
 
 const hiddenYnParam = (hidden) => hidden === "ALL" ? undefined : hidden === "HIDDEN";
 
+const toLimitedText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
+
+const toPositiveInteger = (value, fallback = 1) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : fallback;
+};
+
+const toPositiveNumber = (value, fallback = 1) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 export const buildIncidentUpdatePayload = ({ incidentStatus, assignee, note } = {}) => ({
     incident_status: incidentStatus,
-    assignee,
-    note,
+    assignee: toLimitedText(assignee, ADMIN_ANOMALY_TEXT_LIMITS.incidentAssignee),
+    note: toLimitedText(note, ADMIN_ANOMALY_TEXT_LIMITS.incidentNote),
 });
 
 export const buildIncidentActionPayload = ({ actionType, description, blockMinutes } = {}) => ({
     action_type: actionType,
-    description,
+    description: toLimitedText(description, ADMIN_ANOMALY_TEXT_LIMITS.incidentActionDescription),
     ...(blockMinutes === undefined ? {} : { block_minutes: Math.max(1, Math.min(1440, Number(blockMinutes) || 30)) }),
 });
 
 export const buildRulePayload = ({ metric, hardLimitPerMinute, zScoreThreshold, enabled } = {}) => ({
-    metric: String(metric || "").trim(),
-    hard_limit_per_minute: Number(hardLimitPerMinute) || 1,
-    z_score_threshold: Number(zScoreThreshold) || 1,
+    metric: toLimitedText(metric, ADMIN_ANOMALY_TEXT_LIMITS.ruleMetric),
+    hard_limit_per_minute: toPositiveInteger(hardLimitPerMinute),
+    z_score_threshold: toPositiveNumber(zScoreThreshold),
     enabled: Boolean(enabled),
 });
 
@@ -93,7 +142,8 @@ export const adminAnomaliesAdapter = {
     },
 
     async searchMembers({ keyword, page = 0, size = 20 } = {}) {
-        const response = await api.get("/members/list", { params: { keyword, page, size } });
+        const normalizedKeyword = normalizeMemberSearchKeyword(keyword);
+        const response = await api.get("/members/list", { params: { keyword: normalizedKeyword || undefined, page, size } });
         const payload = unwrapAdminData(response.data);
         const items = payload?.items || payload?.content || payload?.data || payload || [];
         return Array.isArray(items) ? items : [];
@@ -114,13 +164,18 @@ export const adminAnomaliesAdapter = {
     },
 
     async fetchAudits({ type, page = 1, size = 10 } = {}) {
-        const response = await api.get("/admin/audits", { params: { type, page, size } });
-        return normalizeAdminPage(response.data, size);
+        const safePage = normalizePageNumber(page);
+        const safeSize = normalizePageSize(size, 10, ADMIN_AUDIT_PAGE_SIZE_MAX);
+        const response = await api.get("/admin/audits", {
+            params: { type: normalizeAuditType(type), page: safePage, size: safeSize },
+        });
+        return normalizeAdminPage(response.data, safeSize);
     },
 
     async fetchRoleMembers({ keyword, page = 1, size = 10 } = {}) {
+        const normalizedKeyword = normalizeMemberSearchKeyword(keyword);
         const response = await api.get("/admin/roles/members", {
-            params: { keyword: keyword || undefined, page, size },
+            params: { keyword: normalizedKeyword || undefined, page, size },
         });
         return normalizeAdminPage(response.data, size);
     },
@@ -146,8 +201,10 @@ export const adminAnomaliesAdapter = {
         incidentStatus,
         incidentPage,
     }) {
+        const normalizedRoleKeyword = normalizeMemberSearchKeyword(roleKeyword);
+        const normalizedAuditType = normalizeAuditType(auditType);
         const roleMembersPromise = isMaster
-            ? api.get("/admin/roles/members", { params: { keyword: roleKeyword || undefined, page: 1, size: 10 } })
+            ? api.get("/admin/roles/members", { params: { keyword: normalizedRoleKeyword || undefined, page: 1, size: 10 } })
             : Promise.resolve(emptyMasterPageResponse(10));
         const roleAuditsPromise = isMaster
             ? api.get("/admin/roles/audits", { params: { page: 1, size: 10 } })
@@ -180,7 +237,7 @@ export const adminAnomaliesAdapter = {
             api.get("/admin/sanctions/release-requests", { params: { page: 1, size: 50 } }),
             api.get("/admin/moderation/boards", { params: { hiddenYn: hiddenYnParam(moderationHidden), page: 1, size: 8 } }),
             api.get("/admin/moderation/comments", { params: { hiddenYn: hiddenYnParam(moderationHidden), page: 1, size: 8 } }),
-            api.get("/admin/audits", { params: { type: auditType, page: 1, size: 10 } }),
+            api.get("/admin/audits", { params: { type: normalizedAuditType, page: 1, size: 10 } }),
             roleMembersPromise,
             roleAuditsPromise,
         ]);
@@ -221,31 +278,45 @@ export const adminAnomaliesAdapter = {
     },
 
     async updateReportStatus(reportId, { reportStatus, adminNote }) {
-        await api.patch(`/admin/reports/${reportId}`, { report_status: reportStatus, admin_note: adminNote });
+        await api.patch(`/admin/reports/${reportId}`, {
+            report_status: reportStatus,
+            admin_note: toLimitedText(adminNote, ADMIN_ANOMALY_TEXT_LIMITS.reportAdminNote),
+        });
     },
 
     async createSanction({ memberId, reason, days }) {
         await api.post("/admin/sanctions", {
             member_id: memberId,
-            reason,
+            reason: toLimitedText(reason, ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason),
             days: Number.isFinite(days) && days > 0 ? days : undefined,
         });
     },
 
     async releaseSanction(sanctionId, { reason }) {
-        await api.patch(`/admin/sanctions/${sanctionId}/release`, { reason });
+        await api.patch(`/admin/sanctions/${sanctionId}/release`, {
+            reason: toLimitedText(reason, ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason),
+        });
     },
 
     async updateBoardHidden(boardId, { hiddenYn, reason }) {
-        await api.patch(`/admin/moderation/boards/${boardId}`, { hidden_yn: hiddenYn, reason });
+        await api.patch(`/admin/moderation/boards/${boardId}`, {
+            hidden_yn: hiddenYn,
+            reason: toLimitedText(reason, ADMIN_ANOMALY_TEXT_LIMITS.moderationReason),
+        });
     },
 
     async updateCommentHidden(commentId, { hiddenYn, reason }) {
-        await api.patch(`/admin/moderation/comments/${commentId}`, { hidden_yn: hiddenYn, reason });
+        await api.patch(`/admin/moderation/comments/${commentId}`, {
+            hidden_yn: hiddenYn,
+            reason: toLimitedText(reason, ADMIN_ANOMALY_TEXT_LIMITS.moderationReason),
+        });
     },
 
     async updateMemberAdminRole(memberId, { roles, reason }) {
-        await api.patch(`/admin/roles/members/${memberId}`, { roles, reason });
+        await api.patch(`/admin/roles/members/${memberId}`, {
+            roles,
+            reason: toLimitedText(reason, ADMIN_ANOMALY_TEXT_LIMITS.roleReason),
+        });
     },
 
     async saveRule(metric, draft) {

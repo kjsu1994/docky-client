@@ -1,6 +1,6 @@
 import axios from "axios";
-import toast from "react-hot-toast";
 import { beginNetworkActivity, endNetworkActivity } from "./networkActivity.js";
+import { notifyError } from "./toast.js";
 
 const api = axios.create({
     baseURL: "/api",
@@ -16,6 +16,40 @@ const PUBLIC_AUTH_PATHS = [
 
 let refreshPromise = null;
 let sessionExpiredNotified = false;
+
+const NETWORK_ERROR_MESSAGE = "서버와 연결하지 못했습니다. 네트워크 상태를 확인해주세요.";
+const TIMEOUT_ERROR_MESSAGE = "요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.";
+const DEFAULT_ERROR_MESSAGE = "요청 처리 중 오류가 발생했습니다.";
+const DEFAULT_VALIDATION_REASON = "입력값을 확인해주세요.";
+const HANGUL_PATTERN = /[가-힣]/u;
+const ENGLISH_LETTER_PATTERN = /[A-Za-z]/u;
+const TECHNICAL_SERVER_MESSAGE_PATTERN =
+    /\b(?:root_cause|stack\s*trace|NullPointerException|IllegalArgumentException|SQLException|SQLIntegrityConstraintViolationException|Internal Server Error|Bad Request|Unauthorized|Forbidden|ORA-\d{5}|java\.)\b/i;
+
+const FIELD_LABELS = {
+    adminNote: "관리 메모",
+    boardId: "게시글",
+    commentId: "댓글",
+    contents: "본문",
+    detail: "상세 내용",
+    dueDate: "날짜",
+    email: "이메일",
+    file: "파일",
+    files: "파일",
+    hiddenYn: "숨김 여부",
+    keyword: "검색어",
+    memberId: "회원",
+    name: "이름",
+    page: "페이지",
+    password: "비밀번호",
+    reason: "사유",
+    reportStatus: "신고 상태",
+    roomId: "채팅방",
+    size: "목록 크기",
+    targetId: "신고 대상",
+    targetType: "신고 대상 유형",
+    title: "제목",
+};
 
 const shouldTrackNetworkActivity = (config) => config?.meta?.trackNetwork !== false;
 
@@ -64,7 +98,82 @@ const redirectToLogin = () => {
 const notifySessionExpired = () => {
     if (sessionExpiredNotified) return;
     sessionExpiredNotified = true;
-    toast.error("세션이 만료되었습니다. 다시 로그인해주세요.");
+    notifyError("세션이 만료되었습니다. 다시 로그인해주세요.");
+};
+
+const isTimeoutError = (error) => (
+    error?.code === "ECONNABORTED" ||
+    String(error?.message || "").toLowerCase().includes("timeout")
+);
+
+const normalizeFieldKey = (field) => {
+    if (typeof field !== "string" || !field.trim()) return "";
+    const normalized = field
+        .replace(/\[(\d+)\]/g, "")
+        .split(".")
+        .filter(Boolean)
+        .pop();
+    if (!normalized) return "";
+    return normalized.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+};
+
+const fieldLabel = (field) => {
+    const key = normalizeFieldKey(field);
+    return FIELD_LABELS[key] || "";
+};
+
+const isUserFacingServerMessage = (message) => {
+    if (typeof message !== "string") return false;
+    const trimmed = message.trim();
+    if (!trimmed) return false;
+    if (TECHNICAL_SERVER_MESSAGE_PATTERN.test(trimmed)) return false;
+    return HANGUL_PATTERN.test(trimmed) || !ENGLISH_LETTER_PATTERN.test(trimmed);
+};
+
+const normalizeValidationReason = (reason) => {
+    if (reason == null) return DEFAULT_VALIDATION_REASON;
+
+    const trimmed = String(reason).trim();
+    if (!trimmed) return DEFAULT_VALIDATION_REASON;
+    if (trimmed === "must not be blank") return "값을 입력해주세요.";
+    if (trimmed === "must not be empty") return "값을 1개 이상 입력해주세요.";
+    if (trimmed === "must not be null") return "필수 값입니다.";
+    if (trimmed === "must be a well-formed email address") return "올바른 이메일 형식이어야 합니다.";
+    if (trimmed.startsWith("must be less than or equal to ")) {
+        return `${trimmed.slice("must be less than or equal to ".length)} 이하로 입력해주세요.`;
+    }
+    if (trimmed.startsWith("must be greater than or equal to ")) {
+        return `${trimmed.slice("must be greater than or equal to ".length)} 이상으로 입력해주세요.`;
+    }
+    if (trimmed.startsWith("must be greater than ")) {
+        return `${trimmed.slice("must be greater than ".length)}보다 크게 입력해주세요.`;
+    }
+    if (trimmed.startsWith("must be less than ")) {
+        return `${trimmed.slice("must be less than ".length)}보다 작게 입력해주세요.`;
+    }
+    if (trimmed.startsWith("size must be between ")) {
+        const range = trimmed.slice("size must be between ".length);
+        const separator = range.indexOf(" and ");
+        if (separator > 0) {
+            return `길이는 ${range.slice(0, separator)}자 이상 ${range.slice(separator + " and ".length)}자 이하로 입력해주세요.`;
+        }
+    }
+    if (trimmed.startsWith("must match ")) return "형식이 올바르지 않습니다.";
+
+    return isUserFacingServerMessage(trimmed) ? trimmed : DEFAULT_VALIDATION_REASON;
+};
+
+const formatValidationErrors = (errors, fieldKey) => {
+    if (!Array.isArray(errors) || errors.length === 0) return "";
+    return errors
+        .map((item) => {
+            const reason = normalizeValidationReason(item?.reason || item?.message);
+            const label = fieldLabel(item?.[fieldKey]);
+            if (label && reason) return `${label}: ${reason}`;
+            return reason || label;
+        })
+        .filter(Boolean)
+        .join(", ");
 };
 
 const refreshAccessToken = async () => {
@@ -174,23 +283,23 @@ api.interceptors.response.use(
     }
 );
 
-export const getApiErrorMessage = (error, fallbackMessage = "요청 처리 중 오류가 발생했습니다.") => {
-    const fallback = fallbackMessage || "요청 처리 중 오류가 발생했습니다.";
+export const getApiErrorMessage = (error, fallbackMessage = DEFAULT_ERROR_MESSAGE) => {
+    const fallback = fallbackMessage || DEFAULT_ERROR_MESSAGE;
     const data = error?.response?.data;
     const serverMessage = data?.message;
 
-    if (typeof serverMessage === "string" && serverMessage.trim()) {
-        return serverMessage.trim();
-    }
     if (Array.isArray(data?.fieldErrors) && data.fieldErrors.length > 0) {
-        return data.fieldErrors.map((item) => `${item.field}: ${item.reason}`).join(", ");
+        return formatValidationErrors(data.fieldErrors, "field") || fallback;
     }
     if (Array.isArray(data?.violationErrors) && data.violationErrors.length > 0) {
-        return data.violationErrors.map((item) => `${item.propertyPath}: ${item.reason}`).join(", ");
+        return formatValidationErrors(data.violationErrors, "propertyPath") || fallback;
+    }
+    if (isUserFacingServerMessage(serverMessage)) {
+        return serverMessage.trim();
     }
 
     if (!error?.response) {
-        return fallbackMessage || "서버와 연결하지 못했습니다. 네트워크 상태를 확인해주세요.";
+        return isTimeoutError(error) ? TIMEOUT_ERROR_MESSAGE : NETWORK_ERROR_MESSAGE;
     }
 
     const status = Number(error.response.status || 0);

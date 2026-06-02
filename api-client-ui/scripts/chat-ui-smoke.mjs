@@ -23,7 +23,7 @@ const viewports = [
     { name: "mobile", width: 390, height: 844, mobile: true },
 ];
 const listTexts = ["채팅방", "운영 회의", "최근 메시지입니다.", "대화방을 선택해주세요."];
-const roomTexts = ["운영 회의", "실시간", "배포 일정 확인했습니다.", "release-note.pdf", "PDF"];
+const roomTexts = ["운영 회의", "실시간", "배포 일정 확인했습니다.", "release-note.pdf", "PDF", "차단된 첨부", "첨부파일을 표시할 수 없습니다."];
 const blockedTexts = ["Chat Room", "Anonymous", "Invite", "Loading", "Error", "ME"];
 
 let nextMessageId = 1;
@@ -35,6 +35,32 @@ function assertStaticChatAuthWiring() {
     const adapterSource = readFileSync("src/adapters/realtimeAdapter.js", "utf8");
     if (!adapterSource.includes("buildStompConnectHeaders") || !adapterSource.includes("Bearer ${token}")) {
         throw new Error("chat-ui-smoke: realtimeAdapter must build STOMP Authorization headers.");
+    }
+    if (!adapterSource.includes("notifyRealtimeError")
+        || !adapterSource.includes("getRealtimeErrorMessage")
+        || !adapterSource.includes("REALTIME_ERROR_NOTICE_COOLDOWN_MS")) {
+        throw new Error("chat-ui-smoke: realtimeAdapter must centralize safe STOMP error notification handling.");
+    }
+    const chatAdapterSource = readFileSync("src/adapters/chatAdapter.js", "utf8");
+    if (!chatAdapterSource.includes("member_ids: memberIds")) {
+        throw new Error("chat-ui-smoke: chat room creation must send member_ids for the server snake_case contract.");
+    }
+    if (!chatAdapterSource.includes("normalizeMemberSearchKeyword(keyword)")) {
+        throw new Error("chat-ui-smoke: chat member search must normalize keyword before /members/list.");
+    }
+    if (!chatAdapterSource.includes("getApiErrorMessage(error, fallback)")) {
+        throw new Error("chat-ui-smoke: chat errors must use the shared API error formatter.");
+    }
+    if (!chatAdapterSource.includes("compareMessagesByChronology")
+        || !chatAdapterSource.includes(".sort(compareMessagesByChronology)")) {
+        throw new Error("chat-ui-smoke: chat messages must use one shared stable chronology comparator.");
+    }
+    if (chatAdapterSource.includes("Math.random().toString(36)")) {
+        throw new Error("chat-ui-smoke: chat message ids must not use random fallback fingerprints.");
+    }
+    const memberSearchBoundsSource = readFileSync("src/adapters/memberSearchBounds.js", "utf8");
+    if (!memberSearchBoundsSource.includes("MEMBER_SEARCH_KEYWORD_MAX_LENGTH = 80")) {
+        throw new Error("chat-ui-smoke: member search keyword bound must stay at 80 characters.");
     }
 
     for (const sourcePath of [
@@ -48,8 +74,146 @@ function assertStaticChatAuthWiring() {
         if (!source.includes("buildStompConnectHeaders")) {
             throw new Error(`chat-ui-smoke: ${sourcePath} must use realtimeAdapter STOMP auth headers.`);
         }
+        if (!source.includes("createStompClient")) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must lazy-load the STOMP runtime through realtimeAdapter.`);
+        }
+        if (!source.includes("notifyRealtimeError")) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must route STOMP ERROR frames through the shared safe notifier.`);
+        }
+        if (source.includes('notifyError("실시간 연결 오류")')) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} still shows raw repeated realtime error toasts.`);
+        }
+        if (source.includes('import SockJS from "sockjs-client"') || source.includes('import { Client } from "@stomp/stompjs"')) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} still statically imports the STOMP runtime.`);
+        }
         if (source.includes("Bearer ${localStorage.getItem(\"accessToken\")")) {
             throw new Error(`chat-ui-smoke: ${sourcePath} still sends raw localStorage token headers.`);
+        }
+        if ((sourcePath === "src/pages/chat/Chat.jsx" || sourcePath === "src/components/FloatingChat.jsx")
+            && (!source.includes("MEMBER_SEARCH_KEYWORD_MAX_LENGTH") || !source.includes("maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH}"))) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must bound member search input length.`);
+        }
+        if (["src/pages/chat/Chat.jsx", "src/components/FloatingChat.jsx", "src/pages/games/LasVegasGame.jsx", "src/pages/games/NoThanksGame.jsx"].includes(sourcePath)
+            && !source.includes("compareMessagesByChronology")) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must keep realtime chat messages in stable chronology order.`);
+        }
+        if ((sourcePath === "src/pages/chat/Chat.jsx" || sourcePath === "src/components/FloatingChat.jsx")
+            && (source.includes("key={roomId || Math.random()}") || !source.includes("getRoomKey(room, idx)"))) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must use deterministic room list keys.`);
+        }
+        if ((sourcePath === "src/pages/chat/Chat.jsx" || sourcePath === "src/components/FloatingChat.jsx")
+            && (!source.includes("첨부파일을 표시할 수 없습니다.") || source.includes("href={messageFileUrl || undefined}"))) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must render invalid attachment URLs as a disabled file state.`);
+        }
+    }
+}
+
+function assertStaticChatToastRuntimeBoundary() {
+    for (const sourcePath of [
+        "src/pages/chat/Chat.jsx",
+        "src/components/FloatingChat.jsx",
+    ]) {
+        const source = readFileSync(sourcePath, "utf8");
+        if (source.includes("from \"react-hot-toast\"") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(source)) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must use the dynamic toast helper instead of static react-hot-toast imports.`);
+        }
+        if (!source.includes("notifyError") || !source.includes("notifySuccess")) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must keep chat success/error notifications on the dynamic toast runtime boundary.`);
+        }
+    }
+}
+
+function assertStaticChatSendFailureUx() {
+    const requiredSnippets = [
+        "채팅방을 선택한 뒤 메시지를 보내 주세요.",
+        "채팅 연결이 아직 준비되지 않았습니다. 잠시 후 다시 보내 주세요.",
+        "메시지를 전송하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.",
+        "filter((message) => message.id !== tempId)",
+        "방 제목을 입력해 주세요.",
+        "방이 생성되었습니다. 멤버를 초대해 보세요.",
+    ];
+
+    for (const sourcePath of [
+        "src/pages/chat/Chat.jsx",
+        "src/components/FloatingChat.jsx",
+    ]) {
+        const source = readFileSync(sourcePath, "utf8");
+        const missing = requiredSnippets.filter((snippet) => !source.includes(snippet));
+        if (missing.length) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must keep polished send failure UX snippets: ${missing.join(", ")}`);
+        }
+        for (const blocked of ["메시지 전송 실패", "방 제목을 입력해주세요", "초대해보세요!"]) {
+            if (source.includes(blocked)) {
+                throw new Error(`chat-ui-smoke: ${sourcePath} still has rough chat feedback copy: ${blocked}`);
+            }
+        }
+    }
+
+    const floatingSource = readFileSync("src/components/FloatingChat.jsx", "utf8");
+    if (!floatingSource.includes("fetchRooms({ force: true })")) {
+        throw new Error("chat-ui-smoke: floating chat must resync room previews after send failure.");
+    }
+}
+
+function assertStaticFloatingChatAccessibility() {
+    const source = readFileSync("src/components/FloatingChat.jsx", "utf8");
+    if (!source.includes("aria-haspopup=\"dialog\"") || !source.includes("aria-controls={isOpen ? panelId : undefined}") || !source.includes("aria-expanded={isOpen && !isMinimized}")) {
+        throw new Error("chat-ui-smoke: floating chat launcher must expose dialog relationship state.");
+    }
+    if (!source.includes("data-floating-chat-panel=\"true\"") || !source.includes("role=\"dialog\"") || !source.includes("aria-labelledby={panelTitleId}") || !source.includes("aria-describedby={panelDescriptionId}")) {
+        throw new Error("chat-ui-smoke: floating chat panel must be labelled as a dialog.");
+    }
+    if (!source.includes("panelCloseButtonRef.current?.focus()") || !source.includes("launcherRef.current?.focus()")) {
+        throw new Error("chat-ui-smoke: floating chat panel must move focus in and restore launcher focus.");
+    }
+    if (!source.includes("event.key === \"Escape\"") || !source.includes("closeChat()")) {
+        throw new Error("chat-ui-smoke: floating chat panel must close from Escape.");
+    }
+    if (!source.includes("trapFocus(event, panelRef.current)")) {
+        throw new Error("chat-ui-smoke: floating chat panel must trap Tab focus while open.");
+    }
+    if (!source.includes("aria-modal=\"true\"") || !source.includes("aria-labelledby={modalTitleId}") || !source.includes("aria-describedby={modalDescriptionId}") || !source.includes("modalCloseButtonRef.current?.focus()")) {
+        throw new Error("chat-ui-smoke: floating chat create/invite modal must keep ARIA and focus wiring.");
+    }
+    if (!source.includes("trapFocus(event, modalPanelRef.current)")) {
+        throw new Error("chat-ui-smoke: floating chat create/invite modal must trap Tab focus while open.");
+    }
+    if (!/useEffect\(\(\) => \(\) => \{[\s\S]*clearTimeout\(dragHoldTimerRef\.current\)[\s\S]*dragHoldTimerRef\.current = null;[\s\S]*\}, \[\]\);/.test(source)) {
+        throw new Error("chat-ui-smoke: floating chat drag hold timer must be cleared on unmount.");
+    }
+    if (!/dragHoldTimerRef\.current = setTimeout\(\(\) => \{[\s\S]*dragHoldTimerRef\.current = null;[\s\S]*setDragReady\(true\)/.test(source)) {
+        throw new Error("chat-ui-smoke: floating chat drag hold timer callback must clear the stored timer handle.");
+    }
+}
+
+function assertStaticFullChatAccessibility() {
+    const source = readFileSync("src/pages/chat/Chat.jsx", "utf8");
+    if (!source.includes("useId") || !source.includes("modalTitleId") || !source.includes("modalDescriptionId")) {
+        throw new Error("chat-ui-smoke: full chat create/invite modal must use stable ARIA ids.");
+    }
+    if (!source.includes("role=\"dialog\"") || !source.includes("aria-modal=\"true\"") || !source.includes("aria-labelledby={modalTitleId}") || !source.includes("aria-describedby={modalDescriptionId}")) {
+        throw new Error("chat-ui-smoke: full chat create/invite modal must be labelled as a modal dialog.");
+    }
+    if (!source.includes("modalCloseButtonRef.current?.focus()") || !source.includes("previousFocus.focus()") || !source.includes("event.key === \"Escape\"")) {
+        throw new Error("chat-ui-smoke: full chat create/invite modal must support focus movement, restoration, and Escape close.");
+    }
+    if (!source.includes("trapFocus(event, modalPanelRef.current)")) {
+        throw new Error("chat-ui-smoke: full chat create/invite modal must trap Tab focus while open.");
+    }
+    if (!source.includes("htmlFor={roomTitleInputId}") || !source.includes("id={roomTitleInputId}") || !source.includes("htmlFor={memberSearchInputId}") || !source.includes("id={memberSearchInputId}")) {
+        throw new Error("chat-ui-smoke: full chat modal inputs must be connected to labels.");
+    }
+    for (const label of [
+        "채팅방 목록 새로고침",
+        "AI 채팅방 열기",
+        "새 채팅방 만들기",
+        "채팅방 목록 열기",
+        "파일 첨부",
+        "메시지 보내기",
+        "채팅 모달 닫기",
+    ]) {
+        if (!source.includes(label)) {
+            throw new Error(`chat-ui-smoke: full chat missing icon button label ${label}.`);
         }
     }
 }
@@ -157,6 +321,20 @@ function routeMock(url, method) {
                         fileSize: 2048,
                         fileImage: false,
                         createdAt: "2026-06-01T09:28:00+09:00",
+                    },
+                    {
+                        message_id: 3,
+                        roomId: 101,
+                        senderId: 100,
+                        senderName: "운영자",
+                        message: "차단된 첨부",
+                        type: "FILE",
+                        fileName: "차단된 첨부",
+                        fileUrl: "https://example.com/private.pdf",
+                        fileContentType: "application/pdf",
+                        fileSize: 4096,
+                        fileImage: false,
+                        createdAt: "2026-06-01T09:29:00+09:00",
                     },
                 ],
             },
@@ -355,6 +533,10 @@ async function inspectChat(ws, viewport) {
 
 async function main() {
     assertStaticChatAuthWiring();
+    assertStaticChatToastRuntimeBoundary();
+    assertStaticChatSendFailureUx();
+    assertStaticFloatingChatAccessibility();
+    assertStaticFullChatAccessibility();
 
     const chrome = spawn(chromePath, [
         "--headless=new",        "--remote-debugging-pipe",

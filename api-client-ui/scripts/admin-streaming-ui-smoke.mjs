@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -22,6 +22,18 @@ const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false, interactive: true },
     { name: "mobile", width: 390, height: 844, mobile: true, interactive: false },
 ];
+const adminStreamingSource = readFileSync("src/pages/admin/AdminStreamingStudio.jsx", "utf8");
+
+function assertStaticAdminStreamingToastRuntimeBoundary() {
+    if (adminStreamingSource.includes("from \"react-hot-toast\"") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(adminStreamingSource)) {
+        throw new Error("admin-streaming-ui-smoke: AdminStreamingStudio must use the dynamic toast helper instead of static react-hot-toast imports.");
+    }
+    for (const helper of ["loadToast", "notifyError", "notifySuccess"]) {
+        if (!adminStreamingSource.includes(helper)) {
+            throw new Error(`admin-streaming-ui-smoke: AdminStreamingStudio must keep ${helper} on the dynamic toast runtime boundary.`);
+        }
+    }
+}
 
 class PipeCdp {
     constructor(chrome) {
@@ -133,6 +145,16 @@ function routeMock(url, method) {
                             file_size: 73400320,
                             duration_seconds: 90,
                             thumbnail_url: "/api/streaming/videos/901/thumbnail",
+                        },
+                        {
+                            video_id: 904,
+                            title: "외부 썸네일 관리자 샘플",
+                            description: "외부 썸네일 URL은 요청하지 않습니다.",
+                            status: "READY",
+                            source_extension: "mp4",
+                            file_size: 10485760,
+                            duration_seconds: 45,
+                            thumbnail_url: "https://example.com/admin-streaming-thumbnail.jpg",
                         },
                     ],
                 },
@@ -335,7 +357,9 @@ async function assertPageQuality(cdp, sessionId, label) {
     }
 }
 
-async function inspectAdminStreaming(cdp, sessionId, viewport) {
+async function inspectAdminStreaming(cdp, sessionId, viewport, requestLog) {
+    const viewportRequestStart = requestLog.length;
+
     await cdp.send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
@@ -348,8 +372,15 @@ async function inspectAdminStreaming(cdp, sessionId, viewport) {
     await waitForText(cdp, sessionId, "영상 업로드");
     await waitForText(cdp, sessionId, "inbox 반입");
     await waitForText(cdp, sessionId, "관리자 업로드 샘플");
+    await waitForText(cdp, sessionId, "외부 썸네일 관리자 샘플");
     await waitForText(cdp, sessionId, "재생 가능");
     await waitForText(cdp, sessionId, "인박스 강의");
+
+    const externalThumbnailRequest = requestLog.slice(viewportRequestStart)
+        .find((url) => url.includes("example.com/admin-streaming-thumbnail.jpg"));
+    if (externalThumbnailRequest) {
+        throw new Error(`admin streaming ${viewport.name}: unsafe external thumbnail was requested: ${externalThumbnailRequest}`);
+    }
 
     if (viewport.interactive) {
         await setInputValue(cdp, sessionId, "input[placeholder='영상 제목']", "브라우저 업로드 샘플");
@@ -374,6 +405,8 @@ async function inspectAdminStreaming(cdp, sessionId, viewport) {
 }
 
 async function main() {
+    assertStaticAdminStreamingToastRuntimeBoundary();
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",
@@ -401,9 +434,10 @@ async function main() {
         chrome.once("exit", resolve);
     });
 
-    const cdp = new PipeCdp(chrome);
-    let sessionId = null;
-    const runtimeErrors = [];
+        const cdp = new PipeCdp(chrome);
+        let sessionId = null;
+        const runtimeErrors = [];
+        const requestLog = [];
 
     try {
         await cdp.send("Browser.getVersion");
@@ -424,10 +458,13 @@ async function main() {
                 });
             } else if (message.method === "Runtime.exceptionThrown") {
                 runtimeErrors.push(message.params?.exceptionDetails?.text || "Runtime exception");
+            } else if (message.method === "Network.requestWillBeSent") {
+                requestLog.push(message.params?.request?.url || "");
             }
         });
 
         await cdp.send("Page.enable", {}, sessionId);
+        await cdp.send("Network.enable", {}, sessionId);
         await cdp.send("Runtime.enable", {}, sessionId);
         await cdp.send("Fetch.enable", {
             patterns: [
@@ -446,7 +483,7 @@ async function main() {
 
         const results = [];
         for (const viewport of viewports) {
-            results.push(await inspectAdminStreaming(cdp, sessionId, viewport));
+            results.push(await inspectAdminStreaming(cdp, sessionId, viewport, requestLog));
         }
         if (runtimeErrors.length) {
             throw new Error(`Runtime errors: ${runtimeErrors.join(" | ")}`);

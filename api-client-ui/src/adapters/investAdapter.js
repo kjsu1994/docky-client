@@ -1,5 +1,9 @@
 import api, { getApiErrorMessage } from "../utils/api.js";
 
+export const INVEST_SYMBOL_MAX_LENGTH = 20;
+export const INVEST_SYMBOL_QUERY_MAX_LENGTH = 80;
+export const INVEST_CHART_INTERVAL_MAX_LENGTH = 10;
+
 export const unwrapInvestData = (response) => response?.data?.data ?? response?.data ?? response ?? null;
 
 const isPlainObject = (value) => (

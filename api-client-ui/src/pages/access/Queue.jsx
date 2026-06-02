@@ -1,13 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Timer, Users, Loader2, AlertCircle } from "lucide-react";
-import toast from "react-hot-toast";
-import { extractQueueErrorMessage, isQueueUnauthorizedError, queueAdapter, resolveQueuePollIntervalMs } from "../../adapters/queueAdapter.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { notifySuccess } from "../../utils/toast.js";
+
+const loadQueueAdapter = () => import("../../adapters/queueAdapter.js");
 
 const WAITING_UI_DELAY_MS = 700;
 const FALLBACK_POLL_INTERVAL_MS = 3000;
 const MAX_POLL_INTERVAL_MS = 10000;
 const POLL_JITTER_MS = 500;
+
+const toNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const resolvePollIntervalMs = (data) => {
+    const seconds = toNumber(data?.poll_interval_seconds ?? data?.pollIntervalSeconds);
+    if (seconds <= 0) return FALLBACK_POLL_INTERVAL_MS;
+    return Math.min(Math.max(seconds * 1000, FALLBACK_POLL_INTERVAL_MS), MAX_POLL_INTERVAL_MS);
+};
 
 export const Queue = () => {
     const [queueInfo, setQueueInfo] = useState({
@@ -35,11 +48,6 @@ export const Queue = () => {
         }
     };
 
-    const resolvePollIntervalMs = (data) => resolveQueuePollIntervalMs(data, {
-        fallbackMs: FALLBACK_POLL_INTERVAL_MS,
-        maxMs: MAX_POLL_INTERVAL_MS,
-    });
-
     const scheduleNextPoll = (data) => {
         if (!mountedRef.current) return;
         if (pollTimerRef.current) {
@@ -61,6 +69,7 @@ export const Queue = () => {
 
     const fetchQueueStatus = async () => {
         try {
+            const { queueAdapter } = await loadQueueAdapter();
             const data = await queueAdapter.fetchStatus();
             setQueueInfo(data);
             setLoading(false);
@@ -68,7 +77,7 @@ export const Queue = () => {
 
             if (data.status === "ALLOWED") {
                 clearTimers();
-                toast.success("입장 가능합니다. 이동 중...");
+                notifySuccess("입장 가능합니다. 이동 중...");
                 navigate("/app", { replace: true });
                 return;
             }
@@ -84,8 +93,9 @@ export const Queue = () => {
             startWaitingUiDelay();
             scheduleNextPoll(data);
         } catch (err) {
-            console.error("Failed to fetch queue status:", err);
+            logClientError("queue.status.fetch", err);
             setLoading(false);
+            const { extractQueueErrorMessage, isQueueUnauthorizedError } = await loadQueueAdapter();
             setError(extractQueueErrorMessage(err, "대기열 정보를 가져오는데 실패했습니다."));
             if (isQueueUnauthorizedError(err)) {
                 clearTimers();
@@ -188,7 +198,7 @@ export const Queue = () => {
                                     />
                                 </div>
                                 <p className="text-[10px] text-center text-slate-400">
-                                    새로고침하거나 창을 닫으면 대기 순서가 초기화될 수 있습니다.
+                                    같은 브라우저에서는 새로고침해도 대기 정보가 유지됩니다.
                                 </p>
                             </div>
 

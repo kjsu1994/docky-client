@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Film, RefreshCw, Upload, Trash2, AlertTriangle, Clapperboard, LoaderCircle, Server, WandSparkles, FolderSearch, CheckSquare } from "lucide-react";
-import toast from "react-hot-toast";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import { streamingAdapter, streamingErrorMessage } from "../../adapters/streamingAdapter.js";
+import { loadToast, notifyError, notifySuccess } from "../../utils/toast.js";
 
 const statusTone = {
     READY: "bg-emerald-100 text-emerald-700",
@@ -121,7 +121,7 @@ export const AdminStreamingStudio = () => {
             setSelectedInboxFiles((prev) => prev.filter((fileName) => items.some((item) => item.fileName === fileName && item.ready)));
         } catch (err) {
             if (!silent) {
-                toast.error(streamingErrorMessage(err, "inbox 파일 목록을 불러오지 못했습니다."));
+                notifyError(streamingErrorMessage(err, "inbox 파일 목록을 불러오지 못했습니다."));
             }
             setInboxFiles([]);
             setSelectedInboxFiles([]);
@@ -185,7 +185,7 @@ export const AdminStreamingStudio = () => {
     const handleFileSelection = (event) => {
         const files = Array.from(event.target.files || []);
         if (files.length > MAX_STREAMING_BATCH_FILES) {
-            toast.error(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 등록할 수 있습니다.`);
+            notifyError(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 등록할 수 있습니다.`);
             setSelectedFiles(files.slice(0, MAX_STREAMING_BATCH_FILES));
             return;
         }
@@ -195,11 +195,11 @@ export const AdminStreamingStudio = () => {
     const handleUpload = async (e) => {
         e.preventDefault();
         if (!selectedFiles.length) {
-            toast.error("업로드할 영상 파일을 선택해주세요.");
+            notifyError("업로드할 영상 파일을 선택해주세요.");
             return;
         }
         if (selectedFiles.length > MAX_STREAMING_BATCH_FILES) {
-            toast.error(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 등록할 수 있습니다.`);
+            notifyError(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 등록할 수 있습니다.`);
             return;
         }
 
@@ -225,13 +225,13 @@ export const AdminStreamingStudio = () => {
             const createdCount = items.length || selectedFiles.length;
             setUploadPhase("processing");
             setUploadProgress(100);
-            toast.success(`${createdCount}개 영상 업로드가 등록되었습니다. 서버에서 변환을 시작합니다.`);
+            notifySuccess(`${createdCount}개 영상 업로드가 등록되었습니다. 서버에서 변환을 시작합니다.`);
             resetForm();
             await fetchVideos({ silent: true });
         } catch (err) {
             setUploadPhase("idle");
             setUploadProgress(0);
-            toast.error(streamingErrorMessage(err, "영상 업로드에 실패했습니다."));
+            notifyError(streamingErrorMessage(err, "영상 업로드에 실패했습니다."));
         } finally {
             setUploading(false);
         }
@@ -239,7 +239,7 @@ export const AdminStreamingStudio = () => {
 
     const handleImportInbox = async () => {
         if (!selectedInboxFiles.length) {
-            toast.error("가져올 inbox 파일을 선택해주세요.");
+            notifyError("가져올 inbox 파일을 선택해주세요.");
             return;
         }
 
@@ -252,7 +252,7 @@ export const AdminStreamingStudio = () => {
                 description,
             });
             const importedCount = items.length || selectedInboxFiles.length;
-            toast.success(`${importedCount}개 inbox 영상 가져오기가 시작되었습니다.`);
+            notifySuccess(`${importedCount}개 inbox 영상 가져오기가 시작되었습니다.`);
             setSelectedInboxFiles([]);
             await Promise.all([
                 fetchVideos({ silent: true }),
@@ -261,7 +261,7 @@ export const AdminStreamingStudio = () => {
         } catch (err) {
             setUploadPhase("idle");
             setUploadProgress(0);
-            toast.error(streamingErrorMessage(err, "inbox 파일 가져오기에 실패했습니다."));
+            notifyError(streamingErrorMessage(err, "inbox 파일 가져오기에 실패했습니다."));
         } finally {
             setImportingInbox(false);
         }
@@ -273,7 +273,7 @@ export const AdminStreamingStudio = () => {
                 return prev.filter((item) => item !== fileName);
             }
             if (prev.length >= MAX_STREAMING_BATCH_FILES) {
-                toast.error(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 가져올 수 있습니다.`);
+                notifyError(`한 번에 최대 ${MAX_STREAMING_BATCH_FILES}개 영상만 가져올 수 있습니다.`);
                 return prev;
             }
             return [...prev, fileName];
@@ -287,13 +287,29 @@ export const AdminStreamingStudio = () => {
             confirmText: "삭제",
         });
         if (!confirmed) return;
-        const toastId = toast.loading("영상을 삭제하는 중입니다...");
+        let toastApi = null;
+        let toastId = null;
+        try {
+            toastApi = await loadToast();
+            toastId = toastApi.loading("영상을 삭제하는 중입니다...");
+        } catch {
+            // 알림 런타임 로드 실패가 삭제 동작 자체를 막지 않도록 한다.
+        }
         try {
             await streamingAdapter.deleteAdminVideo(videoId);
             await fetchVideos({ silent: true });
-            toast.success("영상이 삭제되었습니다.", { id: toastId });
+            if (toastApi && toastId) {
+                toastApi.success("영상이 삭제되었습니다.", { id: toastId });
+            } else {
+                notifySuccess("영상이 삭제되었습니다.");
+            }
         } catch (err) {
-            toast.error(streamingErrorMessage(err, "영상 삭제에 실패했습니다."), { id: toastId });
+            const message = streamingErrorMessage(err, "영상 삭제에 실패했습니다.");
+            if (toastApi && toastId) {
+                toastApi.error(message, { id: toastId });
+            } else {
+                notifyError(message);
+            }
         }
     };
 

@@ -1,5 +1,5 @@
 ﻿import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createPipeSession } from "./pipe-websocket-cdp.mjs";
@@ -36,6 +36,16 @@ let nextMessageId = 1;
 const pending = new Map();
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function assertStaticStatsToastRuntimeBoundary() {
+    const source = readFileSync("src/pages/home/Statistics.jsx", "utf8");
+    if (source.includes("from \"react-hot-toast\"") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(source)) {
+        throw new Error("stats-ui-smoke: Statistics must use the dynamic toast helper instead of static react-hot-toast imports.");
+    }
+    if (!source.includes("notifyError")) {
+        throw new Error("stats-ui-smoke: Statistics must keep failure notifications on the dynamic toast runtime boundary.");
+    }
+}
 
 async function waitForJson(url, timeoutMs = 10000) {
     const started = Date.now();
@@ -285,6 +295,8 @@ async function inspectStatistics(ws, viewport) {
 }
 
 async function main() {
+    assertStaticStatsToastRuntimeBoundary();
+
     const chrome = spawn(chromePath, [
         "--headless=new",        "--remote-debugging-pipe",
         `--user-data-dir=${userDataDir}`,

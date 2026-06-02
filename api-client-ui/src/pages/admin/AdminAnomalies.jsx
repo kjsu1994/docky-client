@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     AlertTriangle,
     RefreshCw,
@@ -23,14 +24,18 @@ import {
     X,
 } from "lucide-react";
 import {
+    ADMIN_ANOMALY_TEXT_LIMITS,
+    MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
     adminAnomaliesAdapter,
     adminAnomaliesErrorMessage,
 } from "../../adapters/adminAnomaliesAdapter.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { hasRole, isAdminUser } from "../../utils/authorization.js";
-import toast from "react-hot-toast";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { notify, notifyError, notifyLoading, notifySuccess } from "../../utils/toast.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { promptAction } from "../../common/promptAction.jsx";
+import { trapFocus } from "../../utils/focusTrap.js";
 
 const toNumber = (value) => {
     const parsed = Number(value);
@@ -146,6 +151,21 @@ const roleListLabelOf = (roles) => {
         .map((role) => roleLabelOf(role.trim()))
         .join(", ");
 };
+const normalizeNotificationLink = (notification) => {
+    const value = String(notification?.linkUrl ?? notification?.link_url ?? "").trim();
+    if (!value || value.length > 300) return "";
+    if (value !== "/app" && !value.startsWith("/app/")) return "";
+    if (
+        value.startsWith("//") ||
+        /[\\\r\n"'<>]/.test(value)
+    ) {
+        return "";
+    }
+    return value;
+};
+const toIncidentActionKey = (incidentId, actionType) => `${Number(incidentId) || 0}:${actionType || ""}`;
+const compactKeyPart = (value) => String(value ?? "").trim().replace(/\s+/g, " ").slice(0, 120);
+const fallbackKey = (prefix, ...parts) => `${prefix}-${parts.map(compactKeyPart).join("-")}`;
 
 const StatCard = ({ icon: Icon, label, value, tone = "slate" }) => {
     const toneClass = {
@@ -169,6 +189,7 @@ const StatCard = ({ icon: Icon, label, value, tone = "slate" }) => {
 };
 
 export const AdminAnomalies = () => {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = useMemo(() => isAdminUser(user), [user]);
     const isMaster = useMemo(() => {
@@ -184,6 +205,7 @@ export const AdminAnomalies = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [savingIncidentId, setSavingIncidentId] = useState(null);
+    const [applyingIncidentActionKey, setApplyingIncidentActionKey] = useState("");
 
     const [summary, setSummary] = useState(null);
     const [events, setEvents] = useState([]);
@@ -192,15 +214,25 @@ export const AdminAnomalies = () => {
     const [notifications, setNotifications] = useState([]);
     const [releaseRequests, setReleaseRequests] = useState({ items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 });
     const [releaseRequestLoading, setReleaseRequestLoading] = useState(false);
+    const [releaseRequestError, setReleaseRequestError] = useState("");
     const [reportDownloading, setReportDownloading] = useState(false);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+    const [markingNotificationIds, setMarkingNotificationIds] = useState(() => new Set());
+    const [markingAllNotifications, setMarkingAllNotifications] = useState(false);
     const [reportList, setReportList] = useState({ items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 });
     const [reportStatusFilter, setReportStatusFilter] = useState("ALL");
+    const [reportLoading, setReportLoading] = useState(false);
+    const [reportError, setReportError] = useState("");
+    const [updatingReportKey, setUpdatingReportKey] = useState("");
     const [roleMembers, setRoleMembers] = useState({ items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 });
+    const [roleMemberLoading, setRoleMemberLoading] = useState(false);
+    const [roleMemberError, setRoleMemberError] = useState("");
     const [roleAudits, setRoleAudits] = useState({ items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 });
     const [roleKeyword, setRoleKeyword] = useState("");
     const [sanctions, setSanctions] = useState({ items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 });
     const [sanctionStatusFilter, setSanctionStatusFilter] = useState("ACTIVE");
+    const [sanctionLoading, setSanctionLoading] = useState(false);
+    const [sanctionError, setSanctionError] = useState("");
     const [sanctionKeyword, setSanctionKeyword] = useState("");
     const [sanctionMemberResults, setSanctionMemberResults] = useState([]);
     const [sanctionMemberLoading, setSanctionMemberLoading] = useState(false);
@@ -212,11 +244,23 @@ export const AdminAnomalies = () => {
     const [releasingSanctionId, setReleasingSanctionId] = useState(null);
     const [releaseDialog, setReleaseDialog] = useState({ open: false, sanctionId: null, memberEmail: "", notificationId: null });
     const [releaseReasonInput, setReleaseReasonInput] = useState("");
+    const releaseDialogRef = useRef(null);
+    const releaseDialogCloseRef = useRef(null);
+    const releaseDialogTitleId = useId();
+    const releaseDialogDescriptionId = useId();
+    const releaseReasonInputId = useId();
     const [moderationBoards, setModerationBoards] = useState({ items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 });
     const [moderationComments, setModerationComments] = useState({ items: [], page: 1, size: 8, totalElements: 0, totalPages: 0 });
     const [moderationHiddenFilter, setModerationHiddenFilter] = useState("ALL");
+    const [moderationLoading, setModerationLoading] = useState(false);
+    const [moderationError, setModerationError] = useState("");
+    const [moderationActionKey, setModerationActionKey] = useState("");
     const [auditItems, setAuditItems] = useState({ items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 });
     const [auditTypeFilter, setAuditTypeFilter] = useState("ALL");
+    const [auditLoading, setAuditLoading] = useState(false);
+    const [auditError, setAuditError] = useState("");
+    const [roleAuditLoading, setRoleAuditLoading] = useState(false);
+    const [roleAuditError, setRoleAuditError] = useState("");
 
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [page, setPage] = useState(1);
@@ -266,17 +310,51 @@ export const AdminAnomalies = () => {
     };
 
     const fetchReports = async (status = reportStatusFilter) => {
-        setReportList(await adminAnomaliesAdapter.fetchReports({ status, page: 1, size: 10 }));
+        setReportLoading(true);
+        setReportError("");
+        try {
+            const payload = await adminAnomaliesAdapter.fetchReports({ status, page: 1, size: 10 });
+            setReportList(payload);
+            return payload;
+        } catch (err) {
+            const message = adminAnomaliesErrorMessage(err, "신고 내역을 불러오지 못했습니다.");
+            setReportError(message);
+            notifyError(message);
+            return null;
+        } finally {
+            setReportLoading(false);
+        }
     };
 
     const fetchSanctions = async (status = sanctionStatusFilter) => {
-        setSanctions(await adminAnomaliesAdapter.fetchSanctions({ status, page: 1, size: 10 }));
+        setSanctionLoading(true);
+        setSanctionError("");
+        try {
+            const payload = await adminAnomaliesAdapter.fetchSanctions({ status, page: 1, size: 10 });
+            setSanctions(payload);
+            return payload;
+        } catch (err) {
+            const message = adminAnomaliesErrorMessage(err, "제재 내역을 불러오지 못했습니다.");
+            setSanctionError(message);
+            notifyError(message);
+            return null;
+        } finally {
+            setSanctionLoading(false);
+        }
     };
 
     const fetchReleaseRequests = async () => {
         setReleaseRequestLoading(true);
+        setReleaseRequestError("");
         try {
-            setReleaseRequests(await adminAnomaliesAdapter.fetchReleaseRequests({ page: 1, size: 50 }));
+            const payload = await adminAnomaliesAdapter.fetchReleaseRequests({ page: 1, size: 50 });
+            setReleaseRequests(payload);
+            return payload;
+        } catch (err) {
+            const message = adminAnomaliesErrorMessage(err, "제재 해제 요청을 불러오지 못했습니다.");
+            setReleaseRequestError(message);
+            notifyError(message);
+            return null;
         } finally {
             setReleaseRequestLoading(false);
         }
@@ -310,8 +388,41 @@ export const AdminAnomalies = () => {
         setModerationComments(await adminAnomaliesAdapter.fetchModerationComments({ hidden, page: 1, size: 8 }));
     };
 
+    const refreshModerationItems = async (hidden = moderationHiddenFilter) => {
+        if (moderationLoading || moderationActionKey) return null;
+        setModerationLoading(true);
+        setModerationError("");
+        try {
+            await Promise.all([
+                fetchModerationBoards(hidden),
+                fetchModerationComments(hidden),
+            ]);
+            return true;
+        } catch (err) {
+            const message = adminAnomaliesErrorMessage(err, "콘텐츠 검토 목록을 불러오지 못했습니다.");
+            setModerationError(message);
+            notifyError(message);
+            return null;
+        } finally {
+            setModerationLoading(false);
+        }
+    };
+
     const fetchAudits = async (type = auditTypeFilter) => {
-        setAuditItems(await adminAnomaliesAdapter.fetchAudits({ type, page: 1, size: 10 }));
+        setAuditLoading(true);
+        setAuditError("");
+        try {
+            const payload = await adminAnomaliesAdapter.fetchAudits({ type, page: 1, size: 10 });
+            setAuditItems(payload);
+            return payload;
+        } catch (err) {
+            const message = adminAnomaliesErrorMessage(err, "감사 로그를 불러오지 못했습니다.");
+            setAuditError(message);
+            notifyError(message);
+            return null;
+        } finally {
+            setAuditLoading(false);
+        }
     };
 
     const fetchRoleMembers = async (keyword = roleKeyword) => {
@@ -319,9 +430,40 @@ export const AdminAnomalies = () => {
         setRoleMembers(await adminAnomaliesAdapter.fetchRoleMembers({ keyword, page: 1, size: 10 }));
     };
 
+    const refreshRoleMembers = async () => {
+        if (!isMaster || roleMemberLoading) return null;
+        setRoleMemberLoading(true);
+        setRoleMemberError("");
+        try {
+            await fetchRoleMembers(roleKeyword);
+            return true;
+        } catch (err) {
+            const message = adminAnomaliesErrorMessage(err, "회원을 검색하지 못했습니다.");
+            setRoleMemberError(message);
+            notifyError(message);
+            logClientError("admin.anomalies.roleMembers.refresh", err);
+            return null;
+        } finally {
+            setRoleMemberLoading(false);
+        }
+    };
+
     const fetchRoleAudits = async () => {
         if (!isMaster) return;
-        setRoleAudits(await adminAnomaliesAdapter.fetchRoleAudits({ page: 1, size: 10 }));
+        setRoleAuditLoading(true);
+        setRoleAuditError("");
+        try {
+            const payload = await adminAnomaliesAdapter.fetchRoleAudits({ page: 1, size: 10 });
+            setRoleAudits(payload);
+            return payload;
+        } catch (err) {
+            const message = adminAnomaliesErrorMessage(err, "권한 변경 이력을 불러오지 못했습니다.");
+            setRoleAuditError(message);
+            notifyError(message);
+            return null;
+        } finally {
+            setRoleAuditLoading(false);
+        }
     };
 
     const fetchDashboard = async (nextStatus = statusFilter, nextPage = page) => {
@@ -358,10 +500,14 @@ export const AdminAnomalies = () => {
             setNotifications(nextNotifications.items || []);
             setNotificationUnreadCount(nextNotifications.unreadCount || 0);
             setReportList(nextReports);
+            setReportError("");
             setSanctions(nextSanctions);
+            setSanctionError("");
             setReleaseRequests(nextReleaseRequests);
+            setReleaseRequestError("");
             setModerationBoards(nextModerationBoards);
             setModerationComments(nextModerationComments);
+            setModerationError("");
             setAuditItems(nextAudits);
             if (isMaster) {
                 setRoleMembers(nextRoleMembers);
@@ -409,6 +555,31 @@ export const AdminAnomalies = () => {
         return () => clearTimeout(timer);
     }, [sanctionKeyword]);
 
+    useEffect(() => {
+        if (!releaseDialog.open) return undefined;
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const previousOverflow = document.body.style.overflow;
+        const onKeyDown = (event) => {
+            if (event.key === "Escape") {
+                closeReleaseDialog();
+                return;
+            }
+            trapFocus(event, releaseDialogRef.current);
+        };
+
+        document.body.style.overflow = "hidden";
+        window.addEventListener("keydown", onKeyDown);
+        window.setTimeout(() => releaseDialogCloseRef.current?.focus(), 0);
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener("keydown", onKeyDown);
+            if (previousFocus?.isConnected && typeof previousFocus.focus === "function") {
+                previousFocus.focus();
+            }
+        };
+    }, [releaseDialog.open, releasingSanctionId]);
+
     const changeFilter = async (nextStatus) => {
         setStatusFilter(nextStatus);
         setPage(1);
@@ -420,7 +591,14 @@ export const AdminAnomalies = () => {
         await fetchIncidents(statusFilter, nextPage);
     };
 
+    const isIncidentActionApplying = (incidentId, actionType = "") => {
+        const prefix = `${Number(incidentId) || 0}:`;
+        if (!applyingIncidentActionKey.startsWith(prefix)) return false;
+        return !actionType || applyingIncidentActionKey === toIncidentActionKey(incidentId, actionType);
+    };
+
     const changeReportFilter = async (nextStatus) => {
+        if (reportLoading || updatingReportKey) return;
         setReportStatusFilter(nextStatus);
         await fetchReports(nextStatus);
     };
@@ -443,42 +621,56 @@ export const AdminAnomalies = () => {
     };
 
     const applyAction = async (incidentId, actionType) => {
-        const description = await promptAction({
-            title: "조치 설명",
-            label: "설명",
-            placeholder: "조치 내용을 입력하세요",
-            maxLength: 500,
-        });
-        if (description === null) return;
-
-        const payload = { actionType, description };
-        if (actionType === "BLOCK_QUEUE_USER") {
-            const blockMinutesInput = await promptAction({
-                title: "큐 차단 시간",
-                label: "차단 시간(분)",
-                initialValue: "30",
-                placeholder: "1-1440",
-                inputMode: "numeric",
-                required: true,
-                maxLength: 4,
-            });
-            if (blockMinutesInput === null) return;
-            payload.blockMinutes = Math.max(1, Math.min(1440, Number(blockMinutesInput) || 30));
+        const normalizedIncidentId = Number(incidentId);
+        if (!Number.isFinite(normalizedIncidentId) || normalizedIncidentId <= 0) {
+            notifyError("사건 ID가 올바르지 않습니다.");
+            return false;
+        }
+        if (applyingIncidentActionKey) {
+            return false;
         }
 
-        await adminAnomaliesAdapter.applyIncidentAction(incidentId, payload);
-        await fetchIncidents(statusFilter, page);
-        await fetchDetail(incidentId);
-        await fetchDashboard(statusFilter, page);
+        const actionKey = toIncidentActionKey(normalizedIncidentId, actionType);
+        setApplyingIncidentActionKey(actionKey);
+        try {
+            const description = await promptAction({
+                title: "조치 설명",
+                label: "설명",
+                placeholder: "조치 내용을 입력하세요",
+                maxLength: ADMIN_ANOMALY_TEXT_LIMITS.incidentActionDescription,
+            });
+            if (description === null) return false;
+
+            const payload = { actionType, description };
+            if (actionType === "BLOCK_QUEUE_USER") {
+                const blockMinutesInput = await promptAction({
+                    title: "큐 차단 시간",
+                    label: "차단 시간(분)",
+                    initialValue: "30",
+                    placeholder: "1-1440",
+                    inputMode: "numeric",
+                    required: true,
+                    maxLength: 4,
+                });
+                if (blockMinutesInput === null) return false;
+                payload.blockMinutes = Math.max(1, Math.min(1440, Number(blockMinutesInput) || 30));
+            }
+
+            await adminAnomaliesAdapter.applyIncidentAction(normalizedIncidentId, payload);
+            notifySuccess("조치를 실행했습니다.");
+            await fetchIncidents(statusFilter, page);
+            await fetchDetail(normalizedIncidentId);
+            await fetchDashboard(statusFilter, page);
+            return true;
+        } catch (err) {
+            notifyError(adminAnomaliesErrorMessage(err, "이상징후 조치를 실행하지 못했습니다."));
+            return false;
+        } finally {
+            setApplyingIncidentActionKey("");
+        }
     };
 
-    const markNotificationRead = async (notificationId) => {
-        const normalizedId = Number(notificationId);
-        if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
-            toast.error("알림 ID가 올바르지 않습니다.");
-            return;
-        }
-        await adminAnomaliesAdapter.markNotificationRead(normalizedId);
+    const removeNotificationLocally = (normalizedId) => {
         setNotifications((prev) =>
             (prev || []).filter((item) => Number(item?.notificationId ?? item?.notification_id) !== normalizedId)
         );
@@ -490,48 +682,119 @@ export const AdminAnomalies = () => {
         setNotificationUnreadCount((prev) => Math.max(0, Number(prev || 0) - 1));
     };
 
+    const markNotificationRead = async (notificationId, { quietMissing = false } = {}) => {
+        const normalizedId = Number(notificationId);
+        if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
+            notifyError("알림 ID가 올바르지 않습니다.");
+            return false;
+        }
+        if (markingNotificationIds.has(normalizedId)) {
+            return false;
+        }
+
+        setMarkingNotificationIds((prev) => new Set(prev).add(normalizedId));
+        try {
+            await adminAnomaliesAdapter.markNotificationRead(normalizedId);
+            removeNotificationLocally(normalizedId);
+            return true;
+        } catch (err) {
+            const missingNotification =
+                err?.response?.status === 404 ||
+                err?.response?.data?.code === "ADMIN_NOTIFICATION_NOT_FOUND";
+            if (missingNotification) {
+                removeNotificationLocally(normalizedId);
+                if (!quietMissing) {
+                    notify("이미 처리되었거나 삭제된 알림입니다.");
+                }
+                return true;
+            }
+            notifyError(adminAnomaliesErrorMessage(err, "알림을 읽음 처리하지 못했습니다."));
+            return false;
+        } finally {
+            setMarkingNotificationIds((prev) => {
+                const next = new Set(prev);
+                next.delete(normalizedId);
+                return next;
+            });
+        }
+    };
+
     const markAllNotificationsRead = async () => {
-        await adminAnomaliesAdapter.markAllNotificationsRead();
-        await fetchNotifications();
-        await fetchReleaseRequests();
+        if (markingAllNotifications || (!notifications.length && toNumber(notificationUnreadCount) <= 0)) {
+            return;
+        }
+        setMarkingAllNotifications(true);
+        try {
+            await adminAnomaliesAdapter.markAllNotificationsRead();
+            setNotifications([]);
+            setNotificationUnreadCount(0);
+            setReleaseRequests((prev) => ({
+                ...prev,
+                items: [],
+                totalElements: 0,
+                totalPages: 0,
+            }));
+            setReleaseRequestError("");
+            notifySuccess("모든 알림을 읽음 처리했습니다.");
+        } catch (err) {
+            notifyError(adminAnomaliesErrorMessage(err, "알림을 모두 읽음 처리하지 못했습니다."));
+        } finally {
+            setMarkingAllNotifications(false);
+        }
     };
 
     const updateReportStatus = async (reportId, reportStatus) => {
-        const adminNote = await promptAction({
-            title: "신고 처리 메모",
-            label: "관리자 메모",
-            placeholder: "처리 내용을 입력하세요",
-            maxLength: 2000,
-        });
-        if (adminNote === null) return;
-        await adminAnomaliesAdapter.updateReportStatus(reportId, { reportStatus, adminNote });
-        await fetchReports(reportStatusFilter);
-        await fetchNotifications();
+        const normalizedReportId = Number(reportId);
+        if (!Number.isFinite(normalizedReportId) || normalizedReportId <= 0) {
+            notifyError("신고 ID가 올바르지 않습니다.");
+            return;
+        }
+        if (reportLoading || updatingReportKey) return;
+
+        const actionKey = `${normalizedReportId}:${reportStatus}`;
+        setUpdatingReportKey(actionKey);
+        try {
+            const adminNote = await promptAction({
+                title: "신고 처리 메모",
+                label: "관리자 메모",
+                placeholder: "처리 내용을 입력하세요",
+                maxLength: ADMIN_ANOMALY_TEXT_LIMITS.reportAdminNote,
+            });
+            if (adminNote === null) return;
+            await adminAnomaliesAdapter.updateReportStatus(normalizedReportId, { reportStatus, adminNote });
+            notifySuccess("신고 상태를 변경했습니다.");
+            await fetchReports(reportStatusFilter);
+            await fetchNotifications();
+        } catch (err) {
+            notifyError(adminAnomaliesErrorMessage(err, "신고 상태를 변경하지 못했습니다."));
+        } finally {
+            setUpdatingReportKey("");
+        }
     };
     const createSanction = async () => {
         if (creatingSanction) return;
 
         const selectedMemberId = getMemberIdValue(selectedSanctionMember);
         if (!selectedMemberId) {
-            toast.error("제재할 회원을 선택하세요.");
+            notifyError("제재할 회원을 선택하세요.");
             return;
         }
         if (activeSanctionMemberIds.has(selectedMemberId)) {
-            toast.error("이미 진행 중인 제재가 있는 회원입니다.");
+            notifyError("이미 진행 중인 제재가 있는 회원입니다.");
             return;
         }
         const reason = sanctionReasonInput.trim();
         if (!reason) {
-            toast.error("제재 사유를 입력하세요.");
+            notifyError("제재 사유를 입력하세요.");
             return;
         }
 
         const days = sanctionDaysInput ? Number(sanctionDaysInput) : undefined;
-        const toastId = toast.loading("제재를 등록하는 중입니다...");
         setCreatingSanction(true);
+        const loadingToast = await notifyLoading("제재를 등록하는 중입니다...");
         try {
             await adminAnomaliesAdapter.createSanction({ memberId: selectedMemberId, reason, days });
-            toast.success("제재를 등록했습니다.", { id: toastId });
+            loadingToast.success("제재를 등록했습니다.");
             setSanctionReasonInput("");
             setSanctionDaysInput("");
             setSanctionKeyword("");
@@ -541,38 +804,43 @@ export const AdminAnomalies = () => {
             await fetchNotifications();
             await fetchAudits(auditTypeFilter);
         } catch (err) {
-            toast.error(adminAnomaliesErrorMessage(err, "제재 등록에 실패했습니다."), { id: toastId });
+            loadingToast.error(adminAnomaliesErrorMessage(err, "제재 등록에 실패했습니다."));
         } finally {
             setCreatingSanction(false);
         }
     };
 
     const releaseSanction = async (sanctionId, options = {}) => {
-        if (releasingSanctionId === sanctionId) return;
+        const normalizedSanctionId = Number(sanctionId);
+        if (!Number.isFinite(normalizedSanctionId) || normalizedSanctionId <= 0) {
+            notifyError("제재 ID가 올바르지 않습니다.");
+            return false;
+        }
+        if (releasingSanctionId !== null) return false;
 
         const providedReason = typeof options.reason === "string" ? options.reason : "";
         const reason = providedReason.trim();
         if (!reason) {
-            toast.error("제재 해제 사유를 입력하세요.");
+            notifyError("제재 해제 사유를 입력하세요.");
             return false;
         }
 
-        const toastId = toast.loading("제재를 해제하는 중입니다...");
-        setReleasingSanctionId(sanctionId);
+        setReleasingSanctionId(normalizedSanctionId);
+        const loadingToast = await notifyLoading("제재를 해제하는 중입니다...");
         try {
-            await adminAnomaliesAdapter.releaseSanction(sanctionId, { reason });
+            await adminAnomaliesAdapter.releaseSanction(normalizedSanctionId, { reason });
             const notificationId = Number(options.notificationId);
             if (Number.isFinite(notificationId) && notificationId > 0) {
-                await adminAnomaliesAdapter.markNotificationRead(notificationId);
+                await markNotificationRead(notificationId, { quietMissing: true });
             }
-            toast.success("제재를 해제했습니다.", { id: toastId });
+            loadingToast.success("제재를 해제했습니다.");
             await fetchSanctions(sanctionStatusFilter);
             await fetchNotifications();
             await fetchReleaseRequests();
             await fetchAudits(auditTypeFilter);
             return true;
         } catch (err) {
-            toast.error(adminAnomaliesErrorMessage(err, "제재 해제에 실패했습니다."), { id: toastId });
+            loadingToast.error(adminAnomaliesErrorMessage(err, "제재 해제에 실패했습니다."));
             return false;
         } finally {
             setReleasingSanctionId(null);
@@ -585,13 +853,15 @@ export const AdminAnomalies = () => {
     };
 
     const closeReleaseDialog = () => {
+        if (releasingSanctionId !== null) return;
         setReleaseDialog({ open: false, sanctionId: null, memberEmail: "", notificationId: null });
         setReleaseReasonInput("");
     };
 
     const confirmReleaseDialog = async () => {
+        if (releasingSanctionId !== null) return;
         if (!Number.isFinite(Number(releaseDialog.sanctionId)) || Number(releaseDialog.sanctionId) <= 0) {
-            toast.error("제재 ID가 올바르지 않습니다.");
+            notifyError("제재 ID가 올바르지 않습니다.");
             return;
         }
         const released = await releaseSanction(Number(releaseDialog.sanctionId), {
@@ -606,75 +876,89 @@ export const AdminAnomalies = () => {
     const updateBoardHidden = async (boardId, hiddenYn) => {
         const normalizedBoardId = Number(boardId);
         if (!Number.isFinite(normalizedBoardId) || normalizedBoardId <= 0) {
-            toast.error("게시글 ID가 올바르지 않습니다.");
+            notifyError("게시글 ID가 올바르지 않습니다.");
             return;
         }
+        if (moderationLoading || moderationActionKey) return;
         const normalizedHiddenYn = toHiddenYnBoolean(hiddenYn);
         if (normalizedHiddenYn === null) {
-            toast.error("숨김 상태 값이 올바르지 않습니다.");
+            notifyError("숨김 상태 값이 올바르지 않습니다.");
             return;
         }
 
-        const reason = await promptAction({
-            title: normalizedHiddenYn ? "게시글 숨김 사유" : "게시글 복구 사유",
-            label: "사유",
-            placeholder: normalizedHiddenYn ? "숨김 사유를 입력하세요" : "복구 사유를 입력하세요",
-            maxLength: 500,
-        });
-        if (reason === null) return;
+        setModerationActionKey(`board:${normalizedBoardId}`);
+        setModerationError("");
         try {
+            const reason = await promptAction({
+                title: normalizedHiddenYn ? "게시글 숨김 사유" : "게시글 복구 사유",
+                label: "사유",
+                placeholder: normalizedHiddenYn ? "숨김 사유를 입력하세요" : "복구 사유를 입력하세요",
+                maxLength: ADMIN_ANOMALY_TEXT_LIMITS.moderationReason,
+            });
+            if (reason === null) return;
             await adminAnomaliesAdapter.updateBoardHidden(normalizedBoardId, { hiddenYn: normalizedHiddenYn, reason });
-            toast.success(normalizedHiddenYn ? "게시글을 숨김 처리했습니다." : "게시글을 복구했습니다.");
+            notifySuccess(normalizedHiddenYn ? "게시글을 숨김 처리했습니다." : "게시글을 복구했습니다.");
             await fetchModerationBoards(moderationHiddenFilter);
             await fetchAudits(auditTypeFilter);
         } catch (err) {
-            toast.error(adminAnomaliesErrorMessage(err, "게시글 표시 상태 변경에 실패했습니다."));
+            const message = adminAnomaliesErrorMessage(err, "게시글 표시 상태 변경에 실패했습니다.");
+            setModerationError(message);
+            notifyError(message);
+        } finally {
+            setModerationActionKey("");
         }
     };
 
     const updateCommentHidden = async (commentId, hiddenYn) => {
         const normalizedCommentId = Number(commentId);
         if (!Number.isFinite(normalizedCommentId) || normalizedCommentId <= 0) {
-            toast.error("댓글 ID가 올바르지 않습니다.");
+            notifyError("댓글 ID가 올바르지 않습니다.");
             return;
         }
+        if (moderationLoading || moderationActionKey) return;
         const normalizedHiddenYn = toHiddenYnBoolean(hiddenYn);
         if (normalizedHiddenYn === null) {
-            toast.error("숨김 상태 값이 올바르지 않습니다.");
+            notifyError("숨김 상태 값이 올바르지 않습니다.");
             return;
         }
 
-        const reason = await promptAction({
-            title: normalizedHiddenYn ? "댓글 숨김 사유" : "댓글 복구 사유",
-            label: "사유",
-            placeholder: normalizedHiddenYn ? "숨김 사유를 입력하세요" : "복구 사유를 입력하세요",
-            maxLength: 500,
-        });
-        if (reason === null) return;
+        setModerationActionKey(`comment:${normalizedCommentId}`);
+        setModerationError("");
         try {
+            const reason = await promptAction({
+                title: normalizedHiddenYn ? "댓글 숨김 사유" : "댓글 복구 사유",
+                label: "사유",
+                placeholder: normalizedHiddenYn ? "숨김 사유를 입력하세요" : "복구 사유를 입력하세요",
+                maxLength: ADMIN_ANOMALY_TEXT_LIMITS.moderationReason,
+            });
+            if (reason === null) return;
             await adminAnomaliesAdapter.updateCommentHidden(normalizedCommentId, { hiddenYn: normalizedHiddenYn, reason });
-            toast.success(normalizedHiddenYn ? "댓글을 숨김 처리했습니다." : "댓글을 복구했습니다.");
+            notifySuccess(normalizedHiddenYn ? "댓글을 숨김 처리했습니다." : "댓글을 복구했습니다.");
             await fetchModerationComments(moderationHiddenFilter);
             await fetchAudits(auditTypeFilter);
         } catch (err) {
-            toast.error(adminAnomaliesErrorMessage(err, "댓글 표시 상태 변경에 실패했습니다."));
+            const message = adminAnomaliesErrorMessage(err, "댓글 표시 상태 변경에 실패했습니다.");
+            setModerationError(message);
+            notifyError(message);
+        } finally {
+            setModerationActionKey("");
         }
     };
 
     const changeSanctionFilter = async (status) => {
+        if (sanctionLoading || creatingSanction || releasingSanctionId !== null) return;
         setSanctionStatusFilter(status);
         await fetchSanctions(status);
     };
 
     const changeModerationFilter = async (hiddenFilter) => {
+        if (moderationLoading || moderationActionKey) return;
         setModerationHiddenFilter(hiddenFilter);
-        await Promise.all([
-            fetchModerationBoards(hiddenFilter),
-            fetchModerationComments(hiddenFilter),
-        ]);
+        await refreshModerationItems(hiddenFilter);
     };
 
     const changeAuditFilter = async (type) => {
+        if (auditLoading) return;
         setAuditTypeFilter(type);
         await fetchAudits(type);
     };
@@ -684,7 +968,7 @@ export const AdminAnomalies = () => {
     const updateMemberAdminRole = async (member) => {
         const memberId = getMemberIdValue(member);
         if (!memberId) {
-            toast.error("회원 ID가 없습니다.");
+            notifyError("회원 ID가 없습니다.");
             return;
         }
         const currentRoles = Array.isArray(member.roles) ? member.roles : [];
@@ -698,7 +982,7 @@ export const AdminAnomalies = () => {
             title: hasAdmin ? "관리자 권한 해제 사유" : "관리자 권한 부여 사유",
             label: "사유",
             placeholder: hasAdmin ? "권한 해제 사유를 입력하세요" : "권한 부여 사유를 입력하세요",
-            maxLength: 300,
+            maxLength: ADMIN_ANOMALY_TEXT_LIMITS.roleReason,
         });
         if (reason === null) return;
 
@@ -707,21 +991,16 @@ export const AdminAnomalies = () => {
             await fetchRoleMembers(roleKeyword);
             await fetchRoleAudits();
             await fetchNotifications();
-            toast.success(hasAdmin ? "관리자 권한을 해제했습니다." : "관리자 권한을 부여했습니다.");
+            notifySuccess(hasAdmin ? "관리자 권한을 해제했습니다." : "관리자 권한을 부여했습니다.");
         } catch (err) {
             const message = adminAnomaliesErrorMessage(err, "관리자 권한 변경에 실패했습니다.");
-            toast.error(message);
-            console.error("Failed to update member admin role:", err);
+            notifyError(message);
+            logClientError("admin.anomalies.memberRole.update", err);
         }
     };
 
     const searchRoleMembers = async () => {
-        try {
-            await fetchRoleMembers(roleKeyword);
-        } catch (err) {
-            toast.error(adminAnomaliesErrorMessage(err, "회원을 검색하지 못했습니다."));
-            console.error("Failed to search role members:", err);
-        }
+        await refreshRoleMembers();
     };
 
     const refreshRules = async () => {
@@ -750,7 +1029,7 @@ export const AdminAnomalies = () => {
 
     const createRule = async () => {
         if (!newRule.metric.trim()) {
-            toast.error("지표 이름을 입력하세요.");
+            notifyError("지표 이름을 입력하세요.");
             return;
         }
 
@@ -768,7 +1047,7 @@ export const AdminAnomalies = () => {
     const downloadReport = async () => {
         if (reportDownloading) return;
         setReportDownloading(true);
-        const toastId = toast.loading("보고서를 준비하는 중입니다...");
+        const loadingToast = await notifyLoading("보고서를 준비하는 중입니다...");
         try {
             const blobData = await adminAnomaliesAdapter.downloadReport(7);
             const blob = new Blob([blobData], { type: "text/csv;charset=utf-8;" });
@@ -780,9 +1059,9 @@ export const AdminAnomalies = () => {
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
-            toast.success("보고서를 다운로드했습니다.", { id: toastId });
+            loadingToast.success("보고서를 다운로드했습니다.");
         } catch (err) {
-            toast.error(adminAnomaliesErrorMessage(err, "보고서 다운로드에 실패했습니다."), { id: toastId });
+            loadingToast.error(adminAnomaliesErrorMessage(err, "보고서 다운로드에 실패했습니다."));
         } finally {
             setReportDownloading(false);
         }
@@ -927,7 +1206,8 @@ export const AdminAnomalies = () => {
                             <select
                                 value={sanctionStatusFilter}
                                 onChange={(e) => changeSanctionFilter(e.target.value)}
-                                className="input-base py-1.5 px-3 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50"
+                                disabled={sanctionLoading || creatingSanction || releasingSanctionId !== null}
+                                className="input-base py-1.5 px-3 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                             >
                                 {SANCTION_STATUS_OPTIONS.map((status) => (
                                     <option key={status} value={status}>{labelOf(SANCTION_STATUS_LABELS, status)}</option>
@@ -936,19 +1216,28 @@ export const AdminAnomalies = () => {
                             <button
                                 className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-primary-100 disabled:opacity-60"
                                 onClick={createSanction}
-                                disabled={creatingSanction || (selectedSanctionMember && activeSanctionMemberIds.has(getMemberIdValue(selectedSanctionMember)))}
+                                disabled={sanctionLoading || creatingSanction || (selectedSanctionMember && activeSanctionMemberIds.has(getMemberIdValue(selectedSanctionMember)))}
                             >
                                 {creatingSanction ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />} {creatingSanction ? "등록 중..." : "등록"}
                             </button>
                         </div>
                     </div>
+                    {sanctionError ? (
+                        <div role="alert" className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-xs font-bold text-rose-600">
+                            {sanctionError}
+                        </div>
+                    ) : null}
                     <div className="mb-6 space-y-3">
                         <input
                             value={sanctionKeyword}
-                            onChange={(e) => setSanctionKeyword(e.target.value)}
+                            onChange={(e) => setSanctionKeyword(e.target.value.slice(0, MEMBER_SEARCH_KEYWORD_MAX_LENGTH))}
+                            maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH}
                             placeholder="회원 검색 (이름/이메일)"
                             className="input-base w-full"
                         />
+                        <p className="-mt-2 text-right text-[11px] font-semibold text-slate-400">
+                            검색어 {sanctionKeyword.length}/{MEMBER_SEARCH_KEYWORD_MAX_LENGTH}자
+                        </p>
                         {sanctionMemberLoading ? (
                             <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">검색 중...</div>
                         ) : null}
@@ -978,9 +1267,10 @@ export const AdminAnomalies = () => {
                         ) : null}
                         <input
                             value={sanctionReasonInput}
-                            onChange={(e) => setSanctionReasonInput(e.target.value)}
+                            onChange={(e) => setSanctionReasonInput(e.target.value.slice(0, ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason))}
                             placeholder="제재 사유"
                             className="input-base w-full"
+                            maxLength={ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason}
                         />
                         <input
                             value={sanctionDaysInput}
@@ -1001,6 +1291,11 @@ export const AdminAnomalies = () => {
                         <div className="mb-3 text-xs font-black uppercase tracking-widest text-amber-700">
                             제재 해제 요청 ({releaseRequests.items?.length || 0})
                         </div>
+                        {releaseRequestError ? (
+                            <div role="alert" className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">
+                                {releaseRequestError}
+                            </div>
+                        ) : null}
                         {releaseRequestLoading ? (
                             <div className="rounded-xl bg-white px-3 py-4 text-xs font-bold text-slate-400">해제 요청을 불러오는 중입니다...</div>
                         ) : !releaseRequests.items?.length ? (
@@ -1042,8 +1337,10 @@ export const AdminAnomalies = () => {
                                         ?? ""
                                     );
                                     const notificationId = Number(item?.notificationId ?? item?.notification_id);
+                                    const markingNotification = Number.isFinite(notificationId) && markingNotificationIds.has(notificationId);
+                                    const releaseActionInProgress = Number.isFinite(sanctionId) && releasingSanctionId === sanctionId;
                                     return (
-                                        <div key={`release-request-${notificationId || Math.random()}`} className="rounded-xl bg-white p-3 text-xs">
+                                        <div key={Number.isFinite(notificationId) ? `release-request-${notificationId}` : fallbackKey("release-request", sanctionId, memberEmail, sanctionReason, requestReason, item?.createdAt ?? item?.created_at)} className="rounded-xl bg-white p-3 text-xs">
                                             <div className="font-bold text-slate-700">{memberEmail}</div>
                                             <div className="mt-1 text-[11px] font-semibold text-slate-500">제재 #{Number.isFinite(sanctionId) ? sanctionId : "-"}</div>
                                             <div className="mt-1 text-[11px] text-slate-500">제재 사유: {sanctionReason || "-"}</div>
@@ -1053,10 +1350,10 @@ export const AdminAnomalies = () => {
                                                 <button
                                                     type="button"
                                                     className="rounded-lg bg-primary-600 px-3 py-1.5 font-black text-white disabled:opacity-60"
-                                                    disabled={!Number.isFinite(sanctionId) || sanctionId <= 0}
+                                                    disabled={!Number.isFinite(sanctionId) || sanctionId <= 0 || releaseRequestLoading || releasingSanctionId !== null}
                                                     onClick={() => {
                                                         if (!Number.isFinite(sanctionId) || sanctionId <= 0) {
-                                                            toast.error("제재 해제 요청 데이터가 올바르지 않습니다.");
+                                                            notifyError("제재 해제 요청 데이터가 올바르지 않습니다.");
                                                             return;
                                                         }
                                                         openReleaseDialog({
@@ -1066,21 +1363,21 @@ export const AdminAnomalies = () => {
                                                         });
                                                     }}
                                                 >
-                                                    지금 해제
+                                                    {releaseActionInProgress ? "해제 중..." : "지금 해제"}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     className="rounded-lg bg-slate-100 px-3 py-1.5 font-black text-slate-600"
-                                                    disabled={!Number.isFinite(notificationId) || notificationId <= 0}
+                                                    disabled={!Number.isFinite(notificationId) || notificationId <= 0 || markingNotification || markingAllNotifications}
                                                     onClick={() => {
                                                         if (!Number.isFinite(notificationId) || notificationId <= 0) {
-                                                            toast.error("알림 ID가 올바르지 않습니다.");
+                                                            notifyError("알림 ID가 올바르지 않습니다.");
                                                             return;
                                                         }
                                                         markNotificationRead(notificationId);
                                                     }}
                                                 >
-                                                    읽음 처리
+                                                    {markingNotification ? "처리 중..." : "읽음 처리"}
                                                 </button>
                                             </div>
                                         </div>
@@ -1090,7 +1387,9 @@ export const AdminAnomalies = () => {
                         )}
                     </div>
                     {!sanctions.items?.length ? (
-                        <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">제재 내역이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">
+                            {sanctionLoading ? "제재 내역을 불러오는 중입니다." : "제재 내역이 없습니다."}
+                        </div>
                     ) : (
                         <div className="space-y-4 max-h-[400px] overflow-auto pr-2">
                             {sanctions.items.map((sanction, idx) => {
@@ -1099,6 +1398,7 @@ export const AdminAnomalies = () => {
                                 const memberEmail = sanction?.memberEmail ?? sanction?.member_email ?? "-";
                                 const reason = sanction?.reason ?? "-";
                                 const createdAt = sanction?.createdAt ?? sanction?.created_at;
+                                const sanctionReleaseInProgress = releasingSanctionId === sanctionId;
                                 return (
                                 <div key={Number.isFinite(sanctionId) ? sanctionId : `sanction-${idx}`} className="p-5 rounded-2xl bg-slate-50/50 border border-slate-100 hover:border-rose-100 transition-colors">
                                     <div className="flex items-start justify-between mb-3">
@@ -1116,7 +1416,7 @@ export const AdminAnomalies = () => {
                                                 <button
                                                     className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 disabled:opacity-60"
                                                     onClick={() => openReleaseDialog({ sanctionId, memberEmail })}
-                                                    disabled={releasingSanctionId === sanctionId || !Number.isFinite(sanctionId)}
+                                                    disabled={sanctionLoading || releasingSanctionId !== null || !Number.isFinite(sanctionId)}
                                                     title="제재 해제"
                                                 >
                                                     <X className="h-3.5 w-3.5" />
@@ -1124,9 +1424,9 @@ export const AdminAnomalies = () => {
                                                 <button
                                                     className="text-primary-600 hover:underline disabled:opacity-60"
                                                     onClick={() => openReleaseDialog({ sanctionId, memberEmail })}
-                                                    disabled={releasingSanctionId === sanctionId || !Number.isFinite(sanctionId)}
+                                                    disabled={sanctionLoading || releasingSanctionId !== null || !Number.isFinite(sanctionId)}
                                                 >
-                                                    {releasingSanctionId === sanctionId ? "해제 중..." : "해제"}
+                                                    {sanctionReleaseInProgress ? "해제 중..." : "해제"}
                                                 </button>
                                             </div>
                                         )}
@@ -1145,21 +1445,44 @@ export const AdminAnomalies = () => {
                             </div>
                             콘텐츠 검토
                         </h2>
-                        <select
-                            onChange={(e) => changeModerationFilter(e.target.value)}
-                            className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50"
-                        >
-                            <option value="ALL">전체 보기</option>
-                            <option value="HIDDEN">숨김만</option>
-                            <option value="VISIBLE">공개만</option>
-                        </select>
+                        <div className="flex items-center gap-3">
+                            {moderationLoading ? (
+                                <span role="status" className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1 text-[10px] font-black text-primary-600">
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                    불러오는 중
+                                </span>
+                            ) : null}
+                            <select
+                                value={moderationHiddenFilter}
+                                onChange={(e) => changeModerationFilter(e.target.value)}
+                                disabled={moderationLoading || Boolean(moderationActionKey)}
+                                className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                            >
+                                <option value="ALL">전체 보기</option>
+                                <option value="HIDDEN">숨김만</option>
+                                <option value="VISIBLE">공개만</option>
+                            </select>
+                        </div>
                     </div>
+                    {moderationError ? (
+                        <div role="alert" className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-xs font-bold text-rose-600">
+                            {moderationError}
+                        </div>
+                    ) : null}
                     <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
                         <div className="space-y-4">
                             <h3 className="px-2 text-xs font-black text-slate-400 tracking-widest">게시글</h3>
                             <div className="space-y-3">
-                                {(moderationBoards.items || []).map((board) => (
-                                    <div key={getBoardIdValue(board) ?? `board-${Math.random()}`} className="group p-5 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-white hover:shadow-xl transition-all duration-300">
+                                {!(moderationBoards.items || []).length ? (
+                                    <div className="flex h-40 items-center justify-center rounded-2xl bg-slate-50/50 text-sm font-bold text-slate-400">
+                                        {moderationLoading ? "게시글 검토 목록을 불러오는 중입니다." : "게시글 검토 항목이 없습니다."}
+                                    </div>
+                                ) : (moderationBoards.items || []).map((board) => {
+                                    const boardId = Number(getBoardIdValue(board));
+                                    const boardActionLoading = moderationActionKey === `board:${boardId}`;
+                                    const boardActionDisabled = moderationLoading || Boolean(moderationActionKey) || !Number.isFinite(boardId) || boardId <= 0;
+                                    return (
+                                    <div key={Number.isFinite(boardId) ? boardId : fallbackKey("board", getBoardCreatorValue(board), board?.title, board?.createdAt ?? board?.created_at)} className="group p-5 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-white hover:shadow-xl transition-all duration-300">
                                         <div className="flex items-start justify-between gap-3 mb-2">
                                             <div className="font-bold text-slate-900 text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">#{getBoardIdValue(board)} {board.title}</div>
                                             <span className={`flex-shrink-0 px-2 py-0.5 rounded-lg text-[9px] font-black tracking-wider ${getHiddenYnValue(board) ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -1169,22 +1492,31 @@ export const AdminAnomalies = () => {
                                         <div className="flex items-center justify-between">
                                             <span className="text-[11px] font-bold text-slate-400">{getBoardCreatorValue(board)}</span>
                                             <button
-                                                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black transition-all ${getHiddenYnValue(board) ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}
-                                                onClick={() => updateBoardHidden(getBoardIdValue(board), !getHiddenYnValue(board))}
+                                                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black transition-all disabled:cursor-not-allowed disabled:opacity-60 ${getHiddenYnValue(board) ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}
+                                                disabled={boardActionDisabled}
+                                                onClick={() => updateBoardHidden(boardId, !getHiddenYnValue(board))}
                                             >
-                                                {getHiddenYnValue(board) ? <RotateCcw className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                                                {getHiddenYnValue(board) ? "복구" : "숨김"}
+                                                {boardActionLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : getHiddenYnValue(board) ? <RotateCcw className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                                {boardActionLoading ? "처리 중..." : getHiddenYnValue(board) ? "복구" : "숨김"}
                                             </button>
                                         </div>
                                     </div>
-                                ))}
+                                )})}
                             </div>
                         </div>
                         <div className="space-y-4">
                             <h3 className="px-2 text-xs font-black text-slate-400 tracking-widest">댓글</h3>
                             <div className="space-y-3">
-                                {(moderationComments.items || []).map((comment) => (
-                                    <div key={getCommentIdValue(comment) ?? `comment-${Math.random()}`} className="group p-5 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-white hover:shadow-xl transition-all duration-300">
+                                {!(moderationComments.items || []).length ? (
+                                    <div className="flex h-40 items-center justify-center rounded-2xl bg-slate-50/50 text-sm font-bold text-slate-400">
+                                        {moderationLoading ? "댓글 검토 목록을 불러오는 중입니다." : "댓글 검토 항목이 없습니다."}
+                                    </div>
+                                ) : (moderationComments.items || []).map((comment) => {
+                                    const commentId = Number(getCommentIdValue(comment));
+                                    const commentActionLoading = moderationActionKey === `comment:${commentId}`;
+                                    const commentActionDisabled = moderationLoading || Boolean(moderationActionKey) || !Number.isFinite(commentId) || commentId <= 0;
+                                    return (
+                                    <div key={Number.isFinite(commentId) ? commentId : fallbackKey("comment", getBoardIdValue(comment), getWriterNameValue(comment), comment?.createdAt ?? comment?.created_at)} className="group p-5 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-white hover:shadow-xl transition-all duration-300">
                                         <div className="flex items-start justify-between gap-3 mb-2">
                                             <div className="font-bold text-slate-900 text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">#{getCommentIdValue(comment)} (게시글 #{getBoardIdValue(comment)})</div>
                                             <span className={`flex-shrink-0 px-2 py-0.5 rounded-lg text-[9px] font-black tracking-wider ${getHiddenYnValue(comment) ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -1194,15 +1526,16 @@ export const AdminAnomalies = () => {
                                         <div className="flex items-center justify-between">
                                             <span className="text-[11px] font-bold text-slate-400">{getWriterNameValue(comment)}</span>
                                             <button
-                                                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black transition-all ${getHiddenYnValue(comment) ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}
-                                                onClick={() => updateCommentHidden(getCommentIdValue(comment), !getHiddenYnValue(comment))}
+                                                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black transition-all disabled:cursor-not-allowed disabled:opacity-60 ${getHiddenYnValue(comment) ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}
+                                                disabled={commentActionDisabled}
+                                                onClick={() => updateCommentHidden(commentId, !getHiddenYnValue(comment))}
                                             >
-                                                {getHiddenYnValue(comment) ? <RotateCcw className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                                                {getHiddenYnValue(comment) ? "복구" : "숨김"}
+                                                {commentActionLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : getHiddenYnValue(comment) ? <RotateCcw className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                                {commentActionLoading ? "처리 중..." : getHiddenYnValue(comment) ? "복구" : "숨김"}
                                             </button>
                                         </div>
                                     </div>
-                                ))}
+                                )})}
                             </div>
                         </div>
                     </div>
@@ -1217,18 +1550,34 @@ export const AdminAnomalies = () => {
                         </div>
                         통합 감사 로그
                     </h2>
-                    <select
-                        value={auditTypeFilter}
-                        onChange={(e) => changeAuditFilter(e.target.value)}
-                        className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50"
-                    >
-                        {AUDIT_TYPE_OPTIONS.map((type) => (
-                            <option key={type} value={type}>{labelOf(AUDIT_TYPE_LABELS, type)}</option>
-                        ))}
-                    </select>
+                    <div className="flex items-center gap-3">
+                        {auditLoading ? (
+                            <span role="status" className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1 text-[10px] font-black text-primary-600">
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                                불러오는 중
+                            </span>
+                        ) : null}
+                        <select
+                            value={auditTypeFilter}
+                            onChange={(e) => changeAuditFilter(e.target.value)}
+                            disabled={auditLoading}
+                            className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                        >
+                            {AUDIT_TYPE_OPTIONS.map((type) => (
+                                <option key={type} value={type}>{labelOf(AUDIT_TYPE_LABELS, type)}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
+                {auditError ? (
+                    <div role="alert" className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-xs font-bold text-rose-600">
+                        {auditError}
+                    </div>
+                ) : null}
                 {!auditItems.items?.length ? (
-                    <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">감사 이력이 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">
+                        {auditLoading ? "감사 이력을 불러오는 중입니다." : "감사 이력이 없습니다."}
+                    </div>
                 ) : (
                     <div className="space-y-3">
                         {auditItems.items.map((audit, idx) => (
@@ -1259,7 +1608,14 @@ export const AdminAnomalies = () => {
                             <div className="flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-[10px] font-black text-rose-600 uppercase">
                                 <BellRing className="h-3 w-3" /> {toNumber(notificationUnreadCount)}개 미확인
                             </div>
-                            <button className="text-[11px] font-bold text-slate-400 hover:text-primary-600" onClick={markAllNotificationsRead}>모두 읽음</button>
+                            <button
+                                type="button"
+                                className="text-[11px] font-bold text-slate-400 hover:text-primary-600 disabled:cursor-not-allowed disabled:text-slate-300"
+                                onClick={markAllNotificationsRead}
+                                disabled={markingAllNotifications || (!notifications.length && toNumber(notificationUnreadCount) <= 0)}
+                            >
+                                {markingAllNotifications ? "처리 중..." : "모두 읽음"}
+                            </button>
                         </div>
                     </div>
 
@@ -1269,6 +1625,8 @@ export const AdminAnomalies = () => {
                         <div className="space-y-4 max-h-[500px] overflow-auto pr-2">
                             {notifications.map((notification, idx) => {
                                 const notificationId = Number(notification?.notificationId ?? notification?.notification_id);
+                                const markingNotification = Number.isFinite(notificationId) && markingNotificationIds.has(notificationId);
+                                const notificationLink = normalizeNotificationLink(notification);
                                 return (
                                 <div key={Number.isFinite(notificationId) ? notificationId : `notif-${idx}`} className="group p-6 rounded-3xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:shadow-xl transition-all">
                                     <div className="mb-3 flex items-center justify-between">
@@ -1276,15 +1634,27 @@ export const AdminAnomalies = () => {
                                         <span className="px-2 py-0.5 rounded-lg bg-slate-200 text-[9px] font-black text-slate-600 uppercase tracking-tighter">{notification?.severity}</span>
                                     </div>
                                     <p className="mb-5 text-[13px] font-medium text-slate-500 leading-relaxed">{notification?.message}</p>
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
                                         <span className="text-[10px] font-bold text-slate-300">{notification?.createdAt ?? notification?.created_at}</span>
-                                        <button
-                                            className="btn-primary py-1.5 px-4 text-[11px]"
-                                            disabled={!Number.isFinite(notificationId) || notificationId <= 0}
-                                            onClick={() => markNotificationRead(notificationId)}
-                                        >
-                                            읽음 처리
-                                        </button>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {notificationLink ? (
+                                                <button
+                                                    type="button"
+                                                    className="rounded-xl bg-white px-4 py-1.5 text-[11px] font-black text-primary-600 ring-1 ring-primary-100 hover:bg-primary-50"
+                                                    onClick={() => navigate(notificationLink)}
+                                                    title="알림 열기"
+                                                >
+                                                    열기
+                                                </button>
+                                            ) : null}
+                                            <button
+                                                className="btn-primary py-1.5 px-4 text-[11px]"
+                                                disabled={!Number.isFinite(notificationId) || notificationId <= 0 || markingNotification}
+                                                onClick={() => markNotificationRead(notificationId)}
+                                            >
+                                                {markingNotification ? "처리 중..." : "읽음 처리"}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )})}
@@ -1297,19 +1667,31 @@ export const AdminAnomalies = () => {
                         <select
                             value={reportStatusFilter}
                             onChange={(e) => changeReportFilter(e.target.value)}
-                            className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50"
+                            disabled={reportLoading || Boolean(updatingReportKey)}
+                            className="input-base py-1.5 px-4 w-auto rounded-xl text-xs font-bold border-0 bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                         >
                             {REPORT_STATUS_OPTIONS.map((status) => (
                                 <option key={status} value={status}>{labelOf(REPORT_STATUS_LABELS, status)}</option>
                             ))}
                         </select>
                     </div>
+                    {reportError ? (
+                        <div role="alert" className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-xs font-bold text-rose-600">
+                            {reportError}
+                        </div>
+                    ) : null}
 
                     {!reportList.items?.length ? (
-                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">신고 내역이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">
+                            {reportLoading ? "신고 내역을 불러오는 중입니다." : "신고 내역이 없습니다."}
+                        </div>
                     ) : (
                         <div className="space-y-4 max-h-[500px] overflow-auto pr-2">
-                            {reportList.items.map((report) => (
+                            {reportList.items.map((report) => {
+                                const reportId = Number(report.reportId ?? report.report_id);
+                                const reportActionsDisabled = reportLoading || Boolean(updatingReportKey) || !Number.isFinite(reportId) || reportId <= 0;
+                                const reportActionLoading = (status) => updatingReportKey === `${reportId}:${status}`;
+                                return (
                                 <div key={report.reportId} className="p-6 rounded-3xl bg-white border border-slate-100 shadow-sm">
                                     <div className="mb-4 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -1323,12 +1705,30 @@ export const AdminAnomalies = () => {
                                     </div>
                                     <p className="mb-6 text-sm font-bold text-slate-700 leading-relaxed">{report.reason} <span className="text-slate-400 font-medium">{report.detail ? `- ${report.detail}` : ""}</span></p>
                                     <div className="flex flex-wrap gap-2">
-                                        <button className="flex-1 rounded-2xl bg-slate-50 py-2.5 text-[11px] font-black text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-all" onClick={() => updateReportStatus(report.reportId, "IN_REVIEW")}>검토 중</button>
-                                        <button className="flex-1 rounded-2xl bg-emerald-50 py-2.5 text-[11px] font-black text-emerald-600 hover:bg-emerald-100 transition-all" onClick={() => updateReportStatus(report.reportId, "RESOLVED")}>해결</button>
-                                        <button className="flex-1 rounded-2xl bg-rose-50 py-2.5 text-[11px] font-black text-rose-600 hover:bg-rose-100 transition-all" onClick={() => updateReportStatus(report.reportId, "REJECTED")}>반려</button>
+                                        <button
+                                            className="flex-1 rounded-2xl bg-slate-50 py-2.5 text-[11px] font-black text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                                            disabled={reportActionsDisabled}
+                                            onClick={() => updateReportStatus(reportId, "IN_REVIEW")}
+                                        >
+                                            {reportActionLoading("IN_REVIEW") ? "처리 중..." : "검토 중"}
+                                        </button>
+                                        <button
+                                            className="flex-1 rounded-2xl bg-emerald-50 py-2.5 text-[11px] font-black text-emerald-600 hover:bg-emerald-100 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                                            disabled={reportActionsDisabled}
+                                            onClick={() => updateReportStatus(reportId, "RESOLVED")}
+                                        >
+                                            {reportActionLoading("RESOLVED") ? "처리 중..." : "해결"}
+                                        </button>
+                                        <button
+                                            className="flex-1 rounded-2xl bg-rose-50 py-2.5 text-[11px] font-black text-rose-600 hover:bg-rose-100 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                                            disabled={reportActionsDisabled}
+                                            onClick={() => updateReportStatus(reportId, "REJECTED")}
+                                        >
+                                            {reportActionLoading("REJECTED") ? "처리 중..." : "반려"}
+                                        </button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     )}
                 </div>
@@ -1342,7 +1742,16 @@ export const AdminAnomalies = () => {
                                 {isMaster ? ROLE_ACCESS_LABELS.MASTER : ROLE_ACCESS_LABELS.ADMIN}
                             </span>
                         </div>
-                        <button className="text-slate-300 hover:text-primary-600 transition-colors" onClick={() => fetchRoleMembers(roleKeyword)}><RefreshCw className="h-4 w-4" /></button>
+                        <button
+                            type="button"
+                            className="text-slate-300 hover:text-primary-600 transition-colors disabled:cursor-not-allowed disabled:text-slate-300"
+                            onClick={refreshRoleMembers}
+                            disabled={!isMaster || roleMemberLoading}
+                            aria-label="권한 관리 회원 목록 새로고침"
+                            title="권한 관리 회원 목록 새로고침"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${roleMemberLoading ? "animate-spin" : ""}`} />
+                        </button>
                     </div>
                     {!isMaster && (
                         <div className="mb-6 rounded-2xl bg-amber-50 p-4 text-[11px] font-bold text-amber-700 leading-relaxed">
@@ -1353,16 +1762,35 @@ export const AdminAnomalies = () => {
                         <div className="relative flex-1">
                             <input
                                 value={roleKeyword}
-                                onChange={(e) => setRoleKeyword(e.target.value)}
+                                onChange={(e) => setRoleKeyword(e.target.value.slice(0, MEMBER_SEARCH_KEYWORD_MAX_LENGTH))}
+                                maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH}
                                 placeholder="이름 또는 이메일 검색"
-                                className="input-base w-full pl-4 pr-10"
+                                disabled={!isMaster || roleMemberLoading}
+                                className="input-base w-full pl-4 pr-10 disabled:cursor-not-allowed disabled:text-slate-300"
                             />
+                            <p className="mt-1 text-right text-[11px] font-semibold text-slate-400">
+                                검색어 {roleKeyword.length}/{MEMBER_SEARCH_KEYWORD_MAX_LENGTH}자
+                            </p>
                         </div>
-                        <button className="btn-primary py-2.5 px-6 whitespace-nowrap" onClick={searchRoleMembers}>검색</button>
+                        <button
+                            type="button"
+                            className="btn-primary py-2.5 px-6 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={searchRoleMembers}
+                            disabled={!isMaster || roleMemberLoading}
+                        >
+                            {roleMemberLoading ? "검색 중..." : "검색"}
+                        </button>
                     </div>
+                    {roleMemberError ? (
+                        <div role="alert" className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-xs font-bold text-rose-600">
+                            {roleMemberError}
+                        </div>
+                    ) : null}
 
                     {!roleMembers.items?.length ? (
-                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">회원이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">
+                            {roleMemberLoading ? "회원을 불러오는 중입니다." : "회원이 없습니다."}
+                        </div>
                     ) : (
                         <div className="space-y-4 max-h-[600px] overflow-auto pr-2">
                             {roleMembers.items.map((member) => (
@@ -1402,10 +1830,26 @@ export const AdminAnomalies = () => {
                             <History className="h-5 w-5 text-primary-600" />
                             권한 변경 이력
                         </h2>
-                        <button className="text-slate-300 hover:text-primary-600" onClick={fetchRoleAudits}><RefreshCw className="h-4 w-4" /></button>
+                        <button
+                            type="button"
+                            className="text-slate-300 hover:text-primary-600 disabled:cursor-not-allowed disabled:text-slate-300"
+                            onClick={fetchRoleAudits}
+                            disabled={roleAuditLoading}
+                            aria-label="권한 변경 이력 새로고침"
+                            title="권한 변경 이력 새로고침"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${roleAuditLoading ? "animate-spin" : ""}`} />
+                        </button>
                     </div>
+                    {roleAuditError ? (
+                        <div role="alert" className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-xs font-bold text-rose-600">
+                            {roleAuditError}
+                        </div>
+                    ) : null}
                     {!roleAudits.items?.length ? (
-                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">권한 변경 이력이 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-64 rounded-[2rem] bg-slate-50/50 text-slate-400 font-bold text-sm">
+                            {roleAuditLoading ? "권한 변경 이력을 불러오는 중입니다." : "권한 변경 이력이 없습니다."}
+                        </div>
                     ) : (
                         <div className="space-y-4 max-h-[700px] overflow-auto pr-2">
                             {roleAudits.items.map((audit) => (
@@ -1472,6 +1916,7 @@ export const AdminAnomalies = () => {
                                         assignee: item.assignee || "",
                                         note: item.note || "",
                                     };
+                                    const actionApplying = isIncidentActionApplying(item.incidentId);
 
                                     return (
                                         <tr key={item.incidentId} className="border-t border-slate-50 group transition-all hover:bg-slate-50/50 align-top">
@@ -1497,9 +1942,10 @@ export const AdminAnomalies = () => {
                                                     className="input-base py-2 px-4 w-full rounded-xl border-0 bg-white shadow-sm text-[12px] font-bold"
                                                     value={draft.assignee}
                                                     placeholder="담당자"
+                                                    maxLength={ADMIN_ANOMALY_TEXT_LIMITS.incidentAssignee}
                                                     onChange={(e) => setIncidentDrafts((prev) => ({
                                                         ...prev,
-                                                        [item.incidentId]: { ...draft, assignee: e.target.value },
+                                                        [item.incidentId]: { ...draft, assignee: e.target.value.slice(0, ADMIN_ANOMALY_TEXT_LIMITS.incidentAssignee) },
                                                     }))}
                                                 />
                                                 <textarea
@@ -1507,9 +1953,10 @@ export const AdminAnomalies = () => {
                                                     rows={1}
                                                     value={draft.note}
                                                     placeholder="관리자 메모"
+                                                    maxLength={ADMIN_ANOMALY_TEXT_LIMITS.incidentNote}
                                                     onChange={(e) => setIncidentDrafts((prev) => ({
                                                         ...prev,
-                                                        [item.incidentId]: { ...draft, note: e.target.value },
+                                                        [item.incidentId]: { ...draft, note: e.target.value.slice(0, ADMIN_ANOMALY_TEXT_LIMITS.incidentNote) },
                                                     }))}
                                                 />
                                             </td>
@@ -1517,8 +1964,22 @@ export const AdminAnomalies = () => {
                                                 <div className="flex flex-wrap justify-end gap-2">
                                                     <div className="flex gap-1.5 bg-white p-1 rounded-2xl shadow-sm">
                                                         <button className="p-2 rounded-xl hover:bg-primary-50 text-slate-300 hover:text-primary-600 transition-all" onClick={() => fetchDetail(item.incidentId)} title="상세 보기"><Activity className="h-4 w-4" /></button>
-                                                        <button className="p-2 rounded-xl hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-all" onClick={() => applyAction(item.incidentId, "BLOCK_QUEUE_USER")} title="대기열 차단"><UserX className="h-4 w-4" /></button>
-                                                        <button className="p-2 rounded-xl hover:bg-amber-50 text-slate-300 hover:text-amber-600 transition-all" onClick={() => applyAction(item.incidentId, "WARN_MEMBER")} title="회원 경고"><BellRing className="h-4 w-4" /></button>
+                                                        <button
+                                                            className="p-2 rounded-xl hover:bg-rose-50 text-slate-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
+                                                            onClick={() => applyAction(item.incidentId, "BLOCK_QUEUE_USER")}
+                                                            title={actionApplying ? "조치 처리 중" : "대기열 차단"}
+                                                            disabled={actionApplying}
+                                                        >
+                                                            {isIncidentActionApplying(item.incidentId, "BLOCK_QUEUE_USER") ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4" />}
+                                                        </button>
+                                                        <button
+                                                            className="p-2 rounded-xl hover:bg-amber-50 text-slate-300 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
+                                                            onClick={() => applyAction(item.incidentId, "WARN_MEMBER")}
+                                                            title={actionApplying ? "조치 처리 중" : "회원 경고"}
+                                                            disabled={actionApplying}
+                                                        >
+                                                            {isIncidentActionApplying(item.incidentId, "WARN_MEMBER") ? <RefreshCw className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
+                                                        </button>
                                                     </div>
                                                     <button
                                                         className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 text-[12px] font-black text-white hover:bg-primary-600 disabled:opacity-20 transition-all duration-300"
@@ -1587,9 +2048,27 @@ export const AdminAnomalies = () => {
                     <div className="mb-12 space-y-4">
                         <h3 className="text-xs font-black text-slate-500 tracking-widest px-2">판단 조치</h3>
                         <div className="flex flex-wrap gap-4">
-                            <button className="flex-1 rounded-[2rem] bg-primary-600 py-6 text-sm font-black hover:bg-primary-700 transition-all shadow-xl shadow-primary-900/40" onClick={() => applyAction(selectedDetail.incident.incidentId, "BLOCK_QUEUE_USER")}>대기열 차단</button>
-                            <button className="flex-1 rounded-[2rem] bg-white/5 border border-white/10 py-6 text-sm font-black hover:bg-white/10 transition-all" onClick={() => applyAction(selectedDetail.incident.incidentId, "WARN_MEMBER")}>회원 경고</button>
-                            <button className="flex-1 rounded-[2rem] bg-white/5 border border-white/10 py-6 text-sm font-black hover:bg-white/10 transition-all" onClick={() => applyAction(selectedDetail.incident.incidentId, "CLEAR_QUEUE_BLOCK")}>접근 복구</button>
+                            <button
+                                className="flex-1 rounded-[2rem] bg-primary-600 py-6 text-sm font-black hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-xl shadow-primary-900/40"
+                                onClick={() => applyAction(selectedDetail.incident.incidentId, "BLOCK_QUEUE_USER")}
+                                disabled={isIncidentActionApplying(selectedDetail.incident.incidentId)}
+                            >
+                                {isIncidentActionApplying(selectedDetail.incident.incidentId, "BLOCK_QUEUE_USER") ? "처리 중..." : "대기열 차단"}
+                            </button>
+                            <button
+                                className="flex-1 rounded-[2rem] bg-white/5 border border-white/10 py-6 text-sm font-black hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                                onClick={() => applyAction(selectedDetail.incident.incidentId, "WARN_MEMBER")}
+                                disabled={isIncidentActionApplying(selectedDetail.incident.incidentId)}
+                            >
+                                {isIncidentActionApplying(selectedDetail.incident.incidentId, "WARN_MEMBER") ? "처리 중..." : "회원 경고"}
+                            </button>
+                            <button
+                                className="flex-1 rounded-[2rem] bg-white/5 border border-white/10 py-6 text-sm font-black hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                                onClick={() => applyAction(selectedDetail.incident.incidentId, "CLEAR_QUEUE_BLOCK")}
+                                disabled={isIncidentActionApplying(selectedDetail.incident.incidentId)}
+                            >
+                                {isIncidentActionApplying(selectedDetail.incident.incidentId, "CLEAR_QUEUE_BLOCK") ? "처리 중..." : "접근 복구"}
+                            </button>
                         </div>
                     </div>
 
@@ -1640,13 +2119,15 @@ export const AdminAnomalies = () => {
                             className="input-base border-0 shadow-sm rounded-2xl font-bold"
                             placeholder="예: login.attempt"
                             value={newRule.metric}
-                            onChange={(e) => setNewRule((prev) => ({ ...prev, metric: e.target.value }))}
+                            onChange={(e) => setNewRule((prev) => ({ ...prev, metric: e.target.value.slice(0, ADMIN_ANOMALY_TEXT_LIMITS.ruleMetric) }))}
+                            maxLength={ADMIN_ANOMALY_TEXT_LIMITS.ruleMetric}
                         />
                     </div>
                     <div className="px-2">
                         <p className="text-[10px] font-black text-slate-400 tracking-[0.2em] mb-2 ml-1">분당 상한</p>
                         <input
                             type="number"
+                            min={1}
                             className="input-base border-0 shadow-sm rounded-2xl font-bold"
                             value={newRule.hardLimitPerMinute}
                             onChange={(e) => setNewRule((prev) => ({ ...prev, hardLimitPerMinute: e.target.value }))}
@@ -1656,6 +2137,7 @@ export const AdminAnomalies = () => {
                         <p className="text-[10px] font-black text-slate-400 tracking-[0.2em] mb-2 ml-1">Z 임계값</p>
                         <input
                             type="number"
+                            min={0.1}
                             step="0.1"
                             className="input-base border-0 shadow-sm rounded-2xl font-bold"
                             value={newRule.zScoreThreshold}
@@ -1700,6 +2182,7 @@ export const AdminAnomalies = () => {
                                         <p className="text-[9px] font-black text-slate-400 mb-2">분당 상한</p>
                                         <input
                                             type="number"
+                                            min={1}
                                             className="input-base py-2.5 px-4 bg-slate-50/50 border-0 rounded-xl font-black text-sm"
                                             value={draft.hardLimitPerMinute}
                                             onChange={(e) => setRuleDrafts((prev) => ({
@@ -1712,6 +2195,7 @@ export const AdminAnomalies = () => {
                                         <p className="text-[9px] font-black text-slate-400 mb-2">Z 점수</p>
                                         <input
                                             type="number"
+                                            min={0.1}
                                             step="0.1"
                                             className="input-base py-2.5 px-4 bg-slate-50/50 border-0 rounded-xl font-black text-sm"
                                             value={draft.zScoreThreshold}
@@ -1750,38 +2234,57 @@ export const AdminAnomalies = () => {
             </div>
 
             {releaseDialog.open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    role="presentation"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) closeReleaseDialog();
+                    }}
+                >
+                    <div
+                        ref={releaseDialogRef}
+                        className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby={releaseDialogTitleId}
+                        aria-describedby={releaseDialogDescriptionId}
+                    >
+                        <span id={releaseDialogTitleId} className="sr-only">제재 해제</span>
                         <div className="mb-4 flex items-start justify-between gap-4">
                             <div>
                                 <h3 className="text-lg font-black text-slate-900">제재 해제</h3>
-                                <p className="mt-1 text-sm text-slate-500">
+                                <p id={releaseDialogDescriptionId} className="mt-1 text-sm text-slate-500">
                                     대상: {releaseDialog.memberEmail || `#${releaseDialog.sanctionId}`}
                                 </p>
                             </div>
                             <button
+                                ref={releaseDialogCloseRef}
                                 type="button"
+                                autoFocus
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
                                 onClick={closeReleaseDialog}
-                                disabled={releasingSanctionId === releaseDialog.sanctionId}
+                                disabled={releasingSanctionId !== null}
                                 title="닫기"
                             >
                                 <X className="h-4 w-4" />
                             </button>
                         </div>
+                        <label htmlFor={releaseReasonInputId} className="sr-only">제재 해제 사유</label>
                         <textarea
+                            id={releaseReasonInputId}
                             className="input-base min-h-[110px] w-full"
                             value={releaseReasonInput}
-                            onChange={(e) => setReleaseReasonInput(e.target.value)}
+                            onChange={(e) => setReleaseReasonInput(e.target.value.slice(0, ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason))}
                             placeholder="해제 사유를 입력하세요"
-                            maxLength={500}
+                            disabled={releasingSanctionId !== null}
+                            maxLength={ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason}
                         />
                         <div className="mt-4 flex justify-end gap-2">
                             <button
                                 type="button"
                                 className="btn-secondary"
                                 onClick={closeReleaseDialog}
-                                disabled={releasingSanctionId === releaseDialog.sanctionId}
+                                disabled={releasingSanctionId !== null}
                             >
                                 취소
                             </button>
@@ -1789,9 +2292,9 @@ export const AdminAnomalies = () => {
                                 type="button"
                                 className="btn-primary"
                                 onClick={confirmReleaseDialog}
-                                disabled={releasingSanctionId === releaseDialog.sanctionId}
+                                disabled={releasingSanctionId !== null}
                             >
-                                {releasingSanctionId === releaseDialog.sanctionId ? "해제 중..." : "지금 해제"}
+                                {releasingSanctionId !== null ? "해제 중..." : "지금 해제"}
                             </button>
                         </div>
                     </div>

@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import SockJS from "sockjs-client";
-import { Client } from "@stomp/stompjs";
-import toast from "react-hot-toast";
+import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import { CheckCircle2, Crown, Dices, MessageSquare, Play, TimerReset, Users } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { DiceCountBadge, DiceFace, MoneyCard } from "../../common/LasVegasVisuals.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
-import { buildTalkPayload, chatAdapter, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
-import { buildStompConnectHeaders } from "../../adapters/realtimeAdapter.js";
+import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
+import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import {
     buildLasVegasActionPayload,
     getLasVegasChatRoomId,
@@ -132,9 +130,11 @@ export const LasVegasGame = () => {
     const [hotCasinoNo, setHotCasinoNo] = useState(null);
 
     const stompRef = useRef(null);
+    const stompInitRef = useRef(null);
     const gameSubRef = useRef(null);
     const chatSubRef = useRef(null);
     const realtimeRoomRef = useRef(null);
+    const mountedRef = useRef(false);
     const chatScrollRef = useRef(null);
     const prevCasinoSignatureRef = useRef("");
     const lastReadMarkAtRef = useRef(0);
@@ -194,27 +194,39 @@ export const LasVegasGame = () => {
         ? `${lastPlacedPlayer?.nickname || `플레이어 ${lastPlacedMemberId}`}님이 ${casinoName[lastPlacedCasinoNo] || `${lastPlacedCasinoNo}번`}에 주사위 ${lastPlacedDiceCount}개를 배팅했습니다.`
         : "";
 
-    const ensureSocket = () => {
+    const ensureSocket = async () => {
         if (stompRef.current) return stompRef.current;
+        if (stompInitRef.current) return stompInitRef.current;
         const connectHeaders = buildStompConnectHeaders();
         if (!connectHeaders.Authorization) return null;
-        const client = new Client({
-            webSocketFactory: () => new SockJS("/ws/chat"),
+        stompInitRef.current = createStompClient({
+            endpoint: "/ws/chat",
             connectHeaders,
             reconnectDelay: 3000,
             heartbeatIncoming: 4000,
             heartbeatOutgoing: 4000,
-            onStompError: () => toast.error("실시간 연결 오류"),
+        }).then((client) => {
+            if (!mountedRef.current) return null;
+            client.onStompError = (frame) => {
+                void notifyRealtimeError({
+                    scope: "las-vegas-game",
+                    error: frame,
+                    fallbackMessage: "게임 실시간 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+                });
+            };
+            client.beforeConnect = () => {
+                client.connectHeaders = buildStompConnectHeaders();
+            };
+            client.onConnect = () => {
+                bindLatestRealtimeRoom(client);
+            };
+            client.activate();
+            stompRef.current = client;
+            return client;
+        }).finally(() => {
+            stompInitRef.current = null;
         });
-        client.beforeConnect = () => {
-            client.connectHeaders = buildStompConnectHeaders();
-        };
-        client.onConnect = () => {
-            bindLatestRealtimeRoom(client);
-        };
-        client.activate();
-        stompRef.current = client;
-        return client;
+        return stompInitRef.current;
     };
 
     const subscribeGameRoom = (client, roomId) => {
@@ -229,7 +241,7 @@ export const LasVegasGame = () => {
             }
             setState(payload);
             refreshSelectedRoom(roomId).catch(() => {});
-            if (payload.message) toast(payload.message);
+            if (payload.message) notify(payload.message);
         });
     };
 
@@ -250,7 +262,7 @@ export const LasVegasGame = () => {
                 fetchChatMessages(roomId).catch(() => {});
                 return;
             }
-            if (payload) setChatMessages((prev) => [...prev, payload]);
+            if (payload) setChatMessages((prev) => [...prev, payload].sort(compareMessagesByChronology));
             markChatRoomAsRead(roomId).catch(() => {});
         });
     };
@@ -314,14 +326,14 @@ export const LasVegasGame = () => {
         const snapshotChatRoomId = await loadSnapshot();
 
         realtimeRoomRef.current = { roomId, chatRoomId: snapshotChatRoomId };
-        const client = ensureSocket();
+        const client = await ensureSocket();
         if (client?.connected) {
             bindRealtimeRoom(client, roomId, snapshotChatRoomId);
         }
     };
 
     useEffect(() => {
-        fetchRooms().catch(() => toast.error("방 목록을 불러오지 못했습니다."));
+        fetchRooms().catch(() => notifyError("방 목록을 불러오지 못했습니다."));
     }, []);
 
     useEffect(() => {
@@ -420,11 +432,14 @@ export const LasVegasGame = () => {
     }, [state?.casinos]);
 
     useEffect(() => {
+        mountedRef.current = true;
         return () => {
+            mountedRef.current = false;
             if (gameSubRef.current) gameSubRef.current.unsubscribe();
             if (chatSubRef.current) chatSubRef.current.unsubscribe();
             if (stompRef.current) stompRef.current.deactivate();
             realtimeRoomRef.current = null;
+            stompInitRef.current = null;
         };
     }, []);
 
@@ -439,9 +454,9 @@ export const LasVegasGame = () => {
             });
             await hydrateRoomContext(room);
             await fetchRooms();
-            toast.success("방 생성 완료");
+            notifySuccess("방 생성 완료");
         } catch {
-            toast.error("방 생성 실패");
+            notifyError("방 생성 실패");
         } finally {
             setCreating(false);
         }
@@ -453,9 +468,9 @@ export const LasVegasGame = () => {
             const room = await lasVegasGameAdapter.joinRoom(roomId);
             await hydrateRoomContext(room);
             await fetchRooms();
-            toast.success("입장 완료");
+            notifySuccess("입장 완료");
         } catch {
-            toast.error("입장 실패");
+            notifyError("입장 실패");
         } finally {
             setLoading(false);
         }
@@ -465,7 +480,7 @@ export const LasVegasGame = () => {
         e.preventDefault();
         const normalizedCode = joinCode.trim().toUpperCase();
         if (!normalizedCode) {
-            toast.error("방코드를 입력해 주세요.");
+            notifyError("방코드를 입력해 주세요.");
             return;
         }
         try {
@@ -474,9 +489,9 @@ export const LasVegasGame = () => {
             setJoinCode("");
             await hydrateRoomContext(room);
             await fetchRooms();
-            toast.success("방코드로 입장했습니다.");
+            notifySuccess("방코드로 입장했습니다.");
         } catch {
-            toast.error("방코드 입장에 실패했습니다.");
+            notifyError("방코드 입장에 실패했습니다.");
         } finally {
             setLoading(false);
         }
@@ -600,22 +615,32 @@ export const LasVegasGame = () => {
         tail.stop(now + 0.36);
     };
 
-    const publishGameAction = (actionType, casinoNo = null) => {
-        if (!stompRef.current?.connected || !selectedRoom || !myMemberId) return;
+    const publishGameAction = async (actionType, casinoNo = null) => {
+        if (!selectedRoom || !myMemberId) return;
         const roomId = normalizeRoomId(selectedRoom);
         if (!roomId) return;
+        const client = await ensureSocket();
+        if (!client?.connected) {
+            notifyError("실시간 연결이 아직 준비되지 않았습니다.");
+            return;
+        }
         playActionSound(actionType);
-        stompRef.current.publish({
+        client.publish({
             destination: `/pub/game/las-vegas/${roomId}/action`,
             body: JSON.stringify(buildLasVegasActionPayload({ actionType, casinoNo })),
             headers: { "content-type": "application/json" },
         });
     };
 
-    const sendChatMessage = () => {
-        if (!chatInput.trim() || !stompRef.current?.connected || !chatRoomId || !myMemberId) return;
+    const sendChatMessage = async () => {
+        if (!chatInput.trim() || !chatRoomId || !myMemberId) return;
+        const client = await ensureSocket();
+        if (!client?.connected) {
+            notifyError("채팅 연결이 아직 준비되지 않았습니다.");
+            return;
+        }
         const message = chatInput.trim();
-        stompRef.current.publish({
+        client.publish({
             destination: "/pub/chat/message",
             body: JSON.stringify(buildTalkPayload({ roomId: chatRoomId, senderId: myMemberId, message })),
             headers: { "content-type": "application/json" },
@@ -632,39 +657,39 @@ export const LasVegasGame = () => {
                 turnTimeSeconds: toPlainInt(settingsForm.turnTimeSeconds, 25),
             });
             setSelectedRoom(room);
-            toast.success("설정 저장 완료");
+            notifySuccess("설정 저장 완료");
         } catch {
-            toast.error("설정 저장 실패");
+            notifyError("설정 저장 실패");
         }
     };
 
     const toggleReady = async () => {
         if (!selectedRoom) return;
         if (roomStatus !== "WAITING") {
-            toast.error("대기 상태에서만 준비를 변경할 수 있습니다.");
+            notifyError("대기 상태에서만 준비를 변경할 수 있습니다.");
             return;
         }
         const roomId = normalizeRoomId(selectedRoom);
         try {
             await lasVegasGameAdapter.toggleReady(roomId);
-            toast.success("준비 상태 반영");
+            notifySuccess("준비 상태 반영");
         } catch {
-            toast.error("준비 상태 변경 실패");
+            notifyError("준비 상태 변경 실패");
         }
     };
 
     const startGame = async () => {
         if (!selectedRoom) return;
         if (roomStatus !== "WAITING") {
-            toast.error("한 판 더 하기로 대기 상태를 만든 뒤 시작할 수 있습니다.");
+            notifyError("한 판 더 하기로 대기 상태를 만든 뒤 시작할 수 있습니다.");
             return;
         }
         const roomId = normalizeRoomId(selectedRoom);
         try {
             await lasVegasGameAdapter.startGame(roomId);
-            toast.success("게임 시작");
+            notifySuccess("게임 시작");
         } catch {
-            toast.error("게임 시작 실패");
+            notifyError("게임 시작 실패");
         }
     };
 
@@ -677,9 +702,9 @@ export const LasVegasGame = () => {
             setSelectedRoom(room);
             await fetchState(roomId);
             await fetchRooms();
-            toast.success("같은 방에서 새 판 준비를 시작했습니다.");
+            notifySuccess("같은 방에서 새 판 준비를 시작했습니다.");
         } catch {
-            toast.error("한 판 더 하기 준비에 실패했습니다.");
+            notifyError("한 판 더 하기 준비에 실패했습니다.");
         } finally {
             setRematching(false);
         }
@@ -700,9 +725,9 @@ export const LasVegasGame = () => {
             setSelectedRoom(room);
             await fetchState(roomId);
             await fetchRooms();
-            toast.success("현재 게임을 종료하고 대기 상태로 돌아갔습니다.");
+            notifySuccess("현재 게임을 종료하고 대기 상태로 돌아갔습니다.");
         } catch {
-            toast.error("강제 종료에 실패했습니다.");
+            notifyError("강제 종료에 실패했습니다.");
         } finally {
             setForceFinishing(false);
         }
@@ -721,9 +746,9 @@ export const LasVegasGame = () => {
             if (gameSubRef.current) gameSubRef.current.unsubscribe();
             if (chatSubRef.current) chatSubRef.current.unsubscribe();
             await fetchRooms();
-            toast.success("방 퇴장");
+            notifySuccess("방 퇴장");
         } catch {
-            toast.error("퇴장 실패");
+            notifyError("퇴장 실패");
         }
     };
 
@@ -1040,12 +1065,15 @@ export const LasVegasGame = () => {
                             </div>
                             <div ref={chatScrollRef} className="mb-3 h-[420px] space-y-2 overflow-auto rounded-2xl bg-slate-50 p-3 text-xs">
                                 {!chatMessages.length && <div className="text-slate-400">채팅 내역이 없습니다.</div>}
-                                {chatMessages.map((msg, idx) => (
-                                    <div key={`${msg.createdAt || idx}-${idx}`} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                                        <div className="font-black text-slate-800">{msg.senderName || "SYSTEM"}</div>
-                                        <div className="mt-0.5 text-slate-700">{msg.message || ""}</div>
+                                {chatMessages.map((msg) => {
+                                    const normalized = normalizeMessage(msg);
+                                    return (
+                                    <div key={normalized.key || normalized.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                                        <div className="font-black text-slate-800">{normalized.senderName || "SYSTEM"}</div>
+                                        <div className="mt-0.5 text-slate-700">{normalized.message || ""}</div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                             <div className="flex gap-2">
                                 <input

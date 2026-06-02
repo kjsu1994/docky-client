@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert, UserSearch, EyeOff, RotateCcw, RefreshCw } from "lucide-react";
-import toast from "react-hot-toast";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
-import { adminOperationsAdapter, adminOperationsErrorMessage } from "../../adapters/adminOperationsAdapter.js";
+import { notifyError, notifyLoading, notifySuccess } from "../../utils/toast.js";
+import {
+    ADMIN_BANNER_LIMITS,
+    ADMIN_MODERATION_REASON_MAX_LENGTH,
+    MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
+    adminOperationsAdapter,
+    adminOperationsErrorMessage,
+} from "../../adapters/adminOperationsAdapter.js";
 
 export const AdminOperations = () => {
     const { user } = useAuth();
@@ -54,6 +60,28 @@ export const AdminOperations = () => {
         targetAudience: "ALL",
         activeYn: true,
     });
+
+    const updateBannerTextField = (field, value, maxLength) => {
+        setBannerForm((prev) => ({
+            ...prev,
+            [field]: String(value || "").slice(0, maxLength),
+        }));
+    };
+
+    const updateBannerPriority = (value) => {
+        const text = String(value ?? "");
+        if (!text) {
+            setBannerForm((prev) => ({ ...prev, priority: "" }));
+            return;
+        }
+        const parsed = Number(text);
+        if (!Number.isFinite(parsed)) return;
+        const clamped = Math.min(
+            ADMIN_BANNER_LIMITS.priorityMax,
+            Math.max(ADMIN_BANNER_LIMITS.priorityMin, Math.trunc(parsed)),
+        );
+        setBannerForm((prev) => ({ ...prev, priority: String(clamped) }));
+    };
 
     const filteredModerationItems = useMemo(() => {
         const keyword = String(bulkKeyword || "").trim().toLowerCase();
@@ -106,7 +134,7 @@ export const AdminOperations = () => {
     const submitBatchModeration = async (actionType) => {
         const ids = [...new Set(selectedIds)].filter((value) => Number.isFinite(Number(value)) && Number(value) > 0);
         if (!ids.length) {
-            toast.error("항목을 하나 이상 선택하세요.");
+            notifyError("항목을 하나 이상 선택하세요.");
             return;
         }
 
@@ -122,11 +150,11 @@ export const AdminOperations = () => {
             setBatchResult(data);
             await fetchModerationItems(targetType);
             setSelectedIds([]);
-            toast.success(actionType === "HIDE" ? "선택 항목을 숨김 처리했습니다." : "선택 항목을 공개 처리했습니다.");
+            notifySuccess(actionType === "HIDE" ? "선택 항목을 숨김 처리했습니다." : "선택 항목을 공개 처리했습니다.");
         } catch (err) {
             const message = adminOperationsErrorMessage(err, "일괄 처리에 실패했습니다.");
             setBatchError(message);
-            toast.error(message);
+            notifyError(message);
         } finally {
             setBatchLoading(false);
         }
@@ -190,28 +218,28 @@ export const AdminOperations = () => {
     const submitBannerForm = async () => {
         const title = String(bannerForm.title || "").trim();
         if (!title) {
-            toast.error("배너 제목을 입력하세요.");
+            notifyError("배너 제목을 입력하세요.");
             return;
         }
         const isAdsense = String(bannerForm.renderMode || "").toUpperCase() === "ADSENSE";
         if (isAdsense) {
             if (!String(bannerForm.adProvider || "").trim()) {
-                toast.error("애드센스 모드에서는 광고 제공자를 입력해야 합니다.");
+                notifyError("애드센스 모드에서는 광고 제공자를 입력해야 합니다.");
                 return;
             }
             if (!String(bannerForm.adsenseClient || "").trim() || !String(bannerForm.adsenseSlot || "").trim()) {
-                toast.error("애드센스 클라이언트 ID와 슬롯 ID를 모두 입력해야 합니다.");
+                notifyError("애드센스 클라이언트 ID와 슬롯 ID를 모두 입력해야 합니다.");
                 return;
             }
         }
         setBannerSaving(true);
         try {
             await adminOperationsAdapter.saveBanner({ bannerId: editingBannerId, form: bannerForm });
-            toast.success(editingBannerId ? "배너를 수정했습니다." : "배너를 생성했습니다.");
+            notifySuccess(editingBannerId ? "배너를 수정했습니다." : "배너를 생성했습니다.");
             await fetchAdminBanners();
             resetBannerForm();
         } catch (err) {
-            toast.error(adminOperationsErrorMessage(err, "배너 저장에 실패했습니다."));
+            notifyError(adminOperationsErrorMessage(err, "배너 저장에 실패했습니다."));
         } finally {
             setBannerSaving(false);
         }
@@ -221,13 +249,13 @@ export const AdminOperations = () => {
         const bannerId = Number(banner.bannerId || 0);
         if (!bannerId) return;
         const nextActive = !Boolean(banner.activeYn);
-        const toastId = toast.loading("배너 상태를 변경하는 중입니다...");
+        const loadingToast = await notifyLoading("배너 상태를 변경하는 중입니다...");
         try {
             await adminOperationsAdapter.updateBannerActive({ bannerId, activeYn: nextActive });
             await fetchAdminBanners();
-            toast.success(nextActive ? "배너를 활성화했습니다." : "배너를 비활성화했습니다.", { id: toastId });
+            loadingToast.success(nextActive ? "배너를 활성화했습니다." : "배너를 비활성화했습니다.");
         } catch (err) {
-            toast.error(adminOperationsErrorMessage(err, "배너 상태 변경에 실패했습니다."), { id: toastId });
+            loadingToast.error(adminOperationsErrorMessage(err, "배너 상태 변경에 실패했습니다."));
         }
     };
 
@@ -240,14 +268,14 @@ export const AdminOperations = () => {
             confirmText: "삭제",
         });
         if (!confirmed) return;
-        const toastId = toast.loading("배너를 삭제하는 중입니다...");
+        const loadingToast = await notifyLoading("배너를 삭제하는 중입니다...");
         try {
             await adminOperationsAdapter.deleteBanner(bannerId);
             await fetchAdminBanners();
             if (editingBannerId === bannerId) resetBannerForm();
-            toast.success("배너를 삭제했습니다.", { id: toastId });
+            loadingToast.success("배너를 삭제했습니다.");
         } catch (err) {
-            toast.error(adminOperationsErrorMessage(err, "배너 삭제에 실패했습니다."), { id: toastId });
+            loadingToast.error(adminOperationsErrorMessage(err, "배너 삭제에 실패했습니다."));
         }
     };
 
@@ -299,7 +327,7 @@ export const AdminOperations = () => {
     const fetchMemberDetail = async (memberIdOverride) => {
         const memberId = Number(memberIdOverride ?? memberIdInput);
         if (!Number.isFinite(memberId) || memberId <= 0) {
-            toast.error("올바른 회원 ID를 입력하세요.");
+            notifyError("올바른 회원 ID를 입력하세요.");
             return;
         }
 
@@ -312,7 +340,7 @@ export const AdminOperations = () => {
             const message = adminOperationsErrorMessage(err, "회원 상세 정보를 불러오지 못했습니다.");
             setMemberError(message);
             setMemberDetail(null);
-            toast.error(message);
+            notifyError(message);
         } finally {
             setMemberLoading(false);
         }
@@ -321,7 +349,7 @@ export const AdminOperations = () => {
     const selectCandidate = async (member) => {
         const memberId = member.memberId;
         if (!memberId) {
-            toast.error("선택한 회원 정보를 확인할 수 없습니다.");
+            notifyError("선택한 회원 정보를 확인할 수 없습니다.");
             return;
         }
         setMemberIdInput(String(memberId));
@@ -485,9 +513,9 @@ export const AdminOperations = () => {
                     <input
                         className="input-base"
                         value={reason}
-                        onChange={(e) => setReason(e.target.value)}
+                        onChange={(e) => setReason(e.target.value.slice(0, ADMIN_MODERATION_REASON_MAX_LENGTH))}
                         placeholder="사유 (선택, 최대 500자)"
-                        maxLength={500}
+                        maxLength={ADMIN_MODERATION_REASON_MAX_LENGTH}
                     />
 
                     {batchError ? (
@@ -515,9 +543,13 @@ export const AdminOperations = () => {
                         <input
                             className="input-base"
                             value={memberKeyword}
-                            onChange={(e) => setMemberKeyword(e.target.value)}
+                            onChange={(e) => setMemberKeyword(e.target.value.slice(0, MEMBER_SEARCH_KEYWORD_MAX_LENGTH))}
+                            maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH}
                             placeholder="이름 또는 이메일로 회원 검색"
                         />
+                        <p className="text-right text-[11px] font-semibold text-slate-400">
+                            검색어 {memberKeyword.length}/{MEMBER_SEARCH_KEYWORD_MAX_LENGTH}자
+                        </p>
                         {memberSearchLoading ? (
                             <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs font-semibold text-slate-500">
                                 회원을 검색하는 중입니다...
@@ -608,15 +640,15 @@ export const AdminOperations = () => {
                         <option value="USER">회원</option>
                         <option value="ADMIN">관리자</option>
                     </select>
-                    <input className="input-base" value={bannerForm.adProvider} onChange={(e) => setBannerForm((prev) => ({ ...prev, adProvider: e.target.value }))} placeholder="광고 제공자 코드 (예: ADSENSE)" />
-                    <input className="input-base md:col-span-2" value={bannerForm.title} onChange={(e) => setBannerForm((prev) => ({ ...prev, title: e.target.value }))} placeholder="배너 제목" />
-                    <textarea className="input-base md:col-span-2 min-h-[88px]" value={bannerForm.description} onChange={(e) => setBannerForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="배너 설명" />
-                    <input className="input-base md:col-span-2" value={bannerForm.imageUrl} onChange={(e) => setBannerForm((prev) => ({ ...prev, imageUrl: e.target.value }))} placeholder="이미지 URL (선택)" />
-                    <input className="input-base md:col-span-2" value={bannerForm.linkUrl} onChange={(e) => setBannerForm((prev) => ({ ...prev, linkUrl: e.target.value }))} placeholder="연결 URL (선택)" />
-                    <input className="input-base" value={bannerForm.ctaText} onChange={(e) => setBannerForm((prev) => ({ ...prev, ctaText: e.target.value }))} placeholder="버튼 문구 (선택)" />
-                    <input className="input-base" value={bannerForm.adsenseClient} onChange={(e) => setBannerForm((prev) => ({ ...prev, adsenseClient: e.target.value }))} placeholder="애드센스 클라이언트 (ca-pub-...)" />
-                    <input className="input-base" value={bannerForm.adsenseSlot} onChange={(e) => setBannerForm((prev) => ({ ...prev, adsenseSlot: e.target.value }))} placeholder="애드센스 슬롯 ID" />
-                    <input className="input-base" type="number" min={0} max={1000} value={bannerForm.priority} onChange={(e) => setBannerForm((prev) => ({ ...prev, priority: e.target.value }))} placeholder="우선순위" />
+                    <input className="input-base" value={bannerForm.adProvider} onChange={(e) => updateBannerTextField("adProvider", e.target.value, ADMIN_BANNER_LIMITS.adProvider)} maxLength={ADMIN_BANNER_LIMITS.adProvider} placeholder="광고 제공자 코드 (예: ADSENSE)" />
+                    <input className="input-base md:col-span-2" value={bannerForm.title} onChange={(e) => updateBannerTextField("title", e.target.value, ADMIN_BANNER_LIMITS.title)} maxLength={ADMIN_BANNER_LIMITS.title} placeholder="배너 제목" />
+                    <textarea className="input-base md:col-span-2 min-h-[88px]" value={bannerForm.description} onChange={(e) => updateBannerTextField("description", e.target.value, ADMIN_BANNER_LIMITS.description)} maxLength={ADMIN_BANNER_LIMITS.description} placeholder="배너 설명" />
+                    <input className="input-base md:col-span-2" value={bannerForm.imageUrl} onChange={(e) => updateBannerTextField("imageUrl", e.target.value, ADMIN_BANNER_LIMITS.imageUrl)} maxLength={ADMIN_BANNER_LIMITS.imageUrl} placeholder="이미지 URL (선택)" />
+                    <input className="input-base md:col-span-2" value={bannerForm.linkUrl} onChange={(e) => updateBannerTextField("linkUrl", e.target.value, ADMIN_BANNER_LIMITS.linkUrl)} maxLength={ADMIN_BANNER_LIMITS.linkUrl} placeholder="연결 URL (선택)" />
+                    <input className="input-base" value={bannerForm.ctaText} onChange={(e) => updateBannerTextField("ctaText", e.target.value, ADMIN_BANNER_LIMITS.ctaText)} maxLength={ADMIN_BANNER_LIMITS.ctaText} placeholder="버튼 문구 (선택)" />
+                    <input className="input-base" value={bannerForm.adsenseClient} onChange={(e) => updateBannerTextField("adsenseClient", e.target.value, ADMIN_BANNER_LIMITS.adsenseClient)} maxLength={ADMIN_BANNER_LIMITS.adsenseClient} placeholder="애드센스 클라이언트 (ca-pub-...)" />
+                    <input className="input-base" value={bannerForm.adsenseSlot} onChange={(e) => updateBannerTextField("adsenseSlot", e.target.value, ADMIN_BANNER_LIMITS.adsenseSlot)} maxLength={ADMIN_BANNER_LIMITS.adsenseSlot} placeholder="애드센스 슬롯 ID" />
+                    <input className="input-base" type="number" min={ADMIN_BANNER_LIMITS.priorityMin} max={ADMIN_BANNER_LIMITS.priorityMax} value={bannerForm.priority} onChange={(e) => updateBannerPriority(e.target.value)} placeholder="우선순위" />
                     <input className="input-base" type="datetime-local" value={bannerForm.startAt} onChange={(e) => setBannerForm((prev) => ({ ...prev, startAt: e.target.value }))} />
                     <input className="input-base" type="datetime-local" value={bannerForm.endAt} onChange={(e) => setBannerForm((prev) => ({ ...prev, endAt: e.target.value }))} />
                     <label className="md:col-span-2 flex items-center gap-2 text-sm font-semibold text-slate-700">

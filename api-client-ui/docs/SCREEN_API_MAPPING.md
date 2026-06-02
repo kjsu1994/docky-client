@@ -11,12 +11,15 @@
 - 공통 에러 메시지 변환: `src/utils/api.js`의 `getApiErrorMessage`가 서버 메시지, validation 오류, HTTP 상태별 한국어 기본 문구를 어댑터에 제공합니다.
 - 공통 STOMP 연결 헤더: `src/adapters/realtimeAdapter.js`
 - 화면 계층은 axios 오류 응답 shape을 직접 읽지 않고, 인증/권한/상태 코드 판정은 각 adapter helper를 통해 처리합니다.
-- 페이지별 도움말: `src/common/PageGuideButton.jsx`, `src/common/pageGuides.js` (`?` 버튼 첫 열기 시점에 도움말 청크 로드)
-- 보호 라우트는 `ProtectedRoute`를 통과한 뒤 `AppLayout` 안에서 렌더링합니다.
+- 전역 네트워크 요청 표시: `src/components/GlobalNetworkIndicatorEntry.jsx`, `src/components/GlobalNetworkIndicator.jsx` (추적 대상 요청 발생 시점에 표시 UI 청크 로드, 120ms 이상 지속되는 요청만 `aria-label="요청 처리 중"` 진행 표시 노출)
+- 페이지별 도움말: `src/common/PageGuideButtonEntry.jsx`, `src/common/PageGuideButton.jsx`, `src/common/PageGuideDialog.jsx`, `src/common/pageGuides.js` (보호 앱 레이아웃에서 `?` 버튼 청크 로드, 버튼 첫 열기 시점에 도움말 다이얼로그와 안내 데이터 청크 로드, dialog ARIA/초기 포커스/닫기 후 포커스 복귀 제공)
+- 공통 로딩 fallback: `src/components/LoadingSpinner.jsx` (Suspense/page fallback에서 CSS-only spinner 사용, 텍스트가 있을 때 `role=status`와 `aria-live=polite` 제공)
+- 보호 라우트는 `src/components/ProtectedRoutes.jsx`의 `ProtectedRoute`를 통과한 뒤 `ProtectedAppLayout` 안에서 렌더링합니다.
 - 주요 앱 라우트는 `React.lazy`로 분리되어 초기 진입 번들을 줄입니다.
 - 플로팅 채팅은 `FloatingChatEntry`의 가벼운 런처만 첫 화면에 포함하고, 사용자가 런처를 열기 전까지 전체 채팅 청크, 채팅방 REST 조회, STOMP/SockJS 연결을 시작하지 않습니다.
-- `npm run smoke:text-quality`는 화면 문자열과 문서의 깨진 한글, 문자열 리터럴 안의 반복 물음표, 한글 유니코드 이스케이프, 남은 주요 영어 문구를 공통 검증합니다.
-- `npm run smoke:navigation-routes`는 정적 `/app` 링크가 `src/App.jsx`의 실제 라우트 패턴으로 커버되는지 공통 검증합니다.
+- `npm run smoke:text-quality`는 화면 문자열과 문서의 깨진 한글, 문자열 리터럴 안의 반복 물음표, 한글 유니코드 이스케이프, 남은 주요 영어 문구, 운영 소스의 브라우저 기본 alert/confirm/prompt 호출을 공통 검증합니다.
+- 외부 API/서버 응답에서 온 새 탭 링크는 `src/utils/helpers.js`의 `normalizeExternalUrl` 경계를 통과한 http(s) URL만 렌더링합니다. `target="_blank"` 앵커와 `window.open(..., "_blank")`는 `noopener noreferrer`를 포함해야 하며 `smoke:text-quality`가 회귀를 차단합니다.
+- `npm run smoke:navigation-routes`는 정적 `/app` 링크가 `src/App.jsx`와 `src/components/ProtectedRoutes.jsx`의 실제 라우트 패턴으로 커버되는지 공통 검증합니다.
 
 ## 공개 화면
 
@@ -59,6 +62,7 @@
   - 서버는 기본 목록 크기를 20개로 사용하고, 수동 요청의 `size`는 최대 50개로 보정합니다.
   - 목록형 응답의 `contents`는 첫 이미지 태그와 짧은 요약 HTML만 포함합니다. 카드 썸네일과 요약 문구는 이 값을 사용하고, 전체 본문은 상세 API에서 조회합니다.
   - 검색/정렬은 `searchType=ALL`, `searchValue`, `sort`를 서버 요청에 포함하고, 자유게시판 `전체` 탭의 공지사항은 별도 최신 목록으로 조회합니다.
+  - 게시판 검색어는 화면과 `boardAdapter`에서 80자로 제한하고 공백을 정규화하며, 서버도 DB 검색 전에 같은 상한으로 보정합니다.
   - 목록 응답/pagination 헤더와 삭제 액션은 `src/adapters/boardAdapter.js`를 통해 처리합니다.
 - `/app/boards/:kind/:boardId`
   - `GET /boards/{board-id}` (`trackView=false`는 내부 갱신 시 조회수 증가 없이 재조회)
@@ -74,11 +78,13 @@
   - 공개 댓글 조회는 댓글과 부모 게시글이 모두 숨김 상태가 아닐 때만 반환됩니다.
   - `POST /comments`
   - 댓글 작성 payload는 `src/adapters/commentAdapter.js`에서 `board_id`와 trim된 `contents`로 정규화합니다. 서버는 `boardId` legacy alias도 허용하지만, 화면은 2,000자 제한과 처리 중 비활성화 상태를 표시합니다.
+  - 댓글 수정/삭제/좋아요/신고 버튼은 같은 댓글의 확인 모달 또는 API 작업이 진행 중일 때 서로 겹쳐 실행되지 않도록 댓글 단위 busy 상태를 공유합니다.
   - `POST /reports`
-  - 게시글/댓글 신고는 `src/common/ReportDialog.jsx` 공통 모달을 통해 접수합니다. `boardAdapter`/`commentAdapter`는 `target_type`, `target_id`, trim된 `reason/detail`로 전송하고, 모달은 사유 120자/상세 2,000자 제한을 표시합니다.
+  - 게시글/댓글 신고는 `src/common/ReportDialog.jsx` 공통 모달을 통해 접수합니다. `boardAdapter`/`commentAdapter`는 `target_type`, `target_id`, trim된 `reason/detail`로 전송하고, 모달은 사유 120자/상세 2,000자 제한을 표시합니다. 신고 모달은 `role=dialog`, `aria-modal`, 제목/설명/입력 라벨 연결, 열림 시 사유 입력 포커스, 닫힘 후 원래 신고 버튼 포커스 복귀, Escape/배경 클릭 닫기를 제공하되 제출 중에는 닫기를 막습니다.
 - `/app/boards/:kind/new`
   - `POST /boards?kind={kind}`
   - 화면은 외부 CDN 에디터 대신 로컬 contenteditable 에디터를 사용하고, 실제 저장 요청은 `POST /boards?kind={kind}`를 `src/adapters/boardAdapter.js`에서 보냅니다.
+  - 제목 입력은 서버 제한과 맞춰 100자 `maxLength`와 카운터를 제공하고, 본문은 100,000자 카운터와 저장 전 차단을 제공합니다.
   - 저장 payload의 본문 HTML은 `src/utils/helpers.js`의 safelist sanitizer를 통과하며, 서버도 같은 목적의 저장 경계 sanitizer를 적용합니다.
   - 서버는 첨부파일 저장 object key를 UUID 기반으로 생성하지만, 응답 `file_name`/`fileName`은 화면 표시용 안전 파일명으로 유지합니다.
   - 첨부파일은 게시글당 최대 5개, 파일당 20MB까지 허용하며, `src/adapters/boardAdapter.js`의 제한값으로 선택 단계에서 먼저 안내합니다.
@@ -105,7 +111,7 @@
   - 서버 `GET /chat/rooms` 응답의 `last_message`, `last_message_time`, `unread_count`를 adapter에서 정규화해 클라이언트가 방마다 메시지 목록을 다시 조회하지 않도록 합니다.
   - 채팅방 검색은 이미 로드된 방 제목과 최근 메시지를 클라이언트에서 필터링하며, 키 입력마다 추가 API를 호출하지 않습니다.
   - 메시지 입력은 `CHAT_MESSAGE_MAX_LENGTH=2000`을 공유해 전체 채팅과 플로팅 채팅에서 같은 `maxLength`/카운터를 표시합니다. 서버는 저장 전에 방 멤버십, TALK 2,000자 제한, FILE 메타데이터를 다시 검증합니다.
-  - STOMP CONNECT 인증 헤더는 채팅과 보드게임 실시간 화면 모두 `src/adapters/realtimeAdapter.js`에서 생성합니다. 토큰이 없으면 연결을 시작하지 않고, 서버는 JWT principal을 실제 sender로 사용해 payload의 `senderId` 위조를 막습니다.
+- STOMP CONNECT 인증 헤더와 STOMP/SockJS 런타임 생성은 채팅과 보드게임 실시간 화면 모두 `src/adapters/realtimeAdapter.js`를 사용합니다. 토큰이 없으면 연결을 시작하지 않고, 서버는 JWT principal을 실제 sender로 사용해 payload의 `senderId` 위조를 막습니다.
   - 채팅/보드게임 STOMP 구독은 서버가 방 멤버십을 다시 확인하므로 화면은 참여 중인 방의 `/sub/chat/room/*` 및 `/sub/game/*/room/*`만 구독합니다.
 
 ## 개인/정보 화면
@@ -117,6 +123,7 @@
   - `DELETE /members`
   - `POST /members/withdraw/reauth`
   - 화면은 `src/adapters/mypageAdapter.js`에서 회원/작성글/경험치 이력 응답 shape과 계정 상태 라벨을 정규화합니다.
+  - 회원 탈퇴 모달은 `aria-modal` dialog, 제목/설명 연결, 안전한 초기 포커스, Escape/배경 클릭 닫기, 닫힘 후 탈퇴 버튼 포커스 복귀를 제공합니다.
 - `/app/mypage/edit`
   - `PATCH /members/{member-id}`
   - `POST /members/uploadProfile`
@@ -130,6 +137,7 @@
 - `/app/news`
   - `GET /news?query={keyword}&sort={sim|date}&display={10|20|30|50}&start=1`
   - 화면은 `src/adapters/newsAdapter.js`에서 응답 shape, HTML 제거, 기본 검색 파라미터를 정규화합니다.
+  - 뉴스 링크와 원문 링크는 `normalizeExternalUrl`을 통과한 http(s) URL만 새 탭 링크로 렌더링합니다.
   - 뉴스 제공자 실패는 서버 표준 `ErrorResponse(status, code, message)`의 `message`를 adapter 에러 경계에서 표시합니다.
 - `/app/statistics`
   - `GET /stats/dashboard`
@@ -147,8 +155,9 @@
   - `PATCH /todos/{todo-id}`
   - `DELETE /todos/{todo-id}`
   - 화면은 `src/adapters/todoAdapter.js`에서 응답 shape과 snake_case payload를 정규화하고, 생성/완료/수정/삭제 후 실패 시 원복되는 낙관적 갱신을 사용합니다.
+  - 완료/수정/삭제 액션은 할 일별 in-flight 상태로 중복 실행을 막고, 저장/삭제/완료 변경 진행 상태를 한국어 라벨과 비활성 버튼으로 표시합니다.
   - 작성/수정 입력은 서버의 제목 200자 제한을 카운터로 표시하며, `todoAdapter`는 `due_date`를 전송합니다. 서버는 `dueDate` legacy alias도 유지합니다.
-  - 서버는 `GET /todos` 조회 기간을 최대 93일로 제한하며, 초과 시 표준 `{status, code, message}` 오류를 반환합니다.
+  - 서버는 `GET /todos` 조회 기간을 최대 93일, 응답 항목을 최대 500개로 제한합니다. 500개를 초과하면 응답의 `truncated`/`item_limit`을 화면 안내에 사용하며, 기간 초과 시 표준 `{status, code, message}` 오류를 반환합니다.
 - `/app/streaming`
   - `GET /streaming/videos?page={page}&size={size}`
   - `GET /streaming/videos/{video-id}/play`
@@ -162,13 +171,18 @@
   - `GET /invest/analysis/v3?market={KR|US}&symbol={symbol}`
   - 투자 분석/차트/종목 추천 응답 shape은 `src/adapters/investAdapter.js`에서 정규화합니다.
   - 서버가 한글 우선 `limitations`를 반환해도 미국 제공자 경고 판별은 `src/adapters/investAdapter.js`에서 처리합니다.
+  - 종목 검색창은 서버 입력 경계에 맞춰 검색어 80자, 선택 종목코드 20자 제한을 화면에서 안내하고 초과 종목코드 분석 요청을 사전에 막습니다.
   - KIS/DART/SEC EDGAR 제공자 지연은 서버 timeout 안에서 실패 처리되며, 화면은 기존 오류 상태와 `limitations` 경고를 사용합니다.
   - 국내/미국 종목 보조 데이터는 응답에 있을 때만 렌더링합니다.
+  - 투자 뉴스/이슈 원문 링크는 화면 렌더 직전에 `normalizeExternalUrl`로 다시 검증합니다.
 - `/app/facility`
   - 공용 `AddressSearchBox`
     - `GET /addresses/suggest?query={keyword}&limit={limit}`
     - `GET /addresses/geocode?address={address}`
+    - `GET /places/nearby?latitude={lat}&longitude={lng}&radius_km={1..30}&limit={1..50}`
+    - 서버는 `/places/nearby` 서비스 내부에서도 radius를 1~30km, limit을 1~50으로 정규화해 외부 장소 검색 display/radius 계산이 API boundary 밖 호출에도 같은 상한을 유지합니다.
     - 응답 shape은 `src/adapters/addressSearchAdapter.js`에서 정규화합니다.
+    - 주소 검색어는 화면과 adapter에서 120자 이내로 관리하며, 서버도 외부 네이버 지오코딩/장소 검색 호출 전에 같은 상한으로 정규화합니다.
     - 외부 지도/주소 제공자 지연이나 실패는 서버 timeout과 표준 에러 응답을 거쳐 adapter 에러 경계에서 처리합니다.
   - `GET /parking/lots?latitude={lat}&longitude={lng}&radius_km={km}&paid_only={bool}&keyword={keyword}&sort={sort}&limit={limit}`
   - `POST /admin/parking/import`
@@ -184,6 +198,9 @@
   - `GET /admin/medical/import/status`
   - 주차장, 화장실, 도서관, 대피소, 의료시설 하위 화면을 지연 로딩합니다.
   - 시설 조회/CSV 재적재 응답 shape은 `src/adapters/facilityAdapter.js`에서 정규화하며, 조회 반경/개수는 어댑터에서 서버 한계(`radius_km=0..30`, `limit=1..200`)로 보정합니다.
+  - 시설 키워드 입력은 화면과 adapter에서 60자 이내로 관리하며, 서버도 주차장/화장실 DB `LIKE` 검색 전에 같은 상한으로 정규화합니다.
+  - 도서관 홈페이지 링크는 `normalizeExternalUrl`을 통과한 http(s) URL만 새 탭 링크로 표시하고, unsafe URL은 일반 안내 문구로 대체합니다.
+  - 시설/중간장소 지도 팝업은 외부/공공 데이터 표시 텍스트를 `escapeHtml`로 이스케이프하고, inline handler 인자를 `encodeInlineHandlerArg`로 인코딩한 뒤 Naver InfoWindow HTML에 전달합니다.
   - 시설 반경 조회의 서버 좌표 경계 계산은 공통 helper를 사용하며, 화면 API 계약과 adapter 정규화 shape은 변경하지 않습니다.
   - 주차장/화장실/도서관/대피소 CSV 재적재 후 서버 좌표 보정은 누락 좌표 id를 커서 기반 배치로 처리하며, 화면 API 계약은 변경하지 않습니다.
   - 의료 CSV 재적재 후 서버 좌표 큐 시딩도 누락 좌표 의료기관을 커서 기반 배치로 처리하며, import/status 응답 shape은 변경하지 않습니다.
@@ -197,9 +214,10 @@
 ## 게임
 
 - `/app/all-menu`
-  - 전체 메뉴 허브. `GET /members`로 현재 사용자와 관리자 권한을 확인하고, 화면의 나머지 항목은 `src/App.jsx`의 실제 라우트 링크만 사용합니다.
+  - 전체 메뉴 허브. `GET /members`로 현재 사용자와 관리자 권한을 확인하고, 화면의 나머지 항목은 실제 앱 라우트 링크만 사용합니다.
   - 전용 `npm run smoke:hub-ui`는 관리자 메뉴 노출, 핵심/편의/게임/계정 링크 누락, 데스크톱/모바일 가로 overflow를 확인합니다.
 - `/app/games`
+  - Game manual modal accessibility contract: labelled `aria-modal` dialog, title/description linkage, initial focus on the close button, Escape/backdrop close, and focus return to the launcher after close.
   - 게임 허브. 게임 설명서 모달은 클라이언트 로컬 데이터만 사용합니다.
   - 보드게임 입장 방식은 공통 흐름을 유지합니다: 방 제목 입력, 방 코드 입장, 준비, 방장 시작.
   - 전용 `npm run smoke:hub-ui`는 게임 허브 문구, 카탄 설명서 모달 열기/닫기, 게임 입장 링크, 데스크톱/모바일 가로 overflow를 확인합니다.
@@ -207,7 +225,7 @@
   - `POST /game/dice/roll`
   - `POST /game/dice/reroll`
   - `POST /game/plinko/play`
-  - 화면은 `src/adapters/luckyPlinkoAdapter.js`에서 주사위/플링코 응답 shape과 점수/랭크 라벨을 정규화합니다.
+  - 화면은 `src/adapters/luckyPlinkoAdapter.js`에서 주사위/플링코 응답 shape과 점수/랭크 라벨을 정규화합니다. 첫 굴림 응답의 `total_point`는 100포인트 차감 후 잔액으로 표시합니다.
 - `/app/games/catan`
   - `GET /game/catan/variants`
   - `GET /game/catan/rooms`
@@ -292,12 +310,23 @@
   - `GET /admin/moderation/comments`
   - `PATCH /admin/moderation/comments/{comment-id}`
   - `GET /admin/audits`
-  - `GET /admin/roles/members` (`ROLE_MASTER`)
+  - `GET /admin/roles/members?keyword={keyword}` (`ROLE_MASTER`)
   - `PATCH /admin/roles/members/{member-id}` (`ROLE_MASTER`)
   - `GET /admin/roles/audits` (`ROLE_MASTER`)
   - 화면은 `src/adapters/adminAnomaliesAdapter.js`에서 이상징후/신고/제재/검토/감사/권한 관리 응답 shape과 관리자 payload를 정규화합니다.
+  - 관리자 알림의 `linkUrl`은 `/app` 내부 경로일 때만 카드의 `열기` 액션으로 노출합니다. 읽음 처리는 별도 버튼으로 유지해 stale notification 404 처리와 충돌하지 않습니다.
+  - `모두 읽음`은 중복 클릭을 막고 성공 시 알림/제재 해제 요청 로컬 목록을 즉시 비우며, 실패 시 한국어 토스트로 안내합니다.
+  - 사용자 신고 필터와 상태 변경 버튼은 요청 중 중복 실행을 막고, 지연/실패 상태를 카드 안의 한국어 상태 문구로 표시합니다.
+  - 콘텐츠 검토 필터와 게시글/댓글 숨김·복구 버튼은 요청 중 중복 실행을 막고, 지연/실패 상태를 카드 안의 한국어 상태 문구로 표시합니다.
+  - 회원 제재 필터/제재 목록/제재 해제 요청 패널은 요청 중 중복 실행을 막고, 지연/실패 상태를 카드 안의 한국어 상태 문구로 표시합니다.
+  - 제재 해제 성공 후 해제 요청 목록 새로고침이 실패해도 해제 성공 결과와 목록 갱신 실패 안내를 분리해 운영자가 액션 결과를 오인하지 않도록 처리합니다.
+  - 제재 해제 확인 모달은 `aria-modal` 제목/설명 연결, 숨김 사유 label, Escape/backdrop close, background scroll lock, focus return, shared `focusTrap` Tab 순환을 제공합니다.
+  - 사건 담당자 100자, 사건 메모 4,000자, 관리자 조치 설명 1,000자, 규칙 metric 100자, 신고 처리 메모 2,000자, 제재 생성/해제 사유 500자, 숨김/복구 사유 500자, 역할 변경 사유 300자 경계를 화면과 adapter에서 함께 적용합니다. 규칙 숫자 필드는 finite-positive 값으로 정규화합니다.
   - 권한 안내와 권한 관리 배지는 서버 권한 코드값 대신 한국어 라벨을 표시합니다.
+  - 권한 관리 회원 검색과 새로고침은 요청 중 입력/버튼을 비활성화하고, 지연/실패 상태를 카드 안의 한국어 상태 문구로 표시합니다.
   - `GET /admin/audits?type=ALL&page=1&size=10`은 화면 계약을 유지하며, 서버는 내부 소스별 병합 풀을 제한해 큰 수동 요청의 과도한 DB/JVM 부하를 막습니다.
+  - 감사 목록 요청은 `src/adapters/adminAnomaliesAdapter.js`에서 허용된 감사 type, 1 이상 page, 최대 200건 size로 정규화하고, 응답 page metadata도 비정상 숫자가 UI에 노출되지 않도록 보정합니다.
+  - 감사 type 필터와 권한 변경 이력 새로고침은 요청 중 중복 실행을 막고, 지연/실패 상태를 카드 안의 한국어 상태 문구로 표시합니다.
   - 이상징후 사건, 신고, 제재, 제재 해제 요청, 검토 목록, 권한 목록/감사 목록은 기존 page response shape를 유지하며 서버가 요청 `size`를 최대 50건으로 제한합니다.
   - 운영자 사유/메모 입력은 `src/common/promptAction.jsx` 공통 입력 토스트를 사용합니다.
 - `/app/admin/operations` (`ROLE_ADMIN` 또는 `ROLE_MASTER`)
@@ -305,14 +334,17 @@
   - `GET /admin/moderation/comments`
   - `PATCH /admin/moderation/boards/batch`
   - `PATCH /admin/moderation/comments/batch`
+  - 일괄 숨김 사유는 서버 `AdminModerationDto`와 같은 500자 경계를 화면과 adapter에서 함께 적용합니다.
   - `GET /admin/members/{member-id}`
   - `GET /members/list?keyword={keyword}&page=0&size=20`
+  - 회원 검색어는 화면과 adapter에서 80자 이내로 관리하며, 서버도 DB 이름/이메일 검색 전에 같은 상한으로 정규화합니다.
   - `GET /admin/banners`
   - `POST /admin/banners`
   - `PATCH /admin/banners/{banner-id}`
   - `PATCH /admin/banners/{banner-id}/active`
   - `DELETE /admin/banners/{banner-id}`
   - 화면은 `src/adapters/adminOperationsAdapter.js`에서 검토/배너/회원 상세 응답 shape과 배너 payload를 정규화합니다.
+  - 배너 생성/수정 입력은 서버 `AdminBannerDto` 한계와 같은 title 200자, description 1,000자, URL 500자, CTA 60자, adProvider 30자, adsenseClient 80자, adsenseSlot 40자, priority 0~1,000 경계를 화면과 adapter에서 함께 적용합니다.
   - 검토 목록과 배너 목록은 첫 페이지 50건만 요청하며, 서버도 관리 목록 `size`를 최대 50건으로 제한해 운영 화면의 큰 수동 요청을 방지합니다.
   - 배너 카드의 광고 클라이언트/슬롯 정보와 헤더 권한 배지는 코드형 영문 표기 대신 한국어 라벨을 표시합니다.
   - 회원 상세의 권한, 회원 상태, 제재 상태, 신고 상태는 adapter 라벨 필드를 사용해 서버 코드값을 화면에 직접 표시하지 않습니다.
@@ -324,6 +356,7 @@
   - `DELETE /admin/streaming/videos/{video-id}`
   - 화면은 `src/adapters/streamingAdapter.js`에서 관리자 영상 페이지/inbox 응답 shape과 업로드/반입 payload를 정규화합니다.
   - 웹 업로드와 inbox 반입은 서버 변환 큐 보호를 위해 1회 최대 8개로 제한하며, 화면에서 먼저 한국어 안내를 표시합니다.
+  - `GET /admin/streaming/videos/inbox`는 최신 100개 파일만 반환합니다. 운영 compose inbox 디렉터리가 커져도 화면은 이 bounded list를 기준으로 렌더링해야 합니다.
   - 권한 안내와 영상 처리 상태는 코드값 대신 한국어 라벨을 표시하며, 전용 smoke가 상태/권한 코드 노출을 차단합니다.
 
 ## 실시간
@@ -334,8 +367,11 @@
 ## 2026-05-31 변경 반영
 
 - 공통 페이지별 `?` 도움말 버튼이 추가되었습니다.
+- 공통 페이지별 `?` 도움말 모달은 버튼의 `aria-haspopup/controls/expanded` 상태와 dialog의 제목/설명 연결을 유지하고, 열릴 때 닫기 버튼으로 포커스를 이동한 뒤 닫히면 원래 트리거로 포커스를 복귀합니다.
+- 전역 헤더의 데스크톱 전체 메뉴는 트리거의 `aria-haspopup/controls/expanded` 상태와 dialog 패널의 제목/설명 연결을 유지하고, 열릴 때 닫기 버튼으로 포커스를 이동한 뒤 닫히면 원래 메뉴 버튼으로 포커스를 복귀합니다.
 - 앱 라우트와 시설 하위 화면을 지연 로딩하도록 정리했습니다.
 - 플로팅 채팅을 별도 지연 로딩 청크로 분리하고, 최초 런처 열기 전까지 `FloatingChat` 청크 로드, `/chat/rooms`, `/ws/chat/*` 연결을 지연합니다.
+- 전역 플로팅 채팅 런처는 `aria-haspopup/controls/expanded`로 열린 패널 상태를 알리고, 채팅 패널은 제목/설명과 연결된 dialog로 렌더링됩니다. 열림 시 닫기 버튼으로 포커스를 이동하고 닫힘 시 런처로 포커스를 복귀하며, Escape로 닫을 수 있습니다. 채팅방 생성/초대 오버레이는 `aria-modal` dialog와 제목/설명 연결을 제공합니다.
 - 모바일 플로팅 채팅은 전체 패널이 열린 동안 런처를 숨겨 전송 버튼과 겹치지 않습니다.
 - 관리자 운영/이상징후 화면의 주요 UI 문구를 한국어 중심으로 정리했습니다.
 
@@ -347,11 +383,13 @@
 - `/app`의 AdSense 배너 push는 같은 배너/동의/광고 클라이언트/슬롯 조합에서 한 번만 실행합니다. 같은 광고 배너로 다시 돌아오거나 visibility 상태가 바뀌어도 동일 DOM 슬롯에 반복 push하지 않습니다.
 - `/app` 홈 배너가 여러 개인 경우 자동 전환 일시정지/재생, 이전/다음 버튼, 점 선택을 표시하고, hover/focus/touch 직접 조작 중에는 자동 전환을 멈춥니다. 캐러셀에는 접근성 라벨과 현재 배너 점 표시를 제공하며, 무한 루프용 복제 슬라이드 전환 중에도 실제 화면에 보이는 슬라이드 하나만 활성으로 표시하고 비활성 슬라이드의 CTA는 탭 이동 대상에서 제외합니다. `prefers-reduced-motion` 사용자는 자동 전환이 멈춘 상태로 시작합니다.
 - `/app` 공통 레이아웃의 커스텀 커서는 fine pointer와 일반 모션 환경에서만 렌더링하고, 포인터 이동은 React state가 아니라 DOM ref + `requestAnimationFrame`으로 처리합니다. API 계약 영향은 없습니다.
-- `/app` 공통 하단 내비게이션은 `lg` 미만 뷰포트에서만 렌더링하고 스크롤 리스너를 연결합니다. 데스크톱에서는 보이지 않는 하단 내비게이션 DOM과 리스너를 만들지 않으며, 모바일에는 `aria-label="하단 주요 내비게이션"`을 제공합니다.
+- `/app` 공통 하단 내비게이션은 `BottomNavEntry`가 `lg` 미만 뷰포트에서만 `BottomNav` 청크를 로드하고 스크롤 리스너를 연결합니다. 데스크톱에서는 보이지 않는 하단 내비게이션 DOM, 아이콘 청크, 리스너를 만들지 않으며, 모바일에는 `aria-label="하단 주요 내비게이션"`을 제공합니다.
+- `/app` 공통 커스텀 커서는 `CustomCursorEntry`가 fine pointer + reduced-motion 미설정 환경의 첫 `pointermove` 이후에만 `CustomCursor` 청크를 로드합니다. 모바일/터치/동작 줄이기 환경과 첫 화면 정적 로딩에서는 커서 DOM과 포인터 추적 리스너를 만들지 않습니다.
 - `/app` 홈 배너 자동 전환은 `document.hidden` 상태에서 타이머를 만들지 않습니다. 사용자가 보지 않는 백그라운드 탭에서는 배너 인덱스가 자동으로 이동하지 않아 불필요한 렌더와 노출 흐름을 줄이고, 탭이 다시 보이면 기존 재생/일시정지 상태에 따라 전환을 재개합니다.
 - `/app` 홈 배너 자동 전환은 `IntersectionObserver`로 배너 영역이 화면에 보일 때만 타이머를 유지합니다. 사용자가 최신 게시글 등 하단 영역으로 스크롤해 배너가 오프스크린이 되면 자동 전환을 멈추고, 배너가 다시 보이면 기존 재생/일시정지 상태에 따라 전환을 재개합니다.
 - `/app` 홈 배너 `IMPRESSION` 이벤트와 AdSense push도 같은 배너 가시성 조건을 사용합니다. 오프스크린 배너는 사용자가 다시 배너 영역을 볼 때까지 노출 이벤트와 광고 push 대상에서 제외됩니다.
 - `/app` 홈 배너 `IMPRESSION` 이벤트는 동일 탭의 같은 배너/위치/인증 상태 조합에 대해 30초 중복 전송을 건너뜁니다. 게스트와 로그인 상태는 dedupe 키를 분리해 로그인 직후 회원 노출 분석이 이전 게스트 노출로 누락되지 않게 합니다. 전송 실패 시에는 같은 탭 중복 예약을 해제해 재시도를 허용합니다. 서버도 같은 짧은 창 안의 중복 노출은 배너 조회와 이벤트 저장 전에 억제하며, `CLICK` 이벤트 계약은 유지합니다. 배너 이벤트 전송은 전역 로딩 표시와 분리된 백그라운드 요청입니다. CTA 클릭은 로그인 토큰이 있으면 인증 헤더를 유지하는 axios adapter 경로를 사용하고, 비로그인 클릭은 링크 이동 직전에도 누락 가능성을 줄이도록 keepalive와 `navigator.sendBeacon` fallback을 사용합니다. 배너 CTA URL과 이미지 URL은 `src/adapters/homeAdapter.js`에서 http(s) 외부 URL과 `/` 내부 경로만 허용하고 따옴표/역슬래시/제어 문자를 제외한 뒤 내부 링크를 React Router `Link`, 외부 링크를 새 탭 `a`로 렌더링해 앱 전체 문서 reload를 피하면서 링크 복사/새 탭 열기 같은 기본 브라우저 동작을 유지합니다. 허용되지 않는 URL은 클릭 링크나 배경 이미지로 만들지 않습니다. 이미지 배경은 현재/양옆 슬라이드에만 붙여 먼 배너 이미지가 첫 화면에서 한꺼번에 요청되지 않게 합니다.
+- 서버 `/banners/events`의 `IMPRESSION` 중복 억제 맵은 만료 키를 주기적으로 정리하고 최대 크기도 유지합니다. 클라이언트 payload, 응답 shape, `CLICK` 이벤트 계약은 변경하지 않았습니다.
 - `/app` 홈 통계/최신 게시글/운영 배너 요청은 `src/adapters/homeAdapter.js`에서 section timeout을 적용합니다. 통계 dashboard와 최신 게시글 통합 endpoint가 timeout난 경우에는 split fallback 요청을 추가로 보내지 않아 느린 API가 전체 홈 렌더링과 백엔드 부하를 함께 끌고 가지 않게 합니다.
 - docker compose 운영 nginx upstream은 `spring-backend-blue:8080`과 `spring-backend-green:8080`을 모두 포함합니다. 홈 첫 진입 API fan-out은 한 백엔드 컨테이너에만 고정되지 않고 nginx upstream failover/load balancing과 각 인스턴스의 짧은 캐시를 함께 사용합니다.
 - 서버 `bootJar` 산출물은 compose의 실제 blue/green bind mount 경로인 `C:/compose/backend/blue/app.jar`, `C:/compose/backend/green/app.jar`에도 함께 복사됩니다. 운영 nginx 경유 `/api/stats/dashboard`는 blue/green 재시작 후 200 응답을 반환하며, 클라이언트의 split stats fallback은 순차 배포 중 구버전 백엔드가 섞인 경우를 위한 호환 경로로 유지됩니다.
@@ -362,6 +400,7 @@
 - `/app` 홈 방문자 수는 서버 `VisitorTrackingFilter`의 Redis 집계를 사용하되, Swagger, actuator, webjars, favicon, 정적 assets, 배너 분석 이벤트(`/banners/events`) 같은 운영/문서/분석 경로는 방문자 집계에서 제외합니다. 사용자 화면 접근과 운영 점검/백그라운드 분석 트래픽이 같은 `todayVisitors` 지표에 섞이지 않게 하기 위한 처리입니다.
 - 방문자 집계와 배너 이벤트에 공통으로 쓰이는 서버 `ClientIpResolver`는 프록시 IP 헤더 토큰에서 제어 문자를 제거하고 최대 80자로 제한합니다. 운영 프록시 뒤에서 비정상적으로 긴 `X-Forwarded-For` 값이 Redis visitor key, 대기열 식별자, 배너 이벤트 저장값으로 과도하게 커지지 않도록 하기 위한 방어입니다.
 - 홈 첫 진입의 `/stats/dashboard`, `/boards/latest`, `/banners` 병렬 요청은 같은 방문자 기준으로 서버 `VisitorTrackingFilter`의 로컬 예약을 먼저 통과합니다. 첫 Redis `SADD`가 아직 끝나지 않은 순간에 같은 인스턴스로 들어온 후속 요청도 같은 방문자 키를 보고 Redis 쓰기를 건너뛰도록 해 초기 fan-out에서 방문자 집계 write가 증폭되지 않게 합니다. 단, 첫 Redis 쓰기가 실패하면 로컬 예약을 해제해 다음 요청이 다시 집계를 시도합니다.
+- 서버 `VisitorTrackingFilter`의 로컬 방문자 중복 억제 맵은 만료 키를 주기적으로 정리하고 최대 크기도 유지합니다. 홈 화면 API 계약과 클라이언트 payload는 변경하지 않았습니다.
 - `/app` 홈 첫 방문은 통계/최신 게시글/운영 배너 응답을 기다리는 동안에도 주요 서비스와 섹션별 준비 상태를 먼저 렌더링합니다. API 완료 전 전체 화면 스피너로 홈 진입을 막지 않으며, 통계/게시글/배너 준비 상태는 각 섹션 안에서만 표시합니다.
 - `/app` 홈 데이터 로드는 최종 대시보드 캐시를 유지하면서 통계/최신 게시글/운영 배너 섹션 결과를 도착 순서대로 먼저 반영합니다. 느린 통계 API가 timeout을 기다리는 중에도 빠른 최신 게시글과 운영 배너 결과는 먼저 표시됩니다.
 - `/app` 홈 정상 대시보드 응답은 `src/adapters/homeAdapter.js`에서 20초 메모리 캐시와 in-flight 공유를 적용합니다. 클라이언트 캐시는 최근 16개 사용자/게스트 키로 제한합니다. 같은 사용자/게스트 키로 SPA 화면 이동 후 홈에 빠르게 돌아오는 경우 첫 렌더부터 캐시된 대시보드를 표시해 통계/최신 게시글/운영 배너 API 묶음과 전체 로딩 화면을 반복하지 않고, 사용자가 `다시 불러오기`를 누른 백그라운드 갱신은 캐시를 우회합니다. 진행 중 요청에 뒤늦게 붙은 홈 호출자도 이미 도착한 섹션 스냅샷과 이후 섹션 업데이트를 함께 받아 느린 통계 응답이 빠른 게시글/배너 렌더를 막지 않도록 유지합니다.
@@ -370,10 +409,13 @@
 - `/app` 홈 통계/운영 배너/최신 게시글 섹션은 로딩과 부분 장애 상태를 `aria-busy`, `role=status`, `aria-live`로 노출합니다. 광고 개인화 선택 패널은 `role="dialog"`와 제목/설명 연결을 제공하며, API 계약은 변경하지 않습니다.
 - `/app` 홈 AdSense 개인화 설정은 `ads_personalization_consent` 저장값을 안전하게 읽고, 다른 탭에서 같은 저장값이 변경되거나 삭제되면 `storage` 이벤트로 현재 홈 UI 상태도 동기화합니다. 배너 API와 이벤트 payload 계약은 변경하지 않습니다.
 - `/app` 전역 플로팅 채팅은 사용자가 런처를 열기 전까지 전체 채팅 청크, 채팅방 REST 조회, STOMP/SockJS 연결을 시작하지 않습니다. 홈 스모크는 첫 화면 렌더 직후 `FloatingChat` 청크, `/chat/rooms`, `/ws/chat/info`가 호출되지 않는지 확인합니다.
+- 앱 진입점 `src/main.jsx`는 production 빌드에서 `src/utils/consoleGuard.js`를 설치해 브라우저 콘솔 원문 로그를 기본 차단합니다. 운영 장애 대응 시에는 `?debug_console=1` 또는 `localStorage.ctfmon_debug_console=1`로만 일시적으로 콘솔을 열 수 있습니다.
+- `src/App.jsx`는 `src/common/AppErrorBoundary.jsx`로 앱 셸을 감싸 라우트 렌더링 예외가 빈 화면으로 끝나지 않게 합니다. fallback은 한국어 복구 안내와 다시 시도/새로고침/홈 이동 액션을 제공하고, `location.pathname` 변경 시 boundary 상태를 초기화합니다.
 - `/app` 홈 화면의 통계/최신 게시글/배너 병렬 요청은 `AbortController` 신호를 어댑터까지 전달해 이전 요청이 늦게 끝나도 최신 화면 상태를 덮어쓰지 않게 합니다.
 - `/app` 홈 화면은 통계 요청만 실패하고 최신 게시글/배너가 정상인 부분 장애에서 전체 오류 화면으로 전환하지 않고, 통계 영역에 지연 문구와 재시도 버튼을 표시합니다.
 - `/app` 홈 화면은 최신 게시글 최신 API와 legacy fallback이 모두 실패한 경우 실제 빈 목록과 구분해 게시글 지연 문구와 재시도 버튼을 표시합니다.
 - `/app` 홈 화면은 운영 배너 요청이 실패한 경우 fallback 배너를 유지하되, 배너 영역에 지연 문구와 재시도 버튼을 표시합니다.
+- `/app` 홈 화면의 운영 배너 초기 로딩 배지는 미구현처럼 읽히는 일반 `준비 중` 대신 `운영 배너 불러오는 중`으로 표시합니다.
 - `/app` 홈 화면의 부분 장애 재시도 버튼은 전체 홈을 로딩 화면으로 바꾸지 않고 현재 콘텐츠를 유지한 채 백그라운드로 대시보드를 다시 요청합니다. 재시도 중 새로 실패한 섹션은 이미 정상 렌더링된 통계/최신 게시글/운영 배너를 빈 상태나 fallback으로 덮어쓰지 않습니다.
 - `/app` 홈 화면은 최신 게시글이 없는 경우에도 빈 상태 UI를 표시합니다.
 - `/app` 최신 게시글 카드는 `created_at`/`createdAt`을 어댑터의 `createdAt`으로 정규화한 뒤 한국어 상대시간으로 표시합니다.
@@ -384,10 +426,11 @@
 - 홈 실제 런타임 전용 `npm run smoke:home-runtime` 검증은 Docker compose nginx에서 서빙되는 `/app`과 실제 `/api/stats/dashboard`, `/api/boards/latest`, `/api/banners` 응답을 사용합니다. 보호 라우트 진입용 `/api/members`만 브라우저 CDP에서 합성 응답으로 처리하고, 한국어 문구, `aria-busy` 해제, 부분 장애 문구 미노출, unsafe URL 미렌더링, 데스크톱/모바일 가로 오버플로를 확인합니다.
 - 홈 정적 자산 전용 `npm run smoke:home-assets` 검증은 Docker compose nginx가 `/app` HTML을 immutable 캐시로 서빙하지 않고, Vite 해시 CSS/JS 자산에는 장기 immutable 캐시, gzip, `Vary: Accept-Encoding`, `nosniff` 헤더를 반환하는지 확인합니다.
 - 홈 성능 예산 전용 `npm run smoke:home-performance` 검증은 Docker compose nginx에서 `/app`을 headless Chrome으로 열고 첫 화면 준비 시간, DOMContentLoaded/load 시간, 로컬 JS/CSS 전송량을 예산 기준으로 확인합니다.
+- 공개 인증 성능 예산 전용 `npm run smoke:auth-performance` 검증은 Docker compose nginx에서 `/login`을 headless Chrome으로 열고 공개 인증 셸의 로컬 JS/CSS 전송량과 보호 앱 청크 미요청 상태를 확인합니다.
 - 홈 API 부하 전용 `npm run smoke:home-api-load` 검증은 Docker compose nginx를 통해 `/api/stats/dashboard`, `/api/boards/latest`, `/api/banners`를 기본 100개 동시 fan-out으로 호출하고, 모든 응답 200 및 p95 지연 기준을 확인합니다.
 - `/queue` 화면의 응답 정규화를 `src/adapters/queueAdapter.js`로 분리하고, 서버 제공 polling 간격을 기준으로 대기 상태를 재조회합니다.
 - `/login`과 OAuth 콜백 이후 대기열 응답도 `src/adapters/queueAdapter.js`를 사용해 `WAITING/BLOCKED` 상태를 같은 방식으로 처리합니다.
-- `/login`과 `/register`의 로그인, 회원가입, 이메일 인증, 제재 해제 요청은 `src/adapters/authAdapter.js`를 경유하며, 전용 `npm run smoke:auth-ui`로 로그인 이동과 이메일 인증 회원가입 흐름을 확인합니다.
+- `/login`과 `/register`의 로그인, 회원가입, 이메일 인증, 제재 해제 요청은 `src/adapters/authAdapter.js`를 경유하며, 전용 `npm run smoke:auth-ui`로 OAuth 실패 쿼리 정리, 계정 제재 안내/해제 요청 모달, 로그인 이동, 이메일 인증 회원가입 흐름을 확인합니다.
 - `/app/boards/:kind` 목록은 배열 응답 body를 유지하면서 pagination 헤더를 읽어 전체 페이지 수를 계산합니다.
 - `/app/boards/:kind`와 `/app` 최신 게시글 카드의 목록형 `contents`는 첫 이미지와 짧은 요약만 포함되므로, 화면은 카드 렌더링에만 사용하고 전체 본문은 상세 API에서 조회합니다.
 - `/app/boards/:kind`와 `/app/mypage` 작성글 목록은 서버가 요청 `size`를 최대 50개로 보정하고, 게시글 랭킹은 최대 20개로 보정합니다.
@@ -395,37 +438,95 @@
 - `/app/boards/:kind`와 `/app/boards/:kind/:boardId`의 게시글 액션 API 호출은 `src/adapters/boardAdapter.js`로 분리했습니다.
 - 게시글/댓글 화면의 에러 메시지 추출도 `boardAdapter`/`commentAdapter`에서 처리해 화면/훅이 오류 응답 shape을 직접 파싱하지 않습니다.
 - `/app/boards/:kind`의 목록 응답/pagination 헤더 정규화도 `src/adapters/boardAdapter.js`로 이동했으며, 전용 `npm run smoke:boards-ui`로 목록/탭/반응형 overflow를 확인합니다.
+- `/app/boards/:kind` 검색어는 화면/adapter/server에서 80자 이내로 정규화하고, `npm run smoke:boards-ui`가 검색 입력 `maxLength`와 안내 문구를 확인합니다.
+- `/app/boards/:kind`와 `/app/boards/:kind/:boardId`의 검색/댓글 입력 안내와 빈 목록 문구는 한국어 중심의 자연스러운 톤으로 유지하며, `smoke:boards-ui`와 `smoke:text-quality`로 회귀를 확인합니다.
 - 뉴스/통계/할 일/마이페이지의 오류 메시지와 재인증 필요 코드 판별은 각 도메인 어댑터 헬퍼가 처리하며, page/component/hook/context 계층은 오류 응답 구조를 직접 읽지 않습니다.
 - `/app/boards/:kind/new`와 `/app/boards/:kind/:boardId/edit`은 CDN Quill 의존을 제거하고 로컬 에디터와 `boardAdapter` 저장 경로를 사용합니다.
-- `/app/boards/:kind/:boardId`의 게시글/댓글 신고 입력은 브라우저 prompt 대신 앱 내부 모달로 처리합니다.
+- `/app/boards/:kind/new`와 `/app/boards/:kind/:boardId/edit` 제목 입력은 100자 제한과 카운터를 표시하고, 본문은 서버 저장 제한에 맞춰 100,000자 카운터와 저장 전 차단을 제공합니다. `smoke:boards-ui`가 작성 화면 제한을 확인합니다.
+- `/app/boards/:kind/:boardId`의 게시글/댓글 신고 입력은 브라우저 prompt 대신 앱 내부 모달로 처리하며, 키보드 사용자는 열림 시 사유 입력에 바로 진입하고 닫힌 뒤 원래 신고 버튼으로 돌아옵니다. 보조기술은 제목/설명/입력 라벨을 연결된 dialog로 인식합니다.
 - `/app/boards/:kind/:boardId`는 댓글 작성/삭제 후 내부 갱신에 `trackView=false`를 사용해 조회수 오염을 막습니다.
-- `/app/boards/:kind/:boardId` 댓글 목록은 API adapter를 통해 페이지 정보를 읽고 `더 보기` 방식으로 렌더링합니다.
-- `/app/admin/anomalies`의 조치 설명, 신고 메모, 숨김/복구 사유, 역할 변경 사유 입력은 브라우저 prompt 대신 앱 내부 입력 토스트로 처리합니다.
+- `/app/boards/:kind/:boardId` 댓글 목록은 API adapter를 통해 페이지 정보를 읽고 `더 보기` 방식으로 렌더링하며, 삭제 확인 모달이 열린 시점부터 해당 댓글 액션을 잠가 중복 확인/중복 삭제 요청을 막습니다.
+- `/app/admin/anomalies`의 사건 담당자/메모, 조치 설명, 규칙 metric, 신고 메모, 제재 생성/해제 사유, 숨김/복구 사유, 역할 변경 사유 입력은 브라우저 prompt 대신 앱 내부 입력 토스트/폼으로 처리하고 서버 DTO 길이 제한과 같은 경계를 적용합니다. 규칙 숫자 필드는 finite-positive 값으로 정규화합니다.
 - `/app/admin/anomalies`의 대시보드 병렬 조회, 사건 조치, 신고/제재/검토/권한 변경, CSV 다운로드는 `src/adapters/adminAnomaliesAdapter.js`를 경유합니다.
+- `/app/admin/anomalies`의 이상징후 즉시 조치 버튼은 조치 prompt/API 처리 중 같은 사건의 중복 조치를 막고, 성공/실패를 한국어 토스트로 안내합니다.
 - `/app/admin/anomalies`의 CSV 다운로드는 서버의 최신 5,000건 export window 안에서 처리되며, 화면은 다운로드 중 버튼을 비활성화하고 성공/실패 토스트를 표시합니다.
 - `/app/admin/anomalies`의 사건 상세 타임라인은 서버의 최신 100개 조치 로그 window를 사용해 오래된 사건의 상세 조회도 일정한 크기로 유지합니다.
-- `/app/admin/anomalies`는 전용 `npm run smoke:admin-anomalies-ui`로 대시보드 주요 섹션, 사건 상세 조회, 권한 이력의 `ROLE_*` 코드 미노출, 데스크톱/모바일 overflow를 확인합니다.
-- `/app/todos`의 할 일 조회/생성/수정/삭제는 `src/adapters/todoAdapter.js`를 경유하며, 전용 `npm run smoke:todo-ui`로 한국어 문구, 생성 동작, 제목 길이 카운터, 반응형 overflow를 확인합니다.
+- `/app/admin/anomalies`의 관리자 알림 읽음 처리는 중복 클릭을 막고, 이미 삭제/처리된 알림의 `ADMIN_NOTIFICATION_NOT_FOUND` 404 응답은 stale local state로 간주해 목록에서 제거하고 한국어 안내를 표시합니다.
+- `/app/admin/anomalies`는 전용 `npm run smoke:admin-anomalies-ui`로 대시보드 주요 섹션, 사건 상세 조회, 알림 읽음 stale-state 처리, 회원/권한 검색 입력 경계, 권한 이력의 `ROLE_*` 코드 미노출, 데스크톱/모바일 overflow를 확인합니다.
+- `/app/todos`의 할 일 조회/생성/수정/삭제는 `src/adapters/todoAdapter.js`를 경유하며, 전용 `npm run smoke:todo-ui`로 한국어 문구, 생성 동작, 제목 길이 카운터, 응답 500개 제한 안내, 액션 중복 방지 가드, 반응형 overflow를 확인합니다.
 - `/app/statistics`의 요약/방문자 비교/기간 추이 조회는 `src/adapters/statsAdapter.js`를 경유하며, 전용 `npm run smoke:stats-ui`로 한국어 문구, 기간 변경, 반응형 overflow를 확인합니다.
 - `/app/statistics` 기간 추이 응답 shape은 유지되며, 서버는 게시글/댓글 일별 카운트를 일수별 반복 count 대신 DB aggregate query로 계산합니다.
 - `/app`과 `/app/statistics`의 방문자 수 표시는 기존 adapter 정규화 계약을 유지하고, 서버는 동일 방문자의 짧은 시간 내 반복 호출 Redis 쓰기를 억제합니다. Redis 쓰기 실패 후에는 서버가 로컬 예약을 해제해 다음 요청이 재시도되며, Redis visitor count 조회 실패 시에는 방문자 수만 `0`으로 낮춰 응답합니다.
 - `/app/news`의 뉴스 검색은 `src/adapters/newsAdapter.js`를 경유하며, 전용 `npm run smoke:news-ui`로 한국어 문구, 검색 동작, 반응형 overflow를 확인합니다.
+- `/app/news` 검색어는 화면과 어댑터에서 60자 이내로 관리되며, 서버도 외부 네이버 뉴스 API 호출 전에 같은 길이로 정규화하고 60초 캐시 키 개수를 제한합니다.
 - `/app/ranks`의 게시판/레벨/기부 랭킹은 `src/adapters/ranksAdapter.js`를 경유하며, 전용 `npm run smoke:ranks-ui`로 한국어 문구, 탭 전환, 반응형 overflow를 확인합니다.
-- `/app/streaming`의 영상 목록/재생 정보는 `src/adapters/streamingAdapter.js`를 경유하며, 전용 `npm run smoke:streaming-ui`로 한국어 문구, 재생 화면 전환, 반응형 overflow를 확인합니다.
+- `/app/streaming`의 영상 목록/재생 정보는 `src/adapters/streamingAdapter.js`를 경유하며, 전용 `npm run smoke:streaming-ui`로 한국어 문구, 재생 화면 전환, 반응형 overflow, HLS 런타임 지연 로드를 확인합니다.
 - `/app/admin/streaming`의 관리자 영상 페이지 목록/업로드/inbox 반입/삭제는 `src/adapters/streamingAdapter.js`를 경유하며, 전용 `npm run smoke:admin-streaming-ui`로 한국어 상태/권한 라벨, 주요 액션 연결, 반응형 overflow를 확인합니다.
 - `/app/admin/anomalies`의 권한 안내, 권한 관리 배지, 권한 변경 이력은 `ROLE_*` 코드값 대신 한국어 라벨을 표시합니다.
-- `/app/admin/operations`의 일괄 검토/배너/회원 상세는 `src/adapters/adminOperationsAdapter.js`를 경유하며, 전용 `npm run smoke:admin-operations-ui`로 한국어 상태 라벨, 주요 액션 연결, 반응형 overflow를 확인합니다.
+- `/app/admin/operations`의 일괄 검토/배너/회원 상세는 `src/adapters/adminOperationsAdapter.js`를 경유하며, 전용 `npm run smoke:admin-operations-ui`로 회원 검색 입력 경계, 일괄 숨김 사유 500자 경계, 배너 입력 경계, 한국어 상태 라벨, 주요 액션 연결, 반응형 overflow를 확인합니다.
 - `/app/admin/operations`의 회원 상세 권한/상태/제재/신고 표시는 adapter의 한국어 라벨 필드를 사용하며, 전용 smoke가 `ROLE_*`, `MEMBER_*`, `PENDING/ACTIVE` 코드 노출을 차단합니다.
-- `/app/plinko`의 주사위/플링코 실행은 `src/adapters/luckyPlinkoAdapter.js`를 경유하며, 전용 `npm run smoke:plinko-ui`로 한국어 랭크/토스트, 캔버스 렌더링, 반응형 overflow를 확인합니다.
+- `/app/plinko`의 주사위/플링코 실행은 `src/adapters/luckyPlinkoAdapter.js`를 경유하며, 전용 `npm run smoke:plinko-ui`로 한국어 랭크/토스트, 차감/획득 후 포인트 잔액, 캔버스 렌더링, 반응형 overflow를 확인합니다.
 - `/app/games/no-thanks`의 방 목록/생성/설정/상태 조회는 `src/adapters/noThanksGameAdapter.js`를 경유하며, 전용 `npm run smoke:no-thanks-ui`로 서버 snake_case 응답 정규화와 반응형 overflow를 확인합니다.
 - `/app/games/las-vegas`의 방 목록/생성/설정/상태/카지노 조회는 `src/adapters/lasVegasGameAdapter.js`를 경유하며, 전용 `npm run smoke:las-vegas-ui`로 서버 snake_case 응답 정규화와 반응형 overflow를 확인합니다.
 - `/app/games/{catan,blokus,mahe,dalmuti}`의 variants/rooms/state와 방 join/settings/action 요청은 `src/adapters/tabletopGameAdapter.js`를 경유하며, 기존 `npm run smoke:tabletop-ui`로 서버 snake_case 응답 정규화와 반응형 overflow를 확인합니다.
-- `/app/mypage`와 `/app/mypage/edit`은 `src/adapters/mypageAdapter.js`를 경유하며, 전용 `npm run smoke:mypage-ui`로 한국어 문구, 탭 전환, 프로필 수정 화면, 반응형 overflow를 확인합니다.
+- `/app/mypage`와 `/app/mypage/edit`은 `src/adapters/mypageAdapter.js`를 경유하며, 전용 `npm run smoke:mypage-ui`로 한국어 문구, 탭 전환, 회원 탈퇴 모달 접근성 계약, 프로필 수정 화면, 반응형 overflow를 확인합니다.
 - `/app/all-menu`과 `/app/games` 허브는 전용 `npm run smoke:hub-ui`로 관리자 메뉴 노출, 라우트 링크 누락, 게임 설명서 모달, 데스크톱/모바일 overflow를 확인합니다.
-- `/app/chat`과 전역 플로팅 채팅은 `src/adapters/chatAdapter.js`를 경유하며, 전용 `npm run smoke:chat-ui`와 홈 화면 스모크로 한국어 문구, 채팅방 검색/진입, STOMP 대기 중 기록/멤버 선조회, 초대 모달, 메시지 입력 2,000자 제한/카운터, STOMP 인증 헤더 구성, 반응형 overflow를 확인합니다.
-- `/app/facility`의 시설 하위 조회와 관리자 CSV 재적재는 `src/adapters/facilityAdapter.js`를 경유하며, 전용 `npm run smoke:facility-ui`로 하위 탭 전환, 지도 mock 렌더링, 반응형 overflow를 확인합니다.
+- `/app/chat`과 전역 플로팅 채팅은 `src/adapters/chatAdapter.js`를 경유하며, 전용 `npm run smoke:chat-ui`와 홈 화면 스모크로 한국어 문구, 채팅방 검색/진입, STOMP 대기 중 기록/멤버 선조회, 초대 모달, 회원 검색 80자 제한, 메시지 입력 2,000자 제한/카운터, STOMP 인증 헤더 구성과 런타임 지연 로딩, 반응형 overflow를 확인합니다.
+- `/app/chat`의 채팅방 생성/초대 오버레이는 `aria-modal` dialog와 제목/설명 연결, 라벨-입력 연결, 닫기 버튼 초기 포커스, Escape/배경 클릭 닫기, 닫힌 뒤 이전 포커스 복귀를 제공합니다.
+- `/app/facility`의 시설 하위 조회와 관리자 CSV 재적재는 `src/adapters/facilityAdapter.js`를 경유하며, 전용 `npm run smoke:facility-ui`로 하위 탭 전환, 주소/키워드 입력 경계, 지도 mock 렌더링, 반응형 overflow를 확인합니다.
 - 가입/프로필 수정/시설/중간장소 화면의 공용 주소 자동완성/지오코딩은 `src/adapters/addressSearchAdapter.js`를 경유합니다.
+- 공용 주소 자동완성/지오코딩 입력은 `ADDRESS_QUERY_MAX_LENGTH=120`을 공유하고, 전용 시설 스모크에서 `AddressSearchBox`의 `maxLength`와 안내 문구를 확인합니다.
+- Daum 우편번호 창은 `src/utils/daumPostcodeLoader.js` 공통 로더를 사용하며, 명시적 `https://` URL과 timeout으로 외부 스크립트 대기를 제한합니다.
 - `/app/optimizer`의 중간장소 계산은 `src/adapters/optimizerAdapter.js`를 경유하며, 전용 `npm run smoke:optimizer-ui`로 주소 선택, 계산 결과, 지도 mock 렌더링, 반응형 overflow를 확인합니다.
 - `/app/invest`의 투자 분석/차트/종목 추천은 `src/adapters/investAdapter.js`를 경유하며, 전용 `npm run smoke:invest-ui`로 분석 결과, 차트 주기 전환, 추천 레이어, 반응형 overflow를 확인합니다.
+- `/app/invest`의 분석/차트/종목 추천 API는 서버에서 외부 DART/KIS/SEC 호출 전에 입력을 정리하고 크기를 제한합니다. `symbol`은 20자, 검색 `query`는 80자, 차트 `interval`은 10자를 넘으면 표준 오류 응답을 반환하며, 정상 응답 shape은 변경하지 않았습니다.
+- `/app/invest` 화면도 같은 상한을 사용해 종목 검색 입력에 `maxLength=80`과 안내 문구를 제공하고, 분석 시작 전 선택 종목코드가 20자를 넘으면 요청하지 않습니다.
 - 2026-06-01 game mapping note: `/app/games` renders one player-count sorted game section. The sort key is `minPlayers`, then `maxPlayers`, with stable registration order for exact ties; `npm run smoke:hub-ui` asserts the visible card order and absence of the old new/existing group labels.
 - 2026-06-01 realtime mapping note: `/app/games/las-vegas`, `/app/games/no-thanks`, and `/app/games/{catan,blokus,mahe,dalmuti}` bind realtime subscriptions only after a REST state refresh, refresh STOMP auth headers through `beforeConnect`, and rebind the latest active room after reconnect. Their dedicated smoke scripts include source assertions for this reconnect guard.
+- 2026-06-02 map-loader note: `/app/facility` and `/app/optimizer` use `src/utils/naverMapsLoader.js` to load the Naver Maps SDK only when those map screens mount. The SDK is not declared in `index.html`, keeping `/app` initial HTML parsing and home load timing independent from the external map provider.
+- 2026-06-02 facility-infowindow note: `/app/facility` and `/app/optimizer` keep Naver InfoWindow templates behind `escapeHtml`/`encodeInlineHandlerArg`; `smoke:facility-ui` asserts the source-level boundary before browser rendering.
+- 2026-06-02 postcode-loader note: `src/common/AddressSearchBox.jsx` and `/app/optimizer` share `src/utils/daumPostcodeLoader.js`, so postcode script loading keeps one explicit HTTPS source, one in-flight promise, and a bounded timeout.
+- 2026-06-02 address-combobox note: `src/common/AddressSearchBox.jsx` exposes the shared address suggest input as an ARIA combobox/listbox with active option state, ArrowUp/ArrowDown navigation, Enter selection, Escape close, and IME composition guards. `smoke:facility-ui` keeps this source-level contract covered for signup/profile/facility/optimizer address flows.
+- 2026-06-02 route-split note: `/login`, `/register`, and `/queue` are route-level lazy chunks in `src/App.jsx`. Protected `/app` route definitions live in `src/components/ProtectedRoutes.jsx`, so public access visitors do not receive protected home/board/game/admin/facility import maps in the initial app-shell chunk. `smoke:auth-ui` and `smoke:navigation-routes` keep the public flows and static `/app` links covered.
+- 2026-06-02 realtime-runtime note: `/app/games/{catan,blokus,mahe,dalmuti}` keeps REST state loading before realtime binding, but `src/pages/games/TabletopGame.jsx` no longer statically imports `sockjs-client` or `@stomp/stompjs`. It calls `createStompClient` from `src/adapters/realtimeAdapter.js` only when a room socket is needed, and `smoke:tabletop-ui` asserts this source-level guard.
+- 2026-06-02 facility-bound note: `/app/facility` keyword inputs use `FACILITY_KEYWORD_MAX_LENGTH=60`, and `facilityAdapter` applies the same normalization before sending parking/restroom keyword filters to the backend.
+- 2026-06-02 realtime-runtime note: `/app/games/las-vegas` and `/app/games/no-thanks` also call `createStompClient` only when a selected room needs realtime game/chat subscriptions. `smoke:las-vegas-ui` and `smoke:no-thanks-ui` assert that their route components do not reintroduce static STOMP runtime imports.
+- 2026-06-02 streaming-runtime note: `/app/streaming` keeps `hls.js/light` out of the list-screen route load. `smoke:streaming-ui` now asserts the source-level dynamic import and the browser network behavior: no HLS runtime request before selecting a video, then a runtime request after playback starts when native HLS is unavailable.
+- 2026-06-02 realtime-runtime note: `/app/chat` and `src/components/FloatingChat.jsx` use `createStompClient` for chat sockets instead of static `sockjs-client`/`@stomp/stompjs` imports. `smoke:chat-ui` asserts the source-level guard so chat UI changes do not pull the realtime runtime back into the route/UI chunks.
+- 2026-06-02 chat-toast-runtime note: `/app/chat` and `src/components/FloatingChat.jsx` use `src/utils/toast.js` dynamic notification helpers for chat success/error notices. `smoke:chat-ui` guards against static `react-hot-toast` imports in the full chat route and floating chat UI chunks.
+- 2026-06-02 chat-send-failure note: `/app/chat` and `src/components/FloatingChat.jsx` show Korean feedback for no-room and realtime-not-ready send attempts. Both remove optimistic temporary messages after publish failures, and floating chat refreshes room previews so a failed send does not leave stale last-message text.
+- 2026-06-02 chat contract note: `POST /chat/room` uses `member_ids` from `src/adapters/chatAdapter.js`; the server keeps `memberIds` as a compatibility alias. Chat room creation and `POST /chat/room/{roomId}/invite` reject more than 50 raw invite IDs, dedupe repeated IDs, skip self IDs, and keep room titles within 120 characters.
+- 2026-06-02 member-search-bound note: `/app/chat`, floating chat, `/app/admin/anomalies`, and `/app/admin/operations` share `MEMBER_SEARCH_KEYWORD_MAX_LENGTH=80`; adapters normalize whitespace before `/members/list` and `/admin/roles/members` requests.
+- 2026-06-02 streaming-admin note: `/app/admin/streaming` inbox scan consumes `GET /admin/streaming/videos/inbox`, whose response is capped to the latest 100 files. Import remains explicit by `file_names`, so operators can still import a selected ready file without triggering a full inbox metadata rescan.
+- 2026-06-02 streaming-cache note: `/app/streaming` consumes `GET /streaming/videos?page=&size=`, whose ready-video server cache is short-lived and bounded to 64 page/size keys per backend instance. Client pagination should continue to request sequential pages through the adapter instead of speculative random page probes.
+- 2026-06-02 action-dialog note: shared `confirmAction` and `promptAction` toasts are the approved replacement for blocking browser dialogs. They keep Korean copy, initial focus, Tab focus trapped inside modal controls, Escape cancel, focus return to the invoking control, and ARIA title/description/input wiring for destructive and admin reason-entry flows.
+- 2026-06-02 modal-focus note: `src/common/PageGuideButton.jsx` and the global desktop header menu trap Tab/Shift+Tab focus inside the open modal panel while preserving Escape close and focus return to the launcher.
+- 2026-06-02 modal-focus note: `src/utils/focusTrap.js` is shared by report, mypage delete-account, full chat create/invite, floating chat panel, and floating chat create/invite dialogs to keep keyboard focus inside the active overlay.
+- 2026-06-02 modal-focus note: `src/utils/focusTrap.js` is the single shared focus-trap helper for both DOM containers and direct control arrays, so page guide, header menu, report, delete-account, chat, floating chat, admin sanction release, confirm, and prompt overlays share the same Tab/Shift+Tab behavior.
+- 2026-06-02 header-runtime note: `src/components/Header.jsx` lazy-loads `src/components/HeaderMenuDialog.jsx`, so the desktop full-menu route list, menu-only icons, and focus-trap listeners are requested only after the menu launcher is activated. `smoke:home-ui` guards that the menu chunk is not loaded during the initial `/app` home shell.
+- 2026-06-02 page-guide-runtime note: `src/common/PageGuideButton.jsx` lazy-loads `src/common/PageGuideDialog.jsx`, so the help dialog UI, dialog-only icons, focus-trap wiring, and `pageGuides` data are requested only after the `?` launcher is activated. `smoke:home-ui` guards that the page-guide chunks are not loaded during the initial `/app` home shell.
+- 2026-06-02 page-guide-entry-runtime note: `src/components/ProtectedAppLayout.jsx` mounts `src/common/PageGuideButtonEntry.jsx`, which lazy-loads `src/common/PageGuideButton.jsx` only after a user enters the protected app. Public `/login`, `/register`, and `/queue` shells do not request the launcher icon/state code, while the existing dialog/data click-load boundary remains guarded by `smoke:home-ui`.
+- 2026-06-02 network-indicator-runtime note: `src/App.jsx` mounts `src/components/GlobalNetworkIndicatorEntry.jsx`, which subscribes to the shared network activity counter and lazy-loads `src/components/GlobalNetworkIndicator.jsx` only after a tracked request starts. `smoke:home-ui` guards that the accessible request-progress affordance remains intact without statically importing the indicator UI into the app shell.
+- 2026-06-02 loading-spinner-runtime note: `src/components/LoadingSpinner.jsx` uses a CSS-only spinner for app Suspense/page fallback states, so `Loader2` and its icon runtime are no longer statically pulled into the app shell. `smoke:home-ui` guards the CSS spinner and accessible status semantics.
+- 2026-06-02 protected-routes-runtime note: `src/App.jsx` keeps only public access routes and the lazy `/app/*` entry. `src/components/ProtectedRoutes.jsx` owns protected route definitions plus `ProtectedAppLayout` lazy loading, keeping protected screen import maps out of the public auth shell while `smoke:navigation-routes`, `smoke:page-guides`, `smoke:auth-ui`, and `smoke:home-ui` guard the boundary.
+- 2026-06-02 auth-performance-runtime note: `smoke:auth-performance` guards the same public shell boundary at runtime by opening `/login` through nginx, enforcing a 130KiB local JS/CSS transfer budget, and failing if protected route/layout/home/board/game/admin/page-guide/bottom-nav visibility chunks are requested before an auth action.
+- 2026-06-02 bottom-nav-runtime note: `src/components/ProtectedAppLayout.jsx` mounts `src/components/BottomNavEntry.jsx`, which loads `src/components/BottomNav.jsx` only for `max-width: 1023px` protected app viewports. `smoke:home-ui` guards that the BottomNav chunk is not requested during the desktop initial `/app` shell while mobile still renders the bottom navigation.
+- 2026-06-02 custom-cursor-runtime note: `src/components/ProtectedAppLayout.jsx` mounts `src/components/CustomCursorEntry.jsx`, which loads `src/components/CustomCursor.jsx` only after fine-pointer users move the pointer. `smoke:home-ui` guards that the custom cursor chunk is not requested during the initial `/app` shell.
+- 2026-06-02 toast-runtime note: `src/App.jsx` mounts `src/common/ToastViewportEntry.jsx`, which loads `src/common/ToastViewport.jsx` after idle time. `src/contexts/AuthContext.jsx` and `src/utils/api.js` use `src/utils/toast.js` dynamic notification helpers, so `react-hot-toast` is not part of the initial app shell while success/error toast behavior stays unchanged.
+- 2026-06-02 board-toast-runtime note: `src/common/confirmAction.jsx` and `src/common/promptAction.jsx` call `loadToast()` only when an action dialog opens. `src/pages/boards/BoardList.jsx`, `src/pages/boards/BoardDetail.jsx`, `src/components/Comments.jsx`, and `src/common/AddressSearchBox.jsx` use dynamic toast helpers for simple success/error notices, so common board browsing no longer statically requests the toast runtime.
+- 2026-06-02 board-form-toast-runtime note: `src/pages/boards/BoardForm.jsx` uses `src/utils/toast.js` dynamic notification helpers for form validation/save feedback and `notifyLoading` for inline image upload progress. `smoke:boards-ui` guards against reintroducing static `react-hot-toast` imports while keeping the image upload loading toast update behavior.
+- 2026-06-02 game-toast-runtime note: `/app/plinko`, `/app/games/las-vegas`, `/app/games/no-thanks`, and `/app/games/{catan,blokus,mahe,dalmuti}` use `src/utils/toast.js` dynamic notification helpers. Their route smoke scripts guard against reintroducing static `react-hot-toast` imports while keeping existing success/error/plain toast behavior.
+- 2026-06-02 todo-toast-runtime note: `/app/todos` uses `src/utils/toast.js` dynamic notification helpers for success/error notices. `smoke:todo-ui` guards against reintroducing static `react-hot-toast` imports while keeping create/update/delete/fetch failure feedback unchanged.
+- 2026-06-02 stats-toast-runtime note: `/app/statistics` uses `src/utils/toast.js` dynamic notification helpers for trend fetch failure notices. `smoke:stats-ui` guards against reintroducing static `react-hot-toast` imports while keeping the existing trend error feedback unchanged.
+- 2026-06-02 mypage-toast-runtime note: `/app/mypage` and `/app/mypage/edit` use `src/utils/toast.js` dynamic notification helpers for profile, withdrawal, password, upload, and address feedback. `smoke:mypage-ui` guards against reintroducing static `react-hot-toast` imports while keeping existing user feedback unchanged.
+- 2026-06-02 invest-toast-runtime note: `/app/invest` uses `src/utils/toast.js` dynamic notification helpers for chart and analysis feedback. `smoke:invest-ui` guards against reintroducing static `react-hot-toast` imports while keeping existing Korean feedback unchanged.
+- 2026-06-02 admin-streaming-toast-runtime note: `/app/admin/streaming` uses `src/utils/toast.js` dynamic notification helpers for upload/inbox/delete feedback. `smoke:admin-streaming-ui` guards against reintroducing static `react-hot-toast` imports while keeping the delete loading toast update behavior.
+- 2026-06-02 admin-operations-toast-runtime note: `/app/admin/operations` uses `src/utils/toast.js` dynamic notification helpers for moderation, member lookup, and banner feedback. `smoke:admin-operations-ui` guards against reintroducing static `react-hot-toast` imports while keeping banner activation/deletion loading toast update behavior.
+- 2026-06-02 admin-anomalies-toast-runtime note: `/app/admin/anomalies` uses `src/utils/toast.js` dynamic notification helpers for dashboard fetch failures, incident/report/moderation/role actions, notification reads, sanctions, and report downloads. `smoke:admin-anomalies-ui` guards against reintroducing static `react-hot-toast` imports while keeping sanction/report-download loading toast update behavior.
+- 2026-06-02 facility-toast-runtime note: `/app/facility` tab screens and `/app/optimizer` use `src/utils/toast.js` dynamic notification helpers, including `notifyLoading` for current-location progress toasts. `smoke:facility-ui` and `smoke:optimizer-ui` guard against reintroducing static `react-hot-toast` imports while keeping location/address/search/CSV feedback unchanged.
+- 2026-06-02 home-adsense-runtime note: `/app` renders AdSense banner slots from `Home.jsx`, but consent UI, localStorage synchronization, `adsbygoogle` script injection, push de-duplication, and AdSense impression tracking live in lazy `src/pages/home/HomeAdsenseRuntime.jsx`. `smoke:home-ui` guards the source boundary and still verifies that the external AdSense script is not requested before consent, then pushes exactly once after non-personalized consent.
+- 2026-06-02 auth-queue-runtime note: `/login` and OAuth token handling still call `POST /api/queue/join` after successful authentication, but `src/contexts/AuthContext.jsx` imports `src/adapters/queueAdapter.js` dynamically at that moment. `smoke:auth-ui` guards that existing authenticated `/app` visitors do not pull queue routing code into the initial app shell.
+- 2026-06-02 app-error-runtime note: `src/App.jsx` still wraps the route tree with `AppErrorBoundary`, but the Korean recovery screen and render-error icons now live in lazy `src/common/AppErrorFallback.jsx`. Normal `/app` navigation keeps the fallback UI out of the initial app shell, while `smoke:text-quality` guards the boundary wiring and recovery copy.
+- 2026-06-02 auth-adapter-runtime note: `src/contexts/AuthContext.jsx` no longer statically imports `src/adapters/authAdapter.js`. Stored-token hydration, password login, OAuth token handling, logout, and registration load the auth adapter on demand, while `smoke:auth-ui` guards both the auth adapter and queue adapter runtime boundaries.
+- 2026-06-02 protected-layout-runtime note: `src/components/ProtectedRoutes.jsx` lazy-loads `src/components/ProtectedAppLayout.jsx` inside protected routes, so public access routes do not pull protected-only header, floating chat, bottom navigation, custom cursor entry, or protected route table code into their initial shell. `smoke:auth-ui` guards the public shell boundary, and `smoke:home-ui` keeps the protected home layout behavior covered.
+- 2026-06-02 access-runtime note: `/login`, `/register`, and `/queue` no longer statically import `react-hot-toast`, `src/adapters/authAdapter.js`, or `src/adapters/queueAdapter.js`. Access pages load toast/auth/queue runtimes at the action or polling point, while `smoke:auth-ui` guards the source boundary and verifies the login, locked-account release request, registration, and queue redirect flows.

@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import SockJS from "sockjs-client";
-import { Client } from "@stomp/stompjs";
-import toast from "react-hot-toast";
+import { notifyError, notifySuccess } from "../../utils/toast.js";
 import { CheckCircle2, Crown, MessageSquare, Play, TimerReset } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
-import { buildTalkPayload, chatAdapter, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
-import { buildStompConnectHeaders } from "../../adapters/realtimeAdapter.js";
+import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
+import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import {
   buildNoThanksActionPayload,
   getNoThanksChatRoomId,
@@ -57,9 +55,11 @@ export const NoThanksGame = () => {
   const [settingsForm, setSettingsForm] = useState({ startChipCount: "11", turnTimeSeconds: "15" });
 
   const stompRef = useRef(null);
+  const stompInitRef = useRef(null);
   const gameSubRef = useRef(null);
   const chatSubRef = useRef(null);
   const realtimeRoomRef = useRef(null);
+  const mountedRef = useRef(false);
   const chatScrollRef = useRef(null);
   const audioContextRef = useRef(null);
   const isActionSoundPlayingRef = useRef(false);
@@ -178,27 +178,39 @@ export const NoThanksGame = () => {
     }
   };
 
-  const ensureSocket = () => {
+  const ensureSocket = async () => {
     if (stompRef.current) return stompRef.current;
+    if (stompInitRef.current) return stompInitRef.current;
     const connectHeaders = buildStompConnectHeaders();
     if (!connectHeaders.Authorization) return null;
-    const client = new Client({
-      webSocketFactory: () => new SockJS("/ws/chat"),
+    stompInitRef.current = createStompClient({
+      endpoint: "/ws/chat",
       connectHeaders,
       reconnectDelay: 3000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
-      onStompError: () => toast.error("실시간 연결 오류"),
+    }).then((client) => {
+      if (!mountedRef.current) return null;
+      client.onStompError = (frame) => {
+        void notifyRealtimeError({
+          scope: "no-thanks-game",
+          error: frame,
+          fallbackMessage: "게임 실시간 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        });
+      };
+      client.beforeConnect = () => {
+        client.connectHeaders = buildStompConnectHeaders();
+      };
+      client.onConnect = () => {
+        bindLatestRealtimeRoom(client);
+      };
+      client.activate();
+      stompRef.current = client;
+      return client;
+    }).finally(() => {
+      stompInitRef.current = null;
     });
-    client.beforeConnect = () => {
-      client.connectHeaders = buildStompConnectHeaders();
-    };
-    client.onConnect = () => {
-      bindLatestRealtimeRoom(client);
-    };
-    client.activate();
-    stompRef.current = client;
-    return client;
+    return stompInitRef.current;
   };
 
   const fetchRooms = async () => {
@@ -265,7 +277,7 @@ export const NoThanksGame = () => {
         return;
       }
       const normalized = normalizeMessage(payload);
-      if (normalized) setChatMessages((prev) => [...prev, normalized]);
+      if (normalized) setChatMessages((prev) => [...prev, normalized].sort(compareMessagesByChronology));
       markChatRoomAsRead(roomId).catch(() => {});
     });
   };
@@ -297,14 +309,14 @@ export const NoThanksGame = () => {
       setChatMessages([]);
     }
     realtimeRoomRef.current = { roomId, chatRoomId: snapshotChatRoomId };
-    const client = ensureSocket();
+    const client = await ensureSocket();
     if (client?.connected) {
       bindRealtimeRoom(client, roomId, snapshotChatRoomId);
     }
   };
 
   useEffect(() => {
-    fetchRooms().catch(() => toast.error("방 목록을 불러오지 못했습니다."));
+    fetchRooms().catch(() => notifyError("방 목록을 불러오지 못했습니다."));
   }, []);
 
   useEffect(() => {
@@ -390,11 +402,16 @@ export const NoThanksGame = () => {
     previousPotChipsRef.current = potChips;
   }, [potChips]);
 
-  useEffect(() => () => {
-    if (gameSubRef.current) gameSubRef.current.unsubscribe();
-    if (chatSubRef.current) chatSubRef.current.unsubscribe();
-    if (stompRef.current) stompRef.current.deactivate();
-    realtimeRoomRef.current = null;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (gameSubRef.current) gameSubRef.current.unsubscribe();
+      if (chatSubRef.current) chatSubRef.current.unsubscribe();
+      if (stompRef.current) stompRef.current.deactivate();
+      realtimeRoomRef.current = null;
+      stompInitRef.current = null;
+    };
   }, []);
 
   const createRoom = async (event) => {
@@ -407,9 +424,9 @@ export const NoThanksGame = () => {
       });
       await openRoom(room);
       await fetchRooms();
-      toast.success("방 생성 완료");
+      notifySuccess("방 생성 완료");
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "방 생성 실패"));
+      notifyError(noThanksGameErrorMessage(error, "방 생성 실패"));
     }
   };
 
@@ -418,9 +435,9 @@ export const NoThanksGame = () => {
       const room = await noThanksGameAdapter.joinRoom(roomId);
       await openRoom(room);
       await fetchRooms();
-      toast.success("방 입장 완료");
+      notifySuccess("방 입장 완료");
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "방 입장 실패"));
+      notifyError(noThanksGameErrorMessage(error, "방 입장 실패"));
     }
   };
 
@@ -428,7 +445,7 @@ export const NoThanksGame = () => {
     event.preventDefault();
     const code = joinCode.trim().toUpperCase();
     if (!code) {
-      toast.error("방 코드를 입력해주세요.");
+      notifyError("방 코드를 입력해주세요.");
       return;
     }
     try {
@@ -436,9 +453,9 @@ export const NoThanksGame = () => {
       setJoinCode("");
       await openRoom(room);
       await fetchRooms();
-      toast.success("방 코드로 입장했습니다.");
+      notifySuccess("방 코드로 입장했습니다.");
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "방 코드 입장 실패"));
+      notifyError(noThanksGameErrorMessage(error, "방 코드 입장 실패"));
     }
   };
 
@@ -451,9 +468,9 @@ export const NoThanksGame = () => {
       });
       setSelectedRoom(room);
       await fetchRooms();
-      toast.success("방 설정 저장 완료");
+      notifySuccess("방 설정 저장 완료");
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "방 설정 저장 실패"));
+      notifyError(noThanksGameErrorMessage(error, "방 설정 저장 실패"));
     }
   };
 
@@ -462,7 +479,7 @@ export const NoThanksGame = () => {
     try {
       await noThanksGameAdapter.toggleReady(roomIdOf(selectedRoom));
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "준비 상태 변경 실패"));
+      notifyError(noThanksGameErrorMessage(error, "준비 상태 변경 실패"));
     }
   };
 
@@ -471,7 +488,7 @@ export const NoThanksGame = () => {
     try {
       await noThanksGameAdapter.startGame(roomIdOf(selectedRoom));
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "게임 시작 실패"));
+      notifyError(noThanksGameErrorMessage(error, "게임 시작 실패"));
     }
   };
 
@@ -481,9 +498,9 @@ export const NoThanksGame = () => {
       const room = await noThanksGameAdapter.rematch(roomIdOf(selectedRoom));
       setSelectedRoom(room);
       await fetchRooms();
-      toast.success("방이 다시 열렸습니다.");
+      notifySuccess("방이 다시 열렸습니다.");
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "방 다시 열기 실패"));
+      notifyError(noThanksGameErrorMessage(error, "방 다시 열기 실패"));
     }
   };
 
@@ -499,9 +516,9 @@ export const NoThanksGame = () => {
       const room = await noThanksGameAdapter.forceFinish(roomIdOf(selectedRoom));
       setSelectedRoom(room);
       await fetchRooms();
-      toast.success("게임 종료 완료");
+      notifySuccess("게임 종료 완료");
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "게임 종료 실패"));
+      notifyError(noThanksGameErrorMessage(error, "게임 종료 실패"));
     }
   };
 
@@ -517,17 +534,17 @@ export const NoThanksGame = () => {
       if (gameSubRef.current) gameSubRef.current.unsubscribe();
       if (chatSubRef.current) chatSubRef.current.unsubscribe();
       await fetchRooms();
-      toast.success("방 퇴장 완료");
+      notifySuccess("방 퇴장 완료");
     } catch (error) {
-      toast.error(noThanksGameErrorMessage(error, "방 퇴장 실패"));
+      notifyError(noThanksGameErrorMessage(error, "방 퇴장 실패"));
     }
   };
 
-  const publishAction = (actionType) => {
+  const publishAction = async (actionType) => {
     if (!selectedRoom) return;
-    const client = ensureSocket();
+    const client = await ensureSocket();
     if (!client?.connected) {
-      toast.error("실시간 연결이 아직 준비되지 않았습니다.");
+      notifyError("실시간 연결이 아직 준비되지 않았습니다.");
       return;
     }
     playActionSound(actionType);
@@ -537,11 +554,11 @@ export const NoThanksGame = () => {
     });
   };
 
-  const sendChat = () => {
+  const sendChat = async () => {
     if (!chatInput.trim() || !chatRoomId || !myMemberId) return;
-    const client = ensureSocket();
+    const client = await ensureSocket();
     if (!client?.connected) {
-      toast.error("채팅 연결이 아직 준비되지 않았습니다.");
+      notifyError("채팅 연결이 아직 준비되지 않았습니다.");
       return;
     }
     const message = chatInput.trim();
@@ -759,12 +776,15 @@ export const NoThanksGame = () => {
               <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900"><MessageSquare className="h-4 w-4" />방 채팅</div>
               <div ref={chatScrollRef} className="mb-3 h-[420px] space-y-2 overflow-auto rounded-2xl bg-slate-50 p-3 text-xs">
                 {!chatMessages.length && <div className="text-slate-400">채팅 내역이 없습니다.</div>}
-                {chatMessages.map((message, index) => (
-                  <div key={`${message.createdAt || index}-${index}`} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                    <div className="font-black text-slate-800">{message.senderName || "SYSTEM"}</div>
-                    <div className="mt-0.5 text-slate-700">{message.message || ""}</div>
+                {chatMessages.map((message) => {
+                  const normalized = normalizeMessage(message);
+                  return (
+                  <div key={normalized.key || normalized.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                    <div className="font-black text-slate-800">{normalized.senderName || "SYSTEM"}</div>
+                    <div className="mt-0.5 text-slate-700">{normalized.message || ""}</div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="flex gap-2">
                 <input className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="메시지를 입력하세요" value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendChat(); } }} />

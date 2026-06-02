@@ -11,7 +11,6 @@ import {
     Trash2,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
-import toast from "react-hot-toast";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { Comments } from "../../components/Comments.jsx";
@@ -25,8 +24,10 @@ import {
 import { canManageByOwnerOrAdmin } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
 import { boardAdapter, boardErrorMessage, getBoardLikeCount } from "../../adapters/boardAdapter.js";
 import { ReportDialog } from "../../common/ReportDialog.jsx";
+import { notifyError, notifySuccess } from "../../utils/toast.js";
 
 const BoardBody = memo(({ html, files, downloadingFileIds, onDownload }) => (
     <div className="p-6">
@@ -91,10 +92,10 @@ export const BoardDetail = () => {
             const nextBoard = await boardAdapter.fetchBoardDetail(boardId, { trackView });
             setBoard(nextBoard);
         } catch (err) {
-            console.error("Failed to fetch board:", err);
+            logClientError("boards.detail.fetch", err);
             const message = boardErrorMessage(err, "게시글을 불러오는데 실패했습니다.");
             if (silent) {
-                toast.error(message);
+                notifyError(message);
             } else {
                 setError(message);
             }
@@ -130,14 +131,15 @@ export const BoardDetail = () => {
                 like_count: nextLikeCount,
                 likeCount: nextLikeCount,
             }));
-            toast.success("좋아요 상태가 반영되었습니다.");
+            notifySuccess("좋아요 상태가 반영되었습니다.");
         } catch (likeError) {
             setBoard((prev) => ({
                 ...prev,
                 like_count: prevLikeCount,
                 likeCount: prevLikeCount,
             }));
-            toast.error(boardErrorMessage(likeError, "좋아요 처리에 실패했습니다."));
+            logClientError("boards.detail.like", likeError);
+            notifyError(boardErrorMessage(likeError, "좋아요 처리에 실패했습니다."));
         } finally {
             setLiking(false);
         }
@@ -154,10 +156,11 @@ export const BoardDetail = () => {
         setDeleting(true);
         try {
             await boardAdapter.deleteBoard(boardId);
-            toast.success("게시글이 삭제되었습니다.");
+            notifySuccess("게시글이 삭제되었습니다.");
             navigate(`/app/boards/${kind}`);
         } catch (deleteError) {
-            toast.error(boardErrorMessage(deleteError, "게시글 삭제에 실패했습니다."));
+            logClientError("boards.detail.delete", deleteError);
+            notifyError(boardErrorMessage(deleteError, "게시글 삭제에 실패했습니다."));
             setDeleting(false);
         }
     };
@@ -177,7 +180,8 @@ export const BoardDetail = () => {
             link.remove();
             window.URL.revokeObjectURL(url);
         } catch (downloadError) {
-            toast.error(boardErrorMessage(downloadError, "파일 다운로드에 실패했습니다."));
+            logClientError("boards.detail.download", downloadError);
+            notifyError(boardErrorMessage(downloadError, "파일 다운로드에 실패했습니다."));
         } finally {
             const next = { ...downloadingFileIdsRef.current };
             delete next[fileId];
@@ -191,10 +195,11 @@ export const BoardDetail = () => {
         setReporting(true);
         try {
             await boardAdapter.reportBoard(boardId, { reason, detail });
-            toast.success("신고가 접수되었습니다.");
+            notifySuccess("신고가 접수되었습니다.");
             setReportOpen(false);
         } catch (reportError) {
-            toast.error(boardErrorMessage(reportError, "신고 접수에 실패했습니다."));
+            logClientError("boards.detail.report", reportError);
+            notifyError(boardErrorMessage(reportError, "신고 접수에 실패했습니다."));
         } finally {
             setReporting(false);
         }

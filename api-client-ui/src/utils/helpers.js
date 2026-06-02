@@ -1,5 +1,6 @@
 ﻿import { format, formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
+import { logClientError } from "./clientDiagnostics.js";
 
 // 날짜 표시
 export const formatDate = (date) => {
@@ -71,7 +72,7 @@ export const formatFileSize = (bytes) => {
 export const isImageFile = (filename) => {
     if (!filename) return false;
     const ext = filename.split(".").pop().toLowerCase();
-    return ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext);
+    return ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext);
 };
 
 // 긴 텍스트 줄임
@@ -96,8 +97,55 @@ export const stripHtmlTags = (html) => {
         .trim();
 };
 
+export const normalizeExternalUrl = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw || raw.startsWith("/") || raw.startsWith("#") || raw.startsWith("//")) return "";
+
+    const compact = raw.replace(/[\u0000-\u001F\u007F\s]+/g, "").toLowerCase();
+    if (
+        compact.startsWith("javascript:") ||
+        compact.startsWith("vbscript:") ||
+        compact.startsWith("data:")
+    ) {
+        return "";
+    }
+
+    const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw);
+    const domainLike = /^[\w-]+(\.[\w-]+)+(\/|$|[?#])/u.test(raw);
+    if (!hasScheme && !domainLike) return "";
+
+    try {
+        const parsed = new URL(hasScheme ? raw : `https://${raw}`);
+        return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : "";
+    } catch {
+        return "";
+    }
+};
+
+export const escapeHtml = (value) => String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+export const encodeInlineHandlerArg = (value) => escapeHtml(JSON.stringify(String(value ?? "")));
+
 // 내부 저장소 URL 판별
 const INTERNAL_HOST_PATTERN = /^(localhost|127\.0\.0\.1|minio|host\.docker\.internal)$/i;
+const PUBLIC_IMAGE_PROXY_PATH = "/api/image/view";
+const PUBLIC_IMAGE_OBJECT_PREFIXES = ["editor/", "profile/"];
+const PUBLIC_IMAGE_OBJECT_MAX_LENGTH = 512;
+const PUBLIC_IMAGE_HOSTS = new Set(["ctfmon.shop", "www.ctfmon.shop"]);
+const RASTER_IMAGE_EXTENSION_PATTERN = /\.(jpe?g|png|gif|webp|bmp)$/i;
+const CHAT_ATTACHMENT_PROXY_PATHS = new Set(["/api/chat/file/view", "/api/chat/file/download"]);
+
+const getCurrentOrigin = () => {
+    if (typeof window !== "undefined" && window.location?.origin) {
+        return window.location.origin;
+    }
+    return "https://ctfmon.shop";
+};
 
 const getAssetOrigin = () => {
     const envOrigin = import.meta.env.VITE_ASSET_ORIGIN;
@@ -114,6 +162,66 @@ const getAssetOrigin = () => {
     }
 
     return "";
+};
+
+const isAllowedPublicImageObjectKey = (objectKey) => {
+    const normalized = String(objectKey || "").trim();
+    if (
+        !normalized ||
+        normalized.length > PUBLIC_IMAGE_OBJECT_MAX_LENGTH ||
+        normalized.startsWith("/") ||
+        normalized.includes("..") ||
+        normalized.includes("\\") ||
+        normalized.includes("?") ||
+        normalized.includes("#") ||
+        /\s/.test(normalized)
+    ) {
+        return false;
+    }
+
+    return PUBLIC_IMAGE_OBJECT_PREFIXES.some((prefix) => normalized.startsWith(prefix)) &&
+        RASTER_IMAGE_EXTENSION_PATTERN.test(normalized);
+};
+
+const isSafeChatAttachmentObjectKey = (objectKey) => {
+    const normalized = String(objectKey || "").trim();
+    return Boolean(normalized) &&
+        normalized.length <= PUBLIC_IMAGE_OBJECT_MAX_LENGTH &&
+        normalized.startsWith("chat/") &&
+        !normalized.startsWith("/") &&
+        !normalized.includes("..") &&
+        !normalized.includes("\\") &&
+        !normalized.includes("?") &&
+        !normalized.includes("#") &&
+        !/\s/.test(normalized);
+};
+
+export const isSafeBoardContentImageUrl = (value) => {
+    if (!value) return false;
+    const raw = String(value).trim();
+    if (!raw) return false;
+    const compact = raw.replace(/[\u0000-\u001F\u007F\s]+/g, "").toLowerCase();
+    if (
+        compact.startsWith("javascript:") ||
+        compact.startsWith("vbscript:") ||
+        compact.startsWith("data:")
+    ) {
+        return false;
+    }
+
+    try {
+        const parsed = new URL(raw, getCurrentOrigin());
+        if (!["http:", "https:"].includes(parsed.protocol)) return false;
+        if (parsed.pathname !== PUBLIC_IMAGE_PROXY_PATH) return false;
+
+        const sameOrigin = parsed.origin === getCurrentOrigin();
+        const publicHost = PUBLIC_IMAGE_HOSTS.has(parsed.hostname.toLowerCase());
+        if (!sameOrigin && !publicHost) return false;
+
+        return isAllowedPublicImageObjectKey(parsed.searchParams.get("path"));
+    } catch {
+        return false;
+    }
 };
 
 export const resolveAssetUrl = (rawUrl) => {
@@ -155,6 +263,49 @@ export const resolveAssetUrl = (rawUrl) => {
     } catch {
         return input;
     }
+};
+
+export const resolveChatAttachmentUrl = (rawUrl, fileName = "") => {
+    if (!rawUrl) return rawUrl;
+    const input = String(rawUrl).trim();
+    if (!input) return input;
+
+    const buildChatUrl = (objectKey) => {
+        const encodedPath = encodeURIComponent(objectKey);
+        if (isImageFile(fileName || objectKey)) {
+            return `/api/chat/file/view?path=${encodedPath}`;
+        }
+        const safeName = fileName || objectKey.split("/").pop() || "attachment";
+        return `/api/chat/file/download?path=${encodedPath}&name=${encodeURIComponent(safeName)}`;
+    };
+
+    if (input.startsWith("/api/chat/file/view") || input.startsWith("/api/chat/file/download")) {
+        try {
+            const parsed = new URL(input, getCurrentOrigin());
+            return isSafeChatAttachmentObjectKey(parsed.searchParams.get("path")) ? input : "";
+        } catch {
+            return "";
+        }
+    }
+
+    if (input.startsWith("/upload-files/chat/")) {
+        return buildChatUrl(input.replace(/^\/upload-files\//, ""));
+    }
+
+    try {
+        const parsed = new URL(input, getCurrentOrigin());
+        if (CHAT_ATTACHMENT_PROXY_PATHS.has(parsed.pathname) && isSafeChatAttachmentObjectKey(parsed.searchParams.get("path"))) {
+            return `${parsed.pathname}${parsed.search}`;
+        }
+        if (parsed.pathname.startsWith("/upload-files/chat/")) {
+            const objectKey = parsed.pathname.replace(/^\/upload-files\//, "");
+            return isSafeChatAttachmentObjectKey(objectKey) ? buildChatUrl(objectKey) : "";
+        }
+    } catch {
+        return "";
+    }
+
+    return "";
 };
 
 export const normalizeContentImageUrls = (html) => {
@@ -221,12 +372,14 @@ const isSafeBoardContentUrl = (value, { image = false } = {}) => {
         return false;
     }
     if (raw.startsWith("#")) return !image;
-    if (raw.startsWith("/") && !raw.startsWith("//")) return true;
+    if (raw.startsWith("/") && !raw.startsWith("//")) {
+        return image ? isSafeBoardContentImageUrl(raw) : true;
+    }
 
     try {
-        const parsed = new URL(raw, window.location.origin);
+        const parsed = new URL(raw, getCurrentOrigin());
         if (image) {
-            return parsed.protocol === "http:" || parsed.protocol === "https:";
+            return isSafeBoardContentImageUrl(raw);
         }
         return ["http:", "https:", "mailto:"].includes(parsed.protocol);
     } catch {
@@ -362,14 +515,14 @@ export const storage = {
         try {
             localStorage.setItem(key, JSON.stringify(value));
         } catch (error) {
-            console.error("Storage set error:", error);
+            logClientError("storage.set", error);
         }
     },
     remove: (key) => {
         try {
             localStorage.removeItem(key);
         } catch (error) {
-            console.error("Storage remove error:", error);
+            logClientError("storage.remove", error);
         }
     },
 };

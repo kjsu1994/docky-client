@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const srcDir = path.join(rootDir, "src");
 const appSource = readFileSync(path.join(srcDir, "App.jsx"), "utf8");
+const protectedRoutesSource = readFileSync(path.join(srcDir, "components", "ProtectedRoutes.jsx"), "utf8");
 
 function assert(condition, message) {
     if (!condition) {
@@ -42,7 +43,26 @@ function routeToRegex(routePath) {
     return new RegExp(`^${escaped || "/"}$`);
 }
 
-const routePaths = Array.from(appSource.matchAll(/<Route\s+path=["']([^"']+)["']/g), (match) => normalizeRoutePath(match[1]));
+function extractRoutePaths(source) {
+    return Array.from(source.matchAll(/<Route\s+path=["']([^"']+)["']/g), (match) => normalizeRoutePath(match[1]));
+}
+
+function toAppRoutePath(routePath) {
+    const relative = routePath.replace(/^\/+/, "");
+    return normalizeRoutePath(`/app/${relative}`);
+}
+
+const appRoutePaths = extractRoutePaths(appSource);
+const protectedRoutePaths = [
+    ...(/<Route\s+index\b/.test(protectedRoutesSource) ? ["/app"] : []),
+    ...extractRoutePaths(protectedRoutesSource)
+        .filter((routePath) => routePath !== "*")
+        .map(toAppRoutePath),
+];
+const routePaths = [
+    ...appRoutePaths.filter((routePath) => routePath !== "/app/*" && routePath !== "*"),
+    ...protectedRoutePaths,
+];
 const appRoutePatterns = routePaths
     .filter((routePath) => routePath !== "*")
     .map((routePath) => ({ routePath, regex: routeToRegex(routePath) }));
@@ -59,7 +79,8 @@ for (const filePath of sourceFiles) {
     }
 }
 
-assert(routePaths.includes("/app"), "App.jsx must define the /app route");
+assert(appRoutePaths.includes("/app/*"), "App.jsx must delegate protected app routes through /app/*");
+assert(protectedRoutePaths.includes("/app"), "ProtectedRoutes.jsx must define the /app index route");
 assert(links.length > 0, "No static /app navigation links were found");
 
 const brokenLinks = links.filter((link) => !appRoutePatterns.some((route) => route.regex.test(link.path)));

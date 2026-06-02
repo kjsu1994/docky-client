@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Edit2, Flag, Heart, MessageCircle, Send, Trash2 } from "lucide-react";
-import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { COMMENT_CONTENT_MAX_LENGTH, commentAdapter, commentErrorMessage } from "../adapters/commentAdapter.js";
 import { confirmAction } from "../common/confirmAction.jsx";
 import { ReportDialog } from "../common/ReportDialog.jsx";
 import { canManageByOwnerOrAdmin } from "../utils/authorization.js";
 import { formatNumber, formatRelativeTime } from "../utils/helpers.js";
+import { logClientError } from "../utils/clientDiagnostics.js";
 import { normalizeProfileImageUrl } from "../utils/profileImage.js";
+import { notifyError, notifySuccess } from "../utils/toast.js";
 
 const COMMENT_PAGE_SIZE = 20;
 
@@ -58,7 +59,7 @@ export const Comments = ({ boardId, onUpdate }) => {
             setComments((prev) => (append ? mergeComments(prev, result.comments) : result.comments));
             setPageInfo(result.pageInfo);
         } catch (error) {
-            console.error("Failed to fetch comments:", error);
+            logClientError("comments.fetch", error);
             setFetchError(commentErrorMessage(error, "댓글을 불러오지 못했습니다."));
             if (!append) setComments([]);
         } finally {
@@ -76,11 +77,11 @@ export const Comments = ({ boardId, onUpdate }) => {
         if (submitting) return;
         const content = newComment.trim();
         if (!content) {
-            toast.error("댓글 내용을 입력해주세요.");
+            notifyError("댓글 내용을 입력해 주세요.");
             return;
         }
         if (content.length > COMMENT_CONTENT_MAX_LENGTH) {
-            toast.error(`댓글은 ${formatNumber(COMMENT_CONTENT_MAX_LENGTH)}자 이하로 입력해주세요.`);
+            notifyError(`댓글은 ${formatNumber(COMMENT_CONTENT_MAX_LENGTH)}자 이하로 입력해 주세요.`);
             return;
         }
 
@@ -104,14 +105,14 @@ export const Comments = ({ boardId, onUpdate }) => {
 
         try {
             await commentAdapter.createComment(boardId, content);
-            toast.success("댓글이 작성되었습니다.");
+            notifySuccess("댓글이 작성되었습니다.");
             await fetchComments(1);
             onUpdate?.();
         } catch (error) {
             setComments((prev) => prev.filter((comment) => getCommentId(comment) !== tempId));
             setPageInfo((prev) => ({ ...prev, totalElements: Math.max(0, prev.totalElements - 1) }));
-            console.error("Failed to create comment:", error);
-            toast.error(commentErrorMessage(error, "댓글 작성에 실패했습니다."));
+            logClientError("comments.create", error);
+            notifyError(commentErrorMessage(error, "댓글 작성에 실패했습니다."));
         } finally {
             setSubmitting(false);
         }
@@ -131,11 +132,11 @@ export const Comments = ({ boardId, onUpdate }) => {
         if (!commentId || updatingCommentIds[commentId]) return;
         const nextContent = editContent.trim();
         if (!nextContent) {
-            toast.error("댓글 내용을 입력해주세요.");
+            notifyError("댓글 내용을 입력해 주세요.");
             return;
         }
         if (nextContent.length > COMMENT_CONTENT_MAX_LENGTH) {
-            toast.error(`댓글은 ${formatNumber(COMMENT_CONTENT_MAX_LENGTH)}자 이하로 입력해주세요.`);
+            notifyError(`댓글은 ${formatNumber(COMMENT_CONTENT_MAX_LENGTH)}자 이하로 입력해 주세요.`);
             return;
         }
 
@@ -151,10 +152,10 @@ export const Comments = ({ boardId, onUpdate }) => {
             );
             setEditingId(null);
             setEditContent("");
-            toast.success("댓글이 수정되었습니다.");
+            notifySuccess("댓글이 수정되었습니다.");
         } catch (error) {
-            console.error("Failed to update comment:", error);
-            toast.error(commentErrorMessage(error, "댓글 수정에 실패했습니다."));
+            logClientError("comments.update", error);
+            notifyError(commentErrorMessage(error, "댓글 수정에 실패했습니다."));
         } finally {
             setUpdatingCommentIds((prev) => {
                 const next = { ...prev };
@@ -166,29 +167,34 @@ export const Comments = ({ boardId, onUpdate }) => {
 
     const handleDeleteComment = async (commentId) => {
         if (!commentId || deletingCommentIds[commentId]) return;
-        const confirmed = await confirmAction({
-            title: "댓글을 삭제할까요?",
-            description: "삭제한 댓글은 되돌릴 수 없습니다.",
-            confirmText: "삭제",
-        });
-        if (!confirmed) return;
-
-        const existing = comments.find((comment) => getCommentId(comment) === commentId);
-        if (!existing) return;
-
         setDeletingCommentIds((prev) => ({ ...prev, [commentId]: true }));
-        setComments((prev) => prev.filter((comment) => getCommentId(comment) !== commentId));
-        setPageInfo((prev) => ({ ...prev, totalElements: Math.max(0, prev.totalElements - 1) }));
-
+        let existing = null;
+        let removedOptimistically = false;
         try {
+            const confirmed = await confirmAction({
+                title: "댓글을 삭제할까요?",
+                description: "삭제한 댓글은 되돌릴 수 없습니다.",
+                confirmText: "삭제",
+            });
+            if (!confirmed) return;
+
+            existing = comments.find((comment) => getCommentId(comment) === commentId);
+            if (!existing) return;
+
+            setComments((prev) => prev.filter((comment) => getCommentId(comment) !== commentId));
+            setPageInfo((prev) => ({ ...prev, totalElements: Math.max(0, prev.totalElements - 1) }));
+            removedOptimistically = true;
+
             await commentAdapter.deleteComment(commentId);
-            toast.success("댓글이 삭제되었습니다.");
+            notifySuccess("댓글이 삭제되었습니다.");
             onUpdate?.();
         } catch (error) {
-            setComments((prev) => [existing, ...prev]);
-            setPageInfo((prev) => ({ ...prev, totalElements: prev.totalElements + 1 }));
-            console.error("Failed to delete comment:", error);
-            toast.error(commentErrorMessage(error, "댓글 삭제에 실패했습니다."));
+            if (removedOptimistically && existing) {
+                setComments((prev) => [existing, ...prev]);
+                setPageInfo((prev) => ({ ...prev, totalElements: prev.totalElements + 1 }));
+            }
+            logClientError("comments.delete", error);
+            notifyError(commentErrorMessage(error, "댓글 삭제에 실패했습니다."));
         } finally {
             setDeletingCommentIds((prev) => {
                 const next = { ...prev };
@@ -230,7 +236,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                         : comment
                 )
             );
-            toast.success("좋아요 상태가 반영되었습니다.");
+            notifySuccess("좋아요 상태가 반영되었습니다.");
         } catch (error) {
             setComments((prev) =>
                 prev.map((comment) =>
@@ -239,8 +245,8 @@ export const Comments = ({ boardId, onUpdate }) => {
                         : comment
                 )
             );
-            console.error("Failed to like comment:", error);
-            toast.error(commentErrorMessage(error, "좋아요 처리에 실패했습니다."));
+            logClientError("comments.like", error);
+            notifyError(commentErrorMessage(error, "좋아요 처리에 실패했습니다."));
         } finally {
             setLikingCommentIds((prev) => {
                 const next = { ...prev };
@@ -255,10 +261,11 @@ export const Comments = ({ boardId, onUpdate }) => {
         setReporting(true);
         try {
             await commentAdapter.reportComment(reportCommentId, { reason, detail });
-            toast.success("신고가 접수되었습니다.");
+            notifySuccess("신고가 접수되었습니다.");
             setReportCommentId(null);
         } catch (error) {
-            toast.error(commentErrorMessage(error, "신고 접수에 실패했습니다."));
+            logClientError("comments.report", error);
+            notifyError(commentErrorMessage(error, "신고 접수에 실패했습니다."));
         } finally {
             setReporting(false);
         }
@@ -270,7 +277,7 @@ export const Comments = ({ boardId, onUpdate }) => {
     const editContentLength = editContent.length;
 
     if (fetching) {
-        return <div className="py-4 text-center text-slate-500">댓글 로딩 중...</div>;
+        return <div className="py-4 text-center text-slate-500">댓글을 불러오는 중...</div>;
     }
 
     return (
@@ -294,7 +301,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                     <textarea
                         value={newComment}
                         onChange={(event) => setNewComment(event.target.value)}
-                        placeholder="댓글을 입력해주세요..."
+                        placeholder="댓글을 입력해 주세요"
                         className="input-base min-h-[100px] w-full resize-none focus:ring-2 focus:ring-blue-500"
                         maxLength={COMMENT_CONTENT_MAX_LENGTH}
                         disabled={submitting}
@@ -321,7 +328,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                 {comments.length === 0 ? (
                     <div className="card border-2 border-dashed p-12 text-center">
                         <MessageCircle className="mx-auto mb-3 h-12 w-12 text-slate-300" />
-                        <p className="text-slate-600">첫 댓글을 작성해보세요.</p>
+                        <p className="text-slate-600">첫 댓글을 작성해 보세요.</p>
                     </div>
                 ) : (
                     comments.map((comment) => {
@@ -331,6 +338,11 @@ export const Comments = ({ boardId, onUpdate }) => {
                         const isEditing = editingId === commentId;
                         const profileImageUrl = normalizeProfileImageUrl(comment.member?.profile_url || comment.member?.profileUrl || "");
                         const canManageComment = canManageByOwnerOrAdmin(user, comment.member);
+                        const isUpdating = Boolean(updatingCommentIds[commentId]);
+                        const isDeleting = Boolean(deletingCommentIds[commentId]);
+                        const isLiking = Boolean(likingCommentIds[commentId]);
+                        const isReporting = reporting && reportCommentId === commentId;
+                        const isCommentBusy = isUpdating || isDeleting || isLiking || isReporting;
 
                         return (
                             <div key={commentId} className="card p-6 transition-shadow hover:shadow-md">
@@ -371,7 +383,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                     onChange={(event) => setEditContent(event.target.value)}
                                                     className="input-base min-h-[80px] w-full resize-none"
                                                     maxLength={COMMENT_CONTENT_MAX_LENGTH}
-                                                    disabled={Boolean(updatingCommentIds[commentId])}
+                                                    disabled={isUpdating}
                                                 />
                                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                                     <span className="text-xs text-slate-400">
@@ -381,17 +393,17 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                         <button
                                                             type="button"
                                                             onClick={() => handleUpdateComment(commentId)}
-                                                            disabled={Boolean(updatingCommentIds[commentId]) || !editContent.trim()}
-                                                            aria-busy={Boolean(updatingCommentIds[commentId])}
+                                                            disabled={isUpdating || !editContent.trim()}
+                                                            aria-busy={isUpdating}
                                                             data-busy-indicator="true"
                                                             className="btn-primary px-4 py-2 text-sm"
                                                         >
-                                                            {updatingCommentIds[commentId] ? "저장 중..." : "저장"}
+                                                            {isUpdating ? "저장 중..." : "저장"}
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={cancelEdit}
-                                                            disabled={Boolean(updatingCommentIds[commentId])}
+                                                            disabled={isUpdating}
                                                             className="btn-secondary px-4 py-2 text-sm"
                                                         >
                                                             취소
@@ -412,8 +424,10 @@ export const Comments = ({ boardId, onUpdate }) => {
                                         <button
                                             type="button"
                                             onClick={() => handleLikeComment(commentId)}
-                                            disabled={!canLikeComment || Boolean(likingCommentIds[commentId])}
-                                            className="group flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-red-500"
+                                            disabled={!canLikeComment || isCommentBusy}
+                                            aria-busy={isLiking}
+                                            data-busy-indicator="true"
+                                            className="group flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <Heart className="h-4 w-4 group-hover:fill-red-500" />
                                             <span>{comment.like_count ?? comment.likeCount ?? 0}</span>
@@ -423,26 +437,32 @@ export const Comments = ({ boardId, onUpdate }) => {
                                             <button
                                                 type="button"
                                                 onClick={() => setReportCommentId(commentId)}
-                                                className="flex items-center gap-1 text-sm text-slate-500 hover:text-amber-600"
+                                                disabled={isCommentBusy}
+                                                className="flex items-center gap-1 text-sm text-slate-500 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                <Flag className="h-3.5 w-3.5" /> 신고
+                                                <Flag className="h-3.5 w-3.5" /> {isReporting ? "신고 중..." : "신고"}
                                             </button>
                                         )}
 
                                         {canManageComment && (
                                             <div className="flex gap-3 border-l pl-4">
-                                                <button type="button" onClick={() => startEdit(comment)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-blue-600">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startEdit(comment)}
+                                                    disabled={isCommentBusy}
+                                                    className="flex items-center gap-1 text-sm text-slate-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
                                                     <Edit2 className="h-3.5 w-3.5" /> 수정
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDeleteComment(commentId)}
-                                                    disabled={Boolean(deletingCommentIds[commentId])}
-                                                    aria-busy={Boolean(deletingCommentIds[commentId])}
+                                                    disabled={isCommentBusy}
+                                                    aria-busy={isDeleting}
                                                     data-busy-indicator="true"
                                                     className="flex items-center gap-1 text-sm text-slate-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" /> {deletingCommentIds[commentId] ? "삭제 중..." : "삭제"}
+                                                    <Trash2 className="h-3.5 w-3.5" /> {isDeleting ? "삭제 중..." : "삭제"}
                                                 </button>
                                             </div>
                                         )}

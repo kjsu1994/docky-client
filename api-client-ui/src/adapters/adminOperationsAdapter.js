@@ -1,4 +1,22 @@
 import api, { getApiErrorMessage } from "../utils/api.js";
+import { normalizeMemberSearchKeyword } from "./memberSearchBounds.js";
+
+export { MEMBER_SEARCH_KEYWORD_MAX_LENGTH } from "./memberSearchBounds.js";
+
+export const ADMIN_MODERATION_REASON_MAX_LENGTH = 500;
+
+export const ADMIN_BANNER_LIMITS = Object.freeze({
+    title: 200,
+    description: 1000,
+    imageUrl: 500,
+    linkUrl: 500,
+    ctaText: 60,
+    adProvider: 30,
+    adsenseClient: 80,
+    adsenseSlot: 40,
+    priorityMin: 0,
+    priorityMax: 1000,
+});
 
 const unwrapAdminOperationsData = (response) => response?.data?.data ?? response?.data ?? response ?? null;
 
@@ -149,24 +167,35 @@ export const normalizeBanner = (banner) => ({
     modifiedAt: pick(banner, "modifiedAt", "modified_at", ""),
 });
 
-const toNullableText = (value) => {
-    const text = String(value || "").trim();
+const toLimitedText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
+
+const toNullableText = (value, maxLength) => {
+    const text = toLimitedText(value, maxLength);
     return text || null;
+};
+
+const clampBannerPriority = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return ADMIN_BANNER_LIMITS.priorityMin;
+    return Math.min(
+        ADMIN_BANNER_LIMITS.priorityMax,
+        Math.max(ADMIN_BANNER_LIMITS.priorityMin, Math.trunc(parsed)),
+    );
 };
 
 const toBannerPayload = (form) => ({
     banner_type: form.bannerType,
     placement: form.placement,
-    title: String(form.title || "").trim(),
-    description: toNullableText(form.description),
-    image_url: toNullableText(form.imageUrl),
-    link_url: toNullableText(form.linkUrl),
-    cta_text: toNullableText(form.ctaText),
+    title: toLimitedText(form.title, ADMIN_BANNER_LIMITS.title),
+    description: toNullableText(form.description, ADMIN_BANNER_LIMITS.description),
+    image_url: toNullableText(form.imageUrl, ADMIN_BANNER_LIMITS.imageUrl),
+    link_url: toNullableText(form.linkUrl, ADMIN_BANNER_LIMITS.linkUrl),
+    cta_text: toNullableText(form.ctaText, ADMIN_BANNER_LIMITS.ctaText),
     render_mode: form.renderMode || "CONTENT",
-    ad_provider: toNullableText(form.adProvider),
-    adsense_client: toNullableText(form.adsenseClient),
-    adsense_slot: toNullableText(form.adsenseSlot),
-    priority: Number(form.priority) || 0,
+    ad_provider: toNullableText(form.adProvider, ADMIN_BANNER_LIMITS.adProvider),
+    adsense_client: toNullableText(form.adsenseClient, ADMIN_BANNER_LIMITS.adsenseClient),
+    adsense_slot: toNullableText(form.adsenseSlot, ADMIN_BANNER_LIMITS.adsenseSlot),
+    priority: clampBannerPriority(form.priority),
     start_at: form.startAt ? `${form.startAt}:00` : null,
     end_at: form.endAt ? `${form.endAt}:00` : null,
     target_audience: form.targetAudience,
@@ -258,7 +287,7 @@ export const adminOperationsAdapter = {
         const response = await api.patch(endpoint, {
             ids,
             hidden_yn: hiddenYn,
-            reason: reason?.trim() || null,
+            reason: toLimitedText(reason, ADMIN_MODERATION_REASON_MAX_LENGTH) || null,
         });
         return normalizeBatchResult(response);
     },
@@ -288,8 +317,9 @@ export const adminOperationsAdapter = {
     },
 
     async fetchMemberCandidates(keyword) {
+        const normalizedKeyword = normalizeMemberSearchKeyword(keyword);
         const response = await api.get("/members/list", {
-            params: { keyword, page: 0, size: 20 },
+            params: { keyword: normalizedKeyword || undefined, page: 0, size: 20 },
         });
         return listItems(response).map(normalizeMemberCandidate).filter((member) => member.memberId);
     },

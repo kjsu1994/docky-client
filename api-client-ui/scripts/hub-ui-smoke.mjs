@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createPipeSession } from "./pipe-websocket-cdp.mjs";
@@ -77,6 +77,25 @@ let nextMessageId = 1;
 const pending = new Map();
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function assertStaticGamesHubManualAccessibility() {
+    const source = readFileSync("src/pages/games/GamesHub.jsx", "utf8");
+    const requiredSnippets = [
+        "useCallback",
+        "useId",
+        "useRef",
+        "aria-labelledby={titleId}",
+        "aria-describedby={descriptionId}",
+        "ref={closeButtonRef}",
+        "closeButtonRef.current?.focus()",
+        "previousFocus.focus()",
+        "onClose={closeManual}",
+    ];
+    const missing = requiredSnippets.filter((snippet) => !source.includes(snippet));
+    if (missing.length) {
+        throw new Error(`games hub manual accessibility guard missing: ${missing.join(", ")}`);
+    }
+}
 
 function send(ws, method, params = {}) {
     const id = nextMessageId++;
@@ -285,6 +304,8 @@ async function inspectGamesHub(ws, viewport) {
 }
 
 async function main() {
+    assertStaticGamesHubManualAccessibility();
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

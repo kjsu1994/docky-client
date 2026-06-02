@@ -1,5 +1,7 @@
 import api, { getApiErrorMessage } from "../utils/api.js";
 
+export const ADDRESS_QUERY_MAX_LENGTH = 120;
+
 const unwrapAddressData = (response) => response?.data?.data ?? response?.data ?? response ?? {};
 
 const normalizeCoordinate = (value) => {
@@ -35,17 +37,21 @@ export const normalizeGeocodeResponse = (response) => normalizeAddressItem(unwra
 
 export const extractAddressSearchErrorMessage = (error, fallbackMessage) => getApiErrorMessage(error, fallbackMessage);
 
+export const normalizeAddressQuery = (value) => String(value || "").trim().slice(0, ADDRESS_QUERY_MAX_LENGTH);
+
 export const addressSearchAdapter = {
     async suggestAddresses({ query, limit = 5 }) {
+        const normalizedQuery = normalizeAddressQuery(query);
         const response = await api.get("/addresses/suggest", {
-            params: { query, limit },
+            params: { query: normalizedQuery, limit },
         });
         return normalizeAddressSuggestResponse(response);
     },
 
     async geocodeAddress(address) {
+        const normalizedAddress = normalizeAddressQuery(address);
         const response = await api.get("/addresses/geocode", {
-            params: { address },
+            params: { address: normalizedAddress },
         });
         return normalizeGeocodeResponse(response);
     },

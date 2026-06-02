@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createPipeSession } from "./pipe-websocket-cdp.mjs";
@@ -47,6 +47,216 @@ let incidentDetailRequests = 0;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const encodeBody = (value) => Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 const encodeText = (value) => Buffer.from(value, "utf8").toString("base64");
+
+function assertStaticMemberSearchBounds() {
+    const adapterSource = readFileSync("src/adapters/adminAnomaliesAdapter.js", "utf8");
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!adapterSource.includes("normalizeMemberSearchKeyword(keyword)") || !adapterSource.includes("normalizeMemberSearchKeyword(roleKeyword)")) {
+        throw new Error("admin-anomalies-ui-smoke: member and role searches must normalize keywords before requests.");
+    }
+    if (!pageSource.includes("MEMBER_SEARCH_KEYWORD_MAX_LENGTH") || !pageSource.includes("maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH}")) {
+        throw new Error("admin-anomalies-ui-smoke: member search inputs must be bounded.");
+    }
+}
+
+function assertStaticActionTextBounds() {
+    const adapterSource = readFileSync("src/adapters/adminAnomaliesAdapter.js", "utf8");
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    const fields = [
+        "incidentAssignee",
+        "incidentNote",
+        "incidentActionDescription",
+        "reportAdminNote",
+        "sanctionReason",
+        "moderationReason",
+        "roleReason",
+        "ruleMetric",
+    ];
+    if (!adapterSource.includes("ADMIN_ANOMALY_TEXT_LIMITS") || !adapterSource.includes("toLimitedText(reason, ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason)")) {
+        throw new Error("admin-anomalies-ui-smoke: action payload text must be bounded.");
+    }
+    for (const field of fields) {
+        if (!adapterSource.includes(`ADMIN_ANOMALY_TEXT_LIMITS.${field}`) || !pageSource.includes(`ADMIN_ANOMALY_TEXT_LIMITS.${field}`)) {
+            throw new Error(`admin-anomalies-ui-smoke: ${field} limit must be shared by adapter and page.`);
+        }
+    }
+    if (!pageSource.includes("maxLength={ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason}")) {
+        throw new Error("admin-anomalies-ui-smoke: sanction reason inputs must be bounded.");
+    }
+    if (!adapterSource.includes("const toPositiveInteger") || !adapterSource.includes("const toPositiveNumber") || !adapterSource.includes("Number.isFinite(parsed)")) {
+        throw new Error("admin-anomalies-ui-smoke: anomaly rule numeric fields must reject non-finite values.");
+    }
+    if (!adapterSource.includes("hard_limit_per_minute: toPositiveInteger(hardLimitPerMinute)") || !adapterSource.includes("z_score_threshold: toPositiveNumber(zScoreThreshold)")) {
+        throw new Error("admin-anomalies-ui-smoke: anomaly rule payload must normalize numeric fields.");
+    }
+    if (!pageSource.includes("applyingIncidentActionKey") || !pageSource.includes("조치를 실행했습니다.") || !pageSource.includes("이상징후 조치를 실행하지 못했습니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: anomaly action buttons must expose loading, success, and failure states.");
+    }
+    if (!pageSource.includes("disabled={isIncidentActionApplying") || !pageSource.includes("조치 처리 중")) {
+        throw new Error("admin-anomalies-ui-smoke: anomaly action buttons must block duplicate execution.");
+    }
+}
+
+function assertStaticAuditRequestNormalization() {
+    const adapterSource = readFileSync("src/adapters/adminAnomaliesAdapter.js", "utf8");
+    const pageFallbackExpression = "page: normalizePageNumber(data.page " + "?" + "? 1)";
+    if (!adapterSource.includes("ADMIN_AUDIT_PAGE_SIZE_MAX = 200") || !adapterSource.includes("const ADMIN_AUDIT_TYPES")) {
+        throw new Error("admin-anomalies-ui-smoke: audit requests must define bounded type and size guards.");
+    }
+    if (!adapterSource.includes("normalizeAuditType(type)") || !adapterSource.includes("normalizePageNumber(page)") || !adapterSource.includes("normalizePageSize(size, 10, ADMIN_AUDIT_PAGE_SIZE_MAX)")) {
+        throw new Error("admin-anomalies-ui-smoke: audit requests must normalize type, page, and size before calling the API.");
+    }
+    if (!adapterSource.includes(pageFallbackExpression) || !adapterSource.includes("totalPages: toNonNegativeInteger")) {
+        throw new Error("admin-anomalies-ui-smoke: admin page metadata must reject non-finite page values.");
+    }
+}
+
+function assertStaticAuditInteractionStates() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!pageSource.includes("auditLoading") || !pageSource.includes("auditError") || !pageSource.includes("disabled={auditLoading}")) {
+        throw new Error("admin-anomalies-ui-smoke: audit filter must expose loading, error, and disabled states.");
+    }
+    if (!pageSource.includes("감사 이력을 불러오는 중입니다.") || !pageSource.includes("감사 로그를 불러오지 못했습니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: audit loading and failure copy must stay Korean.");
+    }
+    if (!pageSource.includes("roleAuditLoading") || !pageSource.includes("roleAuditError") || !pageSource.includes("disabled={roleAuditLoading}")) {
+        throw new Error("admin-anomalies-ui-smoke: role audit refresh must block duplicate clicks and expose failures.");
+    }
+    if (!pageSource.includes("aria-label=\"권한 변경 이력 새로고침\"") || !pageSource.includes("권한 변경 이력을 불러오는 중입니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: role audit refresh must be accessible and show loading copy.");
+    }
+}
+
+function assertStaticRoleMemberSearchStates() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!pageSource.includes("roleMemberLoading") || !pageSource.includes("roleMemberError") || !pageSource.includes("refreshRoleMembers")) {
+        throw new Error("admin-anomalies-ui-smoke: role member search must expose loading, error, and refresh states.");
+    }
+    if (!pageSource.includes("disabled={!isMaster || roleMemberLoading}") || !pageSource.includes("검색 중...")) {
+        throw new Error("admin-anomalies-ui-smoke: role member search controls must block duplicate clicks.");
+    }
+    if (!pageSource.includes("aria-label=\"권한 관리 회원 목록 새로고침\"") || !pageSource.includes("회원을 불러오는 중입니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: role member refresh must be accessible and show Korean loading copy.");
+    }
+}
+
+function assertStaticReportHandlingStates() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!pageSource.includes("reportLoading") || !pageSource.includes("reportError") || !pageSource.includes("updatingReportKey")) {
+        throw new Error("admin-anomalies-ui-smoke: report list and status actions must expose loading and error states.");
+    }
+    if (!pageSource.includes("disabled={reportLoading || Boolean(updatingReportKey)}") || !pageSource.includes("reportActionsDisabled")) {
+        throw new Error("admin-anomalies-ui-smoke: report filters and action buttons must block duplicate requests.");
+    }
+    if (!pageSource.includes("신고 내역을 불러오는 중입니다.") || !pageSource.includes("신고 상태를 변경하지 못했습니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: report loading and failure copy must stay Korean.");
+    }
+}
+
+function assertStaticModerationHandlingStates() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!pageSource.includes("moderationLoading") || !pageSource.includes("moderationError") || !pageSource.includes("moderationActionKey")) {
+        throw new Error("admin-anomalies-ui-smoke: moderation filter and actions must expose loading and error states.");
+    }
+    if (!pageSource.includes("disabled={moderationLoading || Boolean(moderationActionKey)}") || !pageSource.includes("boardActionDisabled") || !pageSource.includes("commentActionDisabled")) {
+        throw new Error("admin-anomalies-ui-smoke: moderation filter and action buttons must block duplicate requests.");
+    }
+    if (!pageSource.includes("게시글 검토 목록을 불러오는 중입니다.") || !pageSource.includes("댓글 검토 목록을 불러오는 중입니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: moderation loading copy must stay Korean.");
+    }
+}
+
+function assertStaticSanctionListStates() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!pageSource.includes("sanctionLoading") || !pageSource.includes("sanctionError")) {
+        throw new Error("admin-anomalies-ui-smoke: sanction list must expose loading and error states.");
+    }
+    if (!pageSource.includes("disabled={sanctionLoading || creatingSanction || releasingSanctionId !== null}")) {
+        throw new Error("admin-anomalies-ui-smoke: sanction filter must block duplicate requests while sanctions change.");
+    }
+    if (!pageSource.includes("제재 내역을 불러오는 중입니다.") || !pageSource.includes("제재 내역을 불러오지 못했습니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: sanction loading and failure copy must stay Korean.");
+    }
+}
+
+function assertStaticReleaseRequestStates() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!pageSource.includes("releaseRequestLoading") || !pageSource.includes("releaseRequestError")) {
+        throw new Error("admin-anomalies-ui-smoke: release requests must expose loading and error states.");
+    }
+    if (!pageSource.includes("제재 해제 요청을 불러오지 못했습니다.") || !pageSource.includes("해제 요청을 불러오는 중입니다...")) {
+        throw new Error("admin-anomalies-ui-smoke: release request loading and failure copy must stay Korean.");
+    }
+    if (!pageSource.includes("releaseActionInProgress") || !pageSource.includes("disabled={!Number.isFinite(sanctionId) || sanctionId <= 0 || releaseRequestLoading || releasingSanctionId !== null}")) {
+        throw new Error("admin-anomalies-ui-smoke: release request action buttons must block duplicate releases.");
+    }
+    if (!pageSource.includes("disabled={!Number.isFinite(notificationId) || notificationId <= 0 || markingNotification || markingAllNotifications}")) {
+        throw new Error("admin-anomalies-ui-smoke: release request read buttons must respect mark-all processing.");
+    }
+    const dialogSnippets = [
+        "import { trapFocus } from \"../../utils/focusTrap.js\"",
+        "releaseDialogRef",
+        "releaseDialogCloseRef",
+        "releaseDialogTitleId",
+        "releaseDialogDescriptionId",
+        "releaseReasonInputId",
+        "document.body.style.overflow = \"hidden\"",
+        "trapFocus(event, releaseDialogRef.current)",
+        "role=\"presentation\"",
+        "role=\"dialog\"",
+        "aria-modal=\"true\"",
+        "aria-labelledby={releaseDialogTitleId}",
+        "aria-describedby={releaseDialogDescriptionId}",
+        "htmlFor={releaseReasonInputId}",
+        "autoFocus",
+    ];
+    const missingDialogSnippets = dialogSnippets.filter((snippet) => !pageSource.includes(snippet));
+    if (missingDialogSnippets.length) {
+        throw new Error(`admin-anomalies-ui-smoke: release dialog accessibility guard missing ${missingDialogSnippets.join(", ")}`);
+    }
+}
+
+function assertStaticNotificationReadHandling() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!pageSource.includes("markingNotificationIds") || !pageSource.includes("처리 중...")) {
+        throw new Error("admin-anomalies-ui-smoke: notification read buttons must block duplicate clicks.");
+    }
+    if (!pageSource.includes("markingAllNotifications") || !pageSource.includes("모든 알림을 읽음 처리했습니다.") || !pageSource.includes("알림을 모두 읽음 처리하지 못했습니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: mark-all notification action must expose loading, success, and failure states.");
+    }
+    if (!pageSource.includes("ADMIN_NOTIFICATION_NOT_FOUND") || !pageSource.includes("이미 처리되었거나 삭제된 알림입니다.")) {
+        throw new Error("admin-anomalies-ui-smoke: missing notification reads must be handled as stale local state.");
+    }
+    if (!pageSource.includes("normalizeNotificationLink") || !pageSource.includes("title=\"알림 열기\"") || !pageSource.includes("navigate(notificationLink)")) {
+        throw new Error("admin-anomalies-ui-smoke: notification linkUrl must render as a safe internal navigation action.");
+    }
+}
+
+function assertStaticToastRuntimeSplit() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (pageSource.includes("react-hot-toast")
+        || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(pageSource)
+        || /\btoast\s*\(/.test(pageSource)) {
+        throw new Error("admin-anomalies-ui-smoke: AdminAnomalies must use lazy toast helpers instead of static react-hot-toast imports.");
+    }
+    for (const helper of ["notify", "notifyError", "notifySuccess", "notifyLoading"]) {
+        if (!pageSource.includes(helper)) {
+            throw new Error(`admin-anomalies-ui-smoke: AdminAnomalies must keep ${helper} wired for user feedback.`);
+        }
+    }
+}
+
+function assertStaticSafeDiagnostics() {
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    if (!pageSource.includes("logClientError(\"admin.anomalies.roleMembers.refresh\"")
+        || !pageSource.includes("logClientError(\"admin.anomalies.memberRole.update\"")
+        || /console\.error\s*\(/.test(pageSource)) {
+        throw new Error("admin-anomalies-ui-smoke: admin role failures must use safe client diagnostics.");
+    }
+    if (pageSource.includes("Math.random()")) {
+        throw new Error("admin-anomalies-ui-smoke: AdminAnomalies list keys must be deterministic.");
+    }
+}
 
 function send(ws, method, params = {}) {
     const id = nextMessageId++;
@@ -186,6 +396,9 @@ function routeMock(url, method) {
             },
         };
     }
+    if (method === "POST" && pathname === "/api/admin/anomalies/incidents/41/actions") {
+        return { status: 200, body: { data: true } };
+    }
     if (method === "GET" && pathname === "/api/admin/notifications") {
         return {
             status: 200,
@@ -195,10 +408,24 @@ function routeMock(url, method) {
                     title: "이상징후 알림",
                     message: "로그인 시도 급증이 감지되었습니다.",
                     severity: "높음",
+                    linkUrl: "/app/admin/anomalies",
                     createdAt: "2026-06-01 10:00",
                 },
             ], 8, { unreadCount: 1 }),
         };
+    }
+    if (method === "PATCH" && pathname === "/api/admin/notifications/7/read") {
+        return {
+            status: 404,
+            body: {
+                status: 404,
+                code: "ADMIN_NOTIFICATION_NOT_FOUND",
+                message: "알림을 찾을 수 없습니다.",
+            },
+        };
+    }
+    if (method === "POST" && pathname === "/api/admin/notifications/read-all") {
+        return { status: 200, body: { data: true } };
     }
     if (method === "GET" && pathname === "/api/admin/reports") {
         return {
@@ -410,6 +637,26 @@ async function clickButtonByTitle(ws, title) {
     })()`);
 }
 
+async function clickNotificationReadButton(ws) {
+    const rect = await evaluate(ws, `(() => {
+        const heading = Array.from(document.querySelectorAll("h2")).find((node) => (node.innerText || "").trim() === "관리자 알림");
+        const card = heading?.closest(".card");
+        const button = Array.from(card?.querySelectorAll("button") || []).find((node) => (node.innerText || "").trim() === "읽음 처리" && !node.disabled);
+        if (!button) return null;
+        button.scrollIntoView({ block: "center", inline: "center" });
+        const rect = button.getBoundingClientRect();
+        return {
+            x: Math.round(rect.left + rect.width / 2),
+            y: Math.round(rect.top + rect.height / 2),
+        };
+    })()`);
+    if (!rect) return "missing";
+    await send(ws, "Input.dispatchMouseEvent", { type: "mouseMoved", x: rect.x, y: rect.y, button: "none" });
+    await send(ws, "Input.dispatchMouseEvent", { type: "mousePressed", x: rect.x, y: rect.y, button: "left", clickCount: 1 });
+    await send(ws, "Input.dispatchMouseEvent", { type: "mouseReleased", x: rect.x, y: rect.y, button: "left", clickCount: 1 });
+    return "clicked";
+}
+
 async function inspectAdminAnomalies(ws, viewport) {
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
@@ -433,6 +680,12 @@ async function inspectAdminAnomalies(ws, viewport) {
         if (incidentDetailRequests < 1) {
             throw new Error("admin anomalies desktop: incident detail API was not requested");
         }
+        await waitForText(ws, "열기");
+        if (await clickNotificationReadButton(ws) !== "clicked") {
+            throw new Error("admin anomalies desktop: notification read button missing");
+        }
+        await waitForText(ws, "이미 처리되었거나 삭제된 알림입니다.");
+        await waitForText(ws, "읽지 않은 알림이 없습니다.");
     }
 
     await delay(250);
@@ -440,6 +693,18 @@ async function inspectAdminAnomalies(ws, viewport) {
 }
 
 async function main() {
+    assertStaticToastRuntimeSplit();
+    assertStaticSafeDiagnostics();
+    assertStaticMemberSearchBounds();
+    assertStaticActionTextBounds();
+    assertStaticAuditRequestNormalization();
+    assertStaticAuditInteractionStates();
+    assertStaticRoleMemberSearchStates();
+    assertStaticReportHandlingStates();
+    assertStaticModerationHandlingStates();
+    assertStaticSanctionListStates();
+    assertStaticReleaseRequestStates();
+    assertStaticNotificationReadHandling();
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

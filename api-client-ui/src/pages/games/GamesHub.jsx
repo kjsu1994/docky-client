@@ -1,5 +1,5 @@
 ﻿import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, BookOpen, CircleHelp, Dices, Sparkles, X } from "lucide-react";
 
 const sharedRoomStartSteps = [
@@ -647,17 +647,28 @@ const GamePreview = ({ type }) => {
 };
 
 const GameManualModal = ({ game, onClose }) => {
+  const titleId = useId();
+  const descriptionId = useId();
+  const closeButtonRef = useRef(null);
+
   useEffect(() => {
     if (!game) return undefined;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
     };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
+      window.clearTimeout(focusTimer);
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, [game, onClose]);
 
@@ -675,7 +686,8 @@ const GameManualModal = ({ game, onClose }) => {
         className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100vh-3rem)]"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="game-manual-title"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         data-smoke="game-manual-modal"
       >
         <header className={`bg-gradient-to-br ${game.tone} p-[1px]`}>
@@ -686,14 +698,15 @@ const GameManualModal = ({ game, onClose }) => {
                   <BookOpen className="h-3.5 w-3.5 text-primary-500" />
                   게임 설명서
                 </div>
-                <h2 id="game-manual-title" className="mt-3 break-words text-2xl font-black text-slate-900 sm:text-3xl">
+                <h2 id={titleId} className="mt-3 break-words text-2xl font-black text-slate-900 sm:text-3xl">
                   {game.title}
                 </h2>
-                <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500 sm:text-base">
+                <p id={descriptionId} className="mt-2 text-sm font-bold leading-relaxed text-slate-500 sm:text-base">
                   {game.manual.subtitle}
                 </p>
               </div>
               <button
+                ref={closeButtonRef}
                 type="button"
                 className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200"
                 onClick={onClose}
@@ -757,6 +770,7 @@ const GameManualModal = ({ game, onClose }) => {
 
 export const GamesHub = () => {
   const [manualGame, setManualGame] = useState(null);
+  const closeManual = useCallback(() => setManualGame(null), []);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -789,7 +803,7 @@ export const GamesHub = () => {
           </div>
         </section>
       ))}
-      <GameManualModal game={manualGame} onClose={() => setManualGame(null)} />
+      <GameManualModal game={manualGame} onClose={closeManual} />
     </div>
   );
 };

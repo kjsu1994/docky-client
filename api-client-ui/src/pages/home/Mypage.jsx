@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Award,
@@ -14,13 +14,14 @@ import {
     TreePine,
     User,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { EmptyState } from "../../components/EmptyState.jsx";
 import { formatNumber, formatRelativeTime } from "../../utils/helpers.js";
 import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
+import { trapFocus } from "../../utils/focusTrap.js";
+import { notifyError, notifySuccess } from "../../utils/toast.js";
 import { extractMypageErrorMessage, isAccountReauthRequiredError, isGoogleMember, mypageAdapter } from "../../adapters/mypageAdapter.js";
 
 const toDisplayDate = (value) => {
@@ -69,7 +70,7 @@ export const Mypage = () => {
         try {
             setMyBoards(await mypageAdapter.fetchMyBoards());
         } catch (err) {
-            toast.error(extractMypageErrorMessage(err, "작성한 게시글을 불러오지 못했습니다."));
+            notifyError(extractMypageErrorMessage(err, "작성한 게시글을 불러오지 못했습니다."));
             setMyBoards([]);
         } finally {
             setBoardsLoading(false);
@@ -81,7 +82,7 @@ export const Mypage = () => {
         try {
             setLevelHistory(await mypageAdapter.fetchLevelHistory());
         } catch (err) {
-            toast.error(extractMypageErrorMessage(err, "경험치 이력을 불러오지 못했습니다."));
+            notifyError(extractMypageErrorMessage(err, "경험치 이력을 불러오지 못했습니다."));
             setLevelHistory([]);
         } finally {
             setHistoryLoading(false);
@@ -108,10 +109,10 @@ export const Mypage = () => {
             try {
                 await mypageAdapter.grantWithdrawReauth();
                 setOauthWithdrawVerified(true);
-                toast.success("Google 재인증이 확인되었습니다. 이제 탈퇴를 진행할 수 있습니다.");
+                notifySuccess("Google 재인증이 확인되었습니다. 이제 탈퇴를 진행할 수 있습니다.");
             } catch (err) {
                 setOauthWithdrawVerified(false);
-                toast.error(extractMypageErrorMessage(err, "Google 재인증 확인에 실패했습니다."));
+                notifyError(extractMypageErrorMessage(err, "Google 재인증 확인에 실패했습니다."));
             } finally {
                 params.delete("withdraw_reauth");
                 const nextUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
@@ -123,17 +124,17 @@ export const Mypage = () => {
         verify();
     }, []);
 
-    const openDeleteModal = () => {
+    const openDeleteModal = useCallback(() => {
         if (deleteBusy || passwordChecking || oauthReauthLoading) return;
         setDeletePassword("");
         setDeleteModalOpen(true);
-    };
+    }, [deleteBusy, oauthReauthLoading, passwordChecking]);
 
-    const closeDeleteModal = () => {
+    const closeDeleteModal = useCallback(() => {
         if (deleteBusy || passwordChecking || oauthReauthLoading) return;
         setDeletePassword("");
         setDeleteModalOpen(false);
-    };
+    }, [deleteBusy, oauthReauthLoading, passwordChecking]);
 
     const startGoogleWithdrawReauth = () => {
         if (oauthReauthLoading || deleteBusy) return;
@@ -148,24 +149,24 @@ export const Mypage = () => {
 
         if (googleMember) {
             if (!oauthWithdrawVerified) {
-                toast.error("Google 계정은 재인증 후 탈퇴할 수 있습니다.");
+                notifyError("Google 계정은 재인증 후 탈퇴할 수 있습니다.");
                 return;
             }
         } else {
             const email = member.email || user?.email || "";
             if (!email) {
-                toast.error("이메일 정보를 찾을 수 없습니다.");
+                notifyError("이메일 정보를 찾을 수 없습니다.");
                 return;
             }
             if (!deletePassword.trim()) {
-                toast.error("현재 비밀번호를 입력해 주세요.");
+                notifyError("현재 비밀번호를 입력해 주세요.");
                 return;
             }
             try {
                 setPasswordChecking(true);
                 await mypageAdapter.verifyPassword(email, deletePassword.trim());
             } catch (err) {
-                toast.error(extractMypageErrorMessage(err, "현재 비밀번호가 일치하지 않습니다."));
+                notifyError(extractMypageErrorMessage(err, "현재 비밀번호가 일치하지 않습니다."));
                 return;
             } finally {
                 setPasswordChecking(false);
@@ -175,15 +176,15 @@ export const Mypage = () => {
         try {
             setDeleteBusy(true);
             await mypageAdapter.deleteAccount();
-            toast.success("회원 탈퇴가 완료되었습니다.");
+            notifySuccess("회원 탈퇴가 완료되었습니다.");
             await logout({ skipApi: true, silent: true });
         } catch (err) {
             if (isAccountReauthRequiredError(err)) {
                 setOauthWithdrawVerified(false);
-                toast.error("Google 재인증이 만료되었습니다. 다시 인증해 주세요.");
+                notifyError("Google 재인증이 만료되었습니다. 다시 인증해 주세요.");
                 return;
             }
-            toast.error(extractMypageErrorMessage(err, "회원 탈퇴에 실패했습니다."));
+            notifyError(extractMypageErrorMessage(err, "회원 탈퇴에 실패했습니다."));
         } finally {
             setDeleteBusy(false);
         }
@@ -493,12 +494,66 @@ const DeleteAccountModal = ({
     onClose,
     onStartGoogleReauth,
     onDelete,
-}) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <button type="button" className="absolute inset-0 bg-slate-900/55" onClick={onClose} aria-label="닫기" />
-        <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-black text-slate-900">회원 탈퇴 확인</h3>
-            <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
+}) => {
+    const titleId = useId();
+    const descriptionId = useId();
+    const passwordId = useId();
+    const dialogRef = useRef(null);
+    const cancelButtonRef = useRef(null);
+    const passwordInputRef = useRef(null);
+    const closeDisabled = deleteBusy || passwordChecking || oauthReauthLoading;
+
+    useEffect(() => {
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const focusTimer = window.setTimeout(() => {
+            if (googleMember) {
+                cancelButtonRef.current?.focus();
+                return;
+            }
+            passwordInputRef.current?.focus();
+        }, 0);
+
+        return () => {
+            window.clearTimeout(focusTimer);
+            document.body.style.overflow = previousOverflow;
+            if (previousFocus?.isConnected) previousFocus.focus();
+        };
+    }, [googleMember]);
+
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape" && !closeDisabled) {
+                event.preventDefault();
+                onClose();
+                return;
+            }
+            trapFocus(event, dialogRef.current);
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [closeDisabled, onClose]);
+
+    return (
+    <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4"
+        role="presentation"
+        onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !closeDisabled) onClose();
+        }}
+    >
+        <div
+            ref={dialogRef}
+            className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={descriptionId}
+        >
+            <h3 id={titleId} className="text-lg font-black text-slate-900">회원 탈퇴 확인</h3>
+            <p id={descriptionId} className="mt-2 text-sm font-medium leading-6 text-slate-600">
                 {googleMember
                     ? "Google 계정은 재인증 후 최종 탈퇴할 수 있습니다."
                     : "탈퇴를 진행하려면 현재 비밀번호를 입력해 주세요."}
@@ -506,18 +561,18 @@ const DeleteAccountModal = ({
 
             {!googleMember ? (
                 <div className="mt-4 space-y-2">
-                    <label htmlFor="delete-account-password" className="block text-sm font-bold text-slate-700">
+                    <label htmlFor={passwordId} className="block text-sm font-bold text-slate-700">
                         현재 비밀번호
                     </label>
                     <input
-                        id="delete-account-password"
+                        ref={passwordInputRef}
+                        id={passwordId}
                         type="password"
                         className="input-base"
                         value={deletePassword}
                         onChange={(event) => setDeletePassword(event.target.value)}
                         placeholder="현재 비밀번호 입력"
                         disabled={deleteBusy || passwordChecking}
-                        autoFocus
                     />
                 </div>
             ) : (
@@ -529,7 +584,7 @@ const DeleteAccountModal = ({
             )}
 
             <div className="mt-6 flex justify-end gap-2">
-                <button type="button" className="btn-secondary" onClick={onClose} disabled={deleteBusy || passwordChecking || oauthReauthLoading}>
+                <button ref={cancelButtonRef} type="button" className="btn-secondary" onClick={onClose} disabled={closeDisabled}>
                     취소
                 </button>
                 {googleMember ? (
@@ -554,6 +609,7 @@ const DeleteAccountModal = ({
             </div>
         </div>
     </div>
-);
+    );
+};
 
 export default Mypage;

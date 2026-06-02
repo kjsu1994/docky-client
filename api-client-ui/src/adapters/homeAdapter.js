@@ -1,4 +1,5 @@
 import api from "../utils/api.js";
+import { logClientError } from "../utils/clientDiagnostics.js";
 import { statsAdapter } from "./statsAdapter.js";
 
 export const unwrapHomeData = (response) => response?.data?.data ?? response?.data ?? null;
@@ -366,7 +367,7 @@ const fetchRecentBoards = async ({ signal, timeout, fallbackOnTimeout = true } =
     } catch (error) {
         if (isCanceledRequest(error) || signal?.aborted) throw error;
         if (isTimeoutRequest(error) && !fallbackOnTimeout) throw error;
-        console.warn("[homeAdapter] 최신 게시글 통합 요청 실패로 기존 게시글 목록 요청을 사용합니다.", error);
+        logClientError("home.boards.latest.fallback", error);
         return fetchLegacyRecentBoards({ signal, timeout });
     }
 };

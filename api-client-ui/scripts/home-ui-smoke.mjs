@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createPipeSession } from "./pipe-websocket-cdp.mjs";
@@ -52,6 +52,9 @@ let chatSocketInfoRequests = 0;
 let floatingChatChunkRequests = 0;
 let pageGuideChunkRequests = 0;
 let gamesHubChunkRequests = 0;
+let headerMenuChunkRequests = 0;
+let bottomNavChunkRequests = 0;
+let customCursorChunkRequests = 0;
 let gamesHubPrefetchVerified = false;
 let pageGuideLazyLoadVerified = false;
 let forceStatsFailure = false;
@@ -60,6 +63,258 @@ let forceBannerFailure = false;
 let slowStatsDashboard = false;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function assertStaticFocusTrapUtility() {
+    const source = readFileSync("src/utils/focusTrap.js", "utf8");
+    const requiredSnippets = [
+        "export const getFocusableElements",
+        "export const trapFocus",
+        "Array.isArray(target)",
+        "event.key !== \"Tab\"",
+        "event.preventDefault()",
+    ];
+    const missing = requiredSnippets.filter((snippet) => !source.includes(snippet));
+    if (missing.length) {
+        throw new Error(`home-ui-smoke: shared focusTrap utility guard missing ${missing.join(", ")}`);
+    }
+}
+
+function assertStaticPageGuideAccessibility() {
+    const appSource = readFileSync("src/App.jsx", "utf8");
+    const layoutSource = readFileSync("src/components/ProtectedAppLayout.jsx", "utf8");
+    const entrySource = readFileSync("src/common/PageGuideButtonEntry.jsx", "utf8");
+    const buttonSource = readFileSync("src/common/PageGuideButton.jsx", "utf8");
+    const dialogSource = readFileSync("src/common/PageGuideDialog.jsx", "utf8");
+    if (
+        appSource.includes("PageGuideButtonEntry") ||
+        appSource.includes("PageGuideButton.jsx") ||
+        !layoutSource.includes("import { PageGuideButtonEntry } from \"../common/PageGuideButtonEntry.jsx\"") ||
+        !layoutSource.includes("<PageGuideButtonEntry />")
+    ) {
+        throw new Error("home-ui-smoke: page guide launcher must stay out of the public app shell and mount from the protected layout.");
+    }
+    if (
+        !entrySource.includes("const PageGuideButton = lazy(() =>") ||
+        !entrySource.includes("import(\"./PageGuideButton.jsx\")")
+    ) {
+        throw new Error("home-ui-smoke: page guide button must stay lazy-loaded from the protected layout.");
+    }
+    if (!buttonSource.includes("const PageGuideDialog = lazy(() =>")) {
+        throw new Error("home-ui-smoke: page guide dialog must stay lazy-loaded from the app shell.");
+    }
+    if (!dialogSource.includes("import { trapFocus } from \"../utils/focusTrap.js\"")) {
+        throw new Error("home-ui-smoke: page guide dialog must use the shared focusTrap utility.");
+    }
+    if (!buttonSource.includes("aria-haspopup=\"dialog\"") || !buttonSource.includes("aria-controls={open ? dialogId : undefined}") || !buttonSource.includes("aria-expanded={open}")) {
+        throw new Error("home-ui-smoke: page guide trigger must expose dialog relationship state.");
+    }
+    if (!dialogSource.includes("aria-labelledby={titleId}") || !dialogSource.includes("aria-describedby={descriptionId}")) {
+        throw new Error("home-ui-smoke: page guide dialog must connect title and description.");
+    }
+    if (!dialogSource.includes("closeButtonRef.current?.focus()") || !dialogSource.includes("previousFocus.focus()")) {
+        throw new Error("home-ui-smoke: page guide dialog must move focus in and restore it on close.");
+    }
+    if (!dialogSource.includes("trapFocus(event, dialogRef.current)")) {
+        throw new Error("home-ui-smoke: page guide dialog must trap Tab focus while open.");
+    }
+    if (!dialogSource.includes("guide?.summary || \"페이지 설명을 불러오는 중입니다.\"")) {
+        throw new Error("home-ui-smoke: page guide dialog must keep an accessible fallback description while loading.");
+    }
+}
+
+function assertStaticNetworkIndicatorRuntimeBoundary() {
+    const appSource = readFileSync("src/App.jsx", "utf8");
+    const entrySource = readFileSync("src/components/GlobalNetworkIndicatorEntry.jsx", "utf8");
+    const indicatorSource = readFileSync("src/components/GlobalNetworkIndicator.jsx", "utf8");
+    if (appSource.includes("GlobalNetworkIndicator.jsx") || !appSource.includes("GlobalNetworkIndicatorEntry")) {
+        throw new Error("home-ui-smoke: app shell must mount GlobalNetworkIndicatorEntry instead of statically importing the indicator UI.");
+    }
+    const requiredEntrySnippets = [
+        "const GlobalNetworkIndicator = lazy(() =>",
+        "import(\"./GlobalNetworkIndicator.jsx\")",
+        "subscribeNetworkActivity",
+        "activeRequests > 0",
+    ];
+    const missing = requiredEntrySnippets.filter((snippet) => !entrySource.includes(snippet));
+    if (missing.length) {
+        throw new Error(`home-ui-smoke: network indicator entry must lazy-load on tracked requests ${missing.join(", ")}`);
+    }
+    if (!indicatorSource.includes("aria-label=\"요청 처리 중\"") || !indicatorSource.includes("network-indicator__bar")) {
+        throw new Error("home-ui-smoke: network indicator UI must keep the accessible request-progress affordance.");
+    }
+}
+
+function assertStaticLoadingSpinnerBoundary() {
+    const source = readFileSync("src/components/LoadingSpinner.jsx", "utf8");
+    if (source.includes("lucide-react") || source.includes("Loader2")) {
+        throw new Error("home-ui-smoke: LoadingSpinner must stay CSS-only so the app fallback does not pull icon runtime into the initial shell.");
+    }
+    const requiredSnippets = [
+        "role={text ? \"status\" : undefined}",
+        "aria-live={text ? \"polite\" : undefined}",
+        "aria-hidden=\"true\"",
+        "border-t-primary-600",
+    ];
+    const missing = requiredSnippets.filter((snippet) => !source.includes(snippet));
+    if (missing.length) {
+        throw new Error(`home-ui-smoke: LoadingSpinner must keep accessible CSS loading state ${missing.join(", ")}`);
+    }
+}
+
+function assertStaticHeaderMenuAccessibility() {
+    const headerSource = readFileSync("src/components/Header.jsx", "utf8");
+    const dialogSource = readFileSync("src/components/HeaderMenuDialog.jsx", "utf8");
+    const headerRequiredSnippets = [
+        "const HeaderMenuDialog = lazy(() =>",
+        "<Suspense fallback={null}>",
+        "aria-haspopup=\"dialog\"",
+        "aria-controls={menuOpen ? menuPanelId : undefined}",
+        "aria-expanded={menuOpen}",
+        "launcherRef={menuButtonRef}",
+    ];
+    const dialogRequiredSnippets = [
+        "import { trapFocus } from \"../utils/focusTrap.js\"",
+        "role=\"dialog\"",
+        "aria-modal=\"true\"",
+        "aria-labelledby={titleId}",
+        "aria-describedby={descriptionId}",
+        "closeButtonRef.current?.focus()",
+        "previousFocus.focus()",
+        "launcherRef.current?.focus()",
+        "document.body.style.overflow = \"hidden\"",
+        "event.key === \"Escape\"",
+        "trapFocus(event, panelRef.current)",
+    ];
+    const missing = [
+        ...headerRequiredSnippets.filter((snippet) => !headerSource.includes(snippet)),
+        ...dialogRequiredSnippets.filter((snippet) => !dialogSource.includes(snippet)),
+    ];
+    if (missing.length) {
+        throw new Error(`home-ui-smoke: header menu accessibility guard missing ${missing.join(", ")}`);
+    }
+}
+
+function assertStaticBottomNavRuntimeBoundary() {
+    const appSource = readFileSync("src/App.jsx", "utf8");
+    const protectedRoutesSource = readFileSync("src/components/ProtectedRoutes.jsx", "utf8");
+    const layoutSource = readFileSync("src/components/ProtectedAppLayout.jsx", "utf8");
+    const entrySource = readFileSync("src/components/BottomNavEntry.jsx", "utf8");
+    const requiredSnippets = [
+        "const ProtectedRoutes = lazy(() =>",
+        "import(\"./components/ProtectedRoutes.jsx\")",
+        "const ProtectedAppLayout = lazy(() =>",
+        "import(\"./ProtectedAppLayout.jsx\")",
+        "import { BottomNavEntry } from \"./BottomNavEntry.jsx\"",
+        "<BottomNavEntry />",
+        "const BottomNav = lazy(() => import(\"./BottomNav.jsx\")",
+        "window.matchMedia(\"(max-width: 1023px)\")",
+    ];
+    const sources = [appSource, protectedRoutesSource, layoutSource, entrySource];
+    const missing = requiredSnippets.filter((snippet) => !sources.some((source) => source.includes(snippet)));
+    if (
+        missing.length ||
+        appSource.includes("ProtectedAppLayout") ||
+        appSource.includes("BottomNavEntry") ||
+        appSource.includes("import { BottomNav } from \"./components/BottomNav.jsx\"")
+    ) {
+        throw new Error(`home-ui-smoke: bottom nav runtime boundary missing ${missing.join(", ")}`);
+    }
+}
+
+function assertStaticCustomCursorRuntimeBoundary() {
+    const appSource = readFileSync("src/App.jsx", "utf8");
+    const protectedRoutesSource = readFileSync("src/components/ProtectedRoutes.jsx", "utf8");
+    const layoutSource = readFileSync("src/components/ProtectedAppLayout.jsx", "utf8");
+    const entrySource = readFileSync("src/components/CustomCursorEntry.jsx", "utf8");
+    const requiredSnippets = [
+        "const ProtectedRoutes = lazy(() =>",
+        "import(\"./components/ProtectedRoutes.jsx\")",
+        "const ProtectedAppLayout = lazy(() =>",
+        "import(\"./ProtectedAppLayout.jsx\")",
+        "import { CustomCursorEntry } from \"./CustomCursorEntry.jsx\"",
+        "<CustomCursorEntry />",
+        "const CustomCursor = lazy(() => import(\"./CustomCursor.jsx\")",
+        "window.addEventListener(\"pointermove\", activate, { passive: true, once: true })",
+        "window.matchMedia(\"(prefers-reduced-motion: reduce)\")",
+    ];
+    const sources = [appSource, protectedRoutesSource, layoutSource, entrySource];
+    const missing = requiredSnippets.filter((snippet) => !sources.some((source) => source.includes(snippet)));
+    if (
+        missing.length ||
+        appSource.includes("ProtectedAppLayout") ||
+        appSource.includes("CustomCursorEntry") ||
+        appSource.includes("import { CustomCursor } from \"./components/CustomCursor.jsx\"")
+    ) {
+        throw new Error(`home-ui-smoke: custom cursor runtime boundary missing ${missing.join(", ")}`);
+    }
+}
+
+function assertStaticToastViewportRuntimeBoundary() {
+    const appSource = readFileSync("src/App.jsx", "utf8");
+    const authSource = readFileSync("src/contexts/AuthContext.jsx", "utf8");
+    const apiSource = readFileSync("src/utils/api.js", "utf8");
+    const toastHelperSource = readFileSync("src/utils/toast.js", "utf8");
+    const confirmActionSource = readFileSync("src/common/confirmAction.jsx", "utf8");
+    const promptActionSource = readFileSync("src/common/promptAction.jsx", "utf8");
+    const entrySource = readFileSync("src/common/ToastViewportEntry.jsx", "utf8");
+    const viewportSource = readFileSync("src/common/ToastViewport.jsx", "utf8");
+    const requiredSnippets = [
+        "import { ToastViewportEntry } from \"./common/ToastViewportEntry.jsx\"",
+        "<ToastViewportEntry />",
+        "const ToastViewport = lazy(() =>",
+        "import(\"./ToastViewport.jsx\")",
+        "requestIdleCallback",
+        "import { Toaster } from \"react-hot-toast\"",
+        "import(\"react-hot-toast\")",
+        "import { loadToast } from \"../utils/toast.js\"",
+        "toast = await loadToast()",
+        "notifyError",
+        "notifySuccess",
+    ];
+    const sources = [appSource, authSource, apiSource, toastHelperSource, confirmActionSource, promptActionSource, entrySource, viewportSource];
+    const missing = requiredSnippets.filter((snippet) => !sources.some((source) => source.includes(snippet)));
+    if (
+        missing.length ||
+        appSource.includes("react-hot-toast") ||
+        appSource.includes("<Toaster") ||
+        authSource.includes("react-hot-toast") ||
+        apiSource.includes("react-hot-toast") ||
+        confirmActionSource.includes("from \"react-hot-toast\"") ||
+        promptActionSource.includes("from \"react-hot-toast\"")
+    ) {
+        throw new Error(`home-ui-smoke: toast viewport runtime boundary missing ${missing.join(", ")}`);
+    }
+}
+
+function assertStaticHomeAdsenseRuntimeBoundary() {
+    const homeSource = readFileSync("src/pages/home/Home.jsx", "utf8");
+    const runtimeSource = readFileSync("src/pages/home/HomeAdsenseRuntime.jsx", "utf8");
+    const helperSource = readFileSync("src/utils/adsense.js", "utf8");
+    const requiredSnippets = [
+        "const HomeAdsenseRuntime = lazy(() =>",
+        "import(\"./HomeAdsenseRuntime.jsx\")",
+        "readStoredAdsConsent",
+        "isAdsenseBanner",
+        "writeStoredAdsConsent",
+        "window.adsbygoogle",
+        "googlesyndication.com/pagead/js/adsbygoogle.js",
+        "onImpression(activeBanner, \"IMPRESSION\")",
+        "aria-labelledby=\"home-ads-consent-title\"",
+        "aria-label=\"비개인화 광고\"",
+    ];
+    const sources = [homeSource, runtimeSource, helperSource];
+    const missing = requiredSnippets.filter((snippet) => !sources.some((source) => source.includes(snippet)));
+    if (
+        missing.length ||
+        homeSource.includes("window.adsbygoogle") ||
+        homeSource.includes("googlesyndication.com/pagead/js/adsbygoogle.js") ||
+        homeSource.includes("document.createElement(\"script\")") ||
+        homeSource.includes("ADS_CONSENT_STORAGE_KEY") ||
+        homeSource.includes("adsensePushKeysRef")
+    ) {
+        throw new Error(`home-ui-smoke: home AdSense runtime boundary missing ${missing.join(", ")}`);
+    }
+}
 
 async function waitForJson(url, timeoutMs = 10000) {
     const started = Date.now();
@@ -373,11 +628,20 @@ async function handleFetchRequest(ws, event) {
     if (/FloatingChat/i.test(requestUrl)) {
         floatingChatChunkRequests += 1;
     }
-    if (/pageGuides/i.test(requestUrl)) {
+    if (/PageGuideDialog|pageGuides/i.test(requestUrl)) {
         pageGuideChunkRequests += 1;
     }
     if (/GamesHub/i.test(requestUrl)) {
         gamesHubChunkRequests += 1;
+    }
+    if (/HeaderMenuDialog/i.test(requestUrl)) {
+        headerMenuChunkRequests += 1;
+    }
+    if (/\/BottomNav-[^/]+\.js/i.test(requestUrl)) {
+        bottomNavChunkRequests += 1;
+    }
+    if (/CustomCursor/i.test(requestUrl)) {
+        customCursorChunkRequests += 1;
     }
     const mock = routeMock(request.url, request.method, request.postData, request.headers);
     if (!mock) {
@@ -541,6 +805,9 @@ async function inspectHomeInitialShell(ws) {
     statsDashboardRequests = 0;
     latestBoardsRequests = 0;
     bannerListRequests = 0;
+    headerMenuChunkRequests = 0;
+    bottomNavChunkRequests = 0;
+    customCursorChunkRequests = 0;
     slowStatsDashboard = true;
     try {
         await send(ws, "Page.navigate", { url: `${baseUrl}/app` });
@@ -562,6 +829,15 @@ async function inspectHomeInitialShell(ws) {
         await waitForText(ws, "통계를 불러오는 중입니다.", 300);
         if (statsDashboardRequests !== 1 || latestBoardsRequests !== 1 || bannerListRequests !== 1) {
             throw new Error(`home initial shell: expected one dashboard request set, got stats=${statsDashboardRequests} boards=${latestBoardsRequests} banners=${bannerListRequests}`);
+        }
+        if (headerMenuChunkRequests > 0) {
+            throw new Error("home initial shell: header menu chunk loaded before desktop menu activation");
+        }
+        if (bottomNavChunkRequests > 0) {
+            throw new Error("home initial shell: bottom navigation chunk loaded on desktop viewport");
+        }
+        if (customCursorChunkRequests > 0) {
+            throw new Error("home initial shell: custom cursor chunk loaded before pointer activation");
         }
         return "home initial shell: ok";
     } finally {
@@ -600,6 +876,9 @@ async function inspectHome(ws, viewport) {
     floatingChatChunkRequests = 0;
     pageGuideChunkRequests = 0;
     gamesHubChunkRequests = 0;
+    headerMenuChunkRequests = 0;
+    bottomNavChunkRequests = 0;
+    customCursorChunkRequests = 0;
     await send(ws, "Page.navigate", { url: `${baseUrl}/app` });
 
     for (const text of requiredTexts) {
@@ -612,6 +891,12 @@ async function inspectHome(ws, viewport) {
     }
     if (!viewport.mobile && bottomNavExists) {
         throw new Error(`home ${viewport.name}: bottom navigation rendered on desktop viewport`);
+    }
+    if (!viewport.mobile && bottomNavChunkRequests > 0) {
+        throw new Error(`home ${viewport.name}: bottom navigation chunk loaded on desktop viewport`);
+    }
+    if (customCursorChunkRequests > 0) {
+        throw new Error(`home ${viewport.name}: custom cursor chunk loaded before pointer activation`);
     }
     const utilityButtonState = await evaluate(ws, `(() => {
         const toRect = (node) => {
@@ -681,6 +966,11 @@ async function inspectHome(ws, viewport) {
             });
         })()`, 5000);
     }
+    await waitForExpression(
+        ws,
+        `Boolean(document.querySelector('[role="dialog"][aria-labelledby="home-ads-consent-title"][aria-describedby="home-ads-consent-description"]'))`,
+        5000
+    );
     const a11yState = await evaluate(ws, `(() => ({
         quickMenuLabelled: Boolean(document.getElementById("home-quick-menu-heading") && document.querySelector('[aria-labelledby="home-quick-menu-heading"]')),
         boardsLabelled: Boolean(document.getElementById("home-boards-heading") && document.querySelector('[aria-labelledby="home-boards-heading"]')),
@@ -712,6 +1002,9 @@ async function inspectHome(ws, viewport) {
     }
     if (!gamesHubPrefetchVerified && gamesHubChunkRequests > 0) {
         throw new Error(`home ${viewport.name}: games route chunk loaded before link focus/hover intent`);
+    }
+    if (headerMenuChunkRequests > 0) {
+        throw new Error(`home ${viewport.name}: header menu chunk loaded before desktop menu activation`);
     }
     const firstDashboardCounts = {
         statsDashboardRequests,
@@ -1278,6 +1571,16 @@ async function inspectHomeBannerPartialFailure(ws) {
 }
 
 async function main() {
+    assertStaticFocusTrapUtility();
+    assertStaticLoadingSpinnerBoundary();
+    assertStaticNetworkIndicatorRuntimeBoundary();
+    assertStaticPageGuideAccessibility();
+    assertStaticHeaderMenuAccessibility();
+    assertStaticBottomNavRuntimeBoundary();
+    assertStaticCustomCursorRuntimeBoundary();
+    assertStaticToastViewportRuntimeBoundary();
+    assertStaticHomeAdsenseRuntimeBoundary();
+
     const chrome = spawn(chromePath, [
         "--headless=new",        "--remote-debugging-pipe",
         `--user-data-dir=${userDataDir}`,

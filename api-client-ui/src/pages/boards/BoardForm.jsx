@@ -14,10 +14,11 @@ import {
     Upload,
     X,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import {
     BOARD_ATTACHMENT_LIMITS,
+    BOARD_CONTENT_MAX_LENGTH,
+    BOARD_TITLE_MAX_LENGTH,
     boardAdapter,
     boardErrorMessage,
     validateBoardAttachmentSelection,
@@ -25,6 +26,8 @@ import {
 import { promptAction } from "../../common/promptAction.jsx";
 import { canManageByOwnerOrAdmin } from "../../utils/authorization.js";
 import { formatFileSize, isImageFile, normalizeContentImageUrls, sanitizeBoardContentHtml } from "../../utils/helpers.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { notifyError, notifyLoading, notifySuccess } from "../../utils/toast.js";
 
 const hasRole = (roles, roleName) => {
     if (!roles) return false;
@@ -53,6 +56,9 @@ const escapeAttribute = (value) =>
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
+const formatBoardLimitNumber = (value) => value.toLocaleString("ko-KR");
+const BOARD_CONTENT_IMAGE_ACCEPT = "image/jpeg,image/png,image/gif,image/webp,image/bmp";
+
 export const BoardForm = () => {
     const { kind, boardId } = useParams();
     const navigate = useNavigate();
@@ -67,6 +73,7 @@ export const BoardForm = () => {
     const [attachFiles, setAttachFiles] = useState([]);
     const [existingFiles, setExistingFiles] = useState([]);
     const [deletedExistingFileIds, setDeletedExistingFileIds] = useState([]);
+    const [contentLength, setContentLength] = useState(0);
     const [saving, setSaving] = useState(false);
     const [loadingBoard, setLoadingBoard] = useState(isEdit);
 
@@ -76,7 +83,7 @@ export const BoardForm = () => {
 
     useEffect(() => {
         if (kind === "ADMIN_NOTICE" && !isAdmin) {
-            toast.error("공지사항은 관리자만 작성할 수 있습니다.");
+            notifyError("공지사항은 관리자만 작성할 수 있습니다.");
             navigate(`/app/boards/${kind}`, { replace: true });
         }
     }, [kind, isAdmin, navigate]);
@@ -95,7 +102,7 @@ export const BoardForm = () => {
                     userName: user?.name || "",
                 });
                 if (!canManage) {
-                    toast.error("수정 권한이 없습니다.");
+                    notifyError("수정 권한이 없습니다.");
                     navigate(`/app/boards/${kind}/${boardId}`, { replace: true });
                     return;
                 }
@@ -105,13 +112,15 @@ export const BoardForm = () => {
                 setExistingFiles(Array.isArray(files) ? files : []);
                 setDeletedExistingFileIds([]);
                 if (editorRef.current) {
-                    editorRef.current.innerHTML = sanitizeBoardContentHtml(normalizeContentImageUrls(board.contents || board.content || ""));
+                    const sanitizedContents = sanitizeBoardContentHtml(normalizeContentImageUrls(board.contents || board.content || ""));
+                    editorRef.current.innerHTML = sanitizedContents;
+                    setContentLength(sanitizedContents.length);
                 }
                 loadedBoardIdRef.current = boardId;
             })
             .catch((error) => {
-                console.error("Failed to load board for edit:", error);
-                toast.error(boardErrorMessage(error, "게시글 로딩 실패"));
+                logClientError("boards.form.load", error);
+                notifyError(boardErrorMessage(error, "게시글 로딩 실패"));
             })
             .finally(() => {
                 if (mounted) setLoadingBoard(false);
@@ -126,14 +135,20 @@ export const BoardForm = () => {
         editorRef.current?.focus();
     };
 
+    const updateContentLength = () => {
+        setContentLength(sanitizeBoardContentHtml(editorRef.current?.innerHTML || "").length);
+    };
+
     const runCommand = (command, value = null) => {
         focusEditor();
         document.execCommand(command, false, value);
+        updateContentLength();
     };
 
     const insertHtml = (html) => {
         focusEditor();
         document.execCommand("insertHTML", false, html);
+        updateContentLength();
     };
 
     const insertLink = async () => {
@@ -154,24 +169,24 @@ export const BoardForm = () => {
 
     const uploadImageToServer = async (file) => {
         if (isHeicLikeFile(file)) {
-            toast.error("HEIC/HEIF 이미지는 JPG 또는 PNG로 변경 후 업로드해주세요.");
+            notifyError("HEIC/HEIF 이미지는 JPG 또는 PNG로 변경 후 업로드해주세요.");
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
-            toast.error("이미지 크기는 5MB 이하여야 합니다.");
+            notifyError("이미지 크기는 5MB 이하여야 합니다.");
             return;
         }
 
-        const toastId = toast.loading("이미지 업로드 중...");
+        const loadingToast = await notifyLoading("이미지 업로드 중...");
         try {
             const imageUrl = await boardAdapter.uploadContentImage(file);
             if (!imageUrl) throw new Error("uploaded image url missing");
 
             insertHtml(`<img src="${escapeAttribute(imageUrl)}" alt="본문 이미지" />`);
-            toast.success("이미지 삽입 완료", { id: toastId });
+            loadingToast.success("이미지 삽입 완료");
         } catch (error) {
-            console.error("Image upload failed:", error);
-            toast.error(boardErrorMessage(error, "이미지 업로드 실패"), { id: toastId });
+            logClientError("boards.form.imageUpload", error);
+            loadingToast.error(boardErrorMessage(error, "이미지 업로드 실패"));
         }
     };
 
@@ -213,7 +228,7 @@ export const BoardForm = () => {
             incomingFiles: nextFiles,
         });
         if (!validation.valid) {
-            toast.error(validation.message);
+            notifyError(validation.message);
             event.target.value = "";
             return;
         }
@@ -234,10 +249,10 @@ export const BoardForm = () => {
         setDeletedExistingFileIds((prev) => (prev.includes(fileId) ? prev : [...prev, fileId]));
     };
 
-    const buildSubmitFormData = () => {
+    const buildSubmitFormData = (sanitizedContents) => {
         const formData = new FormData();
         formData.append("title", title.trim());
-        formData.append("contents", sanitizeBoardContentHtml(editorRef.current?.innerHTML || ""));
+        formData.append("contents", sanitizedContents);
         attachFiles.forEach((file) => formData.append("files", file));
 
         if (isAdmin) {
@@ -252,11 +267,17 @@ export const BoardForm = () => {
         event.preventDefault();
 
         if (!title.trim()) {
-            toast.error("제목을 입력해주세요.");
+            notifyError("제목을 입력해주세요.");
             return;
         }
         if (!editorRef.current?.innerText.trim()) {
-            toast.error("내용을 입력해주세요.");
+            notifyError("내용을 입력해주세요.");
+            return;
+        }
+        const sanitizedContents = sanitizeBoardContentHtml(editorRef.current?.innerHTML || "");
+        if (sanitizedContents.length > BOARD_CONTENT_MAX_LENGTH) {
+            notifyError(`본문은 ${formatBoardLimitNumber(BOARD_CONTENT_MAX_LENGTH)}자 이하로 작성해주세요.`);
+            setContentLength(sanitizedContents.length);
             return;
         }
 
@@ -264,17 +285,17 @@ export const BoardForm = () => {
         try {
             if (isEdit) {
                 await Promise.all(deletedExistingFileIds.map((fileId) => boardAdapter.deleteBoardFile(boardId, fileId)));
-                await boardAdapter.updateBoard(boardId, buildSubmitFormData());
-                toast.success("게시글이 수정되었습니다.");
+                await boardAdapter.updateBoard(boardId, buildSubmitFormData(sanitizedContents));
+                notifySuccess("게시글이 수정되었습니다.");
             } else {
-                await boardAdapter.createBoard(kind, buildSubmitFormData());
-                toast.success("게시글이 등록되었습니다.");
+                await boardAdapter.createBoard(kind, buildSubmitFormData(sanitizedContents));
+                notifySuccess("게시글이 등록되었습니다.");
             }
 
             navigate(`/app/boards/${kind}`);
         } catch (error) {
-            console.error("Failed to save board:", error);
-            toast.error(boardErrorMessage(error, "저장 실패"));
+            logClientError("boards.form.save", error);
+            notifyError(boardErrorMessage(error, "저장 실패"));
         } finally {
             setSaving(false);
         }
@@ -303,12 +324,16 @@ export const BoardForm = () => {
                         <input
                             type="text"
                             value={title}
-                            onChange={(event) => setTitle(event.target.value)}
+                            onChange={(event) => setTitle(event.target.value.slice(0, BOARD_TITLE_MAX_LENGTH))}
                             className="input-base"
                             placeholder="제목을 입력하세요"
                             disabled={editorDisabled}
+                            maxLength={BOARD_TITLE_MAX_LENGTH}
                             required
                         />
+                        <div className="mt-1 text-right text-xs font-medium text-slate-400">
+                            제목 {title.length}/{BOARD_TITLE_MAX_LENGTH}자
+                        </div>
                     </div>
 
                     <div>
@@ -336,6 +361,7 @@ export const BoardForm = () => {
                                 suppressContentEditableWarning
                                 data-placeholder={loadingBoard ? "게시글을 불러오는 중..." : "내용을 입력하세요."}
                                 className="rich-board-editor min-h-[300px] px-4 py-3 leading-7 outline-none"
+                                onInput={updateContentLength}
                                 onPaste={handlePaste}
                                 onDrop={handleDrop}
                                 onDragOver={(event) => event.preventDefault()}
@@ -343,11 +369,14 @@ export const BoardForm = () => {
                             <input
                                 ref={imageInputRef}
                                 type="file"
-                                accept="image/*"
+                                accept={BOARD_CONTENT_IMAGE_ACCEPT}
                                 multiple
                                 className="hidden"
                                 onChange={handleToolbarImageChange}
                             />
+                        </div>
+                        <div className={`mt-1 text-right text-xs font-medium ${contentLength > BOARD_CONTENT_MAX_LENGTH ? "text-red-500" : "text-slate-400"}`}>
+                            본문 {formatBoardLimitNumber(contentLength)}/{formatBoardLimitNumber(BOARD_CONTENT_MAX_LENGTH)}자
                         </div>
                     </div>
 

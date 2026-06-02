@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -22,6 +22,48 @@ const viewports = [
     { name: "mobile", width: 390, height: 844, mobile: true },
 ];
 const blockedTexts = ["Loading", "Error", "Failed", "undefined", "NaN"];
+const projectRoot = new URL("../", import.meta.url);
+
+function assertOptimizerSourceBoundaries() {
+    const loader = readFileSync(new URL("src/utils/daumPostcodeLoader.js", projectRoot), "utf8");
+    const optimizer = readFileSync(new URL("src/pages/facility/MeetingOptimizer.jsx", projectRoot), "utf8");
+    const adapter = readFileSync(new URL("src/adapters/optimizerAdapter.js", projectRoot), "utf8");
+    const toastHelper = readFileSync(new URL("src/utils/toast.js", projectRoot), "utf8");
+
+    if (!loader.includes("https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js")) {
+        throw new Error("optimizer source guard: Daum postcode loader must use an explicit https URL");
+    }
+    if (!loader.includes("DAUM_POSTCODE_LOAD_TIMEOUT_MS") || !loader.includes("setTimeout")) {
+        throw new Error("optimizer source guard: Daum postcode loader must keep a bounded timeout");
+    }
+    if (!optimizer.includes("../../utils/daumPostcodeLoader.js") || /const\s+loadDaumPostcodeScript\s*=/.test(optimizer)) {
+        throw new Error("optimizer source guard: MeetingOptimizer must use the shared Daum postcode loader");
+    }
+    if (optimizer.includes("t1.daumcdn.net") || optimizer.includes("data-daum-postcode")) {
+        throw new Error("optimizer source guard: MeetingOptimizer must not define its own postcode script tag");
+    }
+    if (!toastHelper.includes("export const notifyLoading") || !toastHelper.includes("import(\"react-hot-toast\")")) {
+        throw new Error("optimizer source guard: toast helper must expose dynamic loading notifications.");
+    }
+    if (optimizer.includes("from \"react-hot-toast\"") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(optimizer)) {
+        throw new Error("optimizer source guard: MeetingOptimizer must use the dynamic toast helper instead of static react-hot-toast imports.");
+    }
+    for (const helperName of ["notifyError", "notifyLoading", "notifySuccess"]) {
+        if (!optimizer.includes(helperName)) {
+            throw new Error(`optimizer source guard: MeetingOptimizer must keep ${helperName} on the dynamic toast runtime boundary.`);
+        }
+    }
+    if (!adapter.includes("OPTIMIZER_MAX_PARTICIPANTS = 8")
+        || !adapter.includes("OPTIMIZER_ADDRESS_MAX_LENGTH = 120")
+        || !adapter.includes("normalizeOptimizerAddresses(addresses)")) {
+        throw new Error("optimizer source guard: optimizer adapter must normalize and bound request payloads.");
+    }
+    if (!optimizer.includes("addresses.length >= OPTIMIZER_MAX_PARTICIPANTS")
+        || !optimizer.includes("maxLength={OPTIMIZER_ADDRESS_MAX_LENGTH}")
+        || !optimizer.includes("최대 {OPTIMIZER_MAX_PARTICIPANTS}명")) {
+        throw new Error("optimizer source guard: MeetingOptimizer must expose participant and address bounds in the UI.");
+    }
+}
 
 class PipeCdp {
     constructor(chrome) {
@@ -357,6 +399,8 @@ async function inspectOptimizer(cdp, sessionId, viewport) {
 }
 
 async function main() {
+    assertOptimizerSourceBoundaries();
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

@@ -1,48 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DatabaseZap, LocateFixed, RefreshCw, Search, Shield, Users, X } from "lucide-react";
-import toast from "react-hot-toast";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
-import { extractFacilityErrorMessage, facilityAdapter } from "../../adapters/facilityAdapter.js";
+import { useNaverMaps } from "../../utils/naverMapsLoader.js";
+import { FACILITY_KEYWORD_MAX_LENGTH, extractFacilityErrorMessage, facilityAdapter } from "../../adapters/facilityAdapter.js";
+import { encodeInlineHandlerArg, escapeHtml } from "../../utils/helpers.js";
+import { notifyError, notifyLoading, notifySuccess } from "../../utils/toast.js";
 
 const INITIAL_CENTER = { latitude: 37.5665, longitude: 126.9780 };
 const ACTIVE_STATUS = "사용중";
 const toNumber = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const getId = (item) => item?.bunker_lot_id ?? item?.bunkerLotId ?? item?.management_no ?? item?.managementNo;
-
-const useNaverMaps = () => {
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        if (window.naver?.maps) {
-            setIsLoaded(true);
-            return;
-        }
-
-        const sdkScript = document.getElementById("naver-maps-sdk");
-        if (!sdkScript) {
-            setError(true);
-            return;
-        }
-
-        const onLoad = () => setIsLoaded(true);
-        const onError = () => setError(true);
-        sdkScript.addEventListener("load", onLoad);
-        sdkScript.addEventListener("error", onError);
-
-        if (window.naver?.maps) setIsLoaded(true);
-
-        return () => {
-            sdkScript.removeEventListener("load", onLoad);
-            sdkScript.removeEventListener("error", onError);
-        };
-    }, []);
-
-    return { isLoaded, error };
-};
 
 export const BunkerFinder = () => {
     const { user } = useAuth();
@@ -158,7 +128,7 @@ export const BunkerFinder = () => {
         recentPickRef.current = { ts: now, latitude: point.latitude, longitude: point.longitude };
         setPickedCenterMarker(point.latitude, point.longitude);
         setCenter(point);
-        toast.success(`${modeLabel} 위치를 기준점으로 설정했습니다.`);
+        notifySuccess(`${modeLabel} 위치를 기준점으로 설정했습니다.`);
     }, [normalizeCoord, setPickedCenterMarker]);
 
     const pickCenterByClientPoint = useCallback((clientX, clientY, modeLabel) => {
@@ -206,7 +176,7 @@ export const BunkerFinder = () => {
             setFetchedItems([]);
             setItems([]);
             setSelectedId(null);
-            toast.error(extractFacilityErrorMessage(err, "대피소 목록을 불러오지 못했습니다."));
+            notifyError(extractFacilityErrorMessage(err, "대피소 목록을 불러오지 못했습니다."));
         } finally {
             setLoading(false);
         }
@@ -226,14 +196,14 @@ export const BunkerFinder = () => {
         if (/^\d*$/.test(event.target.value)) setLimitInput(event.target.value);
     };
 
-    const handleLocate = () => {
+    const handleLocate = async () => {
         if (locatingCurrent) return;
-        if (!navigator.geolocation) return toast.error("브라우저 위치 기능을 사용할 수 없습니다.");
+        if (!navigator.geolocation) return notifyError("브라우저 위치 기능을 사용할 수 없습니다.");
         setLocatingCurrent(true);
-        const tid = toast.loading("현재 위치 확인 중...");
+        const loadingToast = await notifyLoading("현재 위치 확인 중...");
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                toast.dismiss(tid);
+                loadingToast.dismiss();
                 const nextCenter = {
                     latitude: Number(position.coords.latitude.toFixed(6)),
                     longitude: Number(position.coords.longitude.toFixed(6)),
@@ -247,14 +217,14 @@ export const BunkerFinder = () => {
                     mapRef.current.setCenter(new window.naver.maps.LatLng(nextCenter.latitude, nextCenter.longitude));
                     mapRef.current.setZoom(15);
                 }
-                toast.success(Number.isFinite(accuracy)
+                notifySuccess(Number.isFinite(accuracy)
                     ? `현재 위치로 기준점을 변경했습니다. (정확도 ±${Math.round(accuracy)}m)`
                     : "현재 위치로 기준점을 변경했습니다.");
                 setLocatingCurrent(false);
             },
             () => {
-                toast.dismiss(tid);
-                toast.error("위치 권한이 없어 기본 위치(서울시청)를 사용합니다.");
+                loadingToast.dismiss();
+                notifyError("위치 권한이 없어 기본 위치(서울시청)를 사용합니다.");
                 setLocatingCurrent(false);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -271,7 +241,7 @@ export const BunkerFinder = () => {
             mapRef.current.setCenter(new window.naver.maps.LatLng(nextCenter.latitude, nextCenter.longitude));
             mapRef.current.setZoom(14);
         }
-        toast.success(`"${address}" 기준 위치로 이동했습니다.`);
+        notifySuccess(`"${address}" 기준 위치로 이동했습니다.`);
     };
 
     const handleImport = async () => {
@@ -279,10 +249,10 @@ export const BunkerFinder = () => {
         try {
             const data = await facilityAdapter.importBunkerLots(csvPath);
             const count = data.importedCount;
-            toast.success(`CSV 재적재 완료 (${count}건)`);
+            notifySuccess(`CSV 재적재 완료 (${count}건)`);
             await fetchLots();
         } catch (err) {
-            toast.error(extractFacilityErrorMessage(err, "CSV 재적재에 실패했습니다."));
+            notifyError(extractFacilityErrorMessage(err, "CSV 재적재에 실패했습니다."));
         } finally {
             setImporting(false);
         }
@@ -331,12 +301,16 @@ export const BunkerFinder = () => {
             const lat = Number(item?.latitude);
             const lng = Number(item?.longitude);
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-            const safeId = String(id ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            const safeId = encodeInlineHandlerArg(id);
+            const name = item?.facility_name ?? item?.facilityName ?? "대피소";
+            const address = item?.road_address ?? item?.roadAddress ?? item?.full_address ?? item?.fullAddress ?? "주소 없음";
+            const safeName = escapeHtml(name);
+            const safeAddress = escapeHtml(address);
             const position = new window.naver.maps.LatLng(lat, lng);
             const marker = new window.naver.maps.Marker({
                 position,
                 map: mapRef.current,
-                title: item?.facility_name ?? item?.facilityName ?? "대피소",
+                title: name,
                 icon: {
                     content: '<div style="width:14px;height:14px;border-radius:9999px;background:#0f766e;border:2px solid #fff;box-shadow:0 2px 8px rgba(15,118,110,0.45)"></div>',
                     anchor: new window.naver.maps.Point(7, 7),
@@ -344,9 +318,9 @@ export const BunkerFinder = () => {
             });
             const infoWindow = new window.naver.maps.InfoWindow({
                 content: `
-                    <button type="button" onclick="window.__bunkerFinderOpenLotDetail && window.__bunkerFinderOpenLotDetail('${safeId}')" ontouchend="window.__bunkerFinderOpenLotDetail && window.__bunkerFinderOpenLotDetail('${safeId}')" style="padding:10px;min-width:210px;border:0;background:#fff;text-align:left;cursor:pointer;font-family:Arial,sans-serif;">
-                      <div style="font-weight:800;font-size:13px;color:#0f172a;">${item?.facility_name ?? item?.facilityName ?? "대피소"}</div>
-                      <div style="font-size:11px;color:#64748b;margin-top:4px;">${item?.road_address ?? item?.roadAddress ?? item?.full_address ?? item?.fullAddress ?? "주소 없음"}</div>
+                    <button type="button" onclick="window.__bunkerFinderOpenLotDetail && window.__bunkerFinderOpenLotDetail(${safeId})" ontouchend="window.__bunkerFinderOpenLotDetail && window.__bunkerFinderOpenLotDetail(${safeId})" style="padding:10px;min-width:210px;border:0;background:#fff;text-align:left;cursor:pointer;font-family:Arial,sans-serif;">
+                      <div style="font-weight:800;font-size:13px;color:#0f172a;">${safeName}</div>
+                      <div style="font-size:11px;color:#64748b;margin-top:4px;">${safeAddress}</div>
                       <div style="font-size:10px;color:#0f766e;margin-top:6px;font-weight:700;">터치해서 상세 보기</div>
                     </button>
                 `,
@@ -531,7 +505,8 @@ export const BunkerFinder = () => {
                             <button onClick={handleLocate} disabled={locatingCurrent} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-black text-slate-700 disabled:opacity-60"><LocateFixed className="h-3.5 w-3.5" />{"내 위치"}</button>
                             <button onClick={fetchLots} disabled={loading} className="flex items-center justify-center gap-1 rounded-xl bg-primary-600 px-3 py-2.5 text-xs font-black text-white disabled:opacity-60">{loading ? <LoadingSpinner size="sm" text="" /> : <Search className="h-3.5 w-3.5" />}{"검색"}</button>
                         </div>
-                        <input value={keyword} onChange={(e) => setKeyword(e.target.value)} onKeyDown={handleSearchEnter} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" placeholder={"키워드(시설명/주소)"} />
+                        <input value={keyword} onChange={(e) => setKeyword(e.target.value.slice(0, FACILITY_KEYWORD_MAX_LENGTH))} onKeyDown={handleSearchEnter} maxLength={FACILITY_KEYWORD_MAX_LENGTH} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" placeholder={"키워드(시설명/주소)"} />
+                        <p className="text-right text-[11px] font-semibold text-slate-400">검색어 {keyword.length}/{FACILITY_KEYWORD_MAX_LENGTH}자</p>
                         <div className="grid grid-cols-2 gap-2">
                             <div>
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-400">{"반경(km)"}</label>

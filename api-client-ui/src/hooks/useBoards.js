@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { boardAdapter, boardErrorMessage } from "../adapters/boardAdapter.js";
+import { logClientError } from "../utils/clientDiagnostics.js";
 
 export const useBoards = (kind, page = 1, size = 10, reloadKey = 0, options = {}) => {
     const {
@@ -121,7 +122,7 @@ export const useBoards = (kind, page = 1, size = 10, reloadKey = 0, options = {}
                 });
             } catch (err) {
                 if (isMounted) {
-                    console.error("[useBoards] Fetch Error:", err);
+                    logClientError("boards.list.fetch", err);
                     setError(boardErrorMessage(err, "게시글 목록을 불러오지 못했습니다."));
                     setBoards([]);
                     lastFetchKeyRef.current = fetchKey;

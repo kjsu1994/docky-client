@@ -1,9 +1,9 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 if (typeof global === 'undefined') { window.global = window; }
 import { 
     Dices, Trophy, Play, RefreshCcw, Coins, Info, Award, Lock, Unlock, AlertCircle, TrendingUp
 } from "lucide-react";
-import toast from "react-hot-toast";
+import { notifyError, notifySuccess } from "../../utils/toast.js";
 import { formatNumber } from "../../utils/helpers.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { luckyPlinkoAdapter, luckyPlinkoErrorMessage } from "../../adapters/luckyPlinkoAdapter.js";
@@ -21,6 +21,7 @@ const DICE_FACE_ANGLES = {
 };
 const SHOW_LAYOUT_GUIDES = false;
 const BOARD_CROP_BOTTOM_PX = 34;
+const PLINKO_ENTRY_COST = 100;
 
 // Dice face renderer
 const DiceFace = ({ value }) => {
@@ -123,6 +124,7 @@ const ThreeDDice = ({ value, rolling, isHeld, onClick, index }) => {
 export const LuckyPlinko = () => {
     const { user } = useAuth();
     const [step, setStep] = useState(1);
+    const [pointBalance, setPointBalance] = useState(null);
     const [dice, setDice] = useState([1, 2, 3, 4, 5]);
     const [heldIndices, setHeldIndices] = useState([]);
     const [rolling, setRolling] = useState(false);
@@ -148,6 +150,13 @@ export const LuckyPlinko = () => {
     const lastTapAtRef = useRef(0);
 
     useEffect(() => {
+        const nextPoint = Number(user?.point);
+        if (Number.isFinite(nextPoint)) {
+            setPointBalance(nextPoint);
+        }
+    }, [user?.point]);
+
+    useEffect(() => {
         // 모든 구슬 착지가 끝난 뒤 API 최종 점수를 호출한다.
         if (!playInProgress || !pendingPlinkoResult || totalToLand === 0) return;
         if (landedCount < totalToLand) return;
@@ -155,7 +164,8 @@ export const LuckyPlinko = () => {
         setPlinkoResult(pendingPlinkoResult);
         setPendingPlinkoResult(null);
         setPlayInProgress(false);
-        toast.success(`${formatNumber(pendingPlinkoResult.earnedPoint)}포인트를 획득했습니다.`);
+        setPointBalance(pendingPlinkoResult.totalPoint);
+        notifySuccess(`${formatNumber(pendingPlinkoResult.earnedPoint)}포인트를 획득했습니다.`);
     }, [landedCount, totalToLand, pendingPlinkoResult, playInProgress]);
 
     useEffect(() => {
@@ -476,8 +486,15 @@ export const LuckyPlinko = () => {
     }, []);
     const MIN_ROLL_MS = 1800;
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const userPoint = Number(user?.point);
+    const visiblePointBalance = pointBalance ?? (Number.isFinite(userPoint) ? userPoint : 0);
+    const canStartRoll = !rolling && visiblePointBalance >= PLINKO_ENTRY_COST;
     const rollDice = async () => {
         if (rolling) return;
+        if (visiblePointBalance < PLINKO_ENTRY_COST) {
+            notifyError("플링코를 시작하려면 100포인트가 필요합니다.");
+            return;
+        }
         setRolling(true);
         const rollStartedAt = performance.now();
         rollAudio.current.currentTime = 0;
@@ -489,11 +506,14 @@ export const LuckyPlinko = () => {
             setDice(normalized.dice);
             setGameResult(normalized);
             setMarbles(normalized.marbles);
+            if (normalized.totalPoint !== null) {
+                setPointBalance(normalized.totalPoint);
+            }
             setRolling(false);
             setStep(2);
         } catch (error) {
             setRolling(false);
-            toast.error(luckyPlinkoErrorMessage(error, "주사위를 굴리지 못했습니다."));
+            notifyError(luckyPlinkoErrorMessage(error, "주사위를 굴리지 못했습니다."));
         }
     };
     const rerollDice = async () => {
@@ -513,7 +533,7 @@ export const LuckyPlinko = () => {
             setStep(3);
         } catch (error) {
             setRolling(false);
-            toast.error(luckyPlinkoErrorMessage(error, "주사위를 다시 굴리지 못했습니다."));
+            notifyError(luckyPlinkoErrorMessage(error, "주사위를 다시 굴리지 못했습니다."));
         }
     };
     const playPlinko = async () => {
@@ -526,7 +546,8 @@ export const LuckyPlinko = () => {
                 setPlinkoResult(normalized);
                 setPendingPlinkoResult(null);
                 setPlayInProgress(false);
-                toast.success(`${formatNumber(normalized.earnedPoint)}포인트를 획득했습니다.`);
+                setPointBalance(normalized.totalPoint);
+                notifySuccess(`${formatNumber(normalized.earnedPoint)}포인트를 획득했습니다.`);
                 return;
             }
             setPlinkoResult(null);
@@ -553,7 +574,7 @@ export const LuckyPlinko = () => {
             newParticles.forEach((p, i) => setTimeout(() => particlesRef.current.push(p), i * 180));
         } catch (error) {
             setPlayInProgress(false);
-            toast.error(luckyPlinkoErrorMessage(error, "플링코를 실행하지 못했습니다."));
+            notifyError(luckyPlinkoErrorMessage(error, "플링코를 실행하지 못했습니다."));
         }
     };
 
@@ -595,9 +616,9 @@ export const LuckyPlinko = () => {
                         </div>
                         <div className="bg-slate-900/80 px-10 py-6 rounded-[2rem] border border-white/10 shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)]">
                             <span className="text-[10px] text-amber-500 font-black tracking-widest mb-1 block opacity-50 text-center">보유 포인트</span>
-                            <div className="text-4xl font-black text-white flex items-center gap-3">
+                            <div data-smoke="plinko-point-balance" className="text-4xl font-black text-white flex items-center gap-3">
                                 <Coins className="h-8 w-8 text-amber-400" />
-                                {formatNumber(plinkoResult?.totalPoint || user?.point || 0)}
+                                {formatNumber(plinkoResult?.totalPoint ?? visiblePointBalance)}
                             </div>
                             {playInProgress && (
                                 <div className="mt-2 text-center text-amber-200 text-xs font-black tracking-wide">
@@ -634,7 +655,7 @@ export const LuckyPlinko = () => {
                         </div>
                         <div className="mt-10 space-y-4">
                             {step === 1 && (
-                                <button onClick={rollDice} disabled={rolling} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] active:translate-y-2 transition-all">첫 굴림 (100P)</button>
+                                <button onClick={rollDice} disabled={!canStartRoll} className="w-full py-6 rounded-3xl bg-indigo-600 text-white font-black text-2xl shadow-[0_8px_0_rgb(49,46,129)] active:translate-y-2 transition-all disabled:opacity-50">{visiblePointBalance >= PLINKO_ENTRY_COST ? "첫 굴림 (100P)" : "포인트 부족"}</button>
                             )}
                             {step === 2 && (
                                 <div className="flex flex-col gap-4">

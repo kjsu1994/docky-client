@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import toast from "react-hot-toast";
+import { trapFocus } from "../utils/focusTrap.js";
+import { loadToast } from "../utils/toast.js";
+
+const restoreFocus = (previousFocus) => {
+    if (typeof window === "undefined") return;
+    window.setTimeout(() => {
+        if (previousFocus?.isConnected && typeof previousFocus.focus === "function") {
+            previousFocus.focus();
+        }
+    }, 0);
+};
 
 const PromptToast = ({
     item,
@@ -17,10 +27,27 @@ const PromptToast = ({
 }) => {
     const [value, setValue] = useState(initialValue);
     const inputRef = useRef(null);
+    const cancelRef = useRef(null);
+    const submitRef = useRef(null);
+    const titleId = `prompt-title-${item.id}`;
+    const descriptionId = `prompt-description-${item.id}`;
+    const inputId = `prompt-input-${item.id}`;
+    const labelId = `prompt-label-${item.id}`;
 
     useEffect(() => {
         window.setTimeout(() => inputRef.current?.focus(), 0);
-    }, []);
+
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape") {
+                settle(null, item.id);
+                return;
+            }
+            trapFocus(event, [inputRef.current, cancelRef.current, submitRef.current]);
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [item.id, settle]);
 
     const canSubmit = !required || value.trim().length > 0;
 
@@ -38,12 +65,14 @@ const PromptToast = ({
             }`}
             role="dialog"
             aria-modal="true"
-            aria-label={title}
+            aria-labelledby={titleId}
+            aria-describedby={description ? descriptionId : undefined}
         >
-            <div className="text-sm font-black text-slate-900">{title}</div>
-            {description ? <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">{description}</p> : null}
-            <label className="mt-4 block text-[11px] font-black text-slate-500">{label}</label>
+            <div id={titleId} className="text-sm font-black text-slate-900">{title}</div>
+            {description ? <p id={descriptionId} className="mt-2 text-xs font-bold leading-relaxed text-slate-500">{description}</p> : null}
+            <label id={labelId} htmlFor={inputId} className="mt-4 block text-[11px] font-black text-slate-500">{label}</label>
             <input
+                id={inputId}
                 ref={inputRef}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900 outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-100"
                 value={value}
@@ -51,18 +80,23 @@ const PromptToast = ({
                 placeholder={placeholder}
                 inputMode={inputMode}
                 maxLength={maxLength}
+                required={required}
+                aria-labelledby={labelId}
+                aria-required={required}
             />
             <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
+                    ref={cancelRef}
                     type="button"
-                    className="min-h-10 rounded-xl bg-slate-100 px-3 text-sm font-black text-slate-700 transition hover:bg-slate-200"
+                    className="min-h-10 rounded-xl bg-slate-100 px-3 text-sm font-black text-slate-700 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
                     onClick={() => settle(null, item.id)}
                 >
                     {cancelText}
                 </button>
                 <button
+                    ref={submitRef}
                     type="submit"
-                    className="min-h-10 rounded-xl bg-slate-900 px-3 text-sm font-black text-white transition hover:bg-primary-600 disabled:bg-slate-300"
+                    className="min-h-10 rounded-xl bg-slate-900 px-3 text-sm font-black text-white transition hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:bg-slate-300"
                     disabled={!canSubmit}
                 >
                     {confirmText}
@@ -72,7 +106,7 @@ const PromptToast = ({
     );
 };
 
-export const promptAction = ({
+export const promptAction = async ({
     title = "입력",
     description = "",
     label = "내용",
@@ -83,33 +117,49 @@ export const promptAction = ({
     inputMode = "text",
     required = false,
     maxLength = 500,
-} = {}) => new Promise((resolve) => {
-    let settled = false;
-    const settle = (value, toastId) => {
-        if (settled) return;
-        settled = true;
-        if (toastId) toast.dismiss(toastId);
-        resolve(value);
-    };
+} = {}) => {
+    const previousFocus = typeof document !== "undefined"
+        && typeof HTMLElement !== "undefined"
+        && document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    let toast;
+    try {
+        toast = await loadToast();
+    } catch {
+        restoreFocus(previousFocus);
+        return null;
+    }
 
-    toast.custom((item) => (
-        <PromptToast
-            item={item}
-            title={title}
-            description={description}
-            label={label}
-            initialValue={initialValue}
-            placeholder={placeholder}
-            confirmText={confirmText}
-            cancelText={cancelText}
-            inputMode={inputMode}
-            required={required}
-            maxLength={maxLength}
-            settle={settle}
-        />
-    ), {
-        duration: Infinity,
-        position: "bottom-center",
-        onClose: () => settle(null),
+    return new Promise((resolve) => {
+        let settled = false;
+        const settle = (value, toastId) => {
+            if (settled) return;
+            settled = true;
+            if (toastId) toast.dismiss(toastId);
+            restoreFocus(previousFocus);
+            resolve(value);
+        };
+
+        toast.custom((item) => (
+            <PromptToast
+                item={item}
+                title={title}
+                description={description}
+                label={label}
+                initialValue={initialValue}
+                placeholder={placeholder}
+                confirmText={confirmText}
+                cancelText={cancelText}
+                inputMode={inputMode}
+                required={required}
+                maxLength={maxLength}
+                settle={settle}
+            />
+        ), {
+            duration: Infinity,
+            position: "bottom-center",
+            onClose: () => settle(null),
+        });
     });
-});
+};

@@ -1,30 +1,13 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { MapPin, Search } from "lucide-react";
-import toast from "react-hot-toast";
-import { addressSearchAdapter, extractAddressSearchErrorMessage } from "../adapters/addressSearchAdapter.js";
-
-const loadDaumPostcodeScript = () =>
-    new Promise((resolve, reject) => {
-        if (window?.daum?.Postcode) {
-            resolve();
-            return;
-        }
-
-        const existing = document.querySelector('script[data-daum-postcode="true"]');
-        if (existing) {
-            existing.addEventListener("load", () => resolve(), { once: true });
-            existing.addEventListener("error", () => reject(new Error("Daum postcode load failed")), { once: true });
-            return;
-        }
-
-        const script = document.createElement("script");
-        script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
-        script.async = true;
-        script.dataset.daumPostcode = "true";
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Daum postcode load failed"));
-        document.body.appendChild(script);
-    });
+import {
+    ADDRESS_QUERY_MAX_LENGTH,
+    addressSearchAdapter,
+    extractAddressSearchErrorMessage,
+    normalizeAddressQuery,
+} from "../adapters/addressSearchAdapter.js";
+import { loadDaumPostcodeScript } from "../utils/daumPostcodeLoader.js";
+import { notifyError } from "../utils/toast.js";
 
 export const AddressSearchBox = ({
     onResolved,
@@ -42,14 +25,23 @@ export const AddressSearchBox = ({
     const [suggestions, setSuggestions] = useState([]);
     const [open, setOpen] = useState(false);
     const [isComposing, setIsComposing] = useState(false);
+    const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
 
     const rootRef = useRef(null);
     const lastSuggestedKeywordRef = useRef("");
+    const generatedId = useId();
+    const addressSearchId = useMemo(() => generatedId.replace(/:/g, ""), [generatedId]);
+    const inputId = `${addressSearchId}-input`;
+    const listboxId = `${addressSearchId}-listbox`;
+    const activeOptionId = activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]
+        ? `${listboxId}-option-${activeSuggestionIndex}`
+        : undefined;
 
     useEffect(() => {
         const onClickOutside = (event) => {
             if (!rootRef.current?.contains(event.target)) {
                 setOpen(false);
+                setActiveSuggestionIndex(-1);
             }
         };
         document.addEventListener("mousedown", onClickOutside);
@@ -57,11 +49,17 @@ export const AddressSearchBox = ({
     }, []);
 
     useEffect(() => {
-        const keyword = query.trim();
+        const keyword = normalizeAddressQuery(query);
 
         if (keyword.length < 2) {
             setSuggestions([]);
+            setOpen(false);
+            setActiveSuggestionIndex(-1);
             lastSuggestedKeywordRef.current = "";
+            return;
+        }
+
+        if (isComposing) {
             return;
         }
 
@@ -80,9 +78,12 @@ export const AddressSearchBox = ({
 
                 setSuggestions(result.items);
                 setOpen(true);
+                setActiveSuggestionIndex(-1);
             } catch (err) {
                 if (!cancelled) {
                     setSuggestions([]);
+                    setOpen(false);
+                    setActiveSuggestionIndex(-1);
                 }
             } finally {
                 if (!cancelled) {
@@ -106,7 +107,7 @@ export const AddressSearchBox = ({
 
         setLoadingResolve(true);
         try {
-            const payload = await addressSearchAdapter.geocodeAddress(address);
+            const payload = await addressSearchAdapter.geocodeAddress(normalizeAddressQuery(address));
             const { latitude, longitude } = payload;
 
             if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
@@ -117,6 +118,7 @@ export const AddressSearchBox = ({
             setQuery(normalizedAddress);
             setSuggestions([]);
             setOpen(false);
+            setActiveSuggestionIndex(-1);
             lastSuggestedKeywordRef.current = normalizedAddress;
 
             onResolved?.({
@@ -128,7 +130,7 @@ export const AddressSearchBox = ({
                 longitude,
             });
         } catch (err) {
-            toast.error(extractAddressSearchErrorMessage(err, "주소 좌표를 찾지 못했습니다."));
+            notifyError(extractAddressSearchErrorMessage(err, "주소 좌표를 찾지 못했습니다."));
         } finally {
             setLoadingResolve(false);
         }
@@ -144,12 +146,13 @@ export const AddressSearchBox = ({
                 oncomplete: (data) => {
                     const selectedAddress = data?.roadAddress || data?.jibunAddress || data?.address || "";
                     if (!selectedAddress) {
-                        toast.error("주소를 선택하지 못했습니다.");
+                        notifyError("주소를 선택하지 못했습니다.");
                         return;
                     }
 
                     setQuery(selectedAddress);
                     setOpen(false);
+                    setActiveSuggestionIndex(-1);
                     resolveAddress(selectedAddress, {
                         roadAddress: data?.roadAddress || null,
                         jibunAddress: data?.jibunAddress || null,
@@ -158,7 +161,7 @@ export const AddressSearchBox = ({
                 },
             }).open();
         } catch (err) {
-            toast.error("우편번호 서비스를 불러오지 못했습니다.");
+            notifyError("우편번호 서비스를 불러오지 못했습니다.");
         } finally {
             setLoadingPostcode(false);
         }
@@ -166,7 +169,7 @@ export const AddressSearchBox = ({
 
     const runPrimaryAction = () => {
         if (primaryIsResolve) {
-            resolveAddress(query.trim());
+            resolveAddress(normalizeAddressQuery(query));
             return;
         }
         openDaumPostcode();
@@ -174,10 +177,52 @@ export const AddressSearchBox = ({
 
     const runSecondaryAction = () => {
         if (secondaryIsResolve) {
-            resolveAddress(query.trim());
+            resolveAddress(normalizeAddressQuery(query));
             return;
         }
         openDaumPostcode();
+    };
+
+    const selectSuggestion = (item) => {
+        const address = item?.address || item?.roadAddress || item?.jibunAddress;
+        if (!address) return;
+        setActiveSuggestionIndex(-1);
+        resolveAddress(address);
+    };
+
+    const handleInputKeyDown = (event) => {
+        if (event.nativeEvent?.isComposing || isComposing) return;
+
+        if (event.key === "Escape") {
+            setOpen(false);
+            setActiveSuggestionIndex(-1);
+            return;
+        }
+
+        if (!suggestions.length) return;
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setOpen(true);
+            setActiveSuggestionIndex((current) => (
+                current < suggestions.length - 1 ? current + 1 : 0
+            ));
+            return;
+        }
+
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setOpen(true);
+            setActiveSuggestionIndex((current) => (
+                current > 0 ? current - 1 : suggestions.length - 1
+            ));
+            return;
+        }
+
+        if (event.key === "Enter" && open && activeSuggestionIndex >= 0) {
+            event.preventDefault();
+            selectSuggestion(suggestions[activeSuggestionIndex]);
+        }
     };
 
     const primaryDisabled = primaryIsResolve
@@ -195,23 +240,32 @@ export const AddressSearchBox = ({
 
     return (
         <div ref={rootRef} className={`relative ${className}`}>
-            <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">주소 검색</label>
+            <label htmlFor={inputId} className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">주소 검색</label>
 
             <div className="relative">
                 <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                 <input
+                    id={inputId}
+                    role="combobox"
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => setQuery(e.target.value.slice(0, ADDRESS_QUERY_MAX_LENGTH))}
+                    onKeyDown={handleInputKeyDown}
                     onCompositionStart={() => setIsComposing(true)}
                     onCompositionEnd={(e) => {
                         setIsComposing(false);
-                        setQuery(e.currentTarget.value);
+                        setQuery(e.currentTarget.value.slice(0, ADDRESS_QUERY_MAX_LENGTH));
                     }}
                     onFocus={() => {
                         if (suggestions.length) setOpen(true);
                     }}
                     placeholder={placeholder}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-24 text-sm"
+                    maxLength={ADDRESS_QUERY_MAX_LENGTH}
+                    aria-autocomplete="list"
+                    aria-expanded={open}
+                    aria-controls={listboxId}
+                    aria-activedescendant={activeOptionId}
+                    aria-busy={loadingSuggest}
                 />
                 <button
                     type="button"
@@ -235,23 +289,36 @@ export const AddressSearchBox = ({
             </div>
 
             {open && (
-                <div className="absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                <div
+                    id={listboxId}
+                    role="listbox"
+                    aria-label="주소 검색 제안"
+                    aria-live="polite"
+                    className="absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl"
+                >
                     {loadingSuggest ? (
                         <div className="px-3 py-2 text-xs font-semibold text-slate-400">검색 중...</div>
                     ) : suggestions.length === 0 ? (
                         <div className="px-3 py-2 text-xs font-semibold text-slate-400">일치하는 주소가 없습니다.</div>
                     ) : (
                         suggestions.map((item, index) => {
-                            const address = item?.address;
                             const road = item?.roadAddress;
                             const jibun = item?.jibunAddress;
+                            const address = item?.address || road || jibun;
+                            const active = index === activeSuggestionIndex;
 
                             return (
                                 <button
                                     key={`${address}-${index}`}
+                                    id={`${listboxId}-option-${index}`}
+                                    role="option"
+                                    aria-selected={index === activeSuggestionIndex}
                                     type="button"
-                                    onClick={() => resolveAddress(address)}
-                                    className="block w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50"
+                                    onMouseEnter={() => setActiveSuggestionIndex(index)}
+                                    onClick={() => selectSuggestion(item)}
+                                    className={`block w-full rounded-lg px-3 py-2 text-left ${
+                                        active ? "bg-slate-100" : "hover:bg-slate-50"
+                                    }`}
                                 >
                                     <div className="text-sm font-bold text-slate-800">{address}</div>
                                     <div className="mt-0.5 text-xs text-slate-500">
@@ -268,7 +335,7 @@ export const AddressSearchBox = ({
 
             <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-400">
                 <Search className="h-3 w-3" />
-                검색 옵션
+                주소 검색어 {query.length}/{ADDRESS_QUERY_MAX_LENGTH}자
             </div>
         </div>
     );

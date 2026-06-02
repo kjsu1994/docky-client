@@ -5,11 +5,18 @@ import { getPageGuide } from "../src/common/pageGuides.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appPath = path.resolve(__dirname, "../src/App.jsx");
+const protectedRoutesPath = path.resolve(__dirname, "../src/components/ProtectedRoutes.jsx");
 const appSource = await readFile(appPath, "utf8");
+const protectedRoutesSource = await readFile(protectedRoutesPath, "utf8");
 
-const routePaths = [...appSource.matchAll(/<Route\s+path="([^"]+)"/g)]
-    .map((match) => match[1])
-    .filter((routePath) => routePath !== "/" && routePath !== "*" && routePath !== "/app/parking")
+const protectedRoutePaths = [
+    ...(/<Route\s+index\b/.test(protectedRoutesSource) ? ["/app"] : []),
+    ...[...protectedRoutesSource.matchAll(/<Route\s+path="([^"]+)"/g)]
+        .map((match) => match[1])
+        .filter((routePath) => routePath !== "*" && routePath !== "parking")
+        .map((routePath) => `/app/${routePath.replace(/^\/+/, "")}`),
+];
+const routePaths = protectedRoutePaths
     .map((routePath) => routePath
         .replace(":kind", "FREE_BOARD")
         .replace(":boardId", "123"));

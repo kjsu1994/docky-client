@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -106,6 +106,59 @@ class PipeCdp {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const encodeJson = (value) => Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 const encodeText = (value) => Buffer.from(value, "utf8").toString("base64");
+
+function assertStaticMemberSearchBounds() {
+    const adapterSource = readFileSync("src/adapters/adminOperationsAdapter.js", "utf8");
+    const pageSource = readFileSync("src/pages/admin/AdminOperations.jsx", "utf8");
+    if (!adapterSource.includes("normalizeMemberSearchKeyword(keyword)")) {
+        throw new Error("admin-operations-ui-smoke: member candidate search must normalize keyword before /members/list.");
+    }
+    if (!pageSource.includes("MEMBER_SEARCH_KEYWORD_MAX_LENGTH") || !pageSource.includes("maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH}")) {
+        throw new Error("admin-operations-ui-smoke: member search input must be bounded.");
+    }
+}
+
+function assertStaticBannerFormBounds() {
+    const adapterSource = readFileSync("src/adapters/adminOperationsAdapter.js", "utf8");
+    const pageSource = readFileSync("src/pages/admin/AdminOperations.jsx", "utf8");
+    const fields = ["title", "description", "imageUrl", "linkUrl", "ctaText", "adProvider", "adsenseClient", "adsenseSlot"];
+    if (!adapterSource.includes("ADMIN_BANNER_LIMITS") || !adapterSource.includes("clampBannerPriority(form.priority)")) {
+        throw new Error("admin-operations-ui-smoke: banner payload must mirror server DTO limits.");
+    }
+    for (const field of fields) {
+        if (!adapterSource.includes(`ADMIN_BANNER_LIMITS.${field}`) || !pageSource.includes(`maxLength={ADMIN_BANNER_LIMITS.${field}}`)) {
+            throw new Error(`admin-operations-ui-smoke: banner ${field} input must be bounded.`);
+        }
+    }
+    if (!pageSource.includes("min={ADMIN_BANNER_LIMITS.priorityMin}") || !pageSource.includes("max={ADMIN_BANNER_LIMITS.priorityMax}")) {
+        throw new Error("admin-operations-ui-smoke: banner priority input must be clamped.");
+    }
+}
+
+function assertStaticModerationBounds() {
+    const adapterSource = readFileSync("src/adapters/adminOperationsAdapter.js", "utf8");
+    const pageSource = readFileSync("src/pages/admin/AdminOperations.jsx", "utf8");
+    if (!adapterSource.includes("ADMIN_MODERATION_REASON_MAX_LENGTH")
+        || !adapterSource.includes("toLimitedText(reason, ADMIN_MODERATION_REASON_MAX_LENGTH)")) {
+        throw new Error("admin-operations-ui-smoke: moderation reason payload must be bounded.");
+    }
+    if (!pageSource.includes("ADMIN_MODERATION_REASON_MAX_LENGTH")
+        || !pageSource.includes("maxLength={ADMIN_MODERATION_REASON_MAX_LENGTH}")) {
+        throw new Error("admin-operations-ui-smoke: moderation reason input must be bounded.");
+    }
+}
+
+function assertStaticToastRuntimeSplit() {
+    const pageSource = readFileSync("src/pages/admin/AdminOperations.jsx", "utf8");
+    if (pageSource.includes("react-hot-toast") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(pageSource)) {
+        throw new Error("admin-operations-ui-smoke: AdminOperations must use lazy toast helpers instead of static react-hot-toast imports.");
+    }
+    for (const helper of ["notifyError", "notifySuccess", "notifyLoading"]) {
+        if (!pageSource.includes(helper)) {
+            throw new Error(`admin-operations-ui-smoke: AdminOperations must keep ${helper} wired for user feedback.`);
+        }
+    }
+}
 
 function routeMock(url, method) {
     const { hostname, pathname } = new URL(url);
@@ -446,6 +499,10 @@ async function inspectAdminOperations(cdp, sessionId, viewport) {
 }
 
 async function main() {
+    assertStaticToastRuntimeSplit();
+    assertStaticMemberSearchBounds();
+    assertStaticBannerFormBounds();
+    assertStaticModerationBounds();
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

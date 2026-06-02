@@ -24,6 +24,7 @@ const viewports = [
 ];
 const requiredTexts = ["환경 뉴스", "빠른 검색어", "기후위기", "검색 결과", "읽기", "원문 보기"];
 const blockedTexts = ["CLAUDE", "CODEX", "엔트로픽", "Loading", "Error"];
+const NEWS_QUERY_MAX_LENGTH = 60;
 
 let nextMessageId = 1;
 const pending = new Map();
@@ -163,6 +164,17 @@ async function inspectNews(ws, viewport) {
 
     for (const text of requiredTexts) {
         await waitForText(ws, text);
+    }
+
+    const searchBounds = await evaluate(ws, `(() => {
+        const input = document.querySelector('input[type="search"]');
+        return {
+            hasInput: Boolean(input),
+            maxLength: input ? input.maxLength : null,
+        };
+    })()`);
+    if (!searchBounds.hasInput || searchBounds.maxLength !== NEWS_QUERY_MAX_LENGTH) {
+        throw new Error(`news ${viewport.name}: search input bounds missing ${JSON.stringify(searchBounds)}`);
     }
 
     const searched = await evaluate(ws, `(() => {

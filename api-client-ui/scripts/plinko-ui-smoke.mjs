@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -22,6 +22,13 @@ const viewports = [
     { name: "mobile", width: 390, height: 844, mobile: true, interactive: false },
 ];
 const blockedTexts = ["Error occurred", "Reroll failed", "Plinko error", "points earned", "ONE PAIR", "TWO PAIR", "FULL HOUSE", "FOUR CARD", "STRAIGHT", "undefined", "NaN"];
+
+function assertPlinkoToastRuntimeBoundary() {
+    const source = readFileSync("src/pages/games/LuckyPlinko.jsx", "utf8");
+    if (source.includes('from "react-hot-toast"') || !source.includes('from "../../utils/toast.js"')) {
+        throw new Error("plinko-ui-smoke: LuckyPlinko must use the dynamic toast helper instead of static react-hot-toast imports.");
+    }
+}
 
 class PipeCdp {
     constructor(chrome) {
@@ -127,6 +134,7 @@ function routeMock(url, method) {
                 rank_name: "ONE PAIR",
                 marbles: 1,
                 can_reroll: true,
+                total_point: 20,
             },
         };
     }
@@ -139,7 +147,7 @@ function routeMock(url, method) {
                 landing_slots: [],
                 multipliers: [30, 10, 5, 1, 1, 5, 10, 30],
                 earned_point: 30,
-                total_point: 150,
+                total_point: 50,
             },
         };
     }
@@ -193,6 +201,16 @@ async function waitForText(cdp, sessionId, text, timeoutMs = 7000) {
     await waitFor(cdp, sessionId, `document.body?.innerText.includes(${JSON.stringify(text)})`, `text: ${text}`, timeoutMs);
 }
 
+async function waitForPointBalance(cdp, sessionId, value, timeoutMs = 7000) {
+    await waitFor(
+        cdp,
+        sessionId,
+        `document.querySelector('[data-smoke="plinko-point-balance"]')?.textContent.replace(/[^0-9]/g, "") === ${JSON.stringify(String(value))}`,
+        `plinko point balance: ${value}`,
+        timeoutMs,
+    );
+}
+
 async function clickButtonByText(cdp, sessionId, text) {
     const ok = await evaluate(cdp, sessionId, `(() => {
         const button = Array.from(document.querySelectorAll("button"))
@@ -244,9 +262,11 @@ async function inspectPlinko(cdp, sessionId, viewport) {
         await clickButtonByText(cdp, sessionId, "첫 굴림");
         await waitForText(cdp, sessionId, "원 페어", 10000);
         await waitForText(cdp, sessionId, "획득 구슬");
+        await waitForPointBalance(cdp, sessionId, 20);
         await clickButtonByText(cdp, sessionId, "바로 시작");
         await waitForText(cdp, sessionId, "30포인트를 획득했습니다.");
         await waitForText(cdp, sessionId, "+30 획득");
+        await waitForPointBalance(cdp, sessionId, 50);
     }
 
     await assertPageQuality(cdp, sessionId, `plinko ${viewport.name}`);
@@ -254,6 +274,8 @@ async function inspectPlinko(cdp, sessionId, viewport) {
 }
 
 async function main() {
+    assertPlinkoToastRuntimeBoundary();
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

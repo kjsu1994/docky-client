@@ -1,14 +1,10 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-// SockJS/StompJS compatibility for Vite
-if (typeof global === 'undefined') {
-    window.global = window;
-}
-import { 
-    Send, 
-    Plus, 
+import { useState, useEffect, useId, useRef, useCallback, useMemo } from "react";
+import {
+    Send,
+    Plus,
     Bot,
-    User, 
-    Users, 
+    User,
+    Users,
     UserPlus,
     Search,
     MessageSquare,
@@ -23,31 +19,34 @@ import {
     Maximize2,
     LogOut
 } from "lucide-react";
-import { Client } from "@stomp/stompjs";
-import SockJS from "sockjs-client";
 import { useAuth } from "../contexts/AuthContext";
-import toast from "react-hot-toast";
-import { formatRelativeTime, debounce, resolveAssetUrl, formatFileSize } from "../utils/helpers";
+import { formatRelativeTime, debounce, resolveChatAttachmentUrl, formatFileSize } from "../utils/helpers";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { confirmAction } from "../common/confirmAction.jsx";
 import { useBottomNavVisibility } from "../hooks/useBottomNavVisibility.js";
+import { logClientError } from "../utils/clientDiagnostics.js";
+import { trapFocus } from "../utils/focusTrap.js";
+import { notifyError, notifySuccess } from "../utils/toast.js";
 import {
     buildFilePayload,
     buildTalkPayload,
     CHAT_MESSAGE_MAX_LENGTH,
     chatAdapter,
+    compareMessagesByChronology,
     extractChatErrorMessage,
     getAttachmentTypeLabel,
     getLastMessagePreview,
     getMemberId,
     getMembers,
     getRoomId,
+    getRoomKey,
     getRoomPreviewText,
     getUnreadCount,
+    MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
     normalizeMessage,
     isAiRoom,
 } from "../adapters/chatAdapter.js";
-import { buildStompConnectHeaders } from "../adapters/realtimeAdapter.js";
+import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../adapters/realtimeAdapter.js";
 
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
 const MESSAGE_PAGE_SIZE = 20;
@@ -88,7 +87,7 @@ const mergeMessagePages = (olderMessages, currentMessages) => {
         seen.add(key);
         acc.push(normalized);
         return acc;
-    }, []);
+    }, []).sort(compareMessagesByChronology);
 };
 
 export const FloatingChat = ({ initialOpen = false } = {}) => {
@@ -137,13 +136,24 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
     const [uploadingFileName, setUploadingFileName] = useState("");
     const [uploadProgress, setUploadProgress] = useState(0);
+    const panelId = useId();
+    const panelTitleId = useId();
+    const panelDescriptionId = useId();
+    const modalTitleId = useId();
+    const modalDescriptionId = useId();
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
     const chatRootRef = useRef(null);
+    const launcherRef = useRef(null);
+    const panelRef = useRef(null);
+    const panelCloseButtonRef = useRef(null);
+    const modalPanelRef = useRef(null);
+    const modalCloseButtonRef = useRef(null);
     const roomsRequestRef = useRef(null);
     const lastReadMarkAtRef = useRef(0);
     const roomSubscriptionsRef = useRef([]);
+    const modalOpenRef = useRef(false);
     const dragHoldTimerRef = useRef(null);
     const dragStartRef = useRef({ pointerX: 0, pointerY: 0, x: 0, y: 0 });
     const didDragRef = useRef(false);
@@ -181,7 +191,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                 )
             );
         } catch (err) {
-            console.error("Read mark failed:", err);
+            logClientError("floatingChat.markRead", err);
         }
     };
 
@@ -308,7 +318,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             setMessagePageInfo(result.pageInfo);
         } catch (error) {
             skipNextAutoScrollRef.current = false;
-            toast.error(extractChatErrorMessage(error, "이전 메시지를 불러오지 못했습니다."));
+            notifyError(extractChatErrorMessage(error, "이전 메시지를 불러오지 못했습니다."));
         } finally {
             setLoadingOlderMessages(false);
         }
@@ -339,6 +349,10 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
     }, [showCreateModal, showInviteModal, user]);
 
     useEffect(() => {
+        modalOpenRef.current = showCreateModal || showInviteModal;
+    }, [showCreateModal, showInviteModal]);
+
+    useEffect(() => {
         if (!hasChatActivated || !isAuthenticated || isConnected) return;
         const runFallback = () => {
             if (document.visibilityState === "visible") {
@@ -352,37 +366,54 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
 
     useEffect(() => {
         if (!hasChatActivated || !isAuthenticated) return;
+        let cancelled = false;
+        let client;
         const connectHeaders = buildStompConnectHeaders();
         if (!connectHeaders.Authorization) {
             setIsConnected(false);
             return undefined;
         }
-        const socket = new SockJS("/ws/chat");
-        const client = new Client({
-            webSocketFactory: () => socket,
+        createStompClient({
             connectHeaders,
             reconnectDelay: 5000,
             heartbeatIncoming: 4000,
             heartbeatOutgoing: 4000,
+        }).then((nextClient) => {
+            if (cancelled) {
+                nextClient.deactivate();
+                return;
+            }
+            client = nextClient;
+            client.onConnect = () => {
+                stompClientRef.current = client;
+                setIsConnected(true);
+                fetchRooms();
+            };
+            client.onDisconnect = () => {
+                setIsConnected(false);
+                roomSubscriptionsRef.current.forEach((sub) => sub.unsubscribe());
+                roomSubscriptionsRef.current = [];
+            };
+            client.onStompError = (frame) => {
+                setIsConnected(false);
+                void notifyRealtimeError({
+                    scope: "floating-chat",
+                    error: frame,
+                    fallbackMessage: "채팅 연결 인증이 만료되었습니다. 다시 로그인해 주세요.",
+                });
+            };
+            client.activate();
+        }).catch(() => {
+            if (!cancelled) {
+                setIsConnected(false);
+                notifyError("채팅 연결을 준비하지 못했습니다.");
+            }
         });
-        client.onConnect = () => {
-            stompClientRef.current = client;
-            setIsConnected(true);
-            fetchRooms();
-        };
-        client.onDisconnect = () => {
-            setIsConnected(false);
-            roomSubscriptionsRef.current.forEach((sub) => sub.unsubscribe());
-            roomSubscriptionsRef.current = [];
-        };
-        client.onStompError = () => {
-            setIsConnected(false);
-            toast.error("채팅 연결 인증이 만료되었습니다. 다시 로그인해 주세요.");
-        };
-        client.activate();
         return () => {
+            cancelled = true;
             roomSubscriptionsRef.current.forEach((sub) => sub.unsubscribe());
             roomSubscriptionsRef.current = [];
+            stompClientRef.current = null;
             if (client) client.deactivate();
         };
     }, [hasChatActivated, isAuthenticated]);
@@ -461,7 +492,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                     const isDuplicate = prev.some(m => m.key === normalized.key);
                     if (isDuplicate) return prev;
 
-                    return [...prev, normalized];
+                    return [...prev, normalized].sort(compareMessagesByChronology);
                 });
                 upsertRoomPreview(roomId, getLastMessagePreview(normalized), normalized.createdAt, 0);
                 markRoomAsRead(roomId);
@@ -494,9 +525,17 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
         const roomId = getRoomId(currentRoom);
         const myId = Number(getMemberId(user));
         const text = newMessage.trim();
-        if (!text || !client || !isConnected || !roomId) return;
+        if (!text) return;
+        if (!roomId) {
+            notifyError("채팅방을 선택한 뒤 메시지를 보내 주세요.");
+            return;
+        }
+        if (!client || !isConnected) {
+            notifyError("채팅 연결이 아직 준비되지 않았습니다. 잠시 후 다시 보내 주세요.");
+            return;
+        }
         if (text.length > CHAT_MESSAGE_MAX_LENGTH) {
-            toast.error(`메시지는 ${CHAT_MESSAGE_MAX_LENGTH.toLocaleString("ko-KR")}자 이하로 입력해 주세요.`);
+            notifyError(`메시지는 ${CHAT_MESSAGE_MAX_LENGTH.toLocaleString("ko-KR")}자 이하로 입력해 주세요.`);
             return;
         }
 
@@ -510,7 +549,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                 senderName: user.name || "익명", 
                 createdAt: new Date().toISOString() 
             });
-            setMessages(prev => [...prev, optimisticMsg]);
+            setMessages(prev => [...prev, optimisticMsg].sort(compareMessagesByChronology));
             upsertRoomPreview(roomId, text, optimisticMsg.createdAt, 0);
 
             client.publish({ 
@@ -520,8 +559,9 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             });
             setNewMessage("");
         } catch (err) {
-            toast.error("메시지 전송에 실패했습니다.");
-            setMessages(prev => prev.filter(m => m.id !== tempId));
+            notifyError("메시지를 전송하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.");
+            setMessages((prev) => prev.filter((message) => message.id !== tempId));
+            fetchRooms({ force: true });
         }
     };
 
@@ -552,15 +592,15 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                 senderName: user.name || "익명",
                 createdAt: new Date().toISOString()
             });
-            setMessages((prev) => [...prev, optimisticMsg]);
+            setMessages((prev) => [...prev, optimisticMsg].sort(compareMessagesByChronology));
             upsertRoomPreview(roomId, attachment.fileName, optimisticMsg.createdAt, 0);
 
             client.publish({ destination: "/pub/chat/message", body: JSON.stringify(messagePayload), headers: { "content-type": "application/json" } });
             if (isAiRoom(currentRoom) && attachment.fileImage) {
-                toast.success("이미지를 첨부했습니다. 이어서 질문을 보내면 AI가 함께 봅니다.");
+                notifySuccess("이미지를 첨부했습니다. 이어서 질문을 보내면 AI가 함께 봅니다.");
             }
         } catch (error) {
-            toast.error(extractChatErrorMessage(error, "파일 업로드에 실패했습니다."));
+            notifyError(extractChatErrorMessage(error, "파일 업로드에 실패했습니다."));
         } finally {
             setUploadingFileName("");
             setUploadProgress(0);
@@ -578,11 +618,11 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
         if (!confirmed) return;
         try {
             await chatAdapter.leaveRoom(roomId);
-            toast.success("채팅방에서 나갔습니다.");
+            notifySuccess("채팅방에서 나갔습니다.");
             if (getRoomId(currentRoom) === roomId) setCurrentRoom(null);
             fetchRooms({ force: true });
         } catch (error) {
-            toast.error(extractChatErrorMessage(error, "채팅방 나가기에 실패했습니다."));
+            notifyError(extractChatErrorMessage(error, "채팅방 나가기에 실패했습니다."));
         }
     };
 
@@ -598,18 +638,18 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
     }, [contextMenu]);
 
     const createRoom = async () => {
-        if (!newRoomTitle.trim()) { toast.error("방 제목을 입력하세요."); return; }
+        if (!newRoomTitle.trim()) { notifyError("방 제목을 입력해 주세요."); return; }
         try {
             // 방 생성 시 본인만 멤버로 포함하고, 필요한 멤버는 이후 초대한다.
             const myId = Number(getMemberId(user));
             const memberIds = [myId];
 
             const createdRoom = await chatAdapter.createRoom({ title: newRoomTitle, type: newRoomType, memberIds });
-            
-            toast.success("방이 생성되었습니다. 멤버를 초대해보세요.");
+
+            notifySuccess("방이 생성되었습니다. 멤버를 초대해 보세요.");
             setShowCreateModal(false);
             resetMemberSelection();
-            
+
             const updatedRooms = await fetchRooms({ force: true });
             const createdId = getRoomId(createdRoom);
             if (createdId) {
@@ -617,7 +657,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                 setCurrentRoom(found || createdRoom);
             }
         } catch (error) {
-            toast.error(extractChatErrorMessage(error, "방 생성에 실패했습니다."));
+            notifyError(extractChatErrorMessage(error, "방 생성에 실패했습니다."));
         }
     };
 
@@ -633,7 +673,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             setIsOpen(true);
             setIsMinimized(false);
         } catch (error) {
-            toast.error(extractChatErrorMessage(error, "AI 채팅방을 열지 못했습니다."));
+            notifyError(extractChatErrorMessage(error, "AI 채팅방을 열지 못했습니다."));
         }
     };
 
@@ -648,13 +688,13 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             if (memberIds.length === 0) return;
 
             await chatAdapter.inviteMembers(roomId, memberIds);
-            toast.success("멤버를 초대했습니다.");
+            notifySuccess("멤버를 초대했습니다.");
             setShowInviteModal(false);
             resetMemberSelection();
             fetchRooms({ force: true });
             fetchCurrentMembers(roomId);
         } catch (error) {
-            toast.error(extractChatErrorMessage(error, "멤버 초대에 실패했습니다."));
+            notifyError(extractChatErrorMessage(error, "멤버 초대에 실패했습니다."));
         }
     };
 
@@ -677,7 +717,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
     );
 
     const handleSearchChange = (e) => {
-        const query = e.target.value;
+        const query = e.target.value.slice(0, MEMBER_SEARCH_KEYWORD_MAX_LENGTH);
         setMemberSearch(query);
         performSearch(query);
     };
@@ -785,6 +825,13 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
         }
     };
 
+    useEffect(() => () => {
+        if (dragHoldTimerRef.current) {
+            clearTimeout(dragHoldTimerRef.current);
+            dragHoldTimerRef.current = null;
+        }
+    }, []);
+
     const handleFabPointerDown = (e) => {
         if ((e.pointerType === "mouse" && e.button !== 0) || isOpen) return;
         e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -797,6 +844,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
         };
         clearHoldTimer();
         dragHoldTimerRef.current = setTimeout(() => {
+            dragHoldTimerRef.current = null;
             setDragReady(true);
             setIsDraggingFab(true);
         }, 260);
@@ -820,10 +868,15 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
         setIsDraggingFab(false);
     };
 
-    const closeChat = () => {
+    const closeChat = useCallback(() => {
         setIsOpen(false);
         setIsMinimized(false);
-    };
+    }, []);
+
+    const closeMemberModal = useCallback(() => {
+        setShowCreateModal(false);
+        setShowInviteModal(false);
+    }, []);
 
     const toggleChat = () => {
         if (didDragRef.current) {
@@ -870,6 +923,59 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
     };
 
     useEffect(() => {
+        if (!isOpen || isMinimized) return undefined;
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+        const handleKeyDown = (event) => {
+            if (modalOpenRef.current) return;
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeChat();
+                return;
+            }
+            trapFocus(event, panelRef.current);
+        };
+
+        window.setTimeout(() => panelCloseButtonRef.current?.focus(), 0);
+        window.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+            window.setTimeout(() => {
+                if (previousFocus?.isConnected) {
+                    previousFocus.focus();
+                } else {
+                    launcherRef.current?.focus();
+                }
+            }, 0);
+        };
+    }, [closeChat, isMinimized, isOpen]);
+
+    useEffect(() => {
+        if (!showCreateModal && !showInviteModal) return undefined;
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeMemberModal();
+                return;
+            }
+            trapFocus(event, modalPanelRef.current);
+        };
+
+        window.setTimeout(() => modalCloseButtonRef.current?.focus(), 0);
+        window.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+            if (previousFocus?.isConnected) {
+                previousFocus.focus();
+            }
+        };
+    }, [closeMemberModal, showCreateModal, showInviteModal]);
+
+    useEffect(() => {
         if (!isOpen) return;
         const handleOutsidePointerDown = (e) => {
             const root = chatRootRef.current;
@@ -887,7 +993,19 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
     return (
         <div ref={chatRootRef} className="fixed z-[100] pointer-events-none text-slate-900" style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px` }}>
             {isOpen && (
-                <div style={panelStyle} className="pointer-events-auto absolute rounded-3xl shadow-2xl border border-slate-100 bg-white flex flex-col overflow-hidden transition-all duration-500">
+                <div
+                    id={panelId}
+                    ref={panelRef}
+                    style={panelStyle}
+                    className="pointer-events-auto absolute rounded-3xl shadow-2xl border border-slate-100 bg-white flex flex-col overflow-hidden transition-all duration-500"
+                    role="dialog"
+                    aria-labelledby={panelTitleId}
+                    aria-describedby={panelDescriptionId}
+                    data-floating-chat-panel="true"
+                >
+                    <p id={panelDescriptionId} className="sr-only">
+                        채팅방 목록과 대화 메시지를 확인하고 새 메시지를 보낼 수 있습니다.
+                    </p>
                     <div
                         onPointerDown={handlePanelPointerDown}
                         onPointerMove={handlePanelPointerMove}
@@ -897,12 +1015,12 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                         <div className="flex items-center gap-3 overflow-hidden">
                             {currentRoom ? (
                                 <>
-                                    <button onClick={() => setCurrentRoom(null)} className="p-1.5 hover:bg-white/20 rounded-xl transition-colors"><ArrowLeft className="h-4 w-4" /></button>
+                                    <button type="button" aria-label="채팅방 목록으로 돌아가기" onClick={() => setCurrentRoom(null)} className="p-1.5 hover:bg-white/20 rounded-xl transition-colors"><ArrowLeft className="h-4 w-4" /></button>
                                     <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
                                         {currentRoom.type === "AI" ? <Bot className="h-5 w-5" /> : currentRoom.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="font-black text-sm truncate leading-tight">{currentRoom.title}</div>
+                                        <div id={panelTitleId} className="font-black text-sm truncate leading-tight">{currentRoom.title}</div>
                                         <div className="text-[10px] font-bold text-primary-100">{isConnected ? "실시간 연결" : "오프라인"}</div>
                                     </div>
                                 </>
@@ -912,15 +1030,15 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                         <MessageSquare className="h-5 w-5" />
                                     </div>
                                     <div>
-                                        <div className="font-black text-sm">채팅방</div>
+                                        <div id={panelTitleId} className="font-black text-sm">채팅방</div>
                                         <div className="text-[10px] font-bold text-primary-100">방을 개설하고 사용자를 초대하여 사용하세요.</div>
                                     </div>
                                 </>
                             )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                            <button onClick={() => setIsMinimized(!isMinimized)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">{isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}</button>
-                            <button onClick={closeChat} className="p-2 rounded-xl text-rose-200 hover:text-rose-100 hover:bg-rose-500/20 transition-colors"><X className="h-4 w-4" /></button>
+                            <button type="button" aria-label={isMinimized ? "채팅창 펼치기" : "채팅창 최소화"} onClick={() => setIsMinimized(!isMinimized)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">{isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}</button>
+                            <button ref={panelCloseButtonRef} type="button" aria-label="채팅창 닫기" onClick={closeChat} className="p-2 rounded-xl text-rose-200 hover:text-rose-100 hover:bg-rose-500/20 transition-colors"><X className="h-4 w-4" /></button>
                         </div>
                     </div>
 
@@ -936,21 +1054,22 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                 value={roomSearchQuery}
                                                 onChange={(event) => setRoomSearchQuery(event.target.value)}
                                                 placeholder="채팅방 검색"
+                                                aria-label="채팅방 검색"
                                                 className="input-base py-2 pl-10 pr-4 text-xs font-bold bg-slate-50 border-0"
                                             />
                                         </div>
-                                        <button onClick={openAiRoom} className="ml-3 p-2.5 rounded-2xl bg-cyan-600 text-white shadow-lg shadow-cyan-100 hover:scale-105 transition-transform"><Bot className="h-5 w-5" /></button>
-                                        <button onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="ml-3 p-2.5 rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-100 hover:scale-105 transition-transform"><Plus className="h-5 w-5" /></button>
+                                        <button type="button" aria-label="AI 채팅방 열기" onClick={openAiRoom} className="ml-3 p-2.5 rounded-2xl bg-cyan-600 text-white shadow-lg shadow-cyan-100 hover:scale-105 transition-transform"><Bot className="h-5 w-5" /></button>
+                                        <button type="button" aria-label="새 채팅방 만들기" onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="ml-3 p-2.5 rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-100 hover:scale-105 transition-transform"><Plus className="h-5 w-5" /></button>
                                     </div>
                                     <div className="flex-1 overflow-y-auto p-3 space-y-2">
                                         {loadingRooms ? <div className="p-12 flex justify-center"><LoadingSpinner size="sm" /></div> : rooms.length > 0 ? (
                                             filteredRooms.length === 0 ? (
                                                 <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2 opacity-60 font-bold"><Search className="h-9 w-9" /><span>검색 결과가 없습니다.</span></div>
-                                            ) : filteredRooms.map((room) => {
+                                            ) : filteredRooms.map((room, idx) => {
                                                 const roomId = getRoomId(room);
                                                 const isActive = getRoomId(currentRoom) === roomId;
                                                 return (
-                                                    <button key={roomId || Math.random()} onClick={() => { setCurrentRoom(room); setMessages([]); setMessagePageInfo(createEmptyMessagePageInfo()); upsertRoomPreview(roomId, getRoomPreviewText(room), room.updatedAt, 0); }}
+                                                    <button key={getRoomKey(room, idx)} onClick={() => { setCurrentRoom(room); setMessages([]); setMessagePageInfo(createEmptyMessagePageInfo()); upsertRoomPreview(roomId, getRoomPreviewText(room), room.updatedAt, 0); }}
                                                         onContextMenu={(e) => handleContextMenu(e, roomId)}
                                                         className={`w-full flex items-center gap-4 p-4 rounded-[1.5rem] transition-all text-slate-700 hover:shadow-xl hover:-translate-y-0.5 ${isActive ? 'bg-white shadow-xl ring-2 ring-primary-100' : 'bg-white/50 border border-slate-100'}`}>
                                                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 text-primary-600 flex items-center justify-center font-black shrink-0 shadow-sm">
@@ -979,8 +1098,8 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                             </div>
                                         </div>
                                         <div className="flex gap-1.5">
-                                            <button onClick={() => setShowMemberList(!showMemberList)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors flex items-center gap-1.5"><Users className="h-4 w-4" /><span className="text-[10px] font-black">{membersToList.length}</span></button>
-                                            {currentRoom.type === "GROUP" && <button aria-label="멤버 초대" onClick={() => { resetMemberSelection(); setShowInviteModal(true); }} className="p-2 hover:bg-primary-50 rounded-xl text-primary-600 transition-colors"><UserPlus className="h-4 w-4" /></button>}
+                                            <button type="button" aria-label={showMemberList ? "참여자 목록 닫기" : "참여자 목록 열기"} onClick={() => setShowMemberList(!showMemberList)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors flex items-center gap-1.5"><Users className="h-4 w-4" /><span className="text-[10px] font-black">{membersToList.length}</span></button>
+                                            {currentRoom.type === "GROUP" && <button type="button" aria-label="멤버 초대" onClick={() => { resetMemberSelection(); setShowInviteModal(true); }} className="p-2 hover:bg-primary-50 rounded-xl text-primary-600 transition-colors"><UserPlus className="h-4 w-4" /></button>}
                                         </div>
                                     </div>
                                     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
@@ -1003,6 +1122,9 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                 {messages.map((msg, idx) => {
                                             const normalized = normalizeMessage(msg);
                                             const isMe = Number(normalized.senderId) === Number(getMemberId(user));
+                                            const messageFileUrl = normalized.type === "FILE"
+                                                ? resolveChatAttachmentUrl(normalized.fileUrl || normalized.message, normalized.fileName || normalized.message)
+                                                : "";
                                             return (
                                                 <div key={normalized.key || normalized.id || idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                                                     <div className={`flex max-w-[85%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
@@ -1011,13 +1133,28 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                             {!isMe && <span className="text-[10px] font-bold text-slate-400 mb-1 ml-1">{normalized.senderName}</span>}
                                                             <div className={`px-4 py-2.5 rounded-2xl text-[13px] font-medium shadow-sm leading-relaxed ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-700 border border-slate-100 rounded-bl-none"}`}>
                                                                 {normalized.type === "FILE" ? (
-                                                                    normalized.fileImage ? (
+                                                                    !messageFileUrl ? (
+                                                                        <div
+                                                                            className={`flex min-w-[180px] items-center gap-2 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-2.5`}
+                                                                            aria-label="표시할 수 없는 첨부파일"
+                                                                        >
+                                                                            <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-slate-200 text-slate-500"}`}>
+                                                                                <FileIcon className="h-4 w-4" />
+                                                                            </div>
+                                                                            <div className="min-w-0">
+                                                                                <div className="truncate text-[12px] font-bold">{normalized.fileName || normalized.message || "첨부파일"}</div>
+                                                                                <div className={`mt-1 text-[10px] font-bold ${isMe ? "text-white/70" : "text-slate-400"}`}>
+                                                                                    첨부파일을 표시할 수 없습니다.
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : normalized.fileImage ? (
                                                                         <div className="space-y-2">
                                                                             <img
-                                                                                src={resolveAssetUrl(normalized.fileUrl || normalized.message)}
+                                                                                src={messageFileUrl}
                                                                                 alt={normalized.fileName || "이미지"}
                                                                                 className="max-w-[200px] rounded-xl cursor-pointer"
-                                                                                onClick={() => window.open(resolveAssetUrl(normalized.fileUrl || normalized.message), "_blank", "noopener,noreferrer")}
+                                                                                onClick={() => window.open(messageFileUrl, "_blank", "noopener,noreferrer")}
                                                                             />
                                                                             {!!(normalized.fileName || normalized.message) && (
                                                                                 <div className={`text-[10px] font-bold ${isMe ? "text-white/80" : "text-slate-400"}`}>
@@ -1027,7 +1164,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                                         </div>
                                                                     ) : (
                                                                         <a
-                                                                            href={resolveAssetUrl(normalized.fileUrl || normalized.message)}
+                                                                            href={messageFileUrl}
                                                                             target="_blank"
                                                                             rel="noopener noreferrer"
                                                                             className={`flex min-w-[180px] items-center gap-2 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-2.5`}
@@ -1067,7 +1204,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                             </div>
                                         )}
                                         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                                            <button type="button" onClick={() => fileInputRef.current.click()} className="p-2.5 text-slate-300 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"><FileIcon className="h-5 w-5" /></button>
+                                            <button type="button" aria-label="파일 첨부" onClick={() => fileInputRef.current.click()} className="p-2.5 text-slate-300 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"><FileIcon className="h-5 w-5" /></button>
                                             <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.7z" />
                                             <div className="min-w-0 flex-1">
                                                 <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={isAiRoom(currentRoom) ? "질문 입력 후 전송" : "메시지를 입력하세요."} maxLength={CHAT_MESSAGE_MAX_LENGTH} className="input-base h-11 border-0 bg-slate-50 font-medium" />
@@ -1075,7 +1212,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                     {newMessage.length.toLocaleString("ko-KR")} / {CHAT_MESSAGE_MAX_LENGTH.toLocaleString("ko-KR")}
                                                 </div>
                                             </div>
-                                            <button type="submit" disabled={!newMessage.trim() || !isConnected} className="p-2.5 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-100 disabled:opacity-20 transition-all active:scale-90"><Send className="h-5 w-5" /></button>
+                                            <button type="submit" aria-label="메시지 보내기" disabled={!newMessage.trim() || !isConnected} className="p-2.5 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-100 disabled:opacity-20 transition-all active:scale-90"><Send className="h-5 w-5" /></button>
                                         </form>
                                         {isAiRoom(currentRoom) && (
                                             <p className="mt-2 text-[10px] font-bold text-slate-400">
@@ -1087,7 +1224,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                         <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-20 flex flex-col animate-fade-in p-2">
                                             <div className="p-4 flex items-center justify-between border-b border-slate-50">
                                                 <h4 className="font-black text-[11px] text-slate-400">참여자 ({membersToList.length})</h4>
-                                                <button onClick={() => setShowMemberList(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"><X className="h-4 w-4" /></button>
+                                                <button type="button" aria-label="참여자 목록 닫기" onClick={() => setShowMemberList(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"><X className="h-4 w-4" /></button>
                                             </div>
                                             <div className="flex-1 overflow-y-auto p-2 space-y-1">
                                                 {membersToList.map(m => (
@@ -1116,6 +1253,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
 
             {(!isOpen || isMinimized) && (
                 <button
+                    ref={launcherRef}
                     onClick={toggleChat}
                     onPointerDown={handleFabPointerDown}
                     onPointerMove={handleFabPointerMove}
@@ -1126,6 +1264,9 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                         hiddenWithBottomNav ? "pointer-events-none translate-y-8 opacity-0" : "pointer-events-auto translate-y-0 opacity-100"
                     } ${isDraggingFab ? "cursor-grabbing" : "cursor-grab"}`}
                     aria-label={isMinimized ? "채팅창 펼치기" : "채팅창 열기"}
+                    aria-haspopup="dialog"
+                    aria-controls={isOpen ? panelId : undefined}
+                    aria-expanded={isOpen && !isMinimized}
                     data-floating-chat-launcher="true"
                 >
                     <MessageCircle className="h-5 w-5 lg:h-7 lg:w-7" />
@@ -1138,14 +1279,27 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             )}
 
             {(showCreateModal || showInviteModal) && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md pointer-events-auto">
-                    <div className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden animate-slide-up border border-white/20">
+                <div
+                    className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md pointer-events-auto"
+                    role="presentation"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) closeMemberModal();
+                    }}
+                >
+                    <div
+                        ref={modalPanelRef}
+                        className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden animate-slide-up border border-white/20"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby={modalTitleId}
+                        aria-describedby={modalDescriptionId}
+                    >
                         <div className="p-6 border-b flex items-center justify-between bg-primary-600 text-white">
                             <div>
-                                <h3 className="font-black text-lg tracking-tight">{showCreateModal ? "새 채팅방" : "멤버 초대"}</h3>
-                                <p className="text-[10px] font-bold text-primary-100 tracking-[0.2em]">{showCreateModal ? "대화 시작" : "참여자 추가"}</p>
+                                <h3 id={modalTitleId} className="font-black text-lg tracking-tight">{showCreateModal ? "새 채팅방" : "멤버 초대"}</h3>
+                                <p id={modalDescriptionId} className="text-[10px] font-bold text-primary-100 tracking-[0.2em]">{showCreateModal ? "대화 시작" : "참여자 추가"}</p>
                             </div>
-                            <button onClick={() => { setShowCreateModal(false); setShowInviteModal(false); }} className="p-2.5 hover:bg-white/20 rounded-2xl transition-colors"><X className="h-6 w-6" /></button>
+                            <button ref={modalCloseButtonRef} type="button" aria-label="채팅 모달 닫기" onClick={closeMemberModal} className="p-2.5 hover:bg-white/20 rounded-2xl transition-colors"><X className="h-6 w-6" /></button>
                         </div>
                         <div className="p-6 space-y-6 max-h-[450px] overflow-y-auto bg-slate-50/30">
                             {showCreateModal ? (
@@ -1169,8 +1323,9 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                     </div>
                                     <div className="relative group">
                                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
-                                        <input type="text" value={memberSearch} onChange={handleSearchChange} placeholder="이름 또는 이메일 검색" className="input-base pl-11 h-12 bg-white font-bold" />
+                                        <input type="text" value={memberSearch} onChange={handleSearchChange} maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH} placeholder="이름 또는 이메일 검색" className="input-base pl-11 h-12 bg-white font-bold" />
                                     </div>
+                                    <p className="-mt-2 text-right text-[10px] font-bold text-slate-400">검색어 {memberSearch.length}/{MEMBER_SEARCH_KEYWORD_MAX_LENGTH}자</p>
                                     <div className="space-y-2">
                                         {displayedMembers.map(m => {
                                             const mId = getMemberId(m);
@@ -1187,7 +1342,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                             )}
                         </div>
                         <div className="p-6 bg-white flex gap-3 shrink-0">
-                            <button onClick={() => { setShowCreateModal(false); setShowInviteModal(false); }} className="flex-1 py-4 rounded-2xl bg-slate-50 text-slate-400 text-xs font-black hover:bg-slate-100 transition-colors">취소</button>
+                            <button type="button" onClick={closeMemberModal} className="flex-1 py-4 rounded-2xl bg-slate-50 text-slate-400 text-xs font-black hover:bg-slate-100 transition-colors">취소</button>
                             <button onClick={showCreateModal ? createRoom : inviteMembers} disabled={showCreateModal ? !newRoomTitle.trim() : selectedMembers.length === 0} className="flex-1 py-4 rounded-2xl bg-primary-600 text-white text-xs font-black shadow-xl shadow-primary-200 disabled:opacity-20 transition-all hover:bg-primary-700">{showCreateModal ? "방 만들기" : "멤버 추가"}</button>
                         </div>
                     </div>

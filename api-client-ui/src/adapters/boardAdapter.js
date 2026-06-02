@@ -1,4 +1,5 @@
 import api, { getApiErrorMessage, uploadFiles } from "../utils/api.js";
+import { logClientError } from "../utils/clientDiagnostics.js";
 
 export const unwrapBoardData = (response) => response?.data?.data ?? response?.data;
 
@@ -12,6 +13,15 @@ export const BOARD_ATTACHMENT_LIMITS = {
     maxFiles: 5,
     maxFileSizeBytes: 20 * 1024 * 1024,
 };
+
+export const BOARD_SEARCH_MAX_LENGTH = 80;
+export const BOARD_TITLE_MAX_LENGTH = 100;
+export const BOARD_CONTENT_MAX_LENGTH = 100_000;
+
+export const normalizeBoardSearchValue = (value) => String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, BOARD_SEARCH_MAX_LENGTH);
 
 export const validateBoardAttachmentSelection = ({ existingFiles = [], attachFiles = [], incomingFiles = [] }) => {
     const nextTotalCount = existingFiles.length + attachFiles.length + incomingFiles.length;
@@ -58,13 +68,17 @@ const resolvePageMeta = (response, itemCount, fallbackPage, fallbackSize) => {
     };
 };
 
-const createBoardParams = ({ kind, page, size, searchType, searchValue, sortBy }) => ({
-    kind,
-    page,
-    size,
-    sort: SORT_PARAMS[sortBy] || SORT_PARAMS.latest,
-    ...(searchValue ? { searchType, searchValue } : {}),
-});
+const createBoardParams = ({ kind, page, size, searchType, searchValue, sortBy }) => {
+    const normalizedSearchValue = normalizeBoardSearchValue(searchValue);
+
+    return {
+        kind,
+        page,
+        size,
+        sort: SORT_PARAMS[sortBy] || SORT_PARAMS.latest,
+        ...(normalizedSearchValue ? { searchType, searchValue: normalizedSearchValue } : {}),
+    };
+};
 
 const normalizeBoardListItem = (item, fallbackKind) => ({
     ...item,
@@ -154,7 +168,7 @@ export const boardAdapter = {
                 collected.push(...result.items);
                 if (result.items.length < fetchSize) break;
             } catch (error) {
-                console.error("[boardAdapter] fallback list fetch failed:", error);
+                logClientError("boards.adapter.fallbackList", error);
                 break;
             }
         }

@@ -1,5 +1,5 @@
 ﻿import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createPipeSession } from "./pipe-websocket-cdp.mjs";
@@ -28,6 +28,7 @@ const requiredTexts = [
     "주간 리스트",
     "초기 스모크 할 일",
     "남은 할 일",
+    "표시 한도 500개",
 ];
 const blockedTexts = ["Todo", "Loading", "Error"];
 
@@ -36,6 +37,34 @@ let nextMessageId = 1;
 const pending = new Map();
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function assertStaticTodoActionGuards() {
+    const source = readFileSync("src/pages/facility/TodoCalendar.jsx", "utf8");
+    if (!source.includes("mutatingTodoActionKeys") || !source.includes("beginTodoAction") || !source.includes("finishTodoAction")) {
+        throw new Error("todo-ui-smoke: todo mutations must use action-scoped in-flight guards.");
+    }
+    for (const action of ["TODO_ACTION.TOGGLE", "TODO_ACTION.SAVE", "TODO_ACTION.DELETE"]) {
+        if (!source.includes(action)) {
+            throw new Error(`todo-ui-smoke: missing in-flight guard for ${action}.`);
+        }
+    }
+    if (!source.includes("저장 중...") || !source.includes("할 일 삭제 중") || !source.includes("완료 상태 변경 중")) {
+        throw new Error("todo-ui-smoke: todo mutation buttons must expose Korean progress labels.");
+    }
+    if (!source.includes("getTodoId(left)") || !source.includes("getTodoId(right)")) {
+        throw new Error("todo-ui-smoke: todo ordering must use todo id as a stable tie-breaker.");
+    }
+}
+
+function assertStaticTodoToastRuntimeBoundary() {
+    const source = readFileSync("src/pages/facility/TodoCalendar.jsx", "utf8");
+    if (source.includes("from \"react-hot-toast\"") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(source)) {
+        throw new Error("todo-ui-smoke: TodoCalendar must use the dynamic toast helper instead of static react-hot-toast imports.");
+    }
+    if (!source.includes("notifyError") || !source.includes("notifySuccess")) {
+        throw new Error("todo-ui-smoke: TodoCalendar must keep success/error notifications on the dynamic toast runtime boundary.");
+    }
+}
 
 async function waitForJson(url, timeoutMs = 10000) {
     const started = Date.now();
@@ -114,6 +143,8 @@ function routeMock(url, method) {
                     from_date: parsed.searchParams.get("from_date"),
                     to_date: parsed.searchParams.get("to_date"),
                     items: todoItems,
+                    truncated: true,
+                    item_limit: 500,
                 },
             },
         };
@@ -266,6 +297,9 @@ async function inspectTodo(ws, viewport) {
 }
 
 async function main() {
+    assertStaticTodoActionGuards();
+    assertStaticTodoToastRuntimeBoundary();
+
     const chrome = spawn(chromePath, [
         "--headless=new",        "--remote-debugging-pipe",
         `--user-data-dir=${userDataDir}`,

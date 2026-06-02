@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -21,6 +21,9 @@ const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
     { name: "mobile", width: 390, height: 844, mobile: true },
 ];
+const BOARD_SEARCH_MAX_LENGTH = 80;
+const BOARD_TITLE_MAX_LENGTH = 100;
+const BOARD_CONTENT_MAX_LENGTH = 100000;
 const blockedTexts = ["Board", "Loading", "Error", "undefined", "NaN"];
 const dangerousDetailHtml = `
     <p>안전한 본문</p>
@@ -99,6 +102,81 @@ class PipeCdp {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const encodeJson = (value) => Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 const encodeText = (value) => Buffer.from(value, "utf8").toString("base64");
+
+function assertStaticCommentActionStates() {
+    const source = readFileSync("src/components/Comments.jsx", "utf8");
+    if (!source.includes("setDeletingCommentIds((prev) => ({ ...prev, [commentId]: true }))") || !source.includes("const confirmed = await confirmAction")) {
+        throw new Error("boards-ui-smoke: comment deletion must lock before the confirmation dialog opens.");
+    }
+    if (!source.includes("removedOptimistically") || !source.includes("if (removedOptimistically && existing)")) {
+        throw new Error("boards-ui-smoke: comment deletion rollback must only run after optimistic removal.");
+    }
+    if (!source.includes("const isCommentBusy = isUpdating || isDeleting || isLiking || isReporting")) {
+        throw new Error("boards-ui-smoke: comment action buttons must share a per-comment busy guard.");
+    }
+    if (!source.includes("disabled={!canLikeComment || isCommentBusy}") || !source.includes("disabled={isCommentBusy}")) {
+        throw new Error("boards-ui-smoke: comment like/report/edit/delete buttons must block overlapping actions.");
+    }
+}
+
+function assertStaticReportDialogAccessibility() {
+    const source = readFileSync("src/common/ReportDialog.jsx", "utf8");
+    if (!source.includes("role=\"dialog\"") || !source.includes("aria-modal=\"true\"")) {
+        throw new Error("boards-ui-smoke: report dialog must expose modal dialog semantics.");
+    }
+    if (!source.includes("aria-labelledby={titleId}") || !source.includes("aria-describedby={descriptionId}")) {
+        throw new Error("boards-ui-smoke: report dialog title and description must be connected.");
+    }
+    if (!source.includes("event.key === \"Escape\"") || !source.includes("handleBackdropMouseDown")) {
+        throw new Error("boards-ui-smoke: report dialog must support Escape and backdrop close.");
+    }
+    if (!source.includes("htmlFor={reasonId}") || !source.includes("htmlFor={detailId}")) {
+        throw new Error("boards-ui-smoke: report dialog form labels must target their fields.");
+    }
+    if (!source.includes("reasonRef.current?.focus()") || !source.includes("previousFocus.focus()")) {
+        throw new Error("boards-ui-smoke: report dialog must move focus on open and restore focus after close.");
+    }
+    if (!source.includes("trapFocus(event, dialogRef.current)")) {
+        throw new Error("boards-ui-smoke: report dialog must trap Tab focus while open.");
+    }
+    if (!source.includes("document.body.style.overflow = \"hidden\"") || !source.includes("document.body.style.overflow = previousOverflow")) {
+        throw new Error("boards-ui-smoke: report dialog must lock background scroll while open.");
+    }
+}
+
+function assertStaticBoardToastRuntimeBoundary() {
+    const guardedFiles = [
+        "src/pages/boards/BoardList.jsx",
+        "src/pages/boards/BoardDetail.jsx",
+        "src/pages/boards/BoardForm.jsx",
+        "src/components/Comments.jsx",
+        "src/common/AddressSearchBox.jsx",
+        "src/common/confirmAction.jsx",
+        "src/common/promptAction.jsx",
+    ];
+    for (const file of guardedFiles) {
+        const source = readFileSync(file, "utf8");
+        if (source.includes("from \"react-hot-toast\"")) {
+            throw new Error(`boards-ui-smoke: ${file} must use the dynamic toast helper instead of static react-hot-toast imports.`);
+        }
+    }
+
+    const confirmSource = readFileSync("src/common/confirmAction.jsx", "utf8");
+    const promptSource = readFileSync("src/common/promptAction.jsx", "utf8");
+    const commentsSource = readFileSync("src/components/Comments.jsx", "utf8");
+    const boardFormSource = readFileSync("src/pages/boards/BoardForm.jsx", "utf8");
+    if (
+        !confirmSource.includes("toast = await loadToast()") ||
+        !promptSource.includes("toast = await loadToast()") ||
+        !commentsSource.includes("notifyError") ||
+        !commentsSource.includes("notifySuccess") ||
+        !boardFormSource.includes("notifyError") ||
+        !boardFormSource.includes("notifySuccess") ||
+        !boardFormSource.includes("notifyLoading")
+    ) {
+        throw new Error("boards-ui-smoke: board form/comment action toasts must stay on the dynamic toast runtime boundary.");
+    }
+}
 
 const boardRows = {
     FREE_BOARD: [
@@ -300,6 +378,21 @@ async function inspectBoards(cdp, sessionId, viewport) {
     await waitForText(cdp, sessionId, "사용자게시판");
     await waitForText(cdp, sessionId, "운영 점검 공지");
     await waitForText(cdp, sessionId, "나무 심기 후기 공유");
+
+    const searchControls = await evaluate(cdp, sessionId, `(() => {
+        const searchInput = Array.from(document.querySelectorAll("input"))
+            .find((node) => (node.placeholder || "").includes("검색"));
+        const text = document.body?.innerText || "";
+        return {
+            hasSearchInput: Boolean(searchInput),
+            maxLength: searchInput ? searchInput.maxLength : null,
+            hasCounter: text.includes("검색어 0/${BOARD_SEARCH_MAX_LENGTH}자"),
+        };
+    })()`);
+    if (!searchControls.hasSearchInput || searchControls.maxLength !== BOARD_SEARCH_MAX_LENGTH || !searchControls.hasCounter) {
+        throw new Error(`boards ${viewport.name}: search controls failed ${JSON.stringify(searchControls)}`);
+    }
+
     await clickByText(cdp, sessionId, "일반");
     await waitForText(cdp, sessionId, "동네 줍기 모임 안내");
     await delay(400);
@@ -436,7 +529,44 @@ async function inspectBoardDetailSanitizer(cdp, sessionId) {
     return "boards detail sanitizer: ok";
 }
 
+async function inspectBoardCreateFormControls(cdp, sessionId) {
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+        width: 1366,
+        height: 900,
+        deviceScaleFactor: 1,
+        mobile: false,
+    }, sessionId);
+
+    const navigation = await cdp.send("Page.navigate", { url: `${baseUrl}/app/boards/FREE_BOARD/new` }, sessionId);
+    if (navigation.result?.errorText) {
+        throw new Error(`boards form controls: navigation failed ${navigation.result.errorText}`);
+    }
+
+    await waitForText(cdp, sessionId, "게시글 작성");
+    const formControls = await evaluate(cdp, sessionId, `(() => {
+        const titleInput = Array.from(document.querySelectorAll("input"))
+            .find((node) => (node.placeholder || "").includes("제목을 입력"));
+        const text = document.body?.innerText || "";
+        return {
+            hasTitleInput: Boolean(titleInput),
+            maxLength: titleInput ? titleInput.maxLength : null,
+            hasCounter: text.includes("제목 0/${BOARD_TITLE_MAX_LENGTH}자"),
+            hasContentCounter: text.includes("본문 0/${BOARD_CONTENT_MAX_LENGTH.toLocaleString("ko-KR")}자"),
+        };
+    })()`);
+
+    if (!formControls.hasTitleInput || formControls.maxLength !== BOARD_TITLE_MAX_LENGTH || !formControls.hasCounter || !formControls.hasContentCounter) {
+        throw new Error(`boards form controls failed: ${JSON.stringify(formControls)}`);
+    }
+
+    return "boards form controls: ok";
+}
+
 async function main() {
+    assertStaticCommentActionStates();
+    assertStaticReportDialogAccessibility();
+    assertStaticBoardToastRuntimeBoundary();
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",
@@ -512,11 +642,12 @@ async function main() {
             results.push(await inspectBoards(cdp, sessionId, viewport));
         }
         results.push(await inspectBoardDetailSanitizer(cdp, sessionId));
+        results.push(await inspectBoardCreateFormControls(cdp, sessionId));
         if (runtimeErrors.length) {
             throw new Error(`Runtime errors: ${runtimeErrors.join(" | ")}`);
         }
         results.forEach((result) => console.log(result));
-        console.log(`boards-ui-smoke ok (${results.length} responsive checks)`);
+        console.log(`boards-ui-smoke ok (${results.length} checks)`);
     } finally {
         if (chrome.exitCode === null) {
             chrome.kill();

@@ -1,7 +1,8 @@
 ﻿import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { normalizeProfileImageUrl } from "../src/utils/profileImage.js";
 
 const baseUrl = process.env.SMOKE_BASE_URL || "http://localhost";
 const chromePath = process.env.CHROME_PATH || [
@@ -26,6 +27,25 @@ const postsTexts = ["작성 글", "테스트 게시글", "좋아요", "조회"];
 const statsTexts = ["활동 통계", "경험치 이력", "게시글 작성 보상", "다음 레벨까지"];
 const editTexts = ["프로필 수정", "이메일", "전화번호", "주소", "주소 검색", "수정 내용 저장"];
 const blockedTexts = ["Total EXP", "Points", "Trees", "Anonymous", "Name", "Email", "Phone", "Member Status", "Loading", "Error"];
+const mypageSource = readFileSync(new URL("../src/pages/home/Mypage.jsx", import.meta.url), "utf8");
+const mypageEditSource = readFileSync(new URL("../src/pages/home/MypageEdit.jsx", import.meta.url), "utf8");
+
+function assertStaticMypageToastRuntimeBoundary() {
+    for (const [name, source] of [
+        ["Mypage", mypageSource],
+        ["MypageEdit", mypageEditSource],
+    ]) {
+        if (source.includes("from \"react-hot-toast\"") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(source)) {
+            throw new Error(`mypage-ui-smoke: ${name} must use the dynamic toast helper instead of static react-hot-toast imports.`);
+        }
+    }
+    if (!mypageSource.includes("notifyError") || !mypageSource.includes("notifySuccess")) {
+        throw new Error("mypage-ui-smoke: Mypage must keep success/error notifications on the dynamic toast runtime boundary.");
+    }
+    if (!mypageEditSource.includes("notifyError") || !mypageEditSource.includes("notifySuccess") || !mypageEditSource.includes("notify(")) {
+        throw new Error("mypage-ui-smoke: MypageEdit must keep plain/success/error notifications on the dynamic toast runtime boundary.");
+    }
+}
 
 class PipeCdp {
     constructor(chrome) {
@@ -311,6 +331,48 @@ async function inspectMypage(cdp, sessionId, viewport) {
 }
 
 async function main() {
+    assertStaticMypageToastRuntimeBoundary();
+
+    const deleteModalSnippets = [
+        "role=\"dialog\"",
+        "aria-modal=\"true\"",
+        "aria-labelledby={titleId}",
+        "aria-describedby={descriptionId}",
+        "passwordInputRef.current?.focus()",
+        "cancelButtonRef.current?.focus()",
+        "previousFocus.focus()",
+        "document.body.style.overflow = \"hidden\"",
+        "event.key === \"Escape\"",
+        "trapFocus(event, dialogRef.current)",
+        "role=\"presentation\"",
+        "onMouseDown={(event) => {",
+    ];
+    const missingDeleteModalSnippets = deleteModalSnippets.filter((snippet) => !mypageSource.includes(snippet));
+    if (missingDeleteModalSnippets.length) {
+        throw new Error(`mypage delete account modal accessibility guard missing: ${missingDeleteModalSnippets.join(", ")}`);
+    }
+
+    if (!mypageEditSource.includes("PROFILE_IMAGE_ACCEPT = \"image/jpeg,image/png,image/gif,image/webp,image/bmp\"")) {
+        throw new Error("mypage profile upload must keep the raster-only accept list.");
+    }
+    if (!mypageEditSource.includes("isAllowedProfileImageFile(file)")) {
+        throw new Error("mypage profile upload must validate raster image MIME types before upload.");
+    }
+    const googleProfileUrl = "https://lh3.googleusercontent.com/a/avatar";
+    const externalUploadLikeUrl = "https://example.com/upload-files/profile/avatar.png";
+    if (normalizeProfileImageUrl(googleProfileUrl) !== googleProfileUrl) {
+        throw new Error("profile URL normalization must preserve external OAuth image URLs.");
+    }
+    if (normalizeProfileImageUrl(externalUploadLikeUrl) !== externalUploadLikeUrl) {
+        throw new Error("profile URL normalization must not proxy external upload-like URLs.");
+    }
+    if (normalizeProfileImageUrl("http://localhost:9000/upload-files/profile/avatar.png") !== "/api/image/view?path=profile%2Favatar.png") {
+        throw new Error("profile URL normalization must proxy trusted internal profile objects.");
+    }
+    if (normalizeProfileImageUrl("/api/image/view?path=boards%2F1%2Favatar.png") !== "") {
+        throw new Error("profile URL normalization must reject non-profile image proxy paths.");
+    }
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

@@ -1,4 +1,5 @@
 import api, { getApiErrorMessage } from "../utils/api.js";
+import { logClientError } from "../utils/clientDiagnostics.js";
 
 const unwrapStatsData = (response) => response?.data?.data ?? response?.data ?? null;
 
@@ -56,7 +57,7 @@ export const fetchStatsSummaryAndVisitors = async ({ signal, timeout, fallbackOn
     } catch (error) {
         if (isCanceledRequest(error) || signal?.aborted) throw error;
         if (isTimeoutRequest(error) && !fallbackOnTimeout) throw error;
-        console.warn("[statsAdapter] 통계 dashboard 요청 실패로 분리 통계 요청을 사용합니다.", error);
+        logClientError("statistics.dashboard.fallback", error);
     }
 
     const [summaryResponse, visitorsResponse] = await Promise.all([

@@ -1,58 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Clock, Map as MapIcon, MapPin, Navigation, Plus, Users, X } from "lucide-react";
-import toast from "react-hot-toast";
-import { extractOptimizerErrorMessage, optimizerAdapter } from "../../adapters/optimizerAdapter.js";
+import {
+    extractOptimizerErrorMessage,
+    normalizeOptimizerAddress,
+    normalizeOptimizerAddresses,
+    OPTIMIZER_ADDRESS_MAX_LENGTH,
+    OPTIMIZER_MAX_PARTICIPANTS,
+    optimizerAdapter
+} from "../../adapters/optimizerAdapter.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
-
-const loadDaumPostcodeScript = () =>
-    new Promise((resolve, reject) => {
-        if (window?.daum?.Postcode) {
-            resolve();
-            return;
-        }
-        const existing = document.querySelector('script[data-daum-postcode="true"]');
-        if (existing) {
-            existing.addEventListener("load", () => resolve(), { once: true });
-            existing.addEventListener("error", () => reject(new Error("Daum postcode load failed")), { once: true });
-            return;
-        }
-        const script = document.createElement("script");
-        script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
-        script.async = true;
-        script.dataset.daumPostcode = "true";
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Daum postcode load failed"));
-        document.body.appendChild(script);
-    });
-
-const useNaverMaps = () => {
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        if (window.naver?.maps) {
-            setIsLoaded(true);
-            return;
-        }
-        const sdkScript = document.getElementById("naver-maps-sdk");
-        if (!sdkScript) {
-            setError(true);
-            return;
-        }
-        const onLoad = () => setIsLoaded(true);
-        const onError = () => setError(true);
-        sdkScript.addEventListener("load", onLoad);
-        sdkScript.addEventListener("error", onError);
-        return () => {
-            sdkScript.removeEventListener("load", onLoad);
-            sdkScript.removeEventListener("error", onError);
-        };
-    }, []);
-
-    return { isLoaded, error };
-};
-
-const normalizeAddress = (value) => (value || "").trim().replace(/\s+/g, " ");
+import { useNaverMaps } from "../../utils/naverMapsLoader.js";
+import { loadDaumPostcodeScript } from "../../utils/daumPostcodeLoader.js";
+import { escapeHtml } from "../../utils/helpers.js";
+import { notifyError, notifyLoading, notifySuccess } from "../../utils/toast.js";
 
 export const MeetingOptimizer = () => {
     const [addresses, setAddresses] = useState(["", ""]);
@@ -73,7 +33,7 @@ export const MeetingOptimizer = () => {
     const { isLoaded, error: mapsError } = useNaverMaps();
 
     const addressMeta = useMemo(() => {
-        const normalized = addresses.map((value) => normalizeAddress(value));
+        const normalized = addresses.map((value) => normalizeOptimizerAddress(value));
         const counts = normalized.reduce((acc, value) => {
             if (!value) return acc;
             const key = value.toLowerCase();
@@ -83,6 +43,7 @@ export const MeetingOptimizer = () => {
         return normalized.map((value) => {
             if (!value) return { valid: false, reason: "주소를 입력해 주세요." };
             if (value.length < 2) return { valid: false, reason: "주소가 너무 짧습니다." };
+            if (value.length > OPTIMIZER_ADDRESS_MAX_LENGTH) return { valid: false, reason: "주소는 120자 이하로 입력해 주세요." };
             if ((counts.get(value.toLowerCase()) || 0) > 1) return { valid: false, reason: "중복된 주소입니다." };
             return { valid: true, reason: "" };
         });
@@ -91,6 +52,7 @@ export const MeetingOptimizer = () => {
     const canSubmit = useMemo(() => {
         if (loading || loadingPostcodeIndex !== null) return false;
         if (addresses.length < 2) return false;
+        if (addresses.length > OPTIMIZER_MAX_PARTICIPANTS) return false;
         return addressMeta.every((entry) => entry.valid);
     }, [addressMeta, addresses.length, loading, loadingPostcodeIndex]);
 
@@ -132,19 +94,19 @@ export const MeetingOptimizer = () => {
         });
     };
 
-    const handleMyLocation = (index) => {
+    const handleMyLocation = async (index) => {
         if (!navigator.geolocation || !window.naver?.maps?.Service) {
-            toast.error("현재 위치 기능을 사용할 수 없습니다.");
+            notifyError("현재 위치 기능을 사용할 수 없습니다.");
             return;
         }
-        const toastId = toast.loading("현재 위치를 확인하는 중...");
+        const loadingToast = await notifyLoading("현재 위치를 확인하는 중...");
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const coords = new window.naver.maps.LatLng(position.coords.latitude, position.coords.longitude);
                 window.naver.maps.Service.reverseGeocode({ coords }, (status, response) => {
-                    toast.dismiss(toastId);
+                    loadingToast.dismiss();
                     if (status !== window.naver.maps.Service.Status.OK) {
-                        toast.error("현재 위치 주소 변환에 실패했습니다.");
+                        notifyError("현재 위치 주소 변환에 실패했습니다.");
                         return;
                     }
                     const selectedAddress = response?.v2?.address?.roadAddress || response?.v2?.address?.jibunAddress || "";
@@ -156,8 +118,8 @@ export const MeetingOptimizer = () => {
                 });
             },
             () => {
-                toast.dismiss(toastId);
-                toast.error("위치 권한이 필요합니다.");
+                loadingToast.dismiss();
+                notifyError("위치 권한이 필요합니다.");
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
@@ -172,14 +134,14 @@ export const MeetingOptimizer = () => {
                 oncomplete: (data) => {
                     const selectedAddress = data?.roadAddress || data?.jibunAddress || data?.address || "";
                     if (!selectedAddress) {
-                        toast.error("주소가 선택되지 않았습니다.");
+                        notifyError("주소가 선택되지 않았습니다.");
                         return;
                     }
                     updateAddress(index, selectedAddress);
                 },
             }).open();
         } catch (err) {
-            toast.error("우편번호 서비스를 열지 못했습니다.");
+            notifyError("우편번호 서비스를 열지 못했습니다.");
         } finally {
             setLoadingPostcodeIndex(null);
         }
@@ -191,16 +153,16 @@ export const MeetingOptimizer = () => {
         const targetIndex = mapTargetIndexRef.current;
         window.naver.maps.Service.reverseGeocode({ coords }, (status, response) => {
             if (status !== window.naver.maps.Service.Status.OK) {
-                toast.error("선택한 위치의 주소 변환에 실패했습니다.");
+                notifyError("선택한 위치의 주소 변환에 실패했습니다.");
                 return;
             }
             const selectedAddress = response?.v2?.address?.roadAddress || response?.v2?.address?.jibunAddress || "";
             if (!selectedAddress) {
-                toast.error("이 위치의 주소를 찾을 수 없습니다.");
+                notifyError("이 위치의 주소를 찾을 수 없습니다.");
                 return;
             }
             updateAddress(targetIndex, selectedAddress);
-            toast.success(`${label}: 참여자 ${targetIndex + 1} 주소를 반영했습니다.`);
+            notifySuccess(`${label}: 참여자 ${targetIndex + 1} 주소를 반영했습니다.`);
         });
     };
 
@@ -234,16 +196,21 @@ export const MeetingOptimizer = () => {
         const candidates = data?.candidates || [];
         candidates.forEach((candidate, idx) => {
             const position = new window.naver.maps.LatLng(candidate.latitude, candidate.longitude);
+            const markerTitle = candidate.name || `후보 ${idx + 1}`;
+            const displayName = candidate.name || "중간지점";
+            const displayAddress = candidate.address || "주소 정보 없음";
+            const safeName = escapeHtml(displayName);
+            const safeAddress = escapeHtml(displayAddress);
             const marker = new window.naver.maps.Marker({
                 position,
                 map: mapRef.current,
-                title: candidate.name || `후보 ${idx + 1}`,
+                title: markerTitle,
             });
             const infoWindow = new window.naver.maps.InfoWindow({
                 content: `
                     <div style="padding:10px;min-width:180px;">
-                        <div style="font-weight:700;font-size:13px;">후보 ${idx + 1}: ${candidate.name || "중간지점"}</div>
-                        <div style="font-size:11px;color:#64748b;margin-top:4px;">${candidate.address || "주소 정보 없음"}</div>
+                        <div style="font-weight:700;font-size:13px;">후보 ${idx + 1}: ${safeName}</div>
+                        <div style="font-size:11px;color:#64748b;margin-top:4px;">${safeAddress}</div>
                     </div>
                 `,
             });
@@ -339,11 +306,17 @@ export const MeetingOptimizer = () => {
         };
     }, [isLoaded]);
 
-    const addAddress = () => setAddresses((prev) => [...prev, ""]);
+    const addAddress = () => {
+        if (addresses.length >= OPTIMIZER_MAX_PARTICIPANTS) {
+            notifyError("참여자는 최대 8명까지 추가할 수 있습니다.");
+            return;
+        }
+        setAddresses((prev) => [...prev, ""]);
+    };
 
     const removeAddress = (index) => {
         if (addresses.length <= 2) {
-            toast.error("주소는 최소 2개가 필요합니다.");
+            notifyError("주소는 최소 2개가 필요합니다.");
             return;
         }
         setAddresses((prev) => prev.filter((_, i) => i !== index));
@@ -351,14 +324,20 @@ export const MeetingOptimizer = () => {
 
     const handleOptimize = async (event) => {
         event.preventDefault();
-        const normalizedAddresses = addresses.map((value) => normalizeAddress(value));
+        let normalizedAddresses;
+        try {
+            normalizedAddresses = normalizeOptimizerAddresses(addresses);
+        } catch (error) {
+            notifyError(error?.message || "입력값을 확인해 주세요.");
+            return;
+        }
         const invalidIndexes = addressMeta.map((entry, index) => (!entry.valid ? index + 1 : null)).filter(Boolean);
         if (invalidIndexes.length > 0) {
-            toast.error(`입력값을 확인해 주세요: ${invalidIndexes.join(", ")}번 주소`);
+            notifyError(`입력값을 확인해 주세요: ${invalidIndexes.join(", ")}번 주소`);
             return;
         }
         if (normalizedAddresses.length < 2) {
-            toast.error("주소는 최소 2개가 필요합니다.");
+            notifyError("주소는 최소 2개가 필요합니다.");
             return;
         }
 
@@ -368,10 +347,10 @@ export const MeetingOptimizer = () => {
             setResult(data);
             setSelectedCandidateIndex(0);
             setTimeout(() => renderMarkers(data), 100);
-            toast.success("중간장소 계산이 완료되었습니다.");
+            notifySuccess("중간장소 계산이 완료되었습니다.");
         } catch (error) {
             const message = extractOptimizerErrorMessage(error, "중간장소 계산에 실패했습니다.");
-            toast.error(`계산 실패: ${message}`);
+            notifyError(`계산 실패: ${message}`);
         } finally {
             setLoading(false);
         }
@@ -399,9 +378,18 @@ export const MeetingOptimizer = () => {
                                 <Users className="h-5 w-5 text-primary-600" />
                                 참여자 출발지
                             </h3>
-                            <button type="button" onClick={addAddress} className="p-2 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100">
+                            <button
+                                type="button"
+                                onClick={addAddress}
+                                disabled={addresses.length >= OPTIMIZER_MAX_PARTICIPANTS || loading || loadingPostcodeIndex !== null}
+                                title="참여자 추가"
+                                className="p-2 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
                                 <Plus className="h-5 w-5" />
                             </button>
+                        </div>
+                        <div className="mb-3 text-[11px] font-bold text-slate-500">
+                            최대 {OPTIMIZER_MAX_PARTICIPANTS}명, 주소 {OPTIMIZER_ADDRESS_MAX_LENGTH}자 이하까지 계산합니다.
                         </div>
 
                         <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -420,7 +408,7 @@ export const MeetingOptimizer = () => {
                             {addresses.map((address, idx) => (
                                 <div key={`addr-${idx}`} className={`rounded-xl border ${idx === mapTargetIndex ? "border-primary-300 bg-primary-50/40" : "border-transparent"}`}>
                                     <div className="flex items-center gap-2 p-1">
-                                        <input type="text" value={address} readOnly onClick={() => handleDaumPostcode(idx)} placeholder={`참여자 ${idx + 1} 주소`} className="w-full cursor-pointer px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl" />
+                                        <input type="text" value={address} readOnly maxLength={OPTIMIZER_ADDRESS_MAX_LENGTH} onClick={() => handleDaumPostcode(idx)} placeholder={`참여자 ${idx + 1} 주소`} className="w-full cursor-pointer px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl" />
                                         <button type="button" onClick={() => handleMyLocation(idx)} className="p-2 text-slate-500 hover:text-primary-600" title="현재 위치 사용"><Navigation className="h-4 w-4" /></button>
                                         <button type="button" onClick={() => removeAddress(idx)} className="p-2 text-slate-400 hover:text-red-500" title="삭제"><X className="h-4 w-4" /></button>
                                     </div>

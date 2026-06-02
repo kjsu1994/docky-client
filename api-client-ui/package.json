@@ -13,10 +13,12 @@
     "smoke:home-runtime": "node scripts/home-runtime-smoke.mjs",
     "smoke:home-assets": "node scripts/home-assets-smoke.mjs",
     "smoke:home-performance": "node scripts/home-performance-smoke.mjs",
+    "smoke:auth-performance": "node scripts/auth-performance-smoke.mjs",
     "smoke:home-api-load": "node scripts/home-api-load-smoke.mjs",
     "smoke:boards-ui": "node scripts/boards-ui-smoke.mjs",
     "smoke:mypage-ui": "node scripts/mypage-ui-smoke.mjs",
     "smoke:chat-ui": "node scripts/chat-ui-smoke.mjs",
+    "smoke:queue-ui": "node scripts/queue-ui-smoke.mjs",
     "smoke:news-ui": "node scripts/news-ui-smoke.mjs",
     "smoke:ranks-ui": "node scripts/ranks-ui-smoke.mjs",
     "smoke:streaming-ui": "node scripts/streaming-ui-smoke.mjs",
@@ -35,6 +37,7 @@
     "smoke:page-guides": "node scripts/page-guide-smoke.mjs",
     "smoke:navigation-routes": "node scripts/navigation-route-smoke.mjs",
     "smoke:text-quality": "node scripts/text-quality-smoke.mjs",
+    "smoke:api-errors": "node scripts/api-error-message-smoke.mjs",
     "smoke:all": "node scripts/smoke-all.mjs"
   },
   "dependencies": {

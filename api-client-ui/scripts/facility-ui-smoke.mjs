@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -29,6 +29,152 @@ const tabChecks = [
     { tab: "의료시설", heading: "의료시설 찾기", result: "서울의료원" },
 ];
 const blockedTexts = ["Parking", "Restroom", "Library", "Bunker", "Medical", "Loading", "Error"];
+const ADDRESS_QUERY_MAX_LENGTH = 120;
+const FACILITY_KEYWORD_MAX_LENGTH = 60;
+const projectRoot = new URL("../", import.meta.url);
+const infoWindowSourceFiles = [
+    "src/pages/facility/ParkingFinder.jsx",
+    "src/pages/facility/RestroomFinder.jsx",
+    "src/pages/facility/LibraryFinder.jsx",
+    "src/pages/facility/BunkerFinder.jsx",
+    "src/pages/facility/MedicalFinder.jsx",
+    "src/pages/facility/MeetingOptimizer.jsx",
+];
+const facilityToastSourceFiles = [...infoWindowSourceFiles];
+
+function assertFacilityToastRuntimeBoundary() {
+    const helper = readFileSync(new URL("src/utils/toast.js", projectRoot), "utf8");
+    if (!helper.includes("export const notifyLoading") || !helper.includes("import(\"react-hot-toast\")")) {
+        throw new Error("facility source guard: toast helper must expose dynamic loading notifications.");
+    }
+    for (const relativePath of facilityToastSourceFiles) {
+        const source = readFileSync(new URL(relativePath, projectRoot), "utf8");
+        if (source.includes("from \"react-hot-toast\"") || /\btoast\.(success|error|loading|custom|dismiss|remove)\b/.test(source)) {
+            throw new Error(`facility source guard: ${relativePath} must use the dynamic toast helper instead of static react-hot-toast imports.`);
+        }
+        for (const helperName of ["notifyError", "notifyLoading", "notifySuccess"]) {
+            if (!source.includes(helperName)) {
+                throw new Error(`facility source guard: ${relativePath} must keep ${helperName} on the dynamic toast runtime boundary.`);
+            }
+        }
+    }
+}
+
+function assertMedicalImportStartBoundary() {
+    const source = readFileSync(new URL("src/pages/facility/MedicalFinder.jsx", projectRoot), "utf8");
+    const handleStart = source.indexOf("const handleImport = async () =>");
+    const handleEnd = source.indexOf("const fetchImportStatus", handleStart);
+    const handleSource = handleStart >= 0 && handleEnd > handleStart ? source.slice(handleStart, handleEnd) : "";
+    const nullish = "?";
+
+    if (!handleSource.includes(`const status = job?.status ${nullish}${nullish} "IDLE"`)) {
+        throw new Error("facility source guard: medical import start must default non-running responses to IDLE.");
+    }
+    if (!handleSource.includes("if (status === \"RUNNING\")") || !handleSource.includes("notifySuccess(\"의료 CSV 재적재 작업을 시작했습니다.\")")) {
+        throw new Error("facility source guard: medical import start success toast must be limited to RUNNING jobs.");
+    }
+    if (!handleSource.includes("setImporting(false);") || !handleSource.includes("job?.phase === \"WAITING_LOCK\"")) {
+        throw new Error("facility source guard: medical import start must clear the pending UI when the start lock is unavailable.");
+    }
+    if (handleSource.includes(`const status = job?.status ${nullish}${nullish} "RUNNING"`)) {
+        throw new Error("facility source guard: medical import start must not assume every response is RUNNING.");
+    }
+}
+
+function assertMedicalEquipmentDetailBoundary() {
+    const source = readFileSync(new URL("src/pages/facility/MedicalFinder.jsx", projectRoot), "utf8");
+    for (const snippet of [
+        "detailEquipmentTotalCount",
+        "equipmentDetailIsTruncated",
+        "equipment_total_count",
+        "equipmentItems.length",
+        "우선 표시",
+    ]) {
+        if (!source.includes(snippet)) {
+            throw new Error(`facility source guard: medical equipment detail boundary missing ${snippet}`);
+        }
+    }
+}
+
+function assertDaumPostcodeLoaderBoundary() {
+    const loader = readFileSync(new URL("src/utils/daumPostcodeLoader.js", projectRoot), "utf8");
+    const addressSearch = readFileSync(new URL("src/common/AddressSearchBox.jsx", projectRoot), "utf8");
+    const optimizer = readFileSync(new URL("src/pages/facility/MeetingOptimizer.jsx", projectRoot), "utf8");
+
+    if (!loader.includes("https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js")) {
+        throw new Error("facility source guard: Daum postcode loader must use an explicit https URL");
+    }
+    if (!loader.includes("DAUM_POSTCODE_LOAD_TIMEOUT_MS") || !loader.includes("setTimeout")) {
+        throw new Error("facility source guard: Daum postcode loader must keep a bounded timeout");
+    }
+    for (const [relativePath, source] of [
+        ["src/common/AddressSearchBox.jsx", addressSearch],
+        ["src/pages/facility/MeetingOptimizer.jsx", optimizer],
+    ]) {
+        if (!source.includes("loadDaumPostcodeScript")) {
+            throw new Error(`facility source guard: ${relativePath} must use the shared postcode loader`);
+        }
+        if (source.includes("t1.daumcdn.net") || source.includes("data-daum-postcode")) {
+            throw new Error(`facility source guard: ${relativePath} must not define its own postcode script tag`);
+        }
+        if (/const\s+loadDaumPostcodeScript\s*=/.test(source)) {
+            throw new Error(`facility source guard: ${relativePath} must not redeclare loadDaumPostcodeScript`);
+        }
+    }
+}
+
+function assertAddressSearchComboboxBoundary() {
+    const source = readFileSync(new URL("src/common/AddressSearchBox.jsx", projectRoot), "utf8");
+    const requiredSnippets = [
+        "role=\"combobox\"",
+        "aria-autocomplete=\"list\"",
+        "aria-expanded={open}",
+        "aria-controls={listboxId}",
+        "aria-activedescendant={activeOptionId}",
+        "event.nativeEvent?.isComposing || isComposing",
+        "event.key === \"ArrowDown\"",
+        "event.key === \"ArrowUp\"",
+        "event.key === \"Enter\"",
+        "event.key === \"Escape\"",
+        "role=\"listbox\"",
+        "aria-label=\"주소 검색 제안\"",
+        "role=\"option\"",
+        "aria-selected={index === activeSuggestionIndex}",
+    ];
+
+    for (const snippet of requiredSnippets) {
+        if (!source.includes(snippet)) {
+            throw new Error(`facility source guard: AddressSearchBox combobox contract missing ${snippet}`);
+        }
+    }
+}
+
+function assertInfoWindowHtmlBoundary() {
+    const helpers = readFileSync(new URL("src/utils/helpers.js", projectRoot), "utf8");
+    if (!helpers.includes("export const escapeHtml") || !helpers.includes("export const encodeInlineHandlerArg")) {
+        throw new Error("facility source guard: helpers.js must expose escapeHtml and encodeInlineHandlerArg");
+    }
+
+    for (const relativePath of infoWindowSourceFiles) {
+        const source = readFileSync(new URL(relativePath, projectRoot), "utf8");
+        const infoWindowBlocks = [...source.matchAll(/new window\.naver\.maps\.InfoWindow\(\{\s*content:\s*`([\s\S]*?)`\s*,?\s*\}\)/g)];
+        if (!infoWindowBlocks.length) {
+            throw new Error(`facility source guard: ${relativePath} has no checked InfoWindow template`);
+        }
+        if (!source.includes("escapeHtml")) {
+            throw new Error(`facility source guard: ${relativePath} must escape InfoWindow display text`);
+        }
+
+        for (const [, html] of infoWindowBlocks) {
+            if (/\$\{\s*(item\?\.|candidate\.|getDisplayAddress\(item\)|id\s*[}\?])/.test(html)) {
+                throw new Error(`facility source guard: ${relativePath} directly interpolates provider data in InfoWindow HTML`);
+            }
+            if (html.includes("onclick=\"window.__") && !source.includes("encodeInlineHandlerArg")) {
+                throw new Error(`facility source guard: ${relativePath} must encode InfoWindow inline handler arguments`);
+            }
+        }
+    }
+}
 
 class PipeCdp {
     constructor(chrome) {
@@ -256,6 +402,7 @@ function routeMock(url, method) {
             status: 200,
             body: {
                 data: {
+                    equipment_total_count: 12,
                     equipment_items: [
                         {
                             equipment_category_name: "CT",
@@ -344,11 +491,40 @@ async function inspectFacility(cdp, sessionId, viewport) {
         throw new Error(`facility ${viewport.name}: navigation failed ${navigation.result.errorText}`);
     }
     await waitForText(cdp, sessionId, "주변 찾기");
+    const addressInputBounds = await evaluate(cdp, sessionId, `(() => {
+        const input = Array.from(document.querySelectorAll("input"))
+            .find((node) => (node.placeholder || "").includes("서울시청") || (node.placeholder || "").includes("주소"));
+        const helper = Array.from(document.querySelectorAll("div"))
+            .find((node) => (node.innerText || "").includes("주소 검색어"));
+        return {
+            hasInput: Boolean(input),
+            maxLength: input ? input.maxLength : null,
+            helperText: helper ? helper.innerText : "",
+        };
+    })()`);
+    if (
+        !addressInputBounds.hasInput
+        || addressInputBounds.maxLength !== ADDRESS_QUERY_MAX_LENGTH
+        || !addressInputBounds.helperText.includes(`${ADDRESS_QUERY_MAX_LENGTH}자`)
+    ) {
+        throw new Error(`facility ${viewport.name}: address input bounds missing ${JSON.stringify(addressInputBounds)}`);
+    }
 
     for (const check of tabChecks) {
         await clickByText(cdp, sessionId, check.tab);
         await waitForText(cdp, sessionId, check.heading);
         await waitForText(cdp, sessionId, check.result);
+        const keywordInputBounds = await evaluate(cdp, sessionId, `(() => {
+            const inputs = Array.from(document.querySelectorAll("input"));
+            const boundedInputs = inputs.filter((node) => node.maxLength === ${FACILITY_KEYWORD_MAX_LENGTH});
+            return {
+                boundedCount: boundedInputs.length,
+                maxLengths: inputs.map((node) => node.maxLength).filter((value) => value > 0),
+            };
+        })()`);
+        if (!keywordInputBounds.boundedCount) {
+            throw new Error(`facility ${viewport.name}: keyword input bound missing ${JSON.stringify(keywordInputBounds)}`);
+        }
     }
     await delay(500);
 
@@ -397,6 +573,13 @@ async function inspectFacility(cdp, sessionId, viewport) {
 }
 
 async function main() {
+    assertFacilityToastRuntimeBoundary();
+    assertMedicalImportStartBoundary();
+    assertMedicalEquipmentDetailBoundary();
+    assertDaumPostcodeLoaderBoundary();
+    assertAddressSearchComboboxBoundary();
+    assertInfoWindowHtmlBoundary();
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

@@ -1,19 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, MapPin, Save, User, X } from "lucide-react";
-import toast from "react-hot-toast";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
+import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
 import { extractMypageErrorMessage, formatPhoneNumber, isGoogleMember, mypageAdapter } from "../../adapters/mypageAdapter.js";
+
+const PROFILE_IMAGE_ACCEPT = "image/jpeg,image/png,image/gif,image/webp,image/bmp";
+const PROFILE_IMAGE_TYPES = new Set(PROFILE_IMAGE_ACCEPT.split(","));
 
 const isHeicLikeFile = (file) => {
     const type = (file?.type || "").toLowerCase();
     const name = (file?.name || "").toLowerCase();
     return type.includes("heic") || type.includes("heif") || name.endsWith(".heic") || name.endsWith(".heif");
 };
+
+const isAllowedProfileImageFile = (file) => PROFILE_IMAGE_TYPES.has((file?.type || "").toLowerCase());
 
 export const MypageEdit = () => {
     const navigate = useNavigate();
@@ -96,11 +101,11 @@ export const MypageEdit = () => {
         const email = member?.email || user?.email || "";
         const currentPassword = form.currentPassword.trim();
         if (!email) {
-            toast.error("이메일 정보를 찾을 수 없습니다.");
+            notifyError("이메일 정보를 찾을 수 없습니다.");
             return false;
         }
         if (!currentPassword) {
-            toast.error("현재 비밀번호를 먼저 입력해 주세요.");
+            notifyError("현재 비밀번호를 먼저 입력해 주세요.");
             return false;
         }
 
@@ -108,11 +113,11 @@ export const MypageEdit = () => {
         try {
             await mypageAdapter.verifyPassword(email, currentPassword);
             setPasswordVerified(true);
-            toast.success("비밀번호 확인이 완료되었습니다.");
+            notifySuccess("비밀번호 확인이 완료되었습니다.");
             return true;
         } catch (err) {
             setPasswordVerified(false);
-            toast.error(extractMypageErrorMessage(err, "현재 비밀번호가 일치하지 않습니다."));
+            notifyError(extractMypageErrorMessage(err, "현재 비밀번호가 일치하지 않습니다."));
             return false;
         } finally {
             setVerifyingPassword(false);
@@ -123,18 +128,18 @@ export const MypageEdit = () => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        if (!file.type.startsWith("image/")) {
-            toast.error("이미지 파일만 업로드할 수 있습니다.");
+        if (!isAllowedProfileImageFile(file)) {
+            notifyError("프로필 이미지는 JPG, PNG, GIF, WebP, BMP 형식만 업로드할 수 있습니다.");
             event.target.value = "";
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
-            toast.error("프로필 이미지는 5MB 이하로 업로드해 주세요.");
+            notifyError("프로필 이미지는 5MB 이하로 업로드해 주세요.");
             event.target.value = "";
             return;
         }
         if (isHeicLikeFile(file)) {
-            toast.error("HEIC/HEIF 이미지는 지원되지 않습니다. JPG 또는 PNG로 변환해 주세요.");
+            notifyError("HEIC/HEIF 이미지는 지원되지 않습니다. JPG 또는 PNG로 변환해 주세요.");
             event.target.value = "";
             return;
         }
@@ -143,9 +148,9 @@ export const MypageEdit = () => {
         try {
             const updatedMember = await mypageAdapter.uploadProfile(file);
             setMember(updatedMember);
-            toast.success("프로필 이미지가 변경되었습니다.");
+            notifySuccess("프로필 이미지가 변경되었습니다.");
         } catch (err) {
-            toast.error(extractMypageErrorMessage(err, "프로필 이미지 업로드에 실패했습니다."));
+            notifyError(extractMypageErrorMessage(err, "프로필 이미지 업로드에 실패했습니다."));
         } finally {
             setUploading(false);
             event.target.value = "";
@@ -155,11 +160,11 @@ export const MypageEdit = () => {
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (!memberId) {
-            toast.error("회원 식별자를 찾을 수 없습니다.");
+            notifyError("회원 식별자를 찾을 수 없습니다.");
             return;
         }
         if (!isDirty) {
-            toast("변경된 내용이 없습니다.");
+            notify("변경된 내용이 없습니다.");
             return;
         }
 
@@ -169,20 +174,20 @@ export const MypageEdit = () => {
         const currentPassword = form.currentPassword.trim();
 
         if (!nextName) {
-            toast.error("이름을 입력해 주세요.");
+            notifyError("이름을 입력해 주세요.");
             return;
         }
         if (!nextPhone) {
-            toast.error("전화번호를 입력해 주세요.");
+            notifyError("전화번호를 입력해 주세요.");
             return;
         }
         if (nextPassword && nextPassword.length < 8) {
-            toast.error("새 비밀번호는 8자 이상이어야 합니다.");
+            notifyError("새 비밀번호는 8자 이상이어야 합니다.");
             return;
         }
         if (nextPassword && !oauthMember && !passwordVerified) {
             if (!currentPassword) {
-                toast.error("새 비밀번호를 변경하려면 현재 비밀번호를 입력해 주세요.");
+                notifyError("새 비밀번호를 변경하려면 현재 비밀번호를 입력해 주세요.");
                 return;
             }
             const verified = await handleVerifyCurrentPassword();
@@ -197,10 +202,10 @@ export const MypageEdit = () => {
                 address: mergedAddress || null,
                 ...(nextPassword ? { password: nextPassword } : {}),
             });
-            toast.success("회원 정보가 수정되었습니다.");
+            notifySuccess("회원 정보가 수정되었습니다.");
             navigate("/app/mypage");
         } catch (err) {
-            toast.error(extractMypageErrorMessage(err, "회원 정보 수정에 실패했습니다."));
+            notifyError(extractMypageErrorMessage(err, "회원 정보 수정에 실패했습니다."));
         } finally {
             setSaving(false);
         }
@@ -210,7 +215,7 @@ export const MypageEdit = () => {
         if (!address) return;
         setForm((current) => ({ ...current, address }));
         setAddressModalOpen(false);
-        toast.success("주소가 입력되었습니다.");
+        notifySuccess("주소가 입력되었습니다.");
     };
 
     if (loading) {
@@ -248,7 +253,7 @@ export const MypageEdit = () => {
                     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-200">
                         <Camera className="h-4 w-4" />
                         {uploading ? "업로드 중..." : "프로필 이미지 변경"}
-                        <input type="file" accept="image/*" className="hidden" onChange={handleProfileUpload} disabled={uploading} />
+                        <input type="file" accept={PROFILE_IMAGE_ACCEPT} className="hidden" onChange={handleProfileUpload} disabled={uploading} />
                     </label>
                 </div>
 

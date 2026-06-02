@@ -32,10 +32,13 @@ export const normalizeTodo = (item = {}) => ({
 
 const normalizeRangeResponse = (data, fallback) => {
     const items = Array.isArray(data?.items) ? data.items.map(normalizeTodo) : [];
+    const itemLimit = Number(data?.item_limit ?? data?.itemLimit ?? items.length);
     return {
         fromDate: data?.from_date ?? data?.fromDate ?? fallback.fromDate,
         toDate: data?.to_date ?? data?.toDate ?? fallback.toDate,
         items,
+        truncated: Boolean(data?.truncated),
+        itemLimit: Number.isFinite(itemLimit) && itemLimit > 0 ? itemLimit : items.length,
     };
 };
 

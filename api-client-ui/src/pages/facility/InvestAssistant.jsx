@@ -1,10 +1,16 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import toast from "react-hot-toast";
 import { ArrowUpRight, Bot, CircleAlert, Globe2, Landmark, RefreshCw, Search, Sparkles } from "lucide-react";
-import { extractInvestErrorMessage, findUsProviderWarningLimitation, investAdapter } from "../../adapters/investAdapter.js";
+import {
+    INVEST_SYMBOL_MAX_LENGTH,
+    INVEST_SYMBOL_QUERY_MAX_LENGTH,
+    extractInvestErrorMessage,
+    findUsProviderWarningLimitation,
+    investAdapter,
+} from "../../adapters/investAdapter.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
-import { formatDate } from "../../utils/helpers.js";
+import { formatDate, normalizeExternalUrl } from "../../utils/helpers.js";
+import { notifyError, notifySuccess } from "../../utils/toast.js";
 
 const MARKETS = [
     { value: "KR", label: "국내", helper: "KIS 시세, DART 재무, 네이버 뉴스", icon: Landmark },
@@ -63,6 +69,21 @@ const formatPercent = (value) => {
 };
 
 const formatAvailableSection = (value) => AVAILABLE_SECTION_LABELS[value] || value;
+
+const SIGNAL_LABELS = {
+    BUY: "매수",
+    SELL: "매도",
+    HOLD: "보유",
+    NEUTRAL: "중립",
+    POSITIVE: "긍정",
+    NEGATIVE: "부정",
+    CAUTION: "주의",
+    UNKNOWN: "정보 부족",
+    UNAVAILABLE: "산출 불가",
+    INSUFFICIENT_DATA: "데이터 부족",
+};
+
+const formatSignalLabel = (value) => SIGNAL_LABELS[value] || value || "-";
 
 const formatValuationLabel = (value) => {
     const labels = {
@@ -187,6 +208,8 @@ const normalizeSymbol = (value) => {
     if (parenMatch) return parenMatch[1].toUpperCase();
     return raw.toUpperCase();
 };
+
+const clampSymbolQuery = (value) => String(value || "").slice(0, INVEST_SYMBOL_QUERY_MAX_LENGTH);
 
 const buildFallbackChart = ({ market, symbol, interval, priceSnapshot, currency, source }) => {
     const close = Number(priceSnapshot?.price);
@@ -949,7 +972,18 @@ const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
             <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">종목 검색</label>
             <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
-                <input className="input-base pl-10" value={value} onChange={(event) => onChange(event.target.value)} onFocus={() => items.length && setOpen(true)} placeholder={market === "KR" ? "회사명, ETF명, 종목코드" : "회사명, ETF명, 티커"} />
+                <input
+                    className="input-base pl-10"
+                    value={value}
+                    onChange={(event) => onChange(clampSymbolQuery(event.target.value))}
+                    onFocus={() => items.length && setOpen(true)}
+                    placeholder={market === "KR" ? "회사명, ETF명, 종목코드" : "회사명, ETF명, 티커"}
+                    maxLength={INVEST_SYMBOL_QUERY_MAX_LENGTH}
+                    aria-describedby="invest-symbol-query-hint"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck="false"
+                />
                 {open ? (
                     <div className="absolute z-30 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-1 shadow-2xl">
                         {loading ? <div className="px-3 py-2 text-xs font-semibold text-slate-400">검색 중...</div> : null}
@@ -962,6 +996,9 @@ const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
                         {!loading && items.length === 0 ? <div className="px-3 py-2 text-xs font-semibold text-slate-400">일치하는 종목이 없습니다.</div> : null}
                     </div>
                 ) : null}
+            </div>
+            <div id="invest-symbol-query-hint" className="mt-2 text-[11px] font-semibold text-slate-400">
+                검색어 {String(value || "").length}/{INVEST_SYMBOL_QUERY_MAX_LENGTH}자 · 선택 종목코드 {INVEST_SYMBOL_MAX_LENGTH}자 이하
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
                 {PRESETS[market].map((preset) => (
@@ -1012,15 +1049,15 @@ export const InvestAssistant = () => {
                 setChartData(nextChart);
                 return;
             }
-            throw new Error("Chart points are empty");
+            throw new Error("차트 데이터가 비어 있습니다.");
         } catch (fetchError) {
             const fallbackChart = buildFallbackChart({ market: nextMarket, symbol, interval, priceSnapshot: fallbackSource.priceSnapshot, currency: fallbackSource.currency, source: fallbackSource.source });
             if (fallbackChart) {
                 setChartData(fallbackChart);
-                toast.error(extractInvestErrorMessage(fetchError, "차트 히스토리를 불러오지 못해 현재가 기준으로 대체 표시합니다."));
+                notifyError(extractInvestErrorMessage(fetchError, "차트 히스토리를 불러오지 못해 현재가 기준으로 대체 표시합니다."));
             } else {
                 setChartData(null);
-                toast.error(extractInvestErrorMessage(fetchError, "차트 데이터를 불러오지 못했습니다."));
+                notifyError(extractInvestErrorMessage(fetchError, "차트 데이터를 불러오지 못했습니다."));
             }
         } finally {
             setChartLoading(false);
@@ -1030,7 +1067,11 @@ export const InvestAssistant = () => {
     const fetchAnalysis = async ({ silent = false } = {}) => {
         const symbol = normalizeSymbol(selectedSymbol || symbolInput);
         if (!symbol) {
-            toast.error("종목을 선택하거나 입력해 주세요.");
+            notifyError("종목을 선택하거나 입력해 주세요.");
+            return;
+        }
+        if (symbol.length > INVEST_SYMBOL_MAX_LENGTH) {
+            notifyError(`종목코드는 ${INVEST_SYMBOL_MAX_LENGTH}자 이하로 입력해 주세요.`);
             return;
         }
 
@@ -1054,7 +1095,7 @@ export const InvestAssistant = () => {
             });
 
             if (!silent) {
-                toast.success(`${market === "KR" ? "국내" : "미국"} 투자 분석을 불러왔습니다.`);
+                notifySuccess(`${market === "KR" ? "국내" : "미국"} 투자 분석을 불러왔습니다.`);
             }
         } catch (fetchError) {
             setV1(null);
@@ -1070,7 +1111,8 @@ export const InvestAssistant = () => {
     const selectSymbol = (item) => {
         const symbol = normalizeSymbol(item?.symbol);
         setSelectedSymbol(symbol);
-        setSymbolInput(item?.display_name || item?.company_name || symbol);
+        const displayValue = item?.display_name || item?.company_name || symbol;
+        setSymbolInput(displayValue.length <= INVEST_SYMBOL_QUERY_MAX_LENGTH ? displayValue : symbol);
     };
 
     return (
@@ -1099,7 +1141,7 @@ export const InvestAssistant = () => {
                         <div className="text-sm font-black text-slate-900">{currentMarket.label} 시장</div>
                         <div className="mt-1 text-xs font-medium text-slate-500">{price?.source === "KIS" ? "KIS 실시간 시세 응답을 사용 중입니다." : "가용 provider 기준 응답을 사용 중입니다."}</div>
                         <div className="mt-4 space-y-4">
-                            <SymbolSuggestBox market={market} value={symbolInput} onChange={(value) => { setSymbolInput(value); setSelectedSymbol(""); }} onSelect={selectSymbol} />
+                            <SymbolSuggestBox market={market} value={symbolInput} onChange={(value) => { setSymbolInput(clampSymbolQuery(value)); setSelectedSymbol(""); }} onSelect={selectSymbol} />
                             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                                 <button type="button" className="btn-primary" onClick={() => fetchAnalysis()} disabled={loading}>{loading ? "분석 조회 중..." : "분석 시작"}</button>
                                 <button type="button" className="btn-secondary" onClick={() => fetchAnalysis({ silent: true })} disabled={loading}><RefreshCw className="h-4 w-4" /></button>
@@ -1159,7 +1201,7 @@ export const InvestAssistant = () => {
                     <div className={`grid gap-5 ${isKr ? "xl:grid-cols-2" : "xl:grid-cols-3"}`}>
                         <Card title="기본 의견" subtitle="수익성, 안정성, 배당 해석과 보조지표 신호를 함께 반영한 의견">
                             <div className="flex flex-wrap gap-2">
-                                {opinion?.signal ? <Badge className={toneBySignal(opinion.signal)}>{opinion.signal}</Badge> : null}
+                                {opinion?.signal ? <Badge className={toneBySignal(opinion.signal)}>{formatSignalLabel(opinion.signal)}</Badge> : null}
                                 {opinion?.score != null ? <Badge className="bg-slate-100 text-slate-700">의견 점수 {opinion.score}</Badge> : null}
                                 {indicatorAnalysis.score != null ? <Badge className="bg-sky-100 text-sky-700" title={indicatorAnalysis.details?.join(" | ")}>기술 점수 {indicatorAnalysis.score}</Badge> : null}
                                 {indicatorAnalysis.label ? <Badge className="bg-indigo-100 text-indigo-700" title={indicatorAnalysis.details?.join(" | ")}>{indicatorAnalysis.label}</Badge> : null}
@@ -1233,7 +1275,7 @@ export const InvestAssistant = () => {
                             {recommendation ? (
                                 <>
                                     <div className="flex flex-wrap gap-2">
-                                        <Badge className={toneBySignal(recommendation.signal)}>{recommendation.signal}</Badge>
+                                        <Badge className={toneBySignal(recommendation.signal)}>{formatSignalLabel(recommendation.signal)}</Badge>
                                         <Badge className="bg-slate-100 text-slate-700">신뢰도 {recommendation.confidence ?? 0}</Badge>
                                     </div>
                                     <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div className="flex h-full w-full"><div className="bg-emerald-500" style={{ width: `${recommendation.buy_percent ?? 0}%` }} /><div className="bg-amber-400" style={{ width: `${recommendation.neutral_percent ?? 0}%` }} /><div className="bg-rose-500" style={{ width: `${recommendation.sell_percent ?? 0}%` }} /></div></div>
@@ -1264,19 +1306,22 @@ export const InvestAssistant = () => {
                         {isKr ? (
                             <Card title="뉴스 / 이슈" subtitle="v2/v3 이슈 카드">
                                 <div className="space-y-3">
-                                    {newsIssues.length ? newsIssues.map((item, index) => (
-                                        <article key={`${item.url || item.title || "news"}-${index}`} className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
+                                    {newsIssues.length ? newsIssues.map((item, index) => {
+                                        const issueUrl = normalizeExternalUrl(item.url);
+                                        return (
+                                        <article key={`${issueUrl || item.title || "news"}-${index}`} className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div>
                                                     <div className="text-sm font-black leading-snug text-slate-900">{item.title}</div>
-                                                    <div className="mt-1 text-xs font-medium text-slate-400">{item.source || "SOURCE"}{item.published_at ? ` · ${formatDate(item.published_at)}` : ""}</div>
+                                                    <div className="mt-1 text-xs font-medium text-slate-400">{item.source || "출처 미상"}{item.published_at ? ` · ${formatDate(item.published_at)}` : ""}</div>
                                                 </div>
-                                                {item.sentiment_label ? <Badge className="bg-slate-900 text-white">{item.sentiment_label}</Badge> : null}
+                                                {item.sentiment_label ? <Badge className="bg-slate-900 text-white">{formatSignalLabel(item.sentiment_label)}</Badge> : null}
                                             </div>
                                             <p className="mt-3 text-sm leading-relaxed text-slate-600">{item.summary || "요약 정보가 제공되지 않았습니다."}</p>
-                                            {item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-primary-600">원문 보기<ArrowUpRight className="h-4 w-4" /></a> : null}
+                                            {issueUrl ? <a href={issueUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-primary-600">원문 보기<ArrowUpRight className="h-4 w-4" /></a> : null}
                                         </article>
-                                    )) : <EmptySlot message="뉴스 또는 이슈 데이터가 없습니다." />}
+                                        );
+                                    }) : <EmptySlot message="뉴스 또는 이슈 데이터가 없습니다." />}
                                 </div>
                             </Card>
                         ) : null}
@@ -1285,7 +1330,7 @@ export const InvestAssistant = () => {
                             <div className="space-y-3">
                                 {limitations.length ? limitations.map((item, index) => (
                                     <div key={`${item}-${index}`} className="flex gap-3 rounded-[1.4rem] border border-amber-100 bg-amber-50/70 p-4"><CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" /><p className="text-sm font-medium leading-relaxed text-amber-900">{formatLimitation(item)}</p></div>
-                                )) : <EmptySlot message="현재 표시할 limitation 정보가 없습니다." />}
+                                )) : <EmptySlot message="현재 표시할 제약사항 정보가 없습니다." />}
                             </div>
                             {v3?.available_sections?.length ? <div className="mt-5 flex flex-wrap gap-2">{v3.available_sections.map((item) => <Badge key={item} className="bg-slate-900 text-white">{formatAvailableSection(item)}</Badge>)}</div> : null}
                         </Card>

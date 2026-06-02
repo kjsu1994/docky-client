@@ -318,7 +318,7 @@ export const StreamingHub = () => {
                             </div>
                             <div className="mt-3 space-y-2">
                                 <div><span className="font-bold text-slate-800">재생시간:</span> {formatDuration(playInfo?.durationSeconds || selectedVideo?.durationSeconds)}</div>
-                                <div className="break-all"><span className="font-bold text-slate-800">플레이리스트:</span> {playInfo?.playlistUrl ? <a className="text-primary-600 underline" href={playInfo.playlistUrl} target="_blank" rel="noreferrer">{playInfo.playlistUrl}</a> : "없음"}</div>
+                                <div className="break-all"><span className="font-bold text-slate-800">플레이리스트:</span> {playInfo?.playlistUrl ? <a className="text-primary-600 underline" href={playInfo.playlistUrl} target="_blank" rel="noopener noreferrer">{playInfo.playlistUrl}</a> : "없음"}</div>
                             </div>
                         </div>
                     </div>

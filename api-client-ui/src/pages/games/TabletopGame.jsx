@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import SockJS from "sockjs-client";
-import { Client } from "@stomp/stompjs";
-import toast from "react-hot-toast";
+import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import {
   ArrowUp,
   Ban,
@@ -26,7 +24,7 @@ import {
   normalizeTabletopStatePayload,
   tabletopGameAdapter,
 } from "../../adapters/tabletopGameAdapter.js";
-import { buildStompConnectHeaders } from "../../adapters/realtimeAdapter.js";
+import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 
 const gameConfigs = {
@@ -1570,7 +1568,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
                   onFocus={() => {
                     if (!anchorCell) setHoverCell({ x, y });
                   }}
-                  onClick={() => selectCell(x, y).catch(() => toast.error("둘 수 없는 위치입니다."))}
+                  onClick={() => selectCell(x, y).catch(() => notifyError("둘 수 없는 위치입니다."))}
                   aria-label={cellLabel}
                   aria-pressed={anchored}
                   title={cellLabel}
@@ -1648,7 +1646,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
               type="button"
               className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-black text-white ${placeButtonEnabled ? "bg-emerald-600 shadow-lg shadow-emerald-200" : "bg-slate-400 opacity-70"}`}
               disabled={!placeButtonEnabled}
-              onClick={() => anchorCell && place(anchorCell.x, anchorCell.y).catch(() => toast.error("놓을 수 없는 위치입니다."))}
+              onClick={() => anchorCell && place(anchorCell.x, anchorCell.y).catch(() => notifyError("놓을 수 없는 위치입니다."))}
             >
               <CheckCircle2 className="h-4 w-4" />
               놓기
@@ -1656,7 +1654,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
             <button
               type="button"
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-100 px-3 py-3 text-xs font-black text-slate-700 disabled:opacity-40"
-              onClick={() => pass().catch(() => toast.error("아직 놓을 수 있는 조각이 있습니다."))}
+              onClick={() => pass().catch(() => notifyError("아직 놓을 수 있는 조각이 있습니다."))}
               disabled={!canPass}
             >
               패스
@@ -1744,7 +1742,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
             type="button"
             className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-black text-white ${placeButtonEnabled ? "bg-emerald-600 shadow-lg shadow-emerald-200" : "bg-slate-400 opacity-70"}`}
             disabled={!placeButtonEnabled}
-            onClick={() => anchorCell && place(anchorCell.x, anchorCell.y).catch(() => toast.error("둘 수 없는 위치입니다."))}
+            onClick={() => anchorCell && place(anchorCell.x, anchorCell.y).catch(() => notifyError("둘 수 없는 위치입니다."))}
           >
             <CheckCircle2 className="h-4 w-4" />
             선택 위치에 놓기
@@ -1783,7 +1781,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
           <button
             type="button"
             className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-3 text-sm font-black text-slate-700 disabled:opacity-40"
-            onClick={() => pass().catch(() => toast.error("아직 둘 수 있는 조각이 있습니다."))}
+            onClick={() => pass().catch(() => notifyError("아직 둘 수 있는 조각이 있습니다."))}
             disabled={!canPass}
           >
             <Ban className="h-4 w-4" />
@@ -2055,7 +2053,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
         type="button"
         className={`min-h-[74px] rounded-xl px-3 py-2.5 text-left text-white shadow-sm transition disabled:opacity-40 ${tone}`}
         disabled={!canChoose}
-        onClick={() => choose(count).catch(() => toast.error("주사위 개수 선택 실패"))}
+        onClick={() => choose(count).catch(() => notifyError("주사위 개수 선택 실패"))}
         aria-label={choiceLabel}
         title={choiceLabel}
       >
@@ -2244,7 +2242,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
                 type="button"
                 className="min-h-11 rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
                 disabled={!canRoll || dice.length >= 3}
-                onClick={() => roll().catch(() => toast.error("주사위 굴리기 실패"))}
+                onClick={() => roll().catch(() => notifyError("주사위 굴리기 실패"))}
               >
                 굴리기
               </button>
@@ -2252,7 +2250,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
                 type="button"
                 className="min-h-11 rounded-xl bg-amber-500 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
                 disabled={!canRoll || !dice.length}
-                onClick={() => stop().catch(() => toast.error("이동 실패"))}
+                onClick={() => stop().catch(() => notifyError("이동 실패"))}
               >
                 멈추기
               </button>
@@ -2333,7 +2331,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
                 type="button"
                 className="min-h-11 rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
                 disabled={!canRoll || dice.length >= 3}
-                onClick={() => roll().catch(() => toast.error("주사위 굴리기 실패"))}
+                onClick={() => roll().catch(() => notifyError("주사위 굴리기 실패"))}
               >
                 굴리기
               </button>
@@ -2341,7 +2339,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
                 type="button"
                 className="min-h-11 rounded-xl bg-amber-500 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
                 disabled={!canRoll || !dice.length}
-                onClick={() => stop().catch(() => toast.error("이동 실패"))}
+                onClick={() => stop().catch(() => notifyError("이동 실패"))}
               >
                 멈추기
               </button>
@@ -2655,7 +2653,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
 
   const play = async () => {
     if (!selectedPlayStatus.legal) {
-      toast.error(selectedPlayStatus.reason);
+      notifyError(selectedPlayStatus.reason);
       return;
     }
     await onAction({ action_type: "PLAY", card_ids: selectedCardIds });
@@ -2670,7 +2668,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
   const returnTax = async () => {
     const required = Number(get(pendingTax, "count", "count", 0));
     if (selectedCardIds.length !== required) {
-      toast.error(`${required}장을 골라 반환해야 합니다.`);
+      notifyError(`${required}장을 골라 반환해야 합니다.`);
       return;
     }
     await onAction({ action_type: "RETURN_TAX", card_ids: selectedCardIds });
@@ -2734,14 +2732,14 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
       <button
         className="min-h-11 rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
         disabled={!canPlay || !selectedPlayStatus.legal}
-        onClick={() => play().catch(() => toast.error("낼 수 없는 조합입니다."))}
+        onClick={() => play().catch(() => notifyError("낼 수 없는 조합입니다."))}
       >
         제출
       </button>
       <button
         className="min-h-11 rounded-xl bg-slate-100 px-3 py-3 text-sm font-black text-slate-700 disabled:opacity-40"
         disabled={!canPlay || !currentTrick}
-        onClick={() => pass().catch(() => toast.error("패스할 수 없습니다."))}
+        onClick={() => pass().catch(() => notifyError("패스할 수 없습니다."))}
       >
         패스
       </button>
@@ -2751,7 +2749,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
     <button
       className="min-h-11 w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
       disabled={!canReturnTax || selectedCardIds.length !== pendingTaxCount}
-      onClick={() => returnTax().catch(() => toast.error("세금 반환 실패"))}
+      onClick={() => returnTax().catch(() => notifyError("세금 반환 실패"))}
     >
       {canReturnTax ? `선택한 ${selectedCardIds.length}/${pendingTaxCount}장 반환` : "세금 반환 대기"}
     </button>
@@ -2877,10 +2875,10 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
               </div>
               {canDecideRevolution && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-black text-white" onClick={() => onAction({ action_type: "DECLARE_REVOLUTION" }).catch(() => toast.error("혁명 선언 실패"))}>
+                  <button className="rounded-xl bg-amber-600 px-3 py-3 text-sm font-black text-white" onClick={() => onAction({ action_type: "DECLARE_REVOLUTION" }).catch(() => notifyError("혁명 선언 실패"))}>
                     혁명 선언
                   </button>
-                  <button className="rounded-xl bg-white px-3 py-3 text-sm font-black text-amber-700" onClick={() => onAction({ action_type: "SKIP_REVOLUTION" }).catch(() => toast.error("혁명 포기 실패"))}>
+                  <button className="rounded-xl bg-white px-3 py-3 text-sm font-black text-amber-700" onClick={() => onAction({ action_type: "SKIP_REVOLUTION" }).catch(() => notifyError("혁명 포기 실패"))}>
                     포기
                   </button>
                 </div>
@@ -2925,7 +2923,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
                   <button
                     className="mt-3 w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40"
                     disabled={selectedCardIds.length !== pendingTaxCount}
-                    onClick={() => returnTax().catch(() => toast.error("세금 반환 실패"))}
+                    onClick={() => returnTax().catch(() => notifyError("세금 반환 실패"))}
                   >
                     선택한 카드 반환
                   </button>
@@ -3858,7 +3856,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const setupBuild = async () => {
     if (!selectedVertexId || !selectedEdgeId) {
-      toast.error("정착지와 도로 위치를 선택해주세요.");
+      notifyError("정착지와 도로 위치를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "SETUP_BUILD", vertex_id: selectedVertexId, edge_id: selectedEdgeId });
@@ -3869,7 +3867,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
   const build = async () => {
     if (buildMode === "ROAD") {
       if (!selectedEdgeId) {
-        toast.error("도로 위치를 선택해주세요.");
+        notifyError("도로 위치를 선택해주세요.");
         return;
       }
       await onAction({ action_type: "BUILD_ROAD", edge_id: selectedEdgeId });
@@ -3878,7 +3876,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     }
     if (buildMode === "BRIDGE") {
       if (!selectedEdgeId) {
-        toast.error("다리를 놓을 강 간선을 선택해주세요.");
+        notifyError("다리를 놓을 강 간선을 선택해주세요.");
         return;
       }
       await onAction({ action_type: "BUILD_BRIDGE", edge_id: selectedEdgeId });
@@ -3887,7 +3885,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     }
     if (buildMode === "SHIP") {
       if (!selectedEdgeId) {
-        toast.error("배를 놓을 해상 간선을 선택해주세요.");
+        notifyError("배를 놓을 해상 간선을 선택해주세요.");
         return;
       }
       await onAction({ action_type: "BUILD_SHIP", edge_id: selectedEdgeId });
@@ -3897,7 +3895,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     if (buildMode === "MOVE_SHIP") {
       const path = explorersPiratesRule && shipMovePath.length >= 2 ? shipMovePath : [shipMoveFromEdgeId, selectedEdgeId].filter(Boolean);
       if (path.length < 2) {
-        toast.error("이동할 배와 새 해상 간선을 선택해주세요.");
+        notifyError("이동할 배와 새 해상 간선을 선택해주세요.");
         return;
       }
       await onAction({ action_type: "MOVE_SHIP", edge_ids: path });
@@ -3908,11 +3906,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     }
     if (buildMode === "KNIGHT") {
       if (!selectedVertexId) {
-        toast.error("기사를 놓을 교차점을 선택해주세요.");
+        notifyError("기사를 놓을 교차점을 선택해주세요.");
         return;
       }
       if (!selectedVertexCanBuildKnight) {
-        toast.error(selectedVertexKnightBuildWarning || "기사 배치 조건을 확인해주세요.");
+        notifyError(selectedVertexKnightBuildWarning || "기사 배치 조건을 확인해주세요.");
         return;
       }
       await onAction({ action_type: "BUILD_KNIGHT", vertex_id: selectedVertexId });
@@ -3921,7 +3919,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     }
     if (buildMode === "CITY_WALL") {
       if (!selectedVertexId) {
-        toast.error("성벽을 세울 도시를 선택해주세요.");
+        notifyError("성벽을 세울 도시를 선택해주세요.");
         return;
       }
       await onAction({ action_type: "BUILD_CITY_WALL", vertex_id: selectedVertexId });
@@ -3929,7 +3927,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
       return;
     }
     if (!selectedVertexId) {
-      toast.error("교차점을 선택해주세요.");
+      notifyError("교차점을 선택해주세요.");
       return;
     }
     const actionType = buildMode === "CITY"
@@ -3943,15 +3941,15 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const moveRobber = async () => {
     if (!selectedHexId) {
-      toast.error(explorersPiratesRule ? "해적을 보낼 바다 칸을 선택해주세요." : "도적을 옮길 타일을 선택해주세요.");
+      notifyError(explorersPiratesRule ? "해적을 보낼 바다 칸을 선택해주세요." : "도적을 옮길 타일을 선택해주세요.");
       return;
     }
     if (explorersPiratesRule && selectedHex?.terrain !== "SEA") {
-      toast.error("E&P에서는 도적 대신 해적선을 바다 칸에 놓습니다.");
+      notifyError("E&P에서는 도적 대신 해적선을 바다 칸에 놓습니다.");
       return;
     }
     if (citiesKnightsRobberLocked) {
-      toast.error("첫 야만인 침공 전에는 도적을 이동하지 않습니다.");
+      notifyError("첫 야만인 침공 전에는 도적을 이동하지 않습니다.");
       return;
     }
     await onAction({
@@ -3965,11 +3963,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const maritimeTrade = async () => {
     if (tradeForm.give === tradeForm.receive) {
-      toast.error("서로 다른 자원을 선택해주세요.");
+      notifyError("서로 다른 자원을 선택해주세요.");
       return;
     }
     if (!maritimeReceiveWithinBank) {
-      toast.error("은행에 받을 자원이 부족합니다.");
+      notifyError("은행에 받을 자원이 부족합니다.");
       return;
     }
     await onAction({ action_type: "MARITIME_TRADE", resource_type: tradeForm.give, target_resource_type: tradeForm.receive });
@@ -3980,15 +3978,15 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     const offerResources = positiveResourceMap(domesticOfferForm);
     const requestResources = positiveResourceMap(domesticRequestForm);
     if (!target) {
-      toast.error("거래할 플레이어를 선택해주세요.");
+      notifyError("거래할 플레이어를 선택해주세요.");
       return;
     }
     if (resourceMapTotal(offerResources) <= 0 || resourceMapTotal(requestResources) <= 0) {
-      toast.error("줄 자원과 받을 자원을 각각 1개 이상 입력해주세요.");
+      notifyError("줄 자원과 받을 자원을 각각 1개 이상 입력해주세요.");
       return;
     }
     if (domesticOfferExceeded) {
-      toast.error("내가 가진 자원보다 많이 제안할 수 없습니다.");
+      notifyError("내가 가진 자원보다 많이 제안할 수 없습니다.");
       return;
     }
     await onAction({
@@ -4016,12 +4014,12 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
       await onAction({ action_type: "BUILD_SETTLER", edge_id: selectedEdgeId });
       return;
     }
-    toast.error("항구 정착지나 빈 배를 선택해주세요.");
+    notifyError("항구 정착지나 빈 배를 선택해주세요.");
   };
 
   const loadSettler = async () => {
     if (!selectedVertexId || !selectedEdgeId) {
-      toast.error("정착민이 있는 항구와 싣고 갈 배를 선택해주세요.");
+      notifyError("정착민이 있는 항구와 싣고 갈 배를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "LOAD_SETTLER", vertex_id: selectedVertexId, edge_id: selectedEdgeId });
@@ -4038,12 +4036,12 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
       await onAction({ action_type: "BUILD_CREW", edge_id: selectedEdgeId });
       return;
     }
-    toast.error("승무원을 놓을 항구 정착지나 항구와 닿은 배를 선택해주세요.");
+    notifyError("승무원을 놓을 항구 정착지나 항구와 닿은 배를 선택해주세요.");
   };
 
   const unloadCrewToPirateLair = async () => {
     if (!selectedHexId || !selectedEdgeId) {
-      toast.error("해적 소굴과 승무원이 탄 배를 선택해주세요.");
+      notifyError("해적 소굴과 승무원이 탄 배를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "UNLOAD_CREW_TO_PIRATE_LAIR", hex_id: selectedHexId, edge_id: selectedEdgeId });
@@ -4055,7 +4053,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const catchFish = async () => {
     if (!selectedHexId || !selectedEdgeId) {
-      toast.error("어획물이 있는 어장과 비어 있는 배를 선택해주세요.");
+      notifyError("어획물이 있는 어장과 비어 있는 배를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "CATCH_FISH", hex_id: selectedHexId, edge_id: selectedEdgeId });
@@ -4067,7 +4065,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const collectSpice = async () => {
     if (!selectedHexId || !selectedEdgeId) {
-      toast.error("향신료 마을과 승무원이 탄 배를 선택해주세요.");
+      notifyError("향신료 마을과 승무원이 탄 배를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "COLLECT_SPICE", hex_id: selectedHexId, edge_id: selectedEdgeId });
@@ -4075,7 +4073,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const sellResourceForGold = async () => {
     if (fastGoldRemaining <= 0) {
-      toast.error("이번 턴에 사용할 빠른 금 이점이 없습니다.");
+      notifyError("이번 턴에 사용할 빠른 금 이점이 없습니다.");
       return;
     }
     await onAction({ action_type: "SELL_RESOURCE_FOR_GOLD", resource_type: tradeForm.give });
@@ -4083,7 +4081,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const spendGoldForResource = async () => {
     if (myGold < 2 || riverGoldTradesRemaining <= 0) {
-      toast.error("골드 2개와 남은 교환 횟수를 확인해주세요.");
+      notifyError("골드 2개와 남은 교환 횟수를 확인해주세요.");
       return;
     }
     await onAction({ action_type: "SPEND_GOLD_FOR_RESOURCE", resource_type: tradeForm.receive });
@@ -4097,7 +4095,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const placeCamel = async () => {
     if (!selectedEdgeId) {
-      toast.error("낙타를 놓을 경로를 선택해주세요.");
+      notifyError("낙타를 놓을 경로를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "PLACE_CAMEL", edge_id: selectedEdgeId });
@@ -4106,11 +4104,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const recruitBarbarianKnight = async () => {
     if (!selectedDevCard || selectedDevCard.type !== "KNIGHT") {
-      toast.error("사용할 기사 개발 카드를 선택해주세요.");
+      notifyError("사용할 기사 개발 카드를 선택해주세요.");
       return;
     }
     if (!selectedEdgeId) {
-      toast.error("방어 기사를 놓을 경로를 선택해주세요.");
+      notifyError("방어 기사를 놓을 경로를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "RECRUIT_BARBARIAN_KNIGHT", card_ids: [selectedDevCard.id], edge_id: selectedEdgeId });
@@ -4119,7 +4117,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const expelBarbarians = async () => {
     if (!selectedHexId) {
-      toast.error("격퇴할 야만인 타일을 선택해주세요.");
+      notifyError("격퇴할 야만인 타일을 선택해주세요.");
       return;
     }
     await onAction({ action_type: "EXPEL_BARBARIANS", hex_id: selectedHexId });
@@ -4128,7 +4126,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const chaseAwayPirate = async () => {
     if (!selectedHexId) {
-      toast.error("해적을 보낼 바다 칸을 선택해주세요.");
+      notifyError("해적을 보낼 바다 칸을 선택해주세요.");
       return;
     }
     await onAction({ action_type: "CHASE_AWAY_PIRATE", hex_id: selectedHexId });
@@ -4136,7 +4134,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const transferCargo = async () => {
     if (!selectedVertexId || !selectedEdgeId) {
-      toast.error("항구 정착지와 맞닿은 배를 선택해주세요.");
+      notifyError("항구 정착지와 맞닿은 배를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "TRANSFER_CARGO", vertex_id: selectedVertexId, edge_id: selectedEdgeId });
@@ -4144,12 +4142,12 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const deliverCargo = async () => {
     if (!selectedEdgeId) {
-      toast.error("의회 선착장에 닿은 화물 실은 배를 선택해주세요.");
+      notifyError("의회 선착장에 닿은 화물 실은 배를 선택해주세요.");
       return;
     }
     const cargoType = cargoTypesOf(selectedEdge).find((type) => type === "FISH" || type === "SPICE");
     if (!cargoType) {
-      toast.error("납품할 어획물이나 향신료가 실린 배를 선택해주세요.");
+      notifyError("납품할 어획물이나 향신료가 실린 배를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "DELIVER_CARGO", edge_id: selectedEdgeId, resource_type: cargoType });
@@ -4157,7 +4155,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const foundSettlementFromShip = async () => {
     if (!selectedVertexId || !selectedEdgeId) {
-      toast.error("정착민 배와 상륙할 교차점을 선택해주세요.");
+      notifyError("정착민 배와 상륙할 교차점을 선택해주세요.");
       return;
     }
     await onAction({ action_type: "FOUND_SETTLEMENT_FROM_SHIP", vertex_id: selectedVertexId, edge_id: selectedEdgeId });
@@ -4167,7 +4165,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const discardResources = async () => {
     if (discardTotal !== discardRequired) {
-      toast.error(`${discardRequired}장을 정확히 버려야 합니다.`);
+      notifyError(`${discardRequired}장을 정확히 버려야 합니다.`);
       return;
     }
     await onAction({ action_type: "DISCARD_RESOURCES", resources: discardForm, commodities: discardCommodityForm });
@@ -4178,7 +4176,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
   const discardProgressCard = async () => {
     const card = nonVictoryProgressCards.find((item) => item.id === selectedDiscardProgressCardId);
     if (!card) {
-      toast.error("버릴 진행 카드를 선택해주세요.");
+      notifyError("버릴 진행 카드를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "DISCARD_PROGRESS_CARD", card_ids: [card.id] });
@@ -4187,11 +4185,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
   const chooseGoldResources = async () => {
     if (!myGoldChoice) return;
     if (goldTotal !== goldRequired) {
-      toast.error(`${goldRequired}장을 정확히 선택해주세요.`);
+      notifyError(`${goldRequired}장을 정확히 선택해주세요.`);
       return;
     }
     if (!goldChoiceWithinBank) {
-      toast.error("은행에 선택한 자원이 부족합니다.");
+      notifyError("은행에 선택한 자원이 부족합니다.");
       return;
     }
     await onAction({ action_type: "CHOOSE_GOLD_RESOURCE", resources: goldForm });
@@ -4201,7 +4199,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
   const chooseAqueductResource = async () => {
     if (!myAqueductChoice) return;
     if (!aqueductWithinBank) {
-      toast.error("은행에 선택한 자원이 부족합니다.");
+      notifyError("은행에 선택한 자원이 부족합니다.");
       return;
     }
     await onAction({ action_type: "CHOOSE_AQUEDUCT_RESOURCE", resource_type: selectedAqueductResourceType });
@@ -4210,7 +4208,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
   const chooseMasterMerchantCards = async () => {
     if (pendingMasterMerchantAttackerSeatNo !== mySeatNo) return;
     if (masterMerchantTotal !== pendingMasterMerchantCount) {
-      toast.error(`${pendingMasterMerchantCount}장을 정확히 선택해주세요.`);
+      notifyError(`${pendingMasterMerchantCount}장을 정확히 선택해주세요.`);
       return;
     }
     await onAction({ action_type: "CHOOSE_MASTER_MERCHANT_CARDS", resources: masterMerchantResources, commodities: masterMerchantCommodities });
@@ -4220,7 +4218,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const chooseSpyProgressCard = async () => {
     if (!selectedSpyCard) {
-      toast.error("가져올 진행 카드를 선택해주세요.");
+      notifyError("가져올 진행 카드를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "CHOOSE_SPY_PROGRESS_CARD", card_ids: [selectedSpyCard.id] });
@@ -4228,7 +4226,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const chooseDefenderProgressCard = async () => {
     if (!mustChooseDefenderProgress) {
-      toast.error("방어자 진행 카드를 고를 차례가 아닙니다.");
+      notifyError("방어자 진행 카드를 고를 차례가 아닙니다.");
       return;
     }
     await onAction({ action_type: "CHOOSE_DEFENDER_PROGRESS_CARD", improvement_type: selectedImprovementType });
@@ -4237,7 +4235,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
   const respondWeddingCards = async () => {
     if (!mustRespondWedding) return;
     if (weddingTotal !== weddingRequired) {
-      toast.error(`${weddingRequired}장을 정확히 선택해주세요.`);
+      notifyError(`${weddingRequired}장을 정확히 선택해주세요.`);
       return;
     }
     await onAction({ action_type: "RESPOND_WEDDING_CARDS", resources: weddingResources, commodities: weddingCommodities });
@@ -4251,7 +4249,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const addRoadCardEdge = () => {
     if (!selectedEdgeId) {
-      toast.error("도로 카드로 놓을 간선을 선택해주세요.");
+      notifyError("도로 카드로 놓을 간선을 선택해주세요.");
       return;
     }
     setRoadCardEdges((prev) => [...prev.filter((edgeId) => edgeId !== selectedEdgeId), selectedEdgeId].slice(-2));
@@ -4259,7 +4257,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const addProgressHex = () => {
     if (!selectedHexId) {
-      toast.error("진행 카드에 사용할 타일을 선택해주세요.");
+      notifyError("진행 카드에 사용할 타일을 선택해주세요.");
       return;
     }
     setRoadCardEdges((prev) => [...prev.filter((hexId) => hexId !== selectedHexId), selectedHexId].slice(-2));
@@ -4267,7 +4265,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const playDevelopmentCard = async () => {
     if (!selectedDevCard) {
-      toast.error("사용할 개발 카드를 선택해주세요.");
+      notifyError("사용할 개발 카드를 선택해주세요.");
       return;
     }
     const cardType = selectedDevCard.type;
@@ -4277,7 +4275,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     };
     if (cardType === "KNIGHT") {
       if (!selectedHexId) {
-        toast.error("기사가 이동시킬 도적 타일을 선택해주세요.");
+        notifyError("기사가 이동시킬 도적 타일을 선택해주세요.");
         return;
       }
       payload.hex_id = selectedHexId;
@@ -4285,14 +4283,14 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     }
     if (cardType === "ROAD_BUILDING") {
       if (!roadCardEdges.length) {
-        toast.error("도로 건설 카드로 놓을 간선을 추가해주세요.");
+        notifyError("도로 건설 카드로 놓을 간선을 추가해주세요.");
         return;
       }
       payload.edge_ids = roadCardEdges;
     }
     if (cardType === "YEAR_OF_PLENTY") {
       if (!yearOfPlentyWithinBank) {
-        toast.error("은행에 선택한 자원이 부족합니다.");
+        notifyError("은행에 선택한 자원이 부족합니다.");
         return;
       }
       payload.resource_type = tradeForm.give;
@@ -4309,7 +4307,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const playAlchemistCard = async () => {
     if (!selectedAlchemistCardId) {
-      toast.error("연금술사 카드를 선택해주세요.");
+      notifyError("연금술사 카드를 선택해주세요.");
       return;
     }
     await onAction({
@@ -4322,7 +4320,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const activateKnight = async () => {
     if (!selectedOwnKnight) {
-      toast.error("내 기사를 선택해주세요.");
+      notifyError("내 기사를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "ACTIVATE_KNIGHT", vertex_id: selectedVertexId });
@@ -4330,11 +4328,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const promoteKnight = async () => {
     if (!selectedOwnKnight) {
-      toast.error("내 기사를 선택해주세요.");
+      notifyError("내 기사를 선택해주세요.");
       return;
     }
     if (!selectedKnightCanPromote) {
-      toast.error("강한 기사를 최강 기사로 승급하려면 정치 3단계 요새가 필요합니다.");
+      notifyError("강한 기사를 최강 기사로 승급하려면 정치 3단계 요새가 필요합니다.");
       return;
     }
     await onAction({ action_type: "PROMOTE_KNIGHT", vertex_id: selectedVertexId });
@@ -4342,32 +4340,32 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const markKnightMoveSource = () => {
     if (!selectedOwnKnight) {
-      toast.error("이동할 내 기사를 선택해주세요.");
+      notifyError("이동할 내 기사를 선택해주세요.");
       return;
     }
     if (!selectedKnightActive) {
-      toast.error("활성화된 기사만 이동할 수 있습니다.");
+      notifyError("활성화된 기사만 이동할 수 있습니다.");
       return;
     }
     if (selectedKnightActivatedTurnNo === turnNo) {
-      toast.error("이번 턴에 활성화한 기사는 다음 턴부터 행동할 수 있습니다.");
+      notifyError("이번 턴에 활성화한 기사는 다음 턴부터 행동할 수 있습니다.");
       return;
     }
     setKnightMoveSourceId(selectedVertexId);
-    toast.success("기사 이동 출발점을 지정했습니다.");
+    notifySuccess("기사 이동 출발점을 지정했습니다.");
   };
 
   const moveKnight = async () => {
     if (!knightMoveSourceId) {
-      toast.error("이동할 기사의 출발점을 먼저 지정해주세요.");
+      notifyError("이동할 기사의 출발점을 먼저 지정해주세요.");
       return;
     }
     if (!selectedVertexId) {
-      toast.error("기사가 이동할 교차점을 선택해주세요.");
+      notifyError("기사가 이동할 교차점을 선택해주세요.");
       return;
     }
     if (!selectedKnightCanMove) {
-      toast.error("내 도로망으로 실제 연결된 빈 교차점이나 더 약한 상대 기사만 선택할 수 있습니다.");
+      notifyError("내 도로망으로 실제 연결된 빈 교차점이나 더 약한 상대 기사만 선택할 수 있습니다.");
       return;
     }
     await onAction({
@@ -4381,27 +4379,27 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const chaseRobberWithKnight = async () => {
     if (citiesKnightsRobberLocked) {
-      toast.error("첫 야만인 침공 전에는 기사로 도적을 쫓아낼 수 없습니다.");
+      notifyError("첫 야만인 침공 전에는 기사로 도적을 쫓아낼 수 없습니다.");
       return;
     }
     if (!selectedOwnKnight) {
-      toast.error("도적과 닿아 있는 내 기사를 선택해주세요.");
+      notifyError("도적과 닿아 있는 내 기사를 선택해주세요.");
       return;
     }
     if (!selectedKnightActive) {
-      toast.error("활성화된 기사만 도적을 쫓아낼 수 있습니다.");
+      notifyError("활성화된 기사만 도적을 쫓아낼 수 있습니다.");
       return;
     }
     if (selectedKnightActivatedTurnNo === turnNo) {
-      toast.error("이번 턴에 활성화한 기사는 다음 턴부터 행동할 수 있습니다.");
+      notifyError("이번 턴에 활성화한 기사는 다음 턴부터 행동할 수 있습니다.");
       return;
     }
     if (!selectedKnightTouchesRobber) {
-      toast.error("도적과 닿아 있는 기사를 선택해주세요.");
+      notifyError("도적과 닿아 있는 기사를 선택해주세요.");
       return;
     }
     if (!selectedHexCanReceiveRobber) {
-      toast.error("도적을 옮길 숫자 타일을 선택해주세요.");
+      notifyError("도적을 옮길 숫자 타일을 선택해주세요.");
       return;
     }
     await onAction({
@@ -4416,11 +4414,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const moveDisplacedKnight = async () => {
     if (!mustMoveDisplacedKnight) {
-      toast.error("밀려난 기사를 옮길 차례가 아닙니다.");
+      notifyError("밀려난 기사를 옮길 차례가 아닙니다.");
       return;
     }
     if (!selectedVertexId) {
-      toast.error("밀려난 기사가 이동할 빈 교차점을 선택해주세요.");
+      notifyError("밀려난 기사가 이동할 빈 교차점을 선택해주세요.");
       return;
     }
     await onAction({ action_type: "MOVE_DISPLACED_KNIGHT", vertex_id: selectedVertexId });
@@ -4429,11 +4427,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const removeDeserterKnight = async () => {
     if (phase !== "DESERTER_REMOVE" || pendingDeserterTargetSeatNo !== mySeatNo) {
-      toast.error("탈영할 기사를 고를 차례가 아닙니다.");
+      notifyError("탈영할 기사를 고를 차례가 아닙니다.");
       return;
     }
     if (!selectedVertexId || selectedKnightOwner !== mySeatNo) {
-      toast.error("제거할 내 기사를 선택해주세요.");
+      notifyError("제거할 내 기사를 선택해주세요.");
       return;
     }
     await onAction({ action_type: "REMOVE_DESERTER_KNIGHT", vertex_id: selectedVertexId });
@@ -4442,11 +4440,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const placeDeserterKnight = async () => {
     if (phase !== "DESERTER_PLACE" || pendingDeserterAttackerSeatNo !== mySeatNo) {
-      toast.error("탈영 기사를 배치할 차례가 아닙니다.");
+      notifyError("탈영 기사를 배치할 차례가 아닙니다.");
       return;
     }
     if (!selectedVertexId) {
-      toast.error("탈영 기사를 배치할 정점을 선택해주세요.");
+      notifyError("탈영 기사를 배치할 정점을 선택해주세요.");
       return;
     }
     await onAction({ action_type: "PLACE_DESERTER_KNIGHT", vertex_id: selectedVertexId });
@@ -4455,11 +4453,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const moveIntrigueKnight = async () => {
     if (phase !== "INTRIGUE_MOVE" || pendingIntrigueTargetSeatNo !== mySeatNo) {
-      toast.error("음모로 밀려난 기사를 옮길 차례가 아닙니다.");
+      notifyError("음모로 밀려난 기사를 옮길 차례가 아닙니다.");
       return;
     }
     if (!selectedVertexId) {
-      toast.error("기사를 옮길 정점을 선택해주세요.");
+      notifyError("기사를 옮길 정점을 선택해주세요.");
       return;
     }
     await onAction({ action_type: "MOVE_INTRIGUE_KNIGHT", vertex_id: selectedVertexId });
@@ -4468,11 +4466,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const respondCommercialHarbor = async () => {
     if (phase !== "COMMERCIAL_HARBOR" || !pendingCommercialHarborSeatNos.map(Number).includes(mySeatNo)) {
-      toast.error("상업 항구 응답 차례가 아닙니다.");
+      notifyError("상업 항구 응답 차례가 아닙니다.");
       return;
     }
     if (!commodities?.[selectedCommodityType]) {
-      toast.error("줄 상품을 선택해주세요.");
+      notifyError("줄 상품을 선택해주세요.");
       return;
     }
     await onAction({ action_type: "RESPOND_COMMERCIAL_HARBOR", resource_type: selectedCommodityType });
@@ -4484,11 +4482,11 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
   const playProgressCard = async () => {
     if (!selectedProgressCard) {
-      toast.error("사용할 진행 카드를 선택해주세요.");
+      notifyError("사용할 진행 카드를 선택해주세요.");
       return;
     }
     if (!selectedProgressSupported) {
-      toast.error("현재 단계에서 사용할 수 없는 진행 카드입니다.");
+      notifyError("현재 단계에서 사용할 수 없는 진행 카드입니다.");
       return;
     }
     const payload = {
@@ -4496,19 +4494,19 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
       card_ids: [selectedProgressCard.id],
     };
     if (selectedProgressType === "ALCHEMIST") {
-      toast.error("연금술사는 주사위 단계에서만 사용할 수 있습니다.");
+      notifyError("연금술사는 주사위 단계에서만 사용할 수 있습니다.");
       return;
     }
     if (selectedProgressType === "ENGINEER") {
       if (!selectedVertexId) {
-        toast.error("성벽을 세울 도시를 선택해주세요.");
+        notifyError("성벽을 세울 도시를 선택해주세요.");
         return;
       }
       payload.vertex_id = selectedVertexId;
     }
     if (selectedProgressType === "MEDICINE") {
       if (!selectedVertexId) {
-        toast.error("도시로 올릴 마을을 선택해주세요.");
+        notifyError("도시로 올릴 마을을 선택해주세요.");
         return;
       }
       payload.vertex_id = selectedVertexId;
@@ -4518,25 +4516,25 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     }
     if (selectedProgressType === "INVENTOR") {
       if (roadCardEdges.length < 2) {
-        toast.error("숫자 토큰을 바꿀 타일 2개를 추가해주세요.");
+        notifyError("숫자 토큰을 바꿀 타일 2개를 추가해주세요.");
         return;
       }
       payload.edge_ids = roadCardEdges;
     }
     if (selectedProgressType === "INTRIGUE") {
       if (!selectedVertexId || !selectedKnightOwner || selectedKnightOwner === mySeatNo) {
-        toast.error("내 도로에 닿은 상대 기사를 선택해주세요.");
+        notifyError("내 도로에 닿은 상대 기사를 선택해주세요.");
         return;
       }
       payload.vertex_id = selectedVertexId;
     }
     if (selectedProgressType === "BISHOP") {
       if (citiesKnightsRobberLocked) {
-        toast.error("주교는 첫 야만인 침공 후부터 사용할 수 있습니다.");
+        notifyError("주교는 첫 야만인 침공 후부터 사용할 수 있습니다.");
         return;
       }
       if (!selectedHexId || selectedHex?.terrain === "SEA") {
-        toast.error("주교로 옮길 육지 타일을 선택해주세요.");
+        notifyError("주교로 옮길 육지 타일을 선택해주세요.");
         return;
       }
       payload.hex_id = selectedHexId;
@@ -4547,7 +4545,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     if (selectedProgressType === "DESERTER") {
       const target = targetSeatNo ? Number(targetSeatNo) : Number(get(deserterTargets[0], "seat_no", "seatNo", 0));
       if (!target) {
-        toast.error("탈영시킬 상대를 선택해주세요.");
+        notifyError("탈영시킬 상대를 선택해주세요.");
         return;
       }
       payload.target_seat_no = target;
@@ -4555,14 +4553,14 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     if (selectedProgressType === "MASTER_MERCHANT") {
       const target = targetSeatNo ? Number(targetSeatNo) : Number(get(richerPlayers[0], "seat_no", "seatNo", 0));
       if (!target) {
-        toast.error("대상 플레이어를 선택해주세요.");
+        notifyError("대상 플레이어를 선택해주세요.");
         return;
       }
       payload.target_seat_no = target;
     }
     if (selectedProgressType === "MERCHANT") {
       if (!selectedHexId || !catanResourceByTerrain[selectedHex?.terrain]) {
-        toast.error("상인을 놓을 생산 타일을 선택해주세요.");
+        notifyError("상인을 놓을 생산 타일을 선택해주세요.");
         return;
       }
       payload.hex_id = selectedHexId;
@@ -4573,21 +4571,21 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     if (selectedProgressType === "SPY") {
       const target = targetSeatNo ? Number(targetSeatNo) : Number(get(spyTargets[0], "seat_no", "seatNo", 0));
       if (!target) {
-        toast.error("진행 카드를 가져올 플레이어를 선택해주세요.");
+        notifyError("진행 카드를 가져올 플레이어를 선택해주세요.");
         return;
       }
       payload.target_seat_no = target;
     }
     if (selectedProgressType === "ROAD_BUILDING") {
       if (!roadCardEdges.length) {
-        toast.error("도로 건설 카드로 놓을 간선을 추가해주세요.");
+        notifyError("도로 건설 카드로 놓을 간선을 추가해주세요.");
         return;
       }
       payload.edge_ids = roadCardEdges;
     }
     if (selectedProgressType === "DIPLOMAT") {
       if (!roadCardEdges.length) {
-        toast.error("외교관으로 제거할 열린 도로를 추가해주세요.");
+        notifyError("외교관으로 제거할 열린 도로를 추가해주세요.");
         return;
       }
       payload.edge_ids = roadCardEdges;
@@ -5437,7 +5435,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                   첫 배치는 해안의 항구 정착지와 배, 두 번째 배치는 일반 마을 기준으로 진행합니다.
                 </div>
               )}
-              <button className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => setupBuild().catch(() => toast.error("초기 배치 위치를 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => setupBuild().catch(() => notifyError("초기 배치 위치를 확인해주세요."))}>
                 {explorersPiratesRule ? "항구/마을과 길 배치" : seafarersRule ? "정착지와 도로/배 배치" : "정착지와 도로 배치"}
               </button>
             </div>
@@ -5474,7 +5472,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                   ))}
                 </div>
               )}
-              <button className="w-full rounded-xl bg-orange-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => bidCamel().catch(() => toast.error("입찰할 양털/곡물 수량을 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-orange-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => bidCamel().catch(() => notifyError("입찰할 양털/곡물 수량을 확인해주세요."))}>
                 입찰 제출
               </button>
             </div>
@@ -5484,14 +5482,14 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <div className="rounded-xl bg-orange-50 px-3 py-2 text-xs font-bold leading-relaxed text-orange-800">
                 {playerName(camelPlacerSeatNo || activeSeatNo)}이 낙타를 배치합니다. 오아시스 시작 표식 또는 기존 낙타 행렬의 끝 경로를 선택하세요.
               </div>
-              <button className="w-full rounded-xl bg-orange-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedEdgeId} onClick={() => placeCamel().catch(() => toast.error("낙타를 놓을 수 있는 경로를 선택해주세요."))}>
+              <button className="w-full rounded-xl bg-orange-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedEdgeId} onClick={() => placeCamel().catch(() => notifyError("낙타를 놓을 수 있는 경로를 선택해주세요."))}>
                 선택 경로에 낙타 배치
               </button>
             </div>
           )}
           {phase === "ROLL" && (
             <div className="space-y-3">
-              <button className="w-full rounded-xl bg-amber-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => onAction({ action_type: "ROLL_DICE" }).catch(() => toast.error("주사위 굴리기 실패"))}>
+              <button className="w-full rounded-xl bg-amber-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => onAction({ action_type: "ROLL_DICE" }).catch(() => notifyError("주사위 굴리기 실패"))}>
                 주사위 굴리기
               </button>
               {citiesKnightsRule && !!alchemistCards.length && (
@@ -5509,7 +5507,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       {[1, 2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>흰색 {value}</option>)}
                     </select>
                   </div>
-                  <button className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => playAlchemistCard().catch(() => toast.error("연금술사 사용 조건을 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => playAlchemistCard().catch(() => notifyError("연금술사 사용 조건을 확인해주세요."))}>
                     연금술사로 주사위 확정
                   </button>
                 </div>
@@ -5534,7 +5532,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       선택 간선 추가 ({roadCardEdges.join(", ") || "없음"})
                     </button>
                   )}
-                  <button className="w-full rounded-xl bg-violet-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!canPlaySelectedDevelopmentCard} onClick={() => playDevelopmentCard().catch(() => toast.error("개발 카드 사용 조건을 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-violet-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!canPlaySelectedDevelopmentCard} onClick={() => playDevelopmentCard().catch(() => notifyError("개발 카드 사용 조건을 확인해주세요."))}>
                     개발 카드 사용
                   </button>
                   {devCardAlreadyPlayedThisTurn && (
@@ -5595,7 +5593,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       ))}
                     </div>
                   )}
-                  <button className="w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-black text-white" onClick={() => discardResources().catch(() => toast.error("버릴 자원을 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-black text-white" onClick={() => discardResources().catch(() => notifyError("버릴 자원을 확인해주세요."))}>
                     {discardTotal}/{discardRequired}장 버리기
                   </button>
                 </>
@@ -5619,7 +5617,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       return <option key={card.id} value={card.id}>{catanProgressLabels[cardType] || cardType}</option>;
                     })}
                   </select>
-                  <button className="w-full rounded-xl bg-fuchsia-700 px-3 py-3 text-sm font-black text-white" onClick={() => discardProgressCard().catch(() => toast.error("버릴 진행 카드를 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-fuchsia-700 px-3 py-3 text-sm font-black text-white" onClick={() => discardProgressCard().catch(() => notifyError("버릴 진행 카드를 확인해주세요."))}>
                     {progressDiscardRequired || 1}장 남음
                   </button>
                 </>
@@ -5640,7 +5638,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                   <select className="rounded-xl border border-amber-100 px-3 py-2 text-xs font-bold" value={selectedImprovementType} onChange={(event) => setSelectedImprovementType(event.target.value)}>
                     {Object.entries(catanImprovementLabels).map(([key, label]) => <option key={key} value={key}>{label} 진행 카드</option>)}
                   </select>
-                  <button className="rounded-xl bg-amber-700 px-3 py-3 text-sm font-black text-white" onClick={() => chooseDefenderProgressCard().catch(() => toast.error("받을 진행 카드 종류를 확인해주세요."))}>
+                  <button className="rounded-xl bg-amber-700 px-3 py-3 text-sm font-black text-white" onClick={() => chooseDefenderProgressCard().catch(() => notifyError("받을 진행 카드 종류를 확인해주세요."))}>
                     카드 받기
                   </button>
                 </div>
@@ -5656,7 +5654,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <div className="text-xs font-bold leading-relaxed text-blue-800">
                 {playerName(pendingDeserterAttackerSeatNo)}의 탈영병 카드입니다. {playerName(pendingDeserterTargetSeatNo)}이 제거할 자기 기사를 선택합니다.
               </div>
-              <button className="w-full rounded-xl bg-blue-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={pendingDeserterTargetSeatNo !== mySeatNo} onClick={() => removeDeserterKnight().catch(() => toast.error("제거할 기사를 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-blue-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={pendingDeserterTargetSeatNo !== mySeatNo} onClick={() => removeDeserterKnight().catch(() => notifyError("제거할 기사를 확인해주세요."))}>
                 선택 기사 제거
               </button>
             </div>
@@ -5666,7 +5664,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <div className="text-xs font-bold leading-relaxed text-blue-800">
                 {playerName(pendingDeserterAttackerSeatNo)}이 {pendingDeserterKnightLevel}단계 탈영 기사를 배치합니다.
               </div>
-              <button className="w-full rounded-xl bg-blue-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={pendingDeserterAttackerSeatNo !== mySeatNo} onClick={() => placeDeserterKnight().catch(() => toast.error("배치할 정점을 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-blue-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={pendingDeserterAttackerSeatNo !== mySeatNo} onClick={() => placeDeserterKnight().catch(() => notifyError("배치할 정점을 확인해주세요."))}>
                 탈영 기사 배치
               </button>
             </div>
@@ -5676,7 +5674,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <div className="text-xs font-bold leading-relaxed text-indigo-800">
                 {playerName(pendingIntrigueAttackerSeatNo)}의 음모 카드입니다. {playerName(pendingIntrigueTargetSeatNo)}이 {pendingIntrigueKnightLevel}단계 기사를 자기 도로망의 빈 정점으로 옮깁니다.
               </div>
-              <button className="w-full rounded-xl bg-indigo-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={pendingIntrigueTargetSeatNo !== mySeatNo} onClick={() => moveIntrigueKnight().catch(() => toast.error("기사를 옮길 정점을 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-indigo-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={pendingIntrigueTargetSeatNo !== mySeatNo} onClick={() => moveIntrigueKnight().catch(() => notifyError("기사를 옮길 정점을 확인해주세요."))}>
                 밀려난 기사 이동
               </button>
             </div>
@@ -5686,7 +5684,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <div className="text-xs font-bold leading-relaxed text-indigo-800">
                 {playerName(pendingDisplacedKnightTargetSeatNo)}의 {pendingDisplacedKnightLevel}단계 기사가 밀려났습니다. 자기 도로망의 빈 교차점을 선택해 옮깁니다.
               </div>
-              <button className="w-full rounded-xl bg-indigo-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!mustMoveDisplacedKnight} onClick={() => moveDisplacedKnight().catch(() => toast.error("기사를 옮길 교차점을 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-indigo-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!mustMoveDisplacedKnight} onClick={() => moveDisplacedKnight().catch(() => notifyError("기사를 옮길 교차점을 확인해주세요."))}>
                 밀려난 기사 이동
               </button>
             </div>
@@ -5699,7 +5697,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <select className="w-full rounded-xl border border-emerald-100 px-3 py-2 text-xs font-bold" value={selectedCommodityType} onChange={(event) => setSelectedCommodityType(event.target.value)}>
                 {Object.entries(catanCommodityLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
-              <button className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!pendingCommercialHarborSeatNos.map(Number).includes(mySeatNo)} onClick={() => respondCommercialHarbor().catch(() => toast.error("줄 상품을 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!pendingCommercialHarborSeatNos.map(Number).includes(mySeatNo)} onClick={() => respondCommercialHarbor().catch(() => notifyError("줄 상품을 확인해주세요."))}>
                 상품 주고 자원 받기
               </button>
             </div>
@@ -5745,7 +5743,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       </label>
                     ))}
                   </div>
-                  <button className="w-full rounded-xl bg-amber-700 px-3 py-3 text-sm font-black text-white" onClick={() => chooseMasterMerchantCards().catch(() => toast.error("가져올 카드를 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-amber-700 px-3 py-3 text-sm font-black text-white" onClick={() => chooseMasterMerchantCards().catch(() => notifyError("가져올 카드를 확인해주세요."))}>
                     {masterMerchantTotal}/{pendingMasterMerchantCount}장 가져오기
                   </button>
                 </>
@@ -5769,7 +5767,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       return <option key={card.id} value={card.id}>{catanProgressLabels[cardType] || cardType}</option>;
                     })}
                   </select>
-                  <button className="w-full rounded-xl bg-rose-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!revealedSpyCards.length} onClick={() => chooseSpyProgressCard().catch(() => toast.error("가져올 진행 카드를 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-rose-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!revealedSpyCards.length} onClick={() => chooseSpyProgressCard().catch(() => notifyError("가져올 진행 카드를 확인해주세요."))}>
                     선택한 카드 가져오기
                   </button>
                 </>
@@ -5821,7 +5819,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       </label>
                     ))}
                   </div>
-                  <button className="w-full rounded-xl bg-pink-700 px-3 py-3 text-sm font-black text-white" onClick={() => respondWeddingCards().catch(() => toast.error("줄 카드를 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-pink-700 px-3 py-3 text-sm font-black text-white" onClick={() => respondWeddingCards().catch(() => notifyError("줄 카드를 확인해주세요."))}>
                     {weddingTotal}/{weddingRequired}장 주기
                   </button>
                 </>
@@ -5862,7 +5860,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       은행에 부족한 자원은 선택할 수 없습니다.
                     </div>
                   )}
-                  <button className="w-full rounded-xl bg-amber-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={goldTotal !== goldRequired || !goldChoiceWithinBank} onClick={() => chooseGoldResources().catch(() => toast.error("금광 자원 선택을 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-amber-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={goldTotal !== goldRequired || !goldChoiceWithinBank} onClick={() => chooseGoldResources().catch(() => notifyError("금광 자원 선택을 확인해주세요."))}>
                     {goldTotal}/{goldRequired}장 받기
                   </button>
                 </>
@@ -5888,7 +5886,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       은행에 남은 {catanResourceLabels[selectedAqueductResourceType]} 카드가 없습니다.
                     </div>
                   )}
-                  <button className="w-full rounded-xl bg-cyan-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!aqueductWithinBank} onClick={() => chooseAqueductResource().catch(() => toast.error("수로 자원 선택을 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-cyan-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!aqueductWithinBank} onClick={() => chooseAqueductResource().catch(() => notifyError("수로 자원 선택을 확인해주세요."))}>
                     선택한 자원 받기
                   </button>
                 </>
@@ -5912,7 +5910,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                   })}
                 </select>
               )}
-              <button className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => moveRobber().catch(() => toast.error(explorersPiratesRule ? "해적 이동 실패" : "도적 이동 실패"))}>
+              <button className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => moveRobber().catch(() => notifyError(explorersPiratesRule ? "해적 이동 실패" : "도적 이동 실패"))}>
                 {explorersPiratesRule || selectedHex?.terrain === "SEA" ? "해적 이동" : "도적 이동"}
               </button>
             </div>
@@ -5957,7 +5955,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                   </button>
                 )
               )}
-              <button className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={selectedBuildActionDisabled} onClick={() => build().catch(() => toast.error("건설 조건이나 자원을 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={selectedBuildActionDisabled} onClick={() => build().catch(() => notifyError("건설 조건이나 자원을 확인해주세요."))}>
                 선택 위치에 실행
               </button>
               {citiesKnightsRule && buildMode === "KNIGHT" && selectedVertexKnightBuildWarning && (
@@ -5975,7 +5973,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                     <select className="rounded-xl border border-cyan-100 px-3 py-2 text-xs font-bold text-slate-700" value={tradeForm.receive} onChange={(event) => setTradeForm((prev) => ({ ...prev, receive: event.target.value }))}>
                       {catanResourceEntries.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                     </select>
-                    <button type="button" className="rounded-xl bg-cyan-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || myGold < 2 || riverGoldTradesRemaining <= 0} onClick={() => spendGoldForResource().catch(() => toast.error("골드 2개와 받을 자원을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-cyan-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || myGold < 2 || riverGoldTradesRemaining <= 0} onClick={() => spendGoldForResource().catch(() => notifyError("골드 2개와 받을 자원을 확인해주세요."))}>
                       골드 2개 교환
                     </button>
                   </div>
@@ -6002,10 +6000,10 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                     <span>남은 야만인 {barbarianAttackSupply}개</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-red-700 disabled:opacity-40" disabled={!myTurn || !selectedEdgeId || selectedDevCard?.type !== "KNIGHT"} onClick={() => recruitBarbarianKnight().catch(() => toast.error("기사 개발 카드와 빈 경로를 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-red-700 disabled:opacity-40" disabled={!myTurn || !selectedEdgeId || selectedDevCard?.type !== "KNIGHT"} onClick={() => recruitBarbarianKnight().catch(() => notifyError("기사 개발 카드와 빈 경로를 확인해주세요."))}>
                       기사 카드로 방어 기사 배치
                     </button>
-                    <button type="button" className="rounded-xl bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedHexId} onClick={() => expelBarbarians().catch(() => toast.error("격퇴 조건을 만족하는 야만인 타일을 선택해주세요."))}>
+                    <button type="button" className="rounded-xl bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedHexId} onClick={() => expelBarbarians().catch(() => notifyError("격퇴 조건을 만족하는 야만인 타일을 선택해주세요."))}>
                       선택 타일 야만인 격퇴
                     </button>
                   </div>
@@ -6031,15 +6029,15 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                     <select className="rounded-xl border border-sky-100 px-3 py-2 text-xs font-bold text-slate-700" value={tradeForm.receive} onChange={(event) => setTradeForm((prev) => ({ ...prev, receive: event.target.value }))}>
                       {catanResourceEntries.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                     </select>
-                    <button type="button" className="rounded-xl bg-sky-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 4} onClick={() => spendFish("SPEND_FISH_TAKE_RESOURCE", { resource_type: tradeForm.receive }).catch(() => toast.error("물고기 4마리 이상과 받을 자원을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-sky-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 4} onClick={() => spendFish("SPEND_FISH_TAKE_RESOURCE", { resource_type: tradeForm.receive }).catch(() => notifyError("물고기 4마리 이상과 받을 자원을 확인해주세요."))}>
                       자원 받기
                     </button>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-sky-700 disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 2} onClick={() => spendFish("SPEND_FISH_MOVE_ROBBER").catch(() => toast.error("물고기 2마리 이상이 필요합니다."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-sky-700 disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 2} onClick={() => spendFish("SPEND_FISH_MOVE_ROBBER").catch(() => notifyError("물고기 2마리 이상이 필요합니다."))}>
                       도둑 사막으로
                     </button>
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-sky-700 disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 5 || !selectedEdgeId} onClick={() => spendFish("SPEND_FISH_BUILD_ROAD", { edge_id: selectedEdgeId }).catch(() => toast.error("물고기 5마리와 건설 가능한 간선을 선택해주세요."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-sky-700 disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 5 || !selectedEdgeId} onClick={() => spendFish("SPEND_FISH_BUILD_ROAD", { edge_id: selectedEdgeId }).catch(() => notifyError("물고기 5마리와 건설 가능한 간선을 선택해주세요."))}>
                       무료 도로
                     </button>
                   </div>
@@ -6051,15 +6049,15 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                         return <option key={seatNo} value={seatNo}>{playerName(seatNo)} 자원 {get(player, "resource_count", "resourceCount", 0)}장</option>;
                       })}
                     </select>
-                    <button type="button" className="rounded-xl bg-sky-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 3 || !targetSeatNo} onClick={() => spendFish("SPEND_FISH_STEAL_RESOURCE", { target_seat_no: Number(targetSeatNo) }).catch(() => toast.error("물고기 3마리와 카드를 가진 상대가 필요합니다."))}>
+                    <button type="button" className="rounded-xl bg-sky-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 3 || !targetSeatNo} onClick={() => spendFish("SPEND_FISH_STEAL_RESOURCE", { target_seat_no: Number(targetSeatNo) }).catch(() => notifyError("물고기 3마리와 카드를 가진 상대가 필요합니다."))}>
                       자원 뽑기
                     </button>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 7} onClick={() => spendFish("SPEND_FISH_DRAW_DEVELOPMENT").catch(() => toast.error("물고기 7마리와 남은 개발 카드가 필요합니다."))}>
+                    <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || fishermenFishTotal < 7} onClick={() => spendFish("SPEND_FISH_DRAW_DEVELOPMENT").catch(() => notifyError("물고기 7마리와 남은 개발 카드가 필요합니다."))}>
                       개발 카드 받기
                     </button>
-                    <button type="button" className="rounded-xl bg-amber-100 px-3 py-2 text-xs font-black text-amber-800 disabled:opacity-40" disabled={!myTurn || !myHasOldBoot || !targetSeatNo || !oldBootTargets.some((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(targetSeatNo))} onClick={() => spendFish("GIVE_OLD_BOOT", { target_seat_no: Number(targetSeatNo) }).catch(() => toast.error("나보다 승점이 같거나 높은 플레이어에게만 넘길 수 있습니다."))}>
+                    <button type="button" className="rounded-xl bg-amber-100 px-3 py-2 text-xs font-black text-amber-800 disabled:opacity-40" disabled={!myTurn || !myHasOldBoot || !targetSeatNo || !oldBootTargets.some((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(targetSeatNo))} onClick={() => spendFish("GIVE_OLD_BOOT", { target_seat_no: Number(targetSeatNo) }).catch(() => notifyError("나보다 승점이 같거나 높은 플레이어에게만 넘길 수 있습니다."))}>
                       장화 넘기기
                     </button>
                   </div>
@@ -6071,21 +6069,21 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                     정착민 화물 · 항구/배/상륙 교차점을 선택해 순서대로 처리합니다.
                   </div>
                   <div className="grid gap-2 sm:grid-cols-3">
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-amber-700 disabled:opacity-40" disabled={!myTurn} onClick={() => buildSettler().catch(() => toast.error("정착민을 놓을 항구나 배를 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-amber-700 disabled:opacity-40" disabled={!myTurn} onClick={() => buildSettler().catch(() => notifyError("정착민을 놓을 항구나 배를 확인해주세요."))}>
                       정착민 준비
                     </button>
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-amber-700 disabled:opacity-40" disabled={!myTurn || !selectedVertexId || !selectedEdgeId} onClick={() => loadSettler().catch(() => toast.error("항구와 배가 맞닿아 있는지 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-amber-700 disabled:opacity-40" disabled={!myTurn || !selectedVertexId || !selectedEdgeId} onClick={() => loadSettler().catch(() => notifyError("항구와 배가 맞닿아 있는지 확인해주세요."))}>
                       배에 싣기
                     </button>
-                    <button type="button" className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedVertexId || !selectedEdgeId} onClick={() => foundSettlementFromShip().catch(() => toast.error("상륙 위치와 거리 규칙을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedVertexId || !selectedEdgeId} onClick={() => foundSettlementFromShip().catch(() => notifyError("상륙 위치와 거리 규칙을 확인해주세요."))}>
                       상륙 마을
                     </button>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <button type="button" className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 disabled:opacity-40" disabled={!myTurn} onClick={() => buildCrew().catch(() => toast.error("승무원을 놓을 항구나 배를 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 disabled:opacity-40" disabled={!myTurn} onClick={() => buildCrew().catch(() => notifyError("승무원을 놓을 항구나 배를 확인해주세요."))}>
                       승무원 준비
                     </button>
-                    <button type="button" className="rounded-xl bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedHexId || !selectedEdgeId} onClick={() => unloadCrewToPirateLair().catch(() => toast.error("해적 소굴과 승무원이 탄 배가 맞닿아야 합니다."))}>
+                    <button type="button" className="rounded-xl bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedHexId || !selectedEdgeId} onClick={() => unloadCrewToPirateLair().catch(() => notifyError("해적 소굴과 승무원이 탄 배가 맞닿아야 합니다."))}>
                       해적 소굴 공격
                     </button>
                   </div>
@@ -6096,13 +6094,13 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                     향신료 이점 · 항해 +{mySpiceAdvantageCounts.SWIFT_VOYAGE} · 해적 {mySpiceAdvantageCounts.PIRATE_BONUS} · 빠른 금 {fastGoldRemaining}/{mySpiceAdvantageCounts.FAST_GOLD}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-3">
-                    <button type="button" className="rounded-xl bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 disabled:opacity-40" disabled={!myTurn} onClick={() => rollFishHaul().catch(() => toast.error("이번 턴에는 어장 주사위를 굴릴 수 없습니다."))}>
+                    <button type="button" className="rounded-xl bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 disabled:opacity-40" disabled={!myTurn} onClick={() => rollFishHaul().catch(() => notifyError("이번 턴에는 어장 주사위를 굴릴 수 없습니다."))}>
                       어장 주사위
                     </button>
-                    <button type="button" className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedHexId || !selectedEdgeId} onClick={() => catchFish().catch(() => toast.error("어획물이 있는 어장과 빈 배가 맞닿아야 합니다."))}>
+                    <button type="button" className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedHexId || !selectedEdgeId} onClick={() => catchFish().catch(() => notifyError("어획물이 있는 어장과 빈 배가 맞닿아야 합니다."))}>
                       어획물 싣기
                     </button>
-                    <button type="button" className="rounded-xl bg-yellow-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedHexId || !selectedEdgeId} onClick={() => collectSpice().catch(() => toast.error("향신료 마을과 승무원 배가 맞닿아야 합니다."))}>
+                    <button type="button" className="rounded-xl bg-yellow-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedHexId || !selectedEdgeId} onClick={() => collectSpice().catch(() => notifyError("향신료 마을과 승무원 배가 맞닿아야 합니다."))}>
                       향신료 싣기
                     </button>
                   </div>
@@ -6110,18 +6108,18 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                     <select className="rounded-xl border border-yellow-100 px-3 py-2 text-xs font-bold text-slate-700" value={tradeForm.give} onChange={(event) => setTradeForm((prev) => ({ ...prev, give: event.target.value }))}>
                       {catanResourceEntries.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                     </select>
-                    <button type="button" className="rounded-xl bg-yellow-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || fastGoldRemaining <= 0} onClick={() => sellResourceForGold().catch(() => toast.error("판매할 자원과 빠른 금 사용 가능 횟수를 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-yellow-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || fastGoldRemaining <= 0} onClick={() => sellResourceForGold().catch(() => notifyError("판매할 자원과 빠른 금 사용 가능 횟수를 확인해주세요."))}>
                       빠른 금
                     </button>
-                    <button type="button" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-40" disabled={!myTurn || !selectedHexId || mySpiceAdvantageCounts.PIRATE_BONUS <= 0} onClick={() => chaseAwayPirate().catch(() => toast.error("내 배가 해적에 닿아 있는지, 보낼 바다 칸을 선택했는지 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-40" disabled={!myTurn || !selectedHexId || mySpiceAdvantageCounts.PIRATE_BONUS <= 0} onClick={() => chaseAwayPirate().catch(() => notifyError("내 배가 해적에 닿아 있는지, 보낼 바다 칸을 선택했는지 확인해주세요."))}>
                       해적 몰아내기
                     </button>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-amber-700 disabled:opacity-40" disabled={!myTurn || !selectedVertexId || !selectedEdgeId} onClick={() => transferCargo().catch(() => toast.error("항구 정착지와 배의 화물 교환 조건을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-amber-700 disabled:opacity-40" disabled={!myTurn || !selectedVertexId || !selectedEdgeId} onClick={() => transferCargo().catch(() => notifyError("항구 정착지와 배의 화물 교환 조건을 확인해주세요."))}>
                       항구 화물 교환
                     </button>
-                    <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedEdgeId} onClick={() => deliverCargo().catch(() => toast.error("의회 선착장에 닿은 어획물/향신료 배를 선택해주세요."))}>
+                    <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedEdgeId} onClick={() => deliverCargo().catch(() => notifyError("의회 선착장에 닿은 어획물/향신료 배를 선택해주세요."))}>
                       의회에 납품
                     </button>
                   </div>
@@ -6136,18 +6134,18 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                         return <option key={key} value={key}>{label} {Math.min(nextLevel, 5)}단계</option>;
                       })}
                     </select>
-                    <button type="button" className="rounded-xl bg-rose-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => buildCityImprovement().catch(() => toast.error("도시 발전 조건을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-rose-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn} onClick={() => buildCityImprovement().catch(() => notifyError("도시 발전 조건을 확인해주세요."))}>
                       발전
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40" disabled={!myTurn || !selectedOwnKnight} onClick={() => activateKnight().catch(() => toast.error("기사 활성화 조건을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40" disabled={!myTurn || !selectedOwnKnight} onClick={() => activateKnight().catch(() => notifyError("기사 활성화 조건을 확인해주세요."))}>
                       기사 활성화
                     </button>
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40" disabled={!myTurn || !selectedKnightCanPromote} onClick={() => promoteKnight().catch(() => toast.error("기사 승급 조건을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40" disabled={!myTurn || !selectedKnightCanPromote} onClick={() => promoteKnight().catch(() => notifyError("기사 승급 조건을 확인해주세요."))}>
                       기사 승급
                     </button>
-                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40" disabled={!myTurn || !selectedKnightCanChaseRobber} onClick={() => chaseRobberWithKnight().catch(() => toast.error("도적 추방 조건을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40" disabled={!myTurn || !selectedKnightCanChaseRobber} onClick={() => chaseRobberWithKnight().catch(() => notifyError("도적 추방 조건을 확인해주세요."))}>
                       도적 쫓아내기
                     </button>
                   </div>
@@ -6155,7 +6153,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                     <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40" disabled={!myTurn || !selectedOwnKnight} onClick={markKnightMoveSource}>
                       이동 출발 지정
                     </button>
-                    <button type="button" className="rounded-xl bg-rose-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedKnightCanMove} onClick={() => moveKnight().catch(() => toast.error("기사 이동 조건을 확인해주세요."))}>
+                    <button type="button" className="rounded-xl bg-rose-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedKnightCanMove} onClick={() => moveKnight().catch(() => notifyError("기사 이동 조건을 확인해주세요."))}>
                       기사 이동
                     </button>
                   </div>
@@ -6310,7 +6308,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                           {Object.entries(catanCommodityLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                         </select>
                       )}
-                      <button type="button" className="w-full rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedProgressSupported || selectedProgressType === "ALCHEMIST" || selectedProgressBlockedByRobberLock || selectedProgressBlockedByFortress} onClick={() => playProgressCard().catch(() => toast.error("진행 카드 사용 조건을 확인해주세요."))}>
+                      <button type="button" className="w-full rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!myTurn || !selectedProgressSupported || selectedProgressType === "ALCHEMIST" || selectedProgressBlockedByRobberLock || selectedProgressBlockedByFortress} onClick={() => playProgressCard().catch(() => notifyError("진행 카드 사용 조건을 확인해주세요."))}>
                         진행 카드 사용
                       </button>
                     </div>
@@ -6337,16 +6335,16 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                   </div>
                   {pendingTradeTargetSeatNo === mySeatNo && (
                     <div className="grid grid-cols-2 gap-2">
-                      <button type="button" className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white" onClick={() => respondDomesticTrade("ACCEPT_TRADE").catch(() => toast.error("보유 자원을 확인해주세요."))}>
+                      <button type="button" className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white" onClick={() => respondDomesticTrade("ACCEPT_TRADE").catch(() => notifyError("보유 자원을 확인해주세요."))}>
                         수락
                       </button>
-                      <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-emerald-800" onClick={() => respondDomesticTrade("REJECT_TRADE").catch(() => toast.error("거절 처리 실패"))}>
+                      <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-black text-emerald-800" onClick={() => respondDomesticTrade("REJECT_TRADE").catch(() => notifyError("거절 처리 실패"))}>
                         거절
                       </button>
                     </div>
                   )}
                   {pendingTradeProposerSeatNo === mySeatNo && (
-                    <button type="button" className="w-full rounded-xl bg-white px-3 py-2 text-xs font-black text-emerald-800" onClick={() => respondDomesticTrade("CANCEL_TRADE").catch(() => toast.error("거래 취소 실패"))}>
+                    <button type="button" className="w-full rounded-xl bg-white px-3 py-2 text-xs font-black text-emerald-800" onClick={() => respondDomesticTrade("CANCEL_TRADE").catch(() => notifyError("거래 취소 실패"))}>
                       제안 취소
                     </button>
                   )}
@@ -6401,7 +6399,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       </div>
                     </div>
                   </div>
-                  <button className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn || !domesticTradeTargetSeatNo || domesticOfferTotal <= 0 || domesticRequestTotal <= 0 || domesticOfferExceeded} onClick={() => proposeDomesticTrade().catch(() => toast.error("거래 제안 실패"))}>
+                  <button className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!myTurn || !domesticTradeTargetSeatNo || domesticOfferTotal <= 0 || domesticRequestTotal <= 0 || domesticOfferExceeded} onClick={() => proposeDomesticTrade().catch(() => notifyError("거래 제안 실패"))}>
                     거래 제안
                   </button>
                 </div>
@@ -6414,7 +6412,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                   {catanTradeCardEntries.map(([key, label]) => <option key={key} value={key}>{label} 1개</option>)}
                 </select>
               </div>
-              <button className="w-full rounded-xl bg-sky-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!canMaritimeTrade} onClick={() => maritimeTrade().catch(() => toast.error("교환할 자원을 확인해주세요."))}>
+              <button className="w-full rounded-xl bg-sky-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!canMaritimeTrade} onClick={() => maritimeTrade().catch(() => notifyError("교환할 자원을 확인해주세요."))}>
                 항구/해상 교환 {giveTradeRatio}:1
               </button>
               {!maritimeReceiveWithinBank && (
@@ -6423,7 +6421,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                 </div>
               )}
               {!citiesKnightsRule && !explorersPiratesRule && (
-                <button className="w-full rounded-xl bg-violet-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!canBuyDevelopmentCard} onClick={() => buyDevelopmentCard().catch(() => toast.error("개발 카드 비용을 확인해주세요."))}>
+                <button className="w-full rounded-xl bg-violet-600 px-3 py-3 text-sm font-black text-white disabled:opacity-40" disabled={!canBuyDevelopmentCard} onClick={() => buyDevelopmentCard().catch(() => notifyError("개발 카드 비용을 확인해주세요."))}>
                   개발 카드 구입
                 </button>
               )}
@@ -6459,7 +6457,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                       은행에 선택한 자원이 부족합니다. 다른 자원 조합을 선택해주세요.
                     </div>
                   )}
-                  <button className="w-full rounded-xl bg-violet-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!canPlaySelectedDevelopmentCard} onClick={() => playDevelopmentCard().catch(() => toast.error("개발 카드 사용 조건을 확인해주세요."))}>
+                  <button className="w-full rounded-xl bg-violet-700 px-3 py-2 text-xs font-black text-white disabled:opacity-40" disabled={!canPlaySelectedDevelopmentCard} onClick={() => playDevelopmentCard().catch(() => notifyError("개발 카드 사용 조건을 확인해주세요."))}>
                     개발 카드 사용
                   </button>
                   {devCardAlreadyPlayedThisTurn && (
@@ -6484,7 +6482,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                   {pairedTurnActionNotice}
                 </div>
               )}
-              <button className="w-full rounded-xl bg-slate-100 px-3 py-3 text-sm font-black text-slate-700 disabled:opacity-40" disabled={!myTurn} onClick={() => onAction({ action_type: "END_TURN" }).catch(() => toast.error("턴 종료 실패"))}>
+              <button className="w-full rounded-xl bg-slate-100 px-3 py-3 text-sm font-black text-slate-700 disabled:opacity-40" disabled={!myTurn} onClick={() => onAction({ action_type: "END_TURN" }).catch(() => notifyError("턴 종료 실패"))}>
                 턴 종료
               </button>
             </div>
@@ -6685,6 +6683,7 @@ export const TabletopGame = ({ game }) => {
   const [createForm, setCreateForm] = useState({ title: "", variantCode: "BASE", turnTimeSeconds: "30" });
   const [settingsForm, setSettingsForm] = useState({ variantCode: "BASE", turnTimeSeconds: "30" });
   const stompRef = useRef(null);
+  const stompInitRef = useRef(null);
   const gameSubRef = useRef(null);
   const busyRef = useRef(false);
   const actionBusyRef = useRef(false);
@@ -6794,7 +6793,7 @@ export const TabletopGame = ({ game }) => {
     } catch {
       if (!isLatestLobbyLoad(seq)) return;
       setLoadError("방 목록을 새로고침하지 못했습니다.");
-      toast.error("방 목록을 새로고침하지 못했습니다.");
+      notifyError("방 목록을 새로고침하지 못했습니다.");
     } finally {
       if (isLatestLobbyLoad(seq)) setRoomsRefreshing(false);
     }
@@ -6808,7 +6807,7 @@ export const TabletopGame = ({ game }) => {
     if (!isLatestLobbyLoad(seq)) return;
     if (results.some((result) => result.status === "rejected")) {
       setLoadError("게임 설정 또는 방 목록을 불러오지 못했습니다.");
-      toast.error("게임 설정 또는 방 목록을 불러오지 못했습니다.");
+      notifyError("게임 설정 또는 방 목록을 불러오지 못했습니다.");
     }
     setInitialLoading(false);
   };
@@ -6835,10 +6834,10 @@ export const TabletopGame = ({ game }) => {
   const handleStateLoadError = (error, roomId, fallbackMessage) => {
     if (isTabletopStateAccessError(error)) {
       clearRoomSelection(roomId);
-      toast.error("방 참가자만 상태를 볼 수 있습니다. 다시 입장해주세요.");
+      notifyError("방 참가자만 상태를 볼 수 있습니다. 다시 입장해주세요.");
       return;
     }
-    toast.error(fallbackMessage);
+    notifyError(fallbackMessage);
   };
 
   const fetchState = async (roomId, roomSeq = null) => {
@@ -6873,7 +6872,7 @@ export const TabletopGame = ({ game }) => {
       } else {
         setGameState(payload.gameState || null);
       }
-      if (payload.message) toast(payload.message);
+      if (payload.message) notify(payload.message);
     });
     await fetchState(roomId, roomSeq);
   };
@@ -6884,32 +6883,44 @@ export const TabletopGame = ({ game }) => {
     await bindRealtimeRoom(client, target.roomId, target.roomSeq);
   };
 
-  const ensureSocket = () => {
+  const ensureSocket = async () => {
     if (stompRef.current) return stompRef.current;
+    if (stompInitRef.current) return stompInitRef.current;
     const connectHeaders = buildStompConnectHeaders();
     if (!connectHeaders.Authorization) return null;
-    const client = new Client({
-      webSocketFactory: () => new SockJS("/ws/chat"),
+    stompInitRef.current = createStompClient({
+      endpoint: "/ws/chat",
       connectHeaders,
       reconnectDelay: 3000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
+    }).then((client) => {
+      if (!mountedRef.current) return null;
+      client.beforeConnect = () => {
+        client.connectHeaders = buildStompConnectHeaders();
+      };
+      client.onConnect = () => {
+        bindLatestRealtimeRoom(client).catch((error) => {
+          const target = realtimeRoomRef.current;
+          if (target && isLatestRoomOpen(target.roomSeq)) {
+            handleStateLoadError(error, target.roomId, "방 정보를 불러오지 못했습니다.");
+          }
+        });
+      };
+      client.onStompError = (frame) => {
+        void notifyRealtimeError({
+          scope: `tabletop-game-${game}`,
+          error: frame,
+          fallbackMessage: "게임 실시간 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        });
+      };
+      client.activate();
+      stompRef.current = client;
+      return client;
+    }).finally(() => {
+      stompInitRef.current = null;
     });
-    client.beforeConnect = () => {
-      client.connectHeaders = buildStompConnectHeaders();
-    };
-    client.onConnect = () => {
-      bindLatestRealtimeRoom(client).catch((error) => {
-        const target = realtimeRoomRef.current;
-        if (target && isLatestRoomOpen(target.roomSeq)) {
-          handleStateLoadError(error, target.roomId, "방 정보를 불러오지 못했습니다.");
-        }
-      });
-    };
-    client.onStompError = () => toast.error("실시간 연결 오류");
-    client.activate();
-    stompRef.current = client;
-    return client;
+    return stompInitRef.current;
   };
 
   const openRoom = async (room) => {
@@ -6925,12 +6936,13 @@ export const TabletopGame = ({ game }) => {
     });
 
     realtimeRoomRef.current = { roomId, roomSeq };
-    const client = ensureSocket();
+    const clientPromise = ensureSocket();
     await fetchState(roomId, roomSeq).catch((error) => {
       if (!isLatestRoomOpen(roomSeq)) return;
       handleStateLoadError(error, roomId, "방 정보를 불러오지 못했습니다.");
       throw error;
     });
+    const client = await clientPromise;
     if (client?.connected) {
       await bindRealtimeRoom(client, roomId, roomSeq).catch((error) => {
         if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "방 정보를 불러오지 못했습니다.");
@@ -6956,7 +6968,7 @@ export const TabletopGame = ({ game }) => {
         if (!active || !isLatestLobbyLoad(seq)) return;
         if (results.some((result) => result.status === "rejected")) {
           setLoadError("게임 설정 또는 방 목록을 불러오지 못했습니다.");
-          toast.error("게임 설정 또는 방 목록을 불러오지 못했습니다.");
+          notifyError("게임 설정 또는 방 목록을 불러오지 못했습니다.");
         }
       })
       .finally(() => {
@@ -6989,6 +7001,7 @@ export const TabletopGame = ({ game }) => {
       if (stompRef.current) stompRef.current.deactivate();
       realtimeRoomRef.current = null;
       stompRef.current = null;
+      stompInitRef.current = null;
       gameSubRef.current = null;
     };
   }, [game]);
@@ -6996,7 +7009,7 @@ export const TabletopGame = ({ game }) => {
   const createRoom = async (event) => {
     event.preventDefault();
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     busyRef.current = true;
@@ -7009,9 +7022,9 @@ export const TabletopGame = ({ game }) => {
       });
       await openRoom(room);
       await fetchRooms();
-      toast.success("방 생성 완료");
+      notifySuccess("방 생성 완료");
     } catch {
-      toast.error("방 생성 실패");
+      notifyError("방 생성 실패");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7020,7 +7033,7 @@ export const TabletopGame = ({ game }) => {
 
   const joinRoom = async (roomId) => {
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     busyRef.current = true;
@@ -7029,9 +7042,9 @@ export const TabletopGame = ({ game }) => {
       const room = await tabletopGameAdapter.joinRoom(game, roomId);
       await openRoom(room);
       await fetchRooms();
-      toast.success("방 입장 완료");
+      notifySuccess("방 입장 완료");
     } catch {
-      toast.error("방 입장 실패");
+      notifyError("방 입장 실패");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7041,12 +7054,12 @@ export const TabletopGame = ({ game }) => {
   const joinByCode = async (event) => {
     event.preventDefault();
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     const code = joinCode.trim().toUpperCase();
     if (!code) {
-      toast.error("방 코드를 입력해주세요.");
+      notifyError("방 코드를 입력해주세요.");
       return;
     }
     busyRef.current = true;
@@ -7056,9 +7069,9 @@ export const TabletopGame = ({ game }) => {
       setJoinCode("");
       await openRoom(room);
       await fetchRooms();
-      toast.success("방 코드로 입장했습니다.");
+      notifySuccess("방 코드로 입장했습니다.");
     } catch {
-      toast.error("방 코드 입장 실패");
+      notifyError("방 코드 입장 실패");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7068,11 +7081,11 @@ export const TabletopGame = ({ game }) => {
   const saveSettings = async () => {
     if (!selectedRoom) return;
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     if (selectedSettingsTooManyPlayers) {
-      toast.error(`현재 ${players.length}명이라 이 규칙으로 변경할 수 없습니다.`);
+      notifyError(`현재 ${players.length}명이라 이 규칙으로 변경할 수 없습니다.`);
       return;
     }
     busyRef.current = true;
@@ -7085,9 +7098,9 @@ export const TabletopGame = ({ game }) => {
       setSelectedRoom(room);
       setGameState(null);
       await fetchRooms();
-      toast.success("방 설정 저장 완료");
+      notifySuccess("방 설정 저장 완료");
     } catch {
-      toast.error("방 설정 저장 실패");
+      notifyError("방 설정 저장 실패");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7097,7 +7110,7 @@ export const TabletopGame = ({ game }) => {
   const toggleReady = async () => {
     if (!selectedRoom) return;
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     busyRef.current = true;
@@ -7105,7 +7118,7 @@ export const TabletopGame = ({ game }) => {
       setBusy(true);
       await tabletopGameAdapter.toggleReady(game, idOf(selectedRoom));
     } catch {
-      toast.error("준비 상태 변경 실패");
+      notifyError("준비 상태 변경 실패");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7115,7 +7128,7 @@ export const TabletopGame = ({ game }) => {
   const startGame = async () => {
     if (!selectedRoom) return;
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     busyRef.current = true;
@@ -7123,9 +7136,9 @@ export const TabletopGame = ({ game }) => {
       setBusy(true);
       await tabletopGameAdapter.startGame(game, idOf(selectedRoom));
       await fetchState(idOf(selectedRoom));
-      toast.success("게임 시작");
+      notifySuccess("게임 시작");
     } catch {
-      toast.error("인원과 준비 상태를 확인해주세요.");
+      notifyError("인원과 준비 상태를 확인해주세요.");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7135,7 +7148,7 @@ export const TabletopGame = ({ game }) => {
   const sendAction = async (payload) => {
     if (!selectedRoom) return;
     if (actionBusyRef.current) {
-      toast("이전 행동을 처리하는 중입니다.");
+      notify("이전 행동을 처리하는 중입니다.");
       return;
     }
     actionBusyRef.current = true;
@@ -7154,7 +7167,7 @@ export const TabletopGame = ({ game }) => {
   const forceFinish = async () => {
     if (!selectedRoom) return;
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     busyRef.current = true;
@@ -7163,9 +7176,9 @@ export const TabletopGame = ({ game }) => {
       const room = await tabletopGameAdapter.forceFinish(game, idOf(selectedRoom));
       setSelectedRoom(room);
       setGameState(null);
-      toast.success("대기방으로 돌아왔습니다.");
+      notifySuccess("대기방으로 돌아왔습니다.");
     } catch {
-      toast.error("게임 종료 실패");
+      notifyError("게임 종료 실패");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7175,7 +7188,7 @@ export const TabletopGame = ({ game }) => {
   const rematch = async () => {
     if (!selectedRoom) return;
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     busyRef.current = true;
@@ -7184,9 +7197,9 @@ export const TabletopGame = ({ game }) => {
       const room = await tabletopGameAdapter.rematch(game, idOf(selectedRoom));
       setSelectedRoom(room);
       setGameState(null);
-      toast.success("다시 준비합니다.");
+      notifySuccess("다시 준비합니다.");
     } catch {
-      toast.error("다시 하기 실패");
+      notifyError("다시 하기 실패");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7196,7 +7209,7 @@ export const TabletopGame = ({ game }) => {
   const leaveRoom = async () => {
     if (!selectedRoom) return;
     if (busyRef.current) {
-      toast("이전 방 요청을 처리하는 중입니다.");
+      notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
     busyRef.current = true;
@@ -7206,9 +7219,9 @@ export const TabletopGame = ({ game }) => {
       await tabletopGameAdapter.leaveRoom(game, roomId);
       clearRoomSelection(roomId);
       await fetchRooms();
-      toast.success("방 퇴장 완료");
+      notifySuccess("방 퇴장 완료");
     } catch {
-      toast.error("방 퇴장 실패");
+      notifyError("방 퇴장 실패");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -7218,14 +7231,14 @@ export const TabletopGame = ({ game }) => {
   const copySelectedRoomCode = async () => {
     const roomCode = codeOf(selectedRoom);
     if (!roomCode || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
-      toast.error("방 코드를 복사할 수 없습니다.");
+      notifyError("방 코드를 복사할 수 없습니다.");
       return;
     }
     try {
       await navigator.clipboard.writeText(roomCode);
-      toast.success("방 코드 복사 완료");
+      notifySuccess("방 코드 복사 완료");
     } catch {
-      toast.error("방 코드를 복사할 수 없습니다.");
+      notifyError("방 코드를 복사할 수 없습니다.");
     }
   };
 

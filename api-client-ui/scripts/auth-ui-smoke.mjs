@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -89,7 +89,107 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const encodeJson = (value) => Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 const encodeText = (value) => Buffer.from(value, "utf8").toString("base64");
 
-function routeMock(url, method) {
+function assertStaticLoginLockDialogAccessibility() {
+    const source = readFileSync("src/pages/access/Login.jsx", "utf8");
+    const requiredSnippets = [
+        "import { trapFocus } from \"../../utils/focusTrap.js\"",
+        "releaseLoadingRef.current = releaseLoading",
+        "document.body.style.overflow = \"hidden\"",
+        "previousFocus.focus()",
+        "trapFocus(event, lockDialogRef.current)",
+        "role=\"presentation\"",
+        "role=\"dialog\"",
+        "aria-modal=\"true\"",
+        "aria-labelledby={lockDialogTitleId}",
+        "aria-describedby={lockDialogDescriptionId}",
+        "htmlFor={lockReleaseReasonId}",
+        "autoFocus",
+    ];
+    const missing = requiredSnippets.filter((snippet) => !source.includes(snippet));
+    if (missing.length) {
+        throw new Error(`auth-ui-smoke: login lock dialog accessibility guard missing ${missing.join(", ")}`);
+    }
+}
+
+function assertStaticAuthRuntimeBoundaries() {
+    const source = readFileSync("src/contexts/AuthContext.jsx", "utf8");
+    if (source.includes("import { queueAdapter } from \"../adapters/queueAdapter.js\"")
+        || !source.includes("await import(\"../adapters/queueAdapter.js\")")) {
+        throw new Error("auth-ui-smoke: queue adapter must stay lazy-loaded until post-login queue routing.");
+    }
+    if (source.includes("from \"../adapters/authAdapter.js\"")
+        || !source.includes("const loadAuthAdapter = () => import(\"../adapters/authAdapter.js\")")
+        || !source.includes("const { authAdapter } = await loadAuthAdapter()")) {
+        throw new Error("auth-ui-smoke: auth adapter must stay lazy-loaded until auth state or auth action needs it.");
+    }
+
+    const appSource = readFileSync("src/App.jsx", "utf8");
+    const protectedRoutesSource = readFileSync("src/components/ProtectedRoutes.jsx", "utf8");
+    const protectedLayoutSource = readFileSync("src/components/ProtectedAppLayout.jsx", "utf8");
+    const appShellOnlyImports = [
+        "import { Header } from \"./components/Header\"",
+        "import { Header } from \"./components/Header.jsx\"",
+        "BottomNavEntry",
+        "CustomCursorEntry",
+        "FloatingChatEntry",
+        "ProtectedAppLayout",
+        "./pages/home/Home.jsx",
+        "./pages/boards/BoardList.jsx",
+        "./pages/games/TabletopGame.jsx",
+    ];
+    const leakedImports = appShellOnlyImports.filter((snippet) => appSource.includes(snippet));
+    if (
+        leakedImports.length ||
+        !appSource.includes("const ProtectedRoutes = lazy(() =>") ||
+        !appSource.includes("import(\"./components/ProtectedRoutes.jsx\")") ||
+        !appSource.includes("path=\"/app/*\"") ||
+        !protectedRoutesSource.includes("const ProtectedAppLayout = lazy(() =>") ||
+        !protectedRoutesSource.includes("import(\"./ProtectedAppLayout.jsx\")") ||
+        !protectedRoutesSource.includes("import(\"../pages/home/Home.jsx\")") ||
+        !protectedLayoutSource.includes("import { Header } from \"./Header.jsx\"") ||
+        !protectedLayoutSource.includes("<FloatingChatEntry />") ||
+        !protectedLayoutSource.includes("<BottomNavEntry />")
+    ) {
+        throw new Error(`auth-ui-smoke: protected route table and app layout must stay out of the public auth shell ${leakedImports.join(", ")}`);
+    }
+
+    const loginSource = readFileSync("src/pages/access/Login.jsx", "utf8");
+    const registerSource = readFileSync("src/pages/access/Register.jsx", "utf8");
+    const queueSource = readFileSync("src/pages/access/Queue.jsx", "utf8");
+    const accessSources = [
+        ["Login", loginSource],
+        ["Register", registerSource],
+        ["Queue", queueSource],
+    ];
+    const staticAccessRuntimeLeaks = accessSources.flatMap(([name, pageSource]) => {
+        const leaks = [];
+        if (pageSource.includes("from \"react-hot-toast\"")) leaks.push(`${name}:react-hot-toast`);
+        if (pageSource.includes("from \"../../adapters/authAdapter.js\"")) leaks.push(`${name}:authAdapter`);
+        if (pageSource.includes("from \"../../adapters/queueAdapter.js\"")) leaks.push(`${name}:queueAdapter`);
+        return leaks;
+    });
+    if (
+        staticAccessRuntimeLeaks.length ||
+        !loginSource.includes("const loadAuthAdapter = () => import(\"../../adapters/authAdapter.js\")") ||
+        !registerSource.includes("const loadAuthAdapter = () => import(\"../../adapters/authAdapter.js\")") ||
+        !queueSource.includes("const loadQueueAdapter = () => import(\"../../adapters/queueAdapter.js\")") ||
+        !loginSource.includes("import { loadToast, notifyError, notifySuccess } from \"../../utils/toast.js\"") ||
+        !registerSource.includes("import { notifyError, notifySuccess } from \"../../utils/toast.js\"") ||
+        !queueSource.includes("import { notifySuccess } from \"../../utils/toast.js\"")
+    ) {
+        throw new Error(`auth-ui-smoke: public access pages must lazy-load toast/auth/queue runtimes ${staticAccessRuntimeLeaks.join(", ")}`);
+    }
+}
+
+const parsePostData = (postData) => {
+    try {
+        return JSON.parse(postData || "{}");
+    } catch {
+        return {};
+    }
+};
+
+function routeMock(url, method, postData) {
     const { hostname, pathname } = new URL(url);
 
     if (method === "GET" && hostname === "oapi.map.naver.com") {
@@ -97,6 +197,21 @@ function routeMock(url, method) {
     }
 
     if (method === "POST" && pathname === "/api/members/login") {
+        const payload = parsePostData(postData);
+        if (payload.email === "locked@example.com") {
+            return {
+                status: 423,
+                body: {
+                    code: "ACCOUNT_LOCKED",
+                    message: "계정 이용이 제한되었습니다.",
+                    sanction_info: {
+                        reason: "스모크 테스트 제재",
+                        starts_at: "2026-06-01T09:00:00",
+                        ends_at: "2026-06-08T09:00:00",
+                    },
+                },
+            };
+        }
         return {
             status: 200,
             headers: [
@@ -233,12 +348,23 @@ function routeMock(url, method) {
         };
     }
 
+    if (method === "POST" && pathname === "/api/sanctions/release-request") {
+        return {
+            status: 200,
+            body: {
+                data: {
+                    requested: true,
+                },
+            },
+        };
+    }
+
     return null;
 }
 
 async function handleFetchRequest(cdp, sessionId, event) {
     const { requestId, request } = event.params;
-    const mock = routeMock(request.url, request.method);
+    const mock = routeMock(request.url, request.method, request.postData);
     if (!mock) {
         await cdp.send("Fetch.continueRequest", { requestId }, sessionId);
         return;
@@ -372,6 +498,33 @@ async function inspectAuth(cdp, sessionId) {
 
     await cdp.send("Page.navigate", { url: `${baseUrl}/login` }, sessionId);
     await waitForText(cdp, sessionId, "로그인");
+    await setInputValue(cdp, sessionId, "input[type='email']", "locked@example.com");
+    await setInputValue(cdp, sessionId, "input[type='password']", "password123");
+    await clickSelector(cdp, sessionId, "form button[type='submit']");
+    await waitForText(cdp, sessionId, "계정 이용 제한");
+    await waitFor(cdp, sessionId, `(() => {
+        const dialog = document.querySelector("[role='dialog'][aria-modal='true']");
+        if (!dialog) return false;
+        const titleId = dialog.getAttribute("aria-labelledby");
+        const descriptionId = dialog.getAttribute("aria-describedby");
+        return Boolean(
+            titleId &&
+            descriptionId &&
+            document.getElementById(titleId)?.innerText.includes("계정 이용 제한") &&
+            document.getElementById(descriptionId)?.innerText.includes("제재 상태") &&
+            dialog.querySelector("button")?.innerText.includes("닫기") &&
+            document.body.style.overflow === "hidden"
+        );
+    })()`, "locked account dialog accessibility");
+    await setInputValue(cdp, sessionId, "textarea", "검토 부탁드립니다");
+    await clickByText(cdp, sessionId, "해제 요청");
+    await waitForText(cdp, sessionId, "해제 요청이 제출되었습니다.");
+    await clickByText(cdp, sessionId, "닫기");
+    await waitFor(cdp, sessionId, `!document.querySelector("[role='dialog'][aria-modal='true']")`, "locked account dialog close");
+    await assertNoBlockedText(cdp, sessionId, "locked account dialog");
+
+    await cdp.send("Page.navigate", { url: `${baseUrl}/login` }, sessionId);
+    await waitForText(cdp, sessionId, "로그인");
     await setInputValue(cdp, sessionId, "input[type='email']", "smoke@example.com");
     await setInputValue(cdp, sessionId, "input[type='password']", "password123");
     await clickSelector(cdp, sessionId, "form button[type='submit']");
@@ -401,6 +554,9 @@ async function inspectAuth(cdp, sessionId) {
 }
 
 async function main() {
+    assertStaticLoginLockDialogAccessibility();
+    assertStaticAuthRuntimeBoundaries();
+
     const chrome = spawn(chromePath, [
         "--headless=new",
         "--remote-debugging-pipe",

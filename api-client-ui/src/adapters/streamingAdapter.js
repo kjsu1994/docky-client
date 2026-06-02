@@ -12,6 +12,40 @@ const normalizeUrl = (url) => {
     return String(url);
 };
 
+const STREAMING_PUBLIC_HOSTS = new Set(["ctfmon.shop", "www.ctfmon.shop", "localhost", "127.0.0.1"]);
+const STREAMING_ASSET_PATTERN = /^\/api\/streaming\/videos\/(\d+)\/(thumbnail|playlist\.m3u8|hls\/index\.m3u8)$/;
+
+const getCurrentOrigin = () => {
+    if (typeof window !== "undefined" && window.location?.origin) {
+        return window.location.origin;
+    }
+    return "https://ctfmon.shop";
+};
+
+export const normalizeStreamingAssetUrl = (url, videoId, assetType) => {
+    const raw = normalizeUrl(url).trim();
+    if (!raw || !videoId) return "";
+
+    try {
+        const parsed = new URL(raw, getCurrentOrigin());
+        const currentOrigin = new URL(getCurrentOrigin());
+        const trustedHost = parsed.origin === currentOrigin.origin ||
+            STREAMING_PUBLIC_HOSTS.has(parsed.hostname.toLowerCase());
+        if (!trustedHost || parsed.search || parsed.hash) return "";
+
+        const match = parsed.pathname.match(STREAMING_ASSET_PATTERN);
+        if (!match || String(match[1]) !== String(videoId)) return "";
+
+        const pathType = match[2];
+        if (assetType === "thumbnail" && pathType !== "thumbnail") return "";
+        if (assetType === "playlist" && pathType !== "playlist.m3u8" && pathType !== "hls/index.m3u8") return "";
+
+        return parsed.pathname;
+    } catch {
+        return "";
+    }
+};
+
 export const STREAMING_STATUS_LABELS = {
     READY: "재생 가능",
     PROCESSING: "변환 중",
@@ -31,8 +65,8 @@ export const normalizeStreamingVideo = (video) => {
         contentType: video?.contentType ?? video?.content_type ?? "",
         fileSize: toNumber(video?.fileSize ?? video?.file_size),
         durationSeconds: toNumber(video?.durationSeconds ?? video?.duration_seconds),
-        thumbnailUrl: normalizeUrl(video?.thumbnailUrl ?? video?.thumbnail_url),
-        playlistUrl: normalizeUrl(video?.playlistUrl ?? video?.playlist_url),
+        thumbnailUrl: normalizeStreamingAssetUrl(video?.thumbnailUrl ?? video?.thumbnail_url, videoId, "thumbnail"),
+        playlistUrl: normalizeStreamingAssetUrl(video?.playlistUrl ?? video?.playlist_url, videoId, "playlist"),
         createdAt: video?.createdAt ?? video?.created_at ?? "",
         modifiedAt: video?.modifiedAt ?? video?.modified_at ?? "",
         failureReason: video?.failureReason ?? video?.failure_reason ?? "",
@@ -90,8 +124,8 @@ export const normalizePlayInfo = (response) => {
     return {
         videoId: data.videoId ?? data.video_id ?? null,
         title: data.title || "",
-        playlistUrl: normalizeUrl(data.playlistUrl ?? data.playlist_url),
-        thumbnailUrl: normalizeUrl(data.thumbnailUrl ?? data.thumbnail_url),
+        playlistUrl: normalizeStreamingAssetUrl(data.playlistUrl ?? data.playlist_url, data.videoId ?? data.video_id, "playlist"),
+        thumbnailUrl: normalizeStreamingAssetUrl(data.thumbnailUrl ?? data.thumbnail_url, data.videoId ?? data.video_id, "thumbnail"),
         durationSeconds: toNumber(data.durationSeconds ?? data.duration_seconds),
         status: data.status || "READY",
     };

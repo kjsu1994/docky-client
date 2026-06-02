@@ -1,6 +1,28 @@
 import api, { getApiErrorMessage } from "../utils/api.js";
 
+export const OPTIMIZER_MAX_PARTICIPANTS = 8;
+export const OPTIMIZER_ADDRESS_MAX_LENGTH = 120;
+
 const unwrapOptimizerData = (response) => response?.data?.data ?? response?.data ?? response ?? {};
+
+export const normalizeOptimizerAddress = (value) => String(value || "").trim().replace(/\s+/g, " ");
+
+export const normalizeOptimizerAddresses = (addresses = []) => {
+    const dedup = new Map();
+    for (const value of Array.isArray(addresses) ? addresses : []) {
+        const normalized = normalizeOptimizerAddress(value);
+        if (!normalized) continue;
+        if (normalized.length > OPTIMIZER_ADDRESS_MAX_LENGTH) {
+            throw new Error("주소는 120자 이하로 입력해 주세요.");
+        }
+        dedup.set(normalized.toLowerCase(), normalized);
+    }
+    const result = Array.from(dedup.values());
+    if (result.length > OPTIMIZER_MAX_PARTICIPANTS) {
+        throw new Error("주소는 최대 8개까지 입력할 수 있습니다.");
+    }
+    return result;
+};
 
 const toNumberOrNull = (value) => {
     const parsed = Number(value);
@@ -48,7 +70,7 @@ export const extractOptimizerErrorMessage = (error, fallbackMessage) => getApiEr
 
 export const optimizerAdapter = {
     async optimizeMeetingPoint(addresses) {
-        const response = await api.post("/optimizer/optimize", addresses);
+        const response = await api.post("/optimizer/optimize", normalizeOptimizerAddresses(addresses));
         return normalizeOptimizationResult(response);
     },
 };

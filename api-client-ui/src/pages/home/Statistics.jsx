@@ -11,9 +11,10 @@ import {
     Eye,
     Calendar,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import { statsAdapter, statsErrorMessage } from "../../adapters/statsAdapter.js";
 import { formatNumber } from "../../utils/helpers.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { notifyError } from "../../utils/toast.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 
@@ -55,10 +56,10 @@ export const Statistics = () => {
         try {
             setTrend(await statsAdapter.fetchTrend(selectedDays));
         } catch (trendError) {
-            console.error("Failed to fetch stats trend:", trendError);
+            logClientError("statistics.trend.fetch", trendError);
             const message = statsErrorMessage(trendError, "추이 데이터를 불러오지 못했습니다.");
             setTrendError(message);
-            toast.error(message);
+            notifyError(message);
         } finally {
             setTrendLoading(false);
         }
@@ -76,7 +77,7 @@ export const Statistics = () => {
             setTrend(result.trend);
             setDays(result.trend.days || 7);
         } catch (fetchError) {
-            console.error("Failed to fetch statistics data:", fetchError);
+            logClientError("statistics.dashboard.fetch", fetchError);
             setError(statsErrorMessage(fetchError, "통계 데이터를 불러오지 못했습니다."));
         } finally {
             setLoading(false);

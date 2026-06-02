@@ -1,5 +1,7 @@
 import api, { getApiErrorMessage } from "../utils/api.js";
 
+export const FACILITY_KEYWORD_MAX_LENGTH = 60;
+
 const unwrapFacilityData = (response) => response?.data?.data ?? response?.data ?? response ?? {};
 
 const normalizeSearchResponse = (response) => {
@@ -29,6 +31,11 @@ const lotSearchParams = ({ latitude, longitude, radiusKm, limit }) => ({
     radius_km: clampNumber(radiusKm, 3, 0, 30),
     limit: clampInteger(limit, 50, 1, 200),
 });
+
+export const normalizeFacilityKeyword = (value) => {
+    const normalized = String(value ?? "").trim().replace(/\s+/g, " ");
+    return normalized ? normalized.slice(0, FACILITY_KEYWORD_MAX_LENGTH) : "";
+};
 
 export const normalizeImportResult = (response) => {
     const data = unwrapFacilityData(response);
@@ -68,7 +75,7 @@ export const facilityAdapter = {
             params: {
                 ...lotSearchParams({ latitude, longitude, radiusKm, limit }),
                 paid_only: paidOnly,
-                keyword: keyword?.trim() || undefined,
+                keyword: normalizeFacilityKeyword(keyword) || undefined,
                 sort,
             },
         });
@@ -85,7 +92,7 @@ export const facilityAdapter = {
             params: {
                 ...lotSearchParams({ latitude, longitude, radiusKm, limit }),
                 open_type: openType,
-                keyword: keyword?.trim() || undefined,
+                keyword: normalizeFacilityKeyword(keyword) || undefined,
                 sort,
             },
         });

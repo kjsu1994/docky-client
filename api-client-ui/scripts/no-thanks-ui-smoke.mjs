@@ -27,6 +27,8 @@ function assertNoThanksRealtimeSource() {
     const source = readFileSync("src/pages/games/NoThanksGame.jsx", "utf8");
     const requiredSnippets = [
         ["const realtimeRoomRef = useRef(null)", "track the latest realtime room"],
+        ["createStompClient", "load the STOMP runtime through the shared async adapter"],
+        ["notifyRealtimeError", "route STOMP ERROR frames through the shared safe notifier"],
         ["client.beforeConnect = () =>", "refresh STOMP auth headers before reconnect"],
         ["bindLatestRealtimeRoom(client)", "resubscribe the latest room after reconnect"],
         ["realtimeRoomRef.current = { roomId, chatRoomId: snapshotChatRoomId }", "store the latest game/chat room"],
@@ -39,6 +41,18 @@ function assertNoThanksRealtimeSource() {
     }
     if (source.includes("else client.onConnect = ()")) {
         throw new Error("no-thanks-ui-smoke: NoThanksGame must not overwrite STOMP onConnect per room.");
+    }
+    if (source.includes('import SockJS from "sockjs-client"') || source.includes('import { Client } from "@stomp/stompjs"')) {
+        throw new Error("no-thanks-ui-smoke: NoThanksGame must not statically bundle the STOMP runtime into the route chunk.");
+    }
+    if (source.includes('notifyError("실시간 연결 오류")')) {
+        throw new Error("no-thanks-ui-smoke: NoThanksGame must not show raw repeated realtime error toasts.");
+    }
+    if (source.includes('from "react-hot-toast"') || !source.includes('from "../../utils/toast.js"')) {
+        throw new Error("no-thanks-ui-smoke: NoThanksGame must use the dynamic toast helper instead of static react-hot-toast imports.");
+    }
+    if (!source.includes("key={normalized.key || normalized.id}") || source.includes("key={`${message.createdAt || index}-${index}`}")) {
+        throw new Error("no-thanks-ui-smoke: NoThanksGame chat messages must use stable normalized message keys.");
     }
 }
 

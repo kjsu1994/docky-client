@@ -9,10 +9,9 @@ import {
     PlusCircle,
     Search,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useBoards } from "../../hooks/useBoards.js";
-import { boardAdapter } from "../../adapters/boardAdapter.js";
+import { BOARD_SEARCH_MAX_LENGTH, boardAdapter, normalizeBoardSearchValue } from "../../adapters/boardAdapter.js";
 import { EmptyState } from "../../components/EmptyState.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { Pagination } from "../../components/Pagination.jsx";
@@ -23,10 +22,13 @@ import {
     formatNumber,
     formatRelativeTime,
     getBoardKindLabel,
+    isSafeBoardContentImageUrl,
     resolveAssetUrl,
     stripHtmlTags,
     truncateText,
 } from "../../utils/helpers.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { notifyError, notifySuccess } from "../../utils/toast.js";
 
 const isBoardNotice = (board) => {
     const kind = board.kind_of_board || board.kindOfBoard;
@@ -63,7 +65,7 @@ export const BoardList = () => {
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm.trim());
+            setDebouncedSearchTerm(normalizeBoardSearchValue(searchTerm));
         }, 300);
         return () => window.clearTimeout(timer);
     }, [searchTerm]);
@@ -111,11 +113,11 @@ export const BoardList = () => {
 
         try {
             await boardAdapter.deleteBoard(boardId);
-            toast.success("삭제되었습니다.");
+            notifySuccess("삭제되었습니다.");
             setRefreshKey((prev) => prev + 1);
         } catch (error) {
-            console.error("Failed to delete board:", error);
-            toast.error("삭제 실패");
+            logClientError("boards.list.delete", error);
+            notifyError("게시글 삭제에 실패했습니다.");
         }
     };
 
@@ -162,11 +164,15 @@ export const BoardList = () => {
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="검색..."
+                        placeholder="검색어 입력"
                         value={searchTerm}
-                        onChange={(event) => setSearchTerm(event.target.value)}
+                        onChange={(event) => setSearchTerm(event.target.value.slice(0, BOARD_SEARCH_MAX_LENGTH))}
+                        maxLength={BOARD_SEARCH_MAX_LENGTH}
                         className="input-base w-full pl-9"
                     />
+                    <div className="mt-1 text-right text-xs font-medium text-slate-400">
+                        검색어 {searchTerm.length}/{BOARD_SEARCH_MAX_LENGTH}자
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-slate-400" />
@@ -192,7 +198,7 @@ export const BoardList = () => {
                 </div>
             ) : filteredCount === 0 ? (
                 <div className="space-y-4">
-                    <EmptyState message="게시글이 없습니다." subMessage="새로운 이야기를 시작해보세요!" />
+                    <EmptyState message="게시글이 없습니다." subMessage="새로운 이야기를 시작해 보세요." />
                     {canWrite && (
                         <button type="button" className="btn-primary" onClick={() => navigate(`/app/boards/${newBoardKind}/new`)}>
                             첫 글 작성하기
@@ -262,7 +268,8 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
     });
     const contentHtml = board.contents || board.content || "";
     const imgMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
-    const thumbnailUrl = imgMatch ? resolveAssetUrl(imgMatch[1]) : null;
+    const resolvedThumbnailUrl = imgMatch ? resolveAssetUrl(imgMatch[1]) : null;
+    const thumbnailUrl = resolvedThumbnailUrl && isSafeBoardContentImageUrl(resolvedThumbnailUrl) ? resolvedThumbnailUrl : null;
     const [imgError, setImgError] = useState(false);
 
     return (

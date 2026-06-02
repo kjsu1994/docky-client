@@ -1,9 +1,12 @@
-﻿import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Lock, Leaf } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
-import toast from "react-hot-toast";
-import { authAdapter, extractAccountLockInfo, extractAuthErrorMessage } from "../../adapters/authAdapter.js";
+import { trapFocus } from "../../utils/focusTrap.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { loadToast, notifyError, notifySuccess } from "../../utils/toast.js";
+
+const loadAuthAdapter = () => import("../../adapters/authAdapter.js");
 
 export const Login = () => {
     const [oauthProcessing, setOauthProcessing] = useState(() => {
@@ -23,7 +26,12 @@ export const Login = () => {
     const [releaseLoading, setReleaseLoading] = useState(false);
     const { login, loginWithTokens } = useAuth();
     const oauthHandledRef = useRef(false);
+    const releaseLoadingRef = useRef(false);
+    const lockDialogRef = useRef(null);
     const lockCloseBtnRef = useRef(null);
+    const lockDialogTitleId = useId();
+    const lockDialogDescriptionId = useId();
+    const lockReleaseReasonId = useId();
 
     const formatDateTime = (value) => {
         if (!value) return "종료일 없음";
@@ -42,7 +50,7 @@ export const Login = () => {
 
         if (oauthError) {
             window.history.replaceState({}, document.title, window.location.pathname);
-            toast.error("구글 로그인에 실패했습니다. 다시 시도해주세요.");
+            notifyError("구글 로그인에 실패했습니다. 다시 시도해주세요.");
             oauthHandledRef.current = true;
             setOauthProcessing(false);
             return;
@@ -60,9 +68,10 @@ export const Login = () => {
             setGoogleLoading(true);
             try {
                 await loginWithTokens({ accessToken, refreshToken });
-                toast.success("구글 로그인 성공!");
+                notifySuccess("구글 로그인 성공!");
             } catch (error) {
-                toast.error(extractAuthErrorMessage(error, "구글 로그인 처리에 실패했습니다."));
+                const { extractAuthErrorMessage } = await loadAuthAdapter();
+                notifyError(extractAuthErrorMessage(error, "구글 로그인 처리에 실패했습니다."));
                 oauthHandledRef.current = false;
                 setOauthProcessing(false);
             } finally {
@@ -74,18 +83,46 @@ export const Login = () => {
     }, [loginWithTokens]);
 
     useEffect(() => {
-        if (!lockInfo) return;
-        const onKeyDown = (e) => {
-            if (e.key === "Escape") setLockInfo(null);
+        releaseLoadingRef.current = releaseLoading;
+    }, [releaseLoading]);
+
+    useEffect(() => {
+        if (!lockInfo) return undefined;
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const previousOverflow = document.body.style.overflow;
+        const closeLockDialog = () => {
+            if (releaseLoadingRef.current) return;
+            setLockInfo(null);
         };
+        const onKeyDown = (event) => {
+            if (event.key === "Escape") {
+                closeLockDialog();
+                return;
+            }
+            trapFocus(event, lockDialogRef.current);
+        };
+
+        document.body.style.overflow = "hidden";
         window.addEventListener("keydown", onKeyDown);
         window.setTimeout(() => lockCloseBtnRef.current?.focus(), 0);
-        return () => window.removeEventListener("keydown", onKeyDown);
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener("keydown", onKeyDown);
+            if (previousFocus?.isConnected && typeof previousFocus.focus === "function") {
+                previousFocus.focus();
+            }
+        };
     }, [lockInfo]);
 
     const handleGoogleLogin = () => {
         setGoogleLoading(true);
         window.location.href = "/api/oauth2/authorization/google";
+    };
+
+    const closeLockDialog = () => {
+        if (releaseLoadingRef.current) return;
+        setLockInfo(null);
     };
 
     if (oauthProcessing) {
@@ -112,11 +149,12 @@ export const Login = () => {
         try {
             await login(email, password);
         } catch (error) {
+            const { extractAccountLockInfo } = await loadAuthAdapter();
             const nextLockInfo = extractAccountLockInfo(error, email);
             if (nextLockInfo) {
                 setLockInfo(nextLockInfo);
             }
-            console.error("Login error:", error);
+            logClientError("login.submit", error);
         } finally {
             setLoading(false);
         }
@@ -125,14 +163,26 @@ export const Login = () => {
     const handleReleaseRequest = async () => {
         if (!lockInfo?.email || releaseLoading) return;
 
-        const toastId = toast.loading("해제 요청을 제출하는 중...");
         setReleaseLoading(true);
+        const toast = await loadToast().catch(() => null);
+        const toastId = toast?.loading("해제 요청을 제출하는 중...");
         try {
+            const { authAdapter, extractAuthErrorMessage } = await loadAuthAdapter();
             await authAdapter.requestSanctionRelease({ email: lockInfo.email, reason: releaseReason });
-            toast.success("해제 요청이 제출되었습니다.", { id: toastId });
+            if (toast && toastId) {
+                toast.success("해제 요청이 제출되었습니다.", { id: toastId });
+            } else {
+                notifySuccess("해제 요청이 제출되었습니다.");
+            }
             setReleaseReason("");
         } catch (error) {
-            toast.error(extractAuthErrorMessage(error, "해제 요청 제출에 실패했습니다."), { id: toastId });
+            const { extractAuthErrorMessage } = await loadAuthAdapter();
+            const message = extractAuthErrorMessage(error, "해제 요청 제출에 실패했습니다.");
+            if (toast && toastId) {
+                toast.error(message, { id: toastId });
+            } else {
+                notifyError(message);
+            }
         } finally {
             setReleaseLoading(false);
         }
@@ -237,10 +287,23 @@ export const Login = () => {
             </div>
 
             {lockInfo && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-                        <h2 className="text-xl font-black text-slate-900">계정 이용 제한</h2>
-                        <p className="mt-2 text-sm text-slate-600">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    role="presentation"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) closeLockDialog();
+                    }}
+                >
+                    <div
+                        ref={lockDialogRef}
+                        className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby={lockDialogTitleId}
+                        aria-describedby={lockDialogDescriptionId}
+                    >
+                        <h2 id={lockDialogTitleId} className="text-xl font-black text-slate-900">계정 이용 제한</h2>
+                        <p id={lockDialogDescriptionId} className="mt-2 text-sm text-slate-600">
                             현재 이 계정은 제재 상태입니다. 아래 내용을 확인하고 필요하면 해제를 요청하세요.
                         </p>
 
@@ -251,7 +314,9 @@ export const Login = () => {
                             <div><b>종료:</b> {formatDateTime(lockInfo.endsAt)}</div>
                         </div>
 
+                        <label htmlFor={lockReleaseReasonId} className="sr-only">해제 요청 사유</label>
                         <textarea
+                            id={lockReleaseReasonId}
                             className="input-base mt-4 min-h-[88px] w-full"
                             value={releaseReason}
                             onChange={(e) => setReleaseReason(e.target.value)}
@@ -263,8 +328,9 @@ export const Login = () => {
                             <button
                                 ref={lockCloseBtnRef}
                                 type="button"
+                                autoFocus
                                 className="btn-secondary flex-1"
-                                onClick={() => setLockInfo(null)}
+                                onClick={closeLockDialog}
                                 disabled={releaseLoading}
                             >
                                 닫기

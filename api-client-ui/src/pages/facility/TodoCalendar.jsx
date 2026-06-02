@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import toast from "react-hot-toast";
 import {
     addDays,
     addMonths,
@@ -22,6 +21,7 @@ import {
     ChevronRight,
     Pencil,
     Plus,
+    RefreshCw,
     Trash2,
     X,
 } from "lucide-react";
@@ -30,11 +30,19 @@ import { EmptyState } from "../../components/EmptyState.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { notifyError, notifySuccess } from "../../utils/toast.js";
 
 const VIEW_MODE = {
     WEEK: "week",
     MONTH: "month",
     DAY: "day",
+};
+
+const TODO_ACTION = {
+    TOGGLE: "toggle",
+    DELETE: "delete",
+    SAVE: "save",
 };
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -47,7 +55,10 @@ const sortTodos = (items) =>
         const leftDone = left.status === TODO_STATUS.DONE;
         const rightDone = right.status === TODO_STATUS.DONE;
         if (leftDone !== rightDone) return leftDone ? 1 : -1;
-        return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+        const createdCompare = new Date(left.created_at || left.createdAt || 0).getTime()
+            - new Date(right.created_at || right.createdAt || 0).getTime();
+        if (createdCompare !== 0) return createdCompare;
+        return Number(getTodoId(left) || 0) - Number(getTodoId(right) || 0);
     });
 
 const buildWeekDays = (anchorDate) => {
@@ -97,6 +108,9 @@ const moveAnchorDate = (anchorDate, viewMode, direction) => {
 
 const getTodoId = (todo) => todo?.todo_id ?? todo?.todoId;
 
+const toTodoActionKey = (todoId, actionType) => `${String(todoId ?? "")}:${actionType}`;
+const toTodoActionPrefix = (todoId) => `${String(todoId ?? "")}:`;
+
 const isTodoInRange = (todo, period) => {
     if (!todo?.due_date) return false;
     const dueDate = parseISO(todo.due_date);
@@ -111,8 +125,9 @@ export const TodoCalendar = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
     const [creating, setCreating] = useState(false);
-    const [mutatingTodoId, setMutatingTodoId] = useState(null);
+    const [mutatingTodoActionKeys, setMutatingTodoActionKeys] = useState([]);
     const [draftTitle, setDraftTitle] = useState("");
+    const [rangeMeta, setRangeMeta] = useState({ truncated: false, itemLimit: 0 });
     const [dateChoice, setDateChoice] = useState("today");
     const [draftDueDate, setDraftDueDate] = useState(toDateOnly(new Date()));
     const [editingTodoId, setEditingTodoId] = useState(null);
@@ -120,6 +135,7 @@ export const TodoCalendar = () => {
     const [editDueDate, setEditDueDate] = useState("");
     const fetchSeqRef = useRef(0);
     const loadedOnceRef = useRef(false);
+    const mutatingTodoActionKeyRef = useRef(new Set());
 
     const period = useMemo(() => getRangeByView(viewMode, anchorDate), [viewMode, anchorDate]);
     const selectedDate = useMemo(() => toDateOnly(anchorDate), [anchorDate]);
@@ -157,13 +173,14 @@ export const TodoCalendar = () => {
             if (fetchSeqRef.current !== requestSeq) return;
 
             setTodos(result.items);
+            setRangeMeta({ truncated: Boolean(result.truncated), itemLimit: result.itemLimit || result.items.length });
             loadedOnceRef.current = true;
         } catch (fetchError) {
             if (fetchSeqRef.current !== requestSeq) return;
-            console.error("Todo fetch failed:", fetchError);
+            logClientError("todo.range.fetch", fetchError);
             const message = todoErrorMessage(fetchError, "할 일 목록을 불러오지 못했습니다.");
             if (silent && loadedOnceRef.current) {
-                toast.error(message);
+                notifyError(message);
             } else {
                 setError(message);
             }
@@ -209,20 +226,51 @@ export const TodoCalendar = () => {
                 const leftDone = left.status === TODO_STATUS.DONE;
                 const rightDone = right.status === TODO_STATUS.DONE;
                 if (leftDone !== rightDone) return leftDone ? 1 : -1;
-                return new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime();
+                const createdCompare = new Date(left.created_at || left.createdAt || 0).getTime()
+                    - new Date(right.created_at || right.createdAt || 0).getTime();
+                if (createdCompare !== 0) return createdCompare;
+                return Number(getTodoId(left) || 0) - Number(getTodoId(right) || 0);
             });
         });
+    };
+
+    const hasPendingTodoAction = (todoId) => {
+        const prefix = toTodoActionPrefix(todoId);
+        return mutatingTodoActionKeys.some((key) => key.startsWith(prefix));
+    };
+
+    const isTodoActionPending = (todoId, actionType) =>
+        mutatingTodoActionKeys.includes(toTodoActionKey(todoId, actionType));
+
+    const beginTodoAction = (todoId, actionType) => {
+        if (todoId == null || String(todoId).trim() === "") return false;
+        const prefix = toTodoActionPrefix(todoId);
+        const hasSameTodoAction = Array.from(mutatingTodoActionKeyRef.current).some((key) => key.startsWith(prefix));
+        if (hasSameTodoAction) return false;
+
+        const nextKeys = new Set(mutatingTodoActionKeyRef.current);
+        nextKeys.add(toTodoActionKey(todoId, actionType));
+        mutatingTodoActionKeyRef.current = nextKeys;
+        setMutatingTodoActionKeys(Array.from(nextKeys));
+        return true;
+    };
+
+    const finishTodoAction = (todoId, actionType) => {
+        const nextKeys = new Set(mutatingTodoActionKeyRef.current);
+        nextKeys.delete(toTodoActionKey(todoId, actionType));
+        mutatingTodoActionKeyRef.current = nextKeys;
+        setMutatingTodoActionKeys(Array.from(nextKeys));
     };
 
     const handleCreateTodo = async () => {
         if (creating) return;
         const trimmedTitle = draftTitle.trim();
         if (!trimmedTitle) {
-            toast.error("할 일 제목을 입력해 주세요.");
+            notifyError("할 일 제목을 입력해 주세요.");
             return;
         }
         if (!draftDueDate) {
-            toast.error("날짜를 선택해 주세요.");
+            notifyError("날짜를 선택해 주세요.");
             return;
         }
 
@@ -235,12 +283,12 @@ export const TodoCalendar = () => {
             resetComposer();
             const visibleInCurrentRange = isTodoInRange(createdTodo, period);
             mergeVisibleTodo(createdTodo);
-            toast.success(visibleInCurrentRange
+            notifySuccess(visibleInCurrentRange
                 ? "할 일이 추가되었습니다."
                 : "할 일이 추가되었습니다. 선택한 기간 밖에 있어 목록에는 표시되지 않습니다.");
         } catch (createError) {
-            console.error("Todo create failed:", createError);
-            toast.error(todoErrorMessage(createError, "할 일을 추가하지 못했습니다."));
+            logClientError("todo.create", createError);
+            notifyError(todoErrorMessage(createError, "할 일을 추가하지 못했습니다."));
         } finally {
             setCreating(false);
         }
@@ -248,6 +296,8 @@ export const TodoCalendar = () => {
 
     const handleToggleTodo = async (todo) => {
         const todoId = getTodoId(todo);
+        if (!beginTodoAction(todoId, TODO_ACTION.TOGGLE)) return;
+
         const nextStatus = todo.status === TODO_STATUS.DONE ? TODO_STATUS.TODO : TODO_STATUS.DONE;
         const previousTodo = { ...todo };
         const optimisticTodo = {
@@ -257,7 +307,6 @@ export const TodoCalendar = () => {
             completedAt: nextStatus === TODO_STATUS.DONE ? new Date().toISOString() : null,
         };
 
-        setMutatingTodoId(todoId);
         mergeVisibleTodo(optimisticTodo);
         try {
             const updatedTodo = await todoAdapter.updateTodo(todoId, {
@@ -266,36 +315,39 @@ export const TodoCalendar = () => {
             mergeVisibleTodo(updatedTodo);
         } catch (toggleError) {
             mergeVisibleTodo(previousTodo);
-            console.error("Todo toggle failed:", toggleError);
-            toast.error(todoErrorMessage(toggleError, "완료 상태를 변경하지 못했습니다."));
+            logClientError("todo.toggle", toggleError);
+            notifyError(todoErrorMessage(toggleError, "완료 상태를 변경하지 못했습니다."));
         } finally {
-            setMutatingTodoId(null);
+            finishTodoAction(todoId, TODO_ACTION.TOGGLE);
         }
     };
     const handleDeleteTodo = async (todoId) => {
-        const confirmed = await confirmAction({
-            title: "할 일을 삭제할까요?",
-            description: "삭제한 할 일은 되돌릴 수 없습니다.",
-            confirmText: "삭제",
-        });
-        if (!confirmed) return;
+        if (!beginTodoAction(todoId, TODO_ACTION.DELETE)) return;
 
-        const previousTodos = todos;
-        setMutatingTodoId(todoId);
-        setTodos((prev) => prev.filter((todo) => getTodoId(todo) !== todoId));
+        let previousTodo = null;
         try {
+            const confirmed = await confirmAction({
+                title: "할 일을 삭제할까요?",
+                description: "삭제한 할 일은 되돌릴 수 없습니다.",
+                confirmText: "삭제",
+            });
+            if (!confirmed) return;
+
+            previousTodo = todos.find((todo) => getTodoId(todo) === todoId);
+            setTodos((prev) => prev.filter((todo) => getTodoId(todo) !== todoId));
             await todoAdapter.deleteTodo(todoId);
-            toast.success("할 일이 삭제되었습니다.");
+            notifySuccess("할 일이 삭제되었습니다.");
         } catch (deleteError) {
-            setTodos(previousTodos);
-            console.error("Todo delete failed:", deleteError);
-            toast.error(todoErrorMessage(deleteError, "할 일을 삭제하지 못했습니다."));
+            if (previousTodo) mergeVisibleTodo(previousTodo);
+            logClientError("todo.delete", deleteError);
+            notifyError(todoErrorMessage(deleteError, "할 일을 삭제하지 못했습니다."));
         } finally {
-            setMutatingTodoId(null);
+            finishTodoAction(todoId, TODO_ACTION.DELETE);
         }
     };
 
     const beginEditTodo = (todo) => {
+        if (hasPendingTodoAction(getTodoId(todo))) return;
         setEditingTodoId(getTodoId(todo));
         setEditTitle(todo.title);
         setEditDueDate(todo.due_date);
@@ -308,16 +360,16 @@ export const TodoCalendar = () => {
     };
 
     const handleSaveTodo = async (todoId) => {
-        if (mutatingTodoId === todoId) return;
         const trimmedTitle = editTitle.trim();
         if (!trimmedTitle) {
-            toast.error("할 일 제목을 입력해 주세요.");
+            notifyError("할 일 제목을 입력해 주세요.");
             return;
         }
         if (!editDueDate) {
-            toast.error("날짜를 선택해 주세요.");
+            notifyError("날짜를 선택해 주세요.");
             return;
         }
+        if (!beginTodoAction(todoId, TODO_ACTION.SAVE)) return;
 
         const previousTodo = todos.find((todo) => getTodoId(todo) === todoId);
         const optimisticTodo = previousTodo
@@ -328,7 +380,6 @@ export const TodoCalendar = () => {
                 dueDate: editDueDate,
             }
             : null;
-        setMutatingTodoId(todoId);
         if (optimisticTodo) mergeVisibleTodo(optimisticTodo);
         try {
             const updatedTodo = await todoAdapter.updateTodo(todoId, {
@@ -337,20 +388,23 @@ export const TodoCalendar = () => {
             });
             cancelEditTodo();
             mergeVisibleTodo(updatedTodo);
-            toast.success("할 일이 수정되었습니다.");
+            notifySuccess("할 일이 수정되었습니다.");
         } catch (saveError) {
             if (previousTodo) mergeVisibleTodo(previousTodo);
-            console.error("Todo save failed:", saveError);
-            toast.error(todoErrorMessage(saveError, "할 일을 수정하지 못했습니다."));
+            logClientError("todo.save", saveError);
+            notifyError(todoErrorMessage(saveError, "할 일을 수정하지 못했습니다."));
         } finally {
-            setMutatingTodoId(null);
+            finishTodoAction(todoId, TODO_ACTION.SAVE);
         }
     };
 
     const renderTodoRow = (todo, variant = "default") => {
         const todoId = getTodoId(todo);
         const isEditing = editingTodoId === todoId;
-        const isPending = mutatingTodoId === todoId;
+        const isPending = hasPendingTodoAction(todoId);
+        const isToggling = isTodoActionPending(todoId, TODO_ACTION.TOGGLE);
+        const isDeleting = isTodoActionPending(todoId, TODO_ACTION.DELETE);
+        const isSaving = isTodoActionPending(todoId, TODO_ACTION.SAVE);
         const isDone = todo.status === TODO_STATUS.DONE;
         const isCompact = variant === "week";
 
@@ -369,14 +423,16 @@ export const TodoCalendar = () => {
                         onClick={() => handleToggleTodo(todo)}
                         disabled={isPending}
                         aria-busy={isPending}
-                        className={`${isCompact ? "mt-0.5 h-5 w-5" : "mt-0.5 h-6 w-6"} flex flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                        className={`${isCompact ? "mt-0.5 h-5 w-5" : "mt-0.5 h-6 w-6"} flex flex-shrink-0 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed ${
                             isDone
                                 ? "border-emerald-400 bg-emerald-500 text-white"
                                 : "border-slate-300 bg-white text-transparent hover:border-primary-400"
                         }`}
-                        aria-label="완료 상태 변경"
+                        aria-label={isToggling ? "완료 상태 변경 중" : "완료 상태 변경"}
                     >
-                        <Check className={isCompact ? "h-3 w-3" : "h-3.5 w-3.5"} />
+                        {isToggling
+                            ? <RefreshCw className={`${isCompact ? "h-3 w-3" : "h-3.5 w-3.5"} animate-spin`} />
+                            : <Check className={isCompact ? "h-3 w-3" : "h-3.5 w-3.5"} />}
                     </button>
 
                     <div className="min-w-0 flex-1">
@@ -430,9 +486,9 @@ export const TodoCalendar = () => {
                                     onClick={() => handleSaveTodo(todoId)}
                                     disabled={isPending}
                                     aria-busy={isPending}
-                                    className={`rounded-xl bg-primary-600 ${isCompact ? "px-2.5 py-1.5 text-[11px]" : "px-3 py-2 text-xs"} font-black text-white transition-colors hover:bg-primary-700`}
+                                    className={`min-w-[4.5rem] rounded-xl bg-primary-600 ${isCompact ? "px-2.5 py-1.5 text-[11px]" : "px-3 py-2 text-xs"} font-black text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-primary-300`}
                                 >
-                                    저장
+                                    {isSaving ? "저장 중..." : "저장"}
                                 </button>
                                 <button
                                     type="button"
@@ -449,7 +505,8 @@ export const TodoCalendar = () => {
                                 <button
                                     type="button"
                                     onClick={() => beginEditTodo(todo)}
-                                    className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition-colors hover:text-primary-700"
+                                    disabled={isPending}
+                                    className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition-colors hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                                     aria-label="할 일 수정"
                                 >
                                     <Pencil className="h-4 w-4" />
@@ -459,10 +516,10 @@ export const TodoCalendar = () => {
                                     onClick={() => handleDeleteTodo(todoId)}
                                     disabled={isPending}
                                     aria-busy={isPending}
-                                    className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition-colors hover:text-rose-600"
-                                    aria-label="할 일 삭제"
+                                    className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition-colors hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                    aria-label={isDeleting ? "할 일 삭제 중" : "할 일 삭제"}
                                 >
-                                    <Trash2 className="h-4 w-4" />
+                                    {isDeleting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                                 </button>
                             </>
                         )}
@@ -657,6 +714,11 @@ export const TodoCalendar = () => {
                             className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-primary-300"
                         />
                     </div>
+                    {rangeMeta.truncated && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800" role="status">
+                            표시 한도 {rangeMeta.itemLimit.toLocaleString()}개까지만 불러왔습니다. 기간을 좁히면 나머지 할 일을 확인할 수 있습니다.
+                        </div>
+                    )}
                 </div>
             </section>
 

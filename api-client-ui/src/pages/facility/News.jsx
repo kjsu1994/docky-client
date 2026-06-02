@@ -3,7 +3,8 @@ import { Search, Newspaper, ExternalLink, Calendar, TrendingUp } from "lucide-re
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { formatRelativeTime } from "../../utils/helpers.js";
-import { NEWS_DEFAULT_DISPLAY, NEWS_DEFAULT_QUERY, NEWS_DEFAULT_SORT, newsAdapter, newsErrorMessage, normalizeNewsQuery } from "../../adapters/newsAdapter.js";
+import { logClientError } from "../../utils/clientDiagnostics.js";
+import { NEWS_DEFAULT_DISPLAY, NEWS_DEFAULT_QUERY, NEWS_DEFAULT_SORT, NEWS_QUERY_MAX_LENGTH, newsAdapter, newsErrorMessage, normalizeNewsQuery } from "../../adapters/newsAdapter.js";
 
 const quickKeywords = ["기후위기", "탄소중립", "재생에너지", "전기차", "미세먼지"];
 
@@ -39,7 +40,7 @@ export const News = () => {
             }
         } catch (err) {
             if (requestSeqRef.current !== requestId) return;
-            console.error("Failed to fetch news:", err);
+            logClientError("news.search.fetch", err);
             setNews([]);
             setTotal(0);
             setError(newsErrorMessage(err, "뉴스를 불러오지 못했습니다."));
@@ -115,10 +116,10 @@ export const News = () => {
                         <input
                             type="search"
                             value={searchInput}
-                            onChange={(event) => setSearchInput(event.target.value)}
+                            onChange={(event) => setSearchInput(event.target.value.slice(0, NEWS_QUERY_MAX_LENGTH))}
                             placeholder="예: 탄소중립, 재생에너지, 미세먼지"
                             className="input-base w-full pl-11"
-                            maxLength={60}
+                            maxLength={NEWS_QUERY_MAX_LENGTH}
                         />
                     </div>
                     <button type="submit" className="btn-primary px-6" disabled={loading}>

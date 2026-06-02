@@ -1,10 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
-import { authAdapter, extractAuthErrorMessage, isAccountLockedError } from "../adapters/authAdapter.js";
-import { queueAdapter } from "../adapters/queueAdapter.js";
+import { logClientError } from "../utils/clientDiagnostics.js";
+import { notifyError, notifySuccess } from "../utils/toast.js";
 
 const AuthContext = createContext(null);
+const loadAuthAdapter = () => import("../adapters/authAdapter.js");
 
 const parseStoredRoles = () => {
     try {
@@ -44,10 +44,11 @@ export const AuthProvider = ({ children }) => {
             const token = localStorage.getItem("accessToken");
             if (token) {
                 try {
+                    const { authAdapter } = await loadAuthAdapter();
                     const data = await authAdapter.fetchCurrentMember();
                     setUser(withRolesFallback(data, parseStoredRoles()));
                 } catch (error) {
-                    console.error("Failed to fetch user:", error);
+                    logClientError("auth.member.fetch", error);
                     localStorage.removeItem("accessToken");
                     localStorage.removeItem("refreshToken");
                     localStorage.removeItem("userRoles");
@@ -61,20 +62,24 @@ export const AuthProvider = ({ children }) => {
 
     const routeAfterQueue = useCallback(async ({ replace = false } = {}) => {
         try {
+            const { queueAdapter } = await import("../adapters/queueAdapter.js");
             const queueData = await queueAdapter.join();
             if (queueData.status === "WAITING" || queueData.status === "BLOCKED") {
                 navigate("/queue", { replace: true });
                 return;
             }
         } catch (err) {
-            console.error("Queue join failed, proceeding anyway:", err);
+            logClientError("auth.queue.join", err);
         }
 
         navigate("/app", { replace });
     }, [navigate]);
 
     const login = async (email, password) => {
+        let authModule = null;
         try {
+            authModule = await loadAuthAdapter();
+            const { authAdapter } = authModule;
             const { accessToken, refreshToken, roles: loginRoles } = await authAdapter.loginWithPassword({ email, password });
 
             if (!accessToken) throw new Error("로그인 토큰을 찾을 수 없습니다.");
@@ -92,14 +97,14 @@ export const AuthProvider = ({ children }) => {
             const userData = await authAdapter.fetchCurrentMember();
             setUser(withRolesFallback(userData, loginRoles || parseStoredRoles()));
 
-            toast.success("로그인 성공!");
+            notifySuccess("로그인 성공!");
 
             await routeAfterQueue();
         } catch (error) {
-            if (isAccountLockedError(error)) {
+            if (authModule?.isAccountLockedError?.(error)) {
                 throw error;
             }
-            toast.error(extractAuthErrorMessage(error, "로그인 실패"));
+            notifyError(authModule?.extractAuthErrorMessage?.(error, "로그인 실패") || "로그인 실패");
             throw error;
         }
     };
@@ -114,6 +119,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem("refreshToken", refreshToken);
         }
 
+        const { authAdapter } = await loadAuthAdapter();
         const userData = await authAdapter.fetchCurrentMember();
         setUser(withRolesFallback(userData, parseStoredRoles()));
 
@@ -135,9 +141,10 @@ export const AuthProvider = ({ children }) => {
 
         if (!skipApi) {
             try {
+                const { authAdapter } = await loadAuthAdapter();
                 await authAdapter.logout();
             } catch (error) {
-                console.error("Failed to logout from server:", error);
+                logClientError("auth.logout", error);
             }
         }
 
@@ -147,18 +154,21 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
 
         if (!silent) {
-            toast.success("로그아웃되었습니다.");
+            notifySuccess("로그아웃되었습니다.");
         }
         navigate("/login");
     };
 
     const register = async (userData) => {
+        let authModule = null;
         try {
+            authModule = await loadAuthAdapter();
+            const { authAdapter } = authModule;
             await authAdapter.registerMember(userData);
-            toast.success("회원가입 성공! 로그인해주세요.");
+            notifySuccess("회원가입 성공! 로그인해주세요.");
             navigate("/login");
         } catch (error) {
-            toast.error(extractAuthErrorMessage(error, "회원가입 실패"));
+            notifyError(authModule?.extractAuthErrorMessage?.(error, "회원가입 실패") || "회원가입 실패");
             throw error;
         }
     };
