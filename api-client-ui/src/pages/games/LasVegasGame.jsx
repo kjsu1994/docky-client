@@ -20,7 +20,7 @@ import {
 
 const ROOM_STORAGE_KEY = "las_vegas_last_room_id";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
-const LAS_VEGAS_SOUND_VOLUME_MULTIPLIER = 4;
+const LAS_VEGAS_SOUND_VOLUME_MULTIPLIER = 8;
 
 const normalizeRoomId = getLasVegasRoomId;
 const normalizeChatRoomId = getLasVegasChatRoomId;

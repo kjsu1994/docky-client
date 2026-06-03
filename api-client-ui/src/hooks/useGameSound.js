@@ -6,7 +6,7 @@ const createAudioContext = () => {
   return AudioContextCtor ? new AudioContextCtor() : null;
 };
 
-const SOUND_VOLUME_MULTIPLIER = 4;
+const SOUND_VOLUME_MULTIPLIER = 8;
 
 export const useGameSound = ({ myTurn = false, actionSignal = "" } = {}) => {
   const audioContextRef = useRef(null);

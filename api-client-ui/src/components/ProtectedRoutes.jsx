@@ -29,6 +29,7 @@ const MaheGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((modu
 const DalmutiGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.DalmutiGame })));
 const SixNimmtGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.SixNimmtGame })));
 const TelestrationsGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.TelestrationsGame })));
+const MafiaGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.MafiaGame })));
 const PokerGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.PokerGame })));
 const CitadelsGame = lazy(() => import("../pages/games/CitadelsGame.jsx").then((module) => ({ default: module.CitadelsGame })));
 const MeetingOptimizer = lazy(() => import("../pages/facility/MeetingOptimizer.jsx").then((module) => ({ default: module.MeetingOptimizer })));
@@ -80,6 +81,7 @@ export const ProtectedRoutes = () => (
                         <Route path="games/dalmuti" element={<DalmutiGame />} />
                         <Route path="games/six-nimmt" element={<SixNimmtGame />} />
                         <Route path="games/telestrations" element={<TelestrationsGame />} />
+                        <Route path="games/mafia" element={<MafiaGame />} />
                         <Route path="games/citadels" element={<CitadelsGame />} />
                         <Route path="optimizer" element={<MeetingOptimizer />} />
                         <Route path="facility" element={<FacilityFinder />} />

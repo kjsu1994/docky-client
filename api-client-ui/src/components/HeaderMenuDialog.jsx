@@ -81,6 +81,7 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
                     { title: "달무티", to: "/app/games/dalmuti", icon: Dices },
                     { title: "6 nimmt!", to: "/app/games/six-nimmt", icon: Dices },
                     { title: "텔레스트레이션", to: "/app/games/telestrations", icon: Dices },
+                    { title: "마피아", to: "/app/games/mafia", icon: Dices },
                     { title: "시티델", to: "/app/games/citadels", icon: Dices },
                 ],
             },

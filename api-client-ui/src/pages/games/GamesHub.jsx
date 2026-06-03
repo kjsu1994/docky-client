@@ -171,6 +171,36 @@ const gameManuals = {
       },
     ],
   },
+  mafia: {
+    subtitle: "사회자 TTS가 밤과 낮을 진행하고, 마피아·경찰·의사 조합을 고를 수 있는 파티 추리 게임입니다.",
+    tags: ["5~12인", "사회자 TTS", "역할 조합"],
+    sections: [
+      { title: "처음 시작 순서", items: sharedRoomStartSteps },
+      {
+        title: "역할 조합",
+        items: [
+          "방 설정에서 경찰+의사, 경찰만, 의사만, 특수직 없음 중 하나를 고릅니다.",
+          "마피아 수는 5~6명 1명, 7~9명 2명, 10~12명 3명으로 자동 배정됩니다.",
+          "나머지는 선택한 특수직과 시민으로 채워집니다.",
+        ],
+      },
+      {
+        title: "진행",
+        items: [
+          "역할 확인 후 밤에는 마피아, 경찰, 의사가 순서대로 행동합니다.",
+          "아침에는 밤 결과를 확인하고, 낮 토론 뒤 투표로 한 명을 처형할 수 있습니다.",
+          "마피아가 모두 제거되면 시민팀 승리, 마피아 수가 시민팀과 같거나 많아지면 마피아 승리입니다.",
+        ],
+      },
+      {
+        title: "초보 보조",
+        items: [
+          "현재 단계, 남은 시간, 내 역할의 할 일만 크게 표시됩니다.",
+          "사회자 음성은 브라우저 정책상 게임 화면에서 소리 켜기를 한 번 눌러야 시작됩니다.",
+        ],
+      },
+    ],
+  },
   catan: {
     subtitle: "자원을 생산하고 도로, 마을, 도시를 확장해 목표 승점을 먼저 달성하는 전략 보드게임입니다.",
     tags: ["3~6인", "자원 생산", "건설 전략"],
@@ -488,6 +518,20 @@ const games = [
     featured: true,
   },
   {
+    title: "마피아",
+    description: "(5~12인) 사회자 TTS가 밤·낮·투표를 진행하고 경찰/의사 조합을 선택할 수 있습니다.",
+    to: "/app/games/mafia",
+    tone: "from-zinc-950 via-indigo-950 to-rose-900",
+    players: "5~12인",
+    minPlayers: 5,
+    maxPlayers: 12,
+    mode: "비밀 역할",
+    preview: "mafia",
+    highlights: ["사회자 TTS", "경찰/의사 선택", "투표"],
+    manual: gameManuals.mafia,
+    featured: true,
+  },
+  {
     title: "시티델",
     description: "(2~7인) 비밀 캐릭터 선택과 도시 건설을 서버 판정으로 진행합니다.",
     to: "/app/games/citadels",
@@ -513,6 +557,7 @@ const gameRoutePreloads = {
   "/app/games/dalmuti": () => import("./TabletopGame.jsx"),
   "/app/games/six-nimmt": () => import("./TabletopGame.jsx"),
   "/app/games/telestrations": () => import("./TabletopGame.jsx"),
+  "/app/games/mafia": () => import("./TabletopGame.jsx"),
   "/app/games/citadels": () => import("./CitadelsGame.jsx"),
 };
 
@@ -791,6 +836,38 @@ const GamePreview = ({ type }) => {
               <span className="h-1 rounded-full bg-current opacity-20" />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "mafia") {
+    return (
+      <div className="relative h-36 w-60 max-w-full overflow-hidden rounded-lg bg-gradient-to-br from-zinc-950 via-indigo-950 to-rose-950 p-3 text-white shadow-inner">
+        <div className="absolute left-4 top-4 h-12 w-12 rounded-full bg-amber-200/80 shadow-[0_0_28px_rgba(251,191,36,0.45)]" />
+        <div className="relative flex h-full flex-col justify-between">
+          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-indigo-100/80">
+            <span>Night</span>
+            <span>TTS</span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {[
+              { code: "M", label: "마피아", tone: "bg-rose-600" },
+              { code: "P", label: "경찰", tone: "bg-sky-500" },
+              { code: "D", label: "의사", tone: "bg-emerald-500" },
+              { code: "C", label: "시민", tone: "bg-slate-500" },
+            ].map((card) => (
+              <div key={card.code} className={`${card.tone} flex h-20 flex-col justify-between rounded-lg border border-white/20 p-1.5 shadow-lg`}>
+                <span className="text-[10px] font-black text-white/70">{card.code}</span>
+                <span className="text-center text-[10px] font-black">{card.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-black">
+            <span className="rounded-full bg-white/10 py-1">밤</span>
+            <span className="rounded-full bg-white/10 py-1">토론</span>
+            <span className="rounded-full bg-white/10 py-1">투표</span>
+          </div>
         </div>
       </div>
     );

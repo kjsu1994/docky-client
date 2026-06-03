@@ -46,13 +46,16 @@ const allMenuLinks = [
     "/app/ranks",
     "/app/news",
     "/app/games",
-    "/app/plinko",
+    "/app/poker",
     "/app/games/las-vegas",
     "/app/games/no-thanks",
     "/app/games/catan",
     "/app/games/blokus",
     "/app/games/mahe",
     "/app/games/dalmuti",
+    "/app/games/six-nimmt",
+    "/app/games/telestrations",
+    "/app/games/mafia",
     "/app/games/citadels",
     "/app/mypage",
     "/app/mypage/edit",
@@ -64,14 +67,17 @@ const gamesHubTexts = [
     "게임 허브",
     "게임을 선택하세요",
     "게임 목록",
+    "포커",
     "카탄",
     "블로커스",
     "마헤",
     "달무티",
-    "Lucky Plinko",
+    "6 nimmt!",
+    "텔레스트레이션",
+    "마피아",
     "Las Vegas",
     "No Thanks",
-    "Citadels",
+    "시티델",
 ];
 const blockedTexts = ["Loading", "Error", "undefined", "ROLE_ADMIN", "ROLE_MASTER"];
 
@@ -292,7 +298,7 @@ async function inspectGamesHub(ws, viewport) {
     }
 
     const cardOrder = await evaluate(ws, `Array.from(document.querySelectorAll('[data-smoke="game-card"]')).map((node) => node.getAttribute("data-game-title"))`);
-    const expectedOrder = ["Lucky Plinko", "블로커스", "Las Vegas", "마헤", "Citadels", "No Thanks", "카탄", "달무티"];
+    const expectedOrder = ["포커", "블로커스", "Las Vegas", "마헤", "시티델", "6 nimmt!", "No Thanks", "카탄", "텔레스트레이션", "달무티", "마피아"];
     if (JSON.stringify(cardOrder) !== JSON.stringify(expectedOrder)) {
         throw new Error(`games-hub ${viewport.name}: player-count order mismatch ${JSON.stringify(cardOrder)}`);
     }

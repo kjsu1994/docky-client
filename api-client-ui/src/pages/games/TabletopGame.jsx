@@ -10,11 +10,19 @@ import {
   Copy,
   Crown,
   Dices,
+  Eye,
   FlipHorizontal,
+  Gavel,
+  HeartPulse,
+  Moon,
   RefreshCw,
   RotateCw,
   Shield,
+  Skull,
+  Sun,
+  Timer,
   Users,
+  Volume2,
 } from "lucide-react";
 import {
   getTabletopMemberId,
@@ -166,6 +174,28 @@ const gameConfigs = {
       },
     ],
   },
+  mafia: {
+    title: "마피아",
+    eyebrow: "사회자 TTS · 비밀 역할 · 낮 토론 · 투표",
+    description: "정해진 시간에 따라 사회자 음성이 밤과 낮을 진행하고, 마피아·경찰·의사 포함 여부를 선택해 즐기는 파티 추리 게임입니다.",
+    storageKey: "mafia_last_room_id",
+    accent: "from-zinc-950 via-indigo-950 to-rose-900",
+    board: "mafia",
+    guide: [
+      {
+        title: "게임 흐름",
+        items: ["역할을 확인한 뒤 밤에는 역할자만 몰래 행동하고, 낮에는 모두 토론 후 투표합니다.", "마피아가 모두 제거되면 시민팀 승리, 마피아 수가 시민팀과 같거나 많아지면 마피아 승리입니다."],
+      },
+      {
+        title: "역할 선택",
+        items: ["방 설정에서 경찰+의사, 경찰만, 의사만, 특수직 없음 중 하나를 고를 수 있습니다.", "마피아 수는 5~6명 1명, 7~9명 2명, 10~12명 3명으로 자동 배정됩니다.", "경찰 조사 결과와 마피아 동료 정보는 해당 플레이어에게만 보입니다."],
+      },
+      {
+        title: "사회자 TTS",
+        items: ["각 단계가 시작될 때 사회자 음성이 현재 할 일을 안내합니다.", "브라우저 정책 때문에 처음 한 번은 소리 켜기 버튼을 눌러 음성을 활성화해야 합니다."],
+      },
+    ],
+  },
   poker: {
     title: "포커",
     eyebrow: "텍사스 홀덤 · 5장 드로우 · 족보 보조",
@@ -216,6 +246,11 @@ const mobileJumpLinksByGame = {
   telestrations: [
     { href: "#telestrations-task-panel", label: "입력" },
     { href: "#telestrations-replay-panel", label: "공개" },
+  ],
+  mafia: [
+    { href: "#mafia-stage-panel", label: "진행" },
+    { href: "#mafia-action-panel", label: "행동" },
+    { href: "#mafia-players-panel", label: "명단" },
   ],
   poker: [
     { href: "#poker-table-panel", label: "테이블" },
@@ -817,6 +852,12 @@ const variantFeatureTags = (game, variant) => {
   if (game === "telestrations") {
     return ["3~8인", "그림 릴레이", "리플레이 공개"];
   }
+  if (game === "mafia") {
+    if (code === "POLICE_ONLY") return ["5~12인", "경찰 포함", "의사 제외"];
+    if (code === "DOCTOR_ONLY") return ["5~12인", "의사 포함", "경찰 제외"];
+    if (code === "NO_SPECIALS") return ["5~12인", "마피아", "시민"];
+    return ["5~12인", "경찰", "의사"];
+  }
   if (game === "poker") {
     if (code === "SHORT") return ["1~8인", "100칩", "빠른판"];
     if (code === "FIVE_CARD_DRAW") return ["1~6인", "5장 손패", "1회 교체"];
@@ -837,6 +878,7 @@ const catanVariantGroupLabels = {
 };
 
 const catanVariantGroupOrder = ["base", "fiveSix", "seafarers", "citiesKnights", "tradersBarbarians", "explorersPirates", "other"];
+const mafiaCountGuideText = "마피아 수: 5~6명 1명 · 7~9명 2명 · 10~12명 3명";
 
 const catanVariantGroupOf = (variant) => {
   const code = String(variant?.code || "").toUpperCase();
@@ -871,6 +913,13 @@ const variantGroupLabelsByGame = {
     draw: "5장 드로우",
     other: "텍사스 홀덤",
   },
+  mafia: {
+    base: "경찰+의사",
+    police: "경찰 포함",
+    doctor: "의사 포함",
+    simple: "기본 심리전",
+    other: "역할 조합",
+  },
 };
 
 const variantGroupOrderByGame = {
@@ -878,6 +927,7 @@ const variantGroupOrderByGame = {
   mahe: ["base", "other"],
   dalmuti: ["base", "optional", "other"],
   poker: ["base", "draw", "other"],
+  mafia: ["base", "police", "doctor", "simple", "other"],
 };
 
 const variantGroupOf = (game, variant) => {
@@ -891,6 +941,11 @@ const variantGroupOf = (game, variant) => {
   }
   if (game === "dalmuti" && (code === "STRIPPED_DECK" || code === "FIRST_DEAL_REVOLUTION")) return "optional";
   if (game === "poker" && code === "FIVE_CARD_DRAW") return "draw";
+  if (game === "mafia") {
+    if (code === "POLICE_ONLY") return "police";
+    if (code === "DOCTOR_ONLY") return "doctor";
+    if (code === "NO_SPECIALS") return "simple";
+  }
   return "other";
 };
 
@@ -1198,6 +1253,43 @@ const BoardPreview = ({ type, room }) => {
             <div className="mt-6 text-center text-2xl font-black">{item.body}</div>
           </div>
         ))}
+      </div>
+    );
+  }
+  if (type === "mafia") {
+    return (
+      <div className="relative aspect-[4/3] w-full max-w-[560px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-zinc-950 via-indigo-950 to-rose-950 p-5 text-white shadow-2xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(251,191,36,0.22),transparent_28%),radial-gradient(circle_at_72%_70%,rgba(244,63,94,0.26),transparent_30%)]" />
+        <div className="relative flex h-full flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-200">Narrator TTS</div>
+              <div className="mt-1 text-xl font-black">밤이 되었습니다</div>
+            </div>
+            <Moon className="h-8 w-8 text-indigo-200" />
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: "마피아", icon: Skull, tone: "from-rose-600 to-zinc-900" },
+              { label: "경찰", icon: Eye, tone: "from-sky-500 to-indigo-900" },
+              { label: "의사", icon: HeartPulse, tone: "from-emerald-500 to-teal-900" },
+              { label: "시민", icon: Users, tone: "from-slate-400 to-slate-800" },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className={`aspect-[2/3] rounded-xl bg-gradient-to-br ${item.tone} p-2 shadow-xl`}>
+                  <Icon className="h-5 w-5" />
+                  <div className="mt-6 text-center text-xs font-black">{item.label}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-black">
+            <span className="rounded-full bg-white/10 px-3 py-2">밤 행동</span>
+            <span className="rounded-full bg-white/10 px-3 py-2">낮 토론</span>
+            <span className="rounded-full bg-white/10 px-3 py-2">투표</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -7566,6 +7658,328 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
   );
 };
 
+const mafiaPhaseLabels = {
+  ROLE_REVEAL: "역할 확인",
+  NIGHT_MAFIA: "밤 · 마피아",
+  NIGHT_POLICE: "밤 · 경찰",
+  NIGHT_DOCTOR: "밤 · 의사",
+  DAWN: "아침 결과",
+  DISCUSSION: "낮 토론",
+  VOTING: "투표",
+  TRIAL_RESULT: "투표 결과",
+  FINISHED: "게임 종료",
+};
+
+const mafiaRoleLabels = {
+  MAFIA: "마피아",
+  POLICE: "경찰",
+  DOCTOR: "의사",
+  CITIZEN: "시민",
+};
+
+const mafiaRoleTone = {
+  MAFIA: "from-rose-700 via-zinc-950 to-zinc-900 text-white",
+  POLICE: "from-sky-600 via-indigo-900 to-zinc-950 text-white",
+  DOCTOR: "from-emerald-500 via-teal-800 to-zinc-950 text-white",
+  CITIZEN: "from-slate-500 via-slate-800 to-zinc-950 text-white",
+};
+
+const mafiaRoleIcons = {
+  MAFIA: Skull,
+  POLICE: Eye,
+  DOCTOR: HeartPulse,
+  CITIZEN: Users,
+};
+
+const MAFIA_TTS_VOLUME = 1;
+
+const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = false, onAction }) => {
+  const [now, setNow] = useState(() => Date.now());
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [selectedTargetSeatNo, setSelectedTargetSeatNo] = useState(0);
+  const spokenKeyRef = useRef("");
+  const autoAdvanceKeyRef = useRef("");
+
+  const phase = String(get(gameState, "phase", "phase", "") || "");
+  const phaseLabel = mafiaPhaseLabels[phase] || phase || "-";
+  const phaseEndsAt = Number(get(gameState, "phase_ends_at", "phaseEndsAt", 0));
+  const phaseDuration = Number(get(gameState, "phase_duration_seconds", "phaseDurationSeconds", 0));
+  const remainingSeconds = phaseEndsAt > 0 ? Math.max(0, Math.ceil((phaseEndsAt - now) / 1000)) : 0;
+  const progressPercent = phaseDuration > 0 ? Math.max(0, Math.min(100, (remainingSeconds / phaseDuration) * 100)) : 0;
+  const narratorLine = get(gameState, "narrator_line", "narratorLine", "") || "";
+  const myRole = String(get(gameState, "my_role", "myRole", "") || "");
+  const myTeam = String(get(gameState, "my_team", "myTeam", "") || "");
+  const myTask = get(gameState, "my_task", "myTask", "") || narratorLine || "";
+  const mySubmitted = Boolean(get(gameState, "my_submitted", "mySubmitted", false));
+  const myAlive = Boolean(get(gameState, "my_alive", "myAlive", true));
+  const winnerTeam = String(get(gameState, "winner_team", "winnerTeam", "") || "");
+  const outcomeMessage = get(gameState, "outcome_message", "outcomeMessage", "") || "";
+  const mafiaPlayers = listOf(get(gameState, "players", "players", []));
+  const events = listOf(get(gameState, "events", "events", []));
+  const availableActions = new Set(listOf(get(gameState, "available_actions", "availableActions", [])));
+  const completedSeatNos = new Set(listOf(get(gameState, "completed_seat_nos", "completedSeatNos", [])).map(Number));
+  const votedSeatNos = new Set(listOf(get(gameState, "voted_seat_nos", "votedSeatNos", [])).map(Number));
+  const mafiaSeatNos = new Set(listOf(get(gameState, "mafia_seat_nos", "mafiaSeatNos", [])).map(Number));
+  const investigation = get(gameState, "my_investigation_result", "myInvestigationResult", null);
+  const lastNightResult = get(gameState, "last_night_result", "lastNightResult", null);
+  const lastTrialResult = get(gameState, "last_trial_result", "lastTrialResult", null);
+  const voteCounts = get(gameState, "vote_counts", "voteCounts", {}) || {};
+  const RoleIcon = mafiaRoleIcons[myRole] || Shield;
+
+  const playerNameBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
+  const playerProfileBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.profileUrl || "";
+  const alivePlayers = mafiaPlayers.filter((player) => Boolean(get(player, "alive", "alive", true)));
+  const actionType = availableActions.has("MAFIA_KILL") ? "MAFIA_KILL"
+    : availableActions.has("POLICE_CHECK") ? "POLICE_CHECK"
+      : availableActions.has("DOCTOR_SAVE") ? "DOCTOR_SAVE"
+        : availableActions.has("VOTE") ? "VOTE"
+          : "";
+  const targetPlayers = alivePlayers.filter((player) => {
+    const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+    const role = String(get(player, "role", "role", "") || "");
+    if (!actionType) return false;
+    if (actionType === "MAFIA_KILL") return role !== "MAFIA";
+    if (actionType === "POLICE_CHECK" || actionType === "VOTE") return seatNo !== Number(mySeatNo);
+    return true;
+  });
+  const selectedTarget = targetPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(selectedTargetSeatNo));
+  const submitLabel = actionType === "MAFIA_KILL" ? "습격 대상 확정"
+    : actionType === "POLICE_CHECK" ? "조사 대상 확정"
+      : actionType === "DOCTOR_SAVE" ? "보호 대상 확정"
+        : actionType === "VOTE" ? "투표 확정"
+          : mySubmitted ? "선택 완료" : "대기 중";
+  const visibleAliveMafia = mafiaPlayers.filter((player) => Boolean(get(player, "alive", "alive", true)) && String(get(player, "role", "role", "") || "") === "MAFIA").length;
+  const visibleAliveTown = mafiaPlayers.filter((player) => Boolean(get(player, "alive", "alive", true)) && String(get(player, "role", "role", "") || "") !== "MAFIA").length;
+  const serverAliveMafia = Number(get(gameState, "alive_mafia_count", "aliveMafiaCount", Number.NaN));
+  const serverAliveTown = Number(get(gameState, "alive_town_count", "aliveTownCount", Number.NaN));
+  const aliveMafia = Number.isFinite(serverAliveMafia) ? serverAliveMafia : visibleAliveMafia;
+  const aliveTown = Number.isFinite(serverAliveTown) ? serverAliveTown : visibleAliveTown;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    setSelectedTargetSeatNo(0);
+  }, [phase, mySeatNo]);
+
+  const speak = (text) => {
+    if (!text || typeof window === "undefined" || !window.speechSynthesis || typeof window.SpeechSynthesisUtterance === "undefined") return;
+    window.speechSynthesis.cancel();
+    const utterance = new window.SpeechSynthesisUtterance(text);
+    utterance.lang = "ko-KR";
+    utterance.rate = 0.96;
+    utterance.pitch = 0.92;
+    utterance.volume = MAFIA_TTS_VOLUME;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  useEffect(() => {
+    if (!soundEnabled) return;
+    const key = `${phase}:${narratorLine}`;
+    if (!narratorLine || spokenKeyRef.current === key) return;
+    spokenKeyRef.current = key;
+    speak(narratorLine);
+  }, [soundEnabled, phase, narratorLine]);
+
+  useEffect(() => {
+    if (!isHost || phase === "FINISHED" || !phaseEndsAt || remainingSeconds > 0) return;
+    const key = `${phase}:${phaseEndsAt}`;
+    if (autoAdvanceKeyRef.current === key) return;
+    autoAdvanceKeyRef.current = key;
+    onAction({ actionType: "ADVANCE" }).catch(() => notifyError("마피아 단계 진행 실패"));
+  }, [isHost, phase, phaseEndsAt, remainingSeconds, onAction]);
+
+  const enableSound = () => {
+    setSoundEnabled(true);
+    speak(narratorLine || "마피아 사회자 음성을 시작합니다.");
+  };
+
+  const advance = () => onAction({ actionType: "ADVANCE" }).catch(() => notifyError("마피아 단계 진행 실패"));
+
+  const submitTarget = async () => {
+    if (!actionType || !selectedTargetSeatNo || mySubmitted) return;
+    if (actionType === "VOTE") {
+      const confirmed = await confirmAction({
+        title: `${playerNameBySeat(selectedTargetSeatNo)}님에게 투표할까요?`,
+        description: "투표는 다시 누르면 바꿀 수 있지만, 단계가 넘어가면 결과에 반영됩니다.",
+        confirmText: "투표",
+      });
+      if (!confirmed) return;
+    }
+    await onAction({ actionType, targetSeatNo: Number(selectedTargetSeatNo) }).catch(() => notifyError("선택을 반영하지 못했습니다."));
+  };
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]" data-smoke="mafia-board">
+      <main className="space-y-4">
+        <section id="mafia-stage-panel" data-smoke="mafia-stage" className="scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-zinc-800 bg-zinc-950 text-white shadow-2xl">
+          <div className="bg-gradient-to-br from-zinc-950 via-indigo-950 to-rose-950 p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-200">Mafia Narrator</div>
+                <h2 className="mt-1 text-2xl font-black">{phaseLabel}</h2>
+                <p className="mt-2 max-w-2xl text-sm font-bold leading-relaxed text-indigo-50/85">{narratorLine}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-right">
+                <div className="rounded-2xl bg-white/10 px-3 py-2">
+                  <div className="text-[10px] font-black text-white/60">남은 시간</div>
+                  <div className="text-2xl font-black">{remainingSeconds}s</div>
+                </div>
+                <button type="button" onClick={enableSound} className={`rounded-2xl px-3 py-2 text-xs font-black ${soundEnabled ? "bg-emerald-400 text-zinc-950" : "bg-white/10 text-white"}`}>
+                  <Volume2 className="mx-auto mb-1 h-4 w-4" />
+                  {soundEnabled ? "음성 켜짐" : "소리 켜기"}
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-300 transition-all" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-[260px_minmax(0,1fr)]">
+              <div className={`rounded-2xl bg-gradient-to-br ${mafiaRoleTone[myRole] || mafiaRoleTone.CITIZEN} p-4 shadow-xl`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">내 역할</div>
+                    <div className="mt-1 text-2xl font-black">{mafiaRoleLabels[myRole] || "미확인"}</div>
+                    <div className="mt-1 text-xs font-bold text-white/70">{myTeam === "MAFIA" ? "마피아팀" : "시민팀"}</div>
+                  </div>
+                  <RoleIcon className="h-10 w-10 text-white/85" />
+                </div>
+                {mafiaSeatNos.size > 0 && (
+                  <div className="mt-4 rounded-xl bg-white/10 px-3 py-2 text-xs font-black">
+                    마피아 동료: {[...mafiaSeatNos].map(playerNameBySeat).join(" · ")}
+                  </div>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl bg-white/10 px-3 py-3">
+                  <div className="flex items-center gap-2 text-[11px] font-black text-white/60"><Timer className="h-4 w-4" /> 라운드</div>
+                  <div className="mt-2 text-xl font-black">{Number(get(gameState, "round_no", "roundNo", 0)) || 0}</div>
+                </div>
+                <div className="rounded-2xl bg-white/10 px-3 py-3">
+                  <div className="flex items-center gap-2 text-[11px] font-black text-white/60"><Skull className="h-4 w-4" /> 생존 마피아</div>
+                  <div className="mt-2 text-xl font-black">{aliveMafia}</div>
+                </div>
+                <div className="rounded-2xl bg-white/10 px-3 py-3">
+                  <div className="flex items-center gap-2 text-[11px] font-black text-white/60"><Sun className="h-4 w-4" /> 생존 시민팀</div>
+                  <div className="mt-2 text-xl font-black">{aliveTown}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="mafia-action-panel" className="tabletop-mobile-action-strip sticky bottom-3 z-20 scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur xl:static xl:bg-white">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-black text-slate-900">{phase === "FINISHED" ? "최종 결과" : mySubmitted ? "행동 완료" : actionType ? "지금 할 일" : "대기 중"}</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">{phase === "FINISHED" ? outcomeMessage : myTask}</div>
+            </div>
+            {isHost && phase !== "FINISHED" && (
+              <button type="button" onClick={advance} className="min-h-11 rounded-xl bg-slate-900 px-4 text-sm font-black text-white">
+                다음 진행
+              </button>
+            )}
+          </div>
+
+          {investigation && (
+            <div className={`mt-3 rounded-xl px-3 py-2 text-sm font-black ${get(investigation, "mafia", "mafia", false) ? "bg-rose-50 text-rose-700" : "bg-sky-50 text-sky-700"}`}>
+              경찰 조사: {playerNameBySeat(get(investigation, "target_seat_no", "targetSeatNo", 0))}님은 {get(investigation, "mafia", "mafia", false) ? "마피아입니다." : "마피아가 아닙니다."}
+            </div>
+          )}
+
+          {(lastNightResult || lastTrialResult) && phase !== "FINISHED" && (
+            <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-600">
+              {get(lastTrialResult, "message", "message", "") || get(lastNightResult, "message", "message", "")}
+            </div>
+          )}
+
+          {actionType ? (
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {targetPlayers.map((player) => {
+                  const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+                  const selected = selectedTargetSeatNo === seatNo;
+                  return (
+                    <button key={seatNo} type="button" onClick={() => setSelectedTargetSeatNo(seatNo)} className={`min-h-16 rounded-xl border px-3 py-2 text-left transition ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <UserAvatar name={playerNameBySeat(seatNo)} profileUrl={playerProfileBySeat(seatNo)} size="xs" />
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-black">{playerNameBySeat(seatNo)}</div>
+                          <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}</div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <button type="button" disabled={!selectedTarget || mySubmitted} onClick={submitTarget} className="min-h-12 w-full rounded-xl bg-rose-600 px-4 text-sm font-black text-white disabled:opacity-40">
+                {mySubmitted ? "선택 완료" : submitLabel}
+              </button>
+            </div>
+          ) : (
+            <div className={`mt-3 rounded-xl px-3 py-2 text-sm font-black ${myAlive ? "bg-slate-50 text-slate-600" : "bg-zinc-100 text-zinc-500"}`}>
+              {phase === "FINISHED" ? `${winnerTeam === "MAFIA" ? "마피아팀" : "시민팀"} 승리` : myAlive ? "현재 단계에서는 내 행동이 없습니다." : "탈락 상태로 관전 중입니다."}
+            </div>
+          )}
+        </section>
+      </main>
+
+      <aside id="mafia-players-panel" className="scroll-mt-24 space-y-4">
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+            <Users className="h-4 w-4 text-slate-600" />
+            참가자
+          </div>
+          <div className="space-y-2">
+            {mafiaPlayers.map((player) => {
+              const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+              const alive = Boolean(get(player, "alive", "alive", true));
+              const role = String(get(player, "role", "role", "") || get(player, "revealed_role", "revealedRole", "") || "");
+              const Role = mafiaRoleIcons[role] || Shield;
+              return (
+                <div key={seatNo} className={`rounded-xl border px-3 py-2 ${alive ? "border-slate-100 bg-slate-50" : "border-zinc-200 bg-zinc-100 opacity-75"}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <UserAvatar name={playerNameBySeat(seatNo)} profileUrl={playerProfileBySeat(seatNo)} size="sm" />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-black text-slate-900">{playerNameBySeat(seatNo)}</div>
+                        <div className="text-[11px] font-bold text-slate-500">좌석 {seatNo} · {alive ? "생존" : "탈락"}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {(completedSeatNos.has(seatNo) || votedSeatNos.has(seatNo)) && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">완료</span>}
+                      {role && <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-black text-white"><Role className="h-3 w-3" />{mafiaRoleLabels[role] || role}</span>}
+                    </div>
+                  </div>
+                  {phase === "TRIAL_RESULT" && Object.prototype.hasOwnProperty.call(voteCounts, seatNo) && (
+                    <div className="mt-2 rounded-lg bg-white px-2 py-1 text-[11px] font-black text-slate-600">득표 {voteCounts[seatNo]}표</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+            <Gavel className="h-4 w-4 text-amber-600" />
+            사회자 로그
+          </div>
+          <div className="max-h-80 space-y-2 overflow-auto pr-1">
+            {[...events].slice(-8).reverse().map((event) => (
+              <div key={get(event, "event_no", "eventNo", "")} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-600">
+                {get(event, "message", "message", get(event, "event_type", "eventType", ""))}
+              </div>
+            ))}
+          </div>
+        </section>
+      </aside>
+    </div>
+  );
+};
+
 const pokerPhaseLabels = {
   OPENING_BET: "첫 베팅",
   PREFLOP: "프리플롭",
@@ -8724,6 +9138,12 @@ export const TabletopGame = ({ game }) => {
                   <div>
                     {get(selectedVariant, "summary", "summary", "")} · {get(selectedVariant, "min_players", "minPlayers", 0)}~{get(selectedVariant, "max_players", "maxPlayers", 0)}명
                   </div>
+                  {game === "mafia" && (
+                    <div className="mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-black text-white">
+                      <Skull className="h-3.5 w-3.5 text-rose-300" />
+                      {mafiaCountGuideText}
+                    </div>
+                  )}
                   <VariantFeatureTags game={game} variant={selectedVariant} className="mt-2" />
                 </div>
               )}
@@ -8836,6 +9256,12 @@ export const TabletopGame = ({ game }) => {
                   {variantSummaryOf(selectedRoom) || get(selectedRoomVariant, "summary", "summary", "")}
                 </div>
                 <VariantFeatureTags game={game} variant={selectedRoomVariant} className="mt-2" />
+                {game === "mafia" && (
+                  <div className="mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-black text-white">
+                    <Skull className="h-3.5 w-3.5 text-rose-300" />
+                    {mafiaCountGuideText}
+                  </div>
+                )}
               </div>
               <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:flex sm:flex-wrap">
                 <Link to="/app/games" className="hidden min-h-11 items-center justify-center rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
@@ -8943,6 +9369,12 @@ export const TabletopGame = ({ game }) => {
                       </span>
                     </div>
                     <div>{get(selectedSettingsVariant, "summary", "summary", "")}</div>
+                    {game === "mafia" && (
+                      <div className="mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-black text-white">
+                        <Skull className="h-3.5 w-3.5 text-rose-300" />
+                        {mafiaCountGuideText}
+                      </div>
+                    )}
                     <VariantFeatureTags game={game} variant={selectedSettingsVariant} className="mt-2" />
                     {players.length < Number(get(selectedSettingsVariant, "min_players", "minPlayers", 0)) && (
                       <div className="mt-1 text-amber-700">
@@ -8992,6 +9424,8 @@ export const TabletopGame = ({ game }) => {
               <SixNimmtBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
             ) : game === "telestrations" && gameState ? (
               <TelestrationsBoard gameState={gameState} players={players} mySeatNo={mySeatNo} isHost={isHost} onAction={sendAction} />
+            ) : game === "mafia" && gameState ? (
+              <MafiaBoard gameState={gameState} players={players} mySeatNo={mySeatNo} isHost={isHost} onAction={sendAction} />
             ) : game === "poker" && gameState ? (
               <PokerBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
             ) : (
@@ -9111,6 +9545,7 @@ export const MaheGame = () => <TabletopGame game="mahe" />;
 export const DalmutiGame = () => <TabletopGame game="dalmuti" />;
 export const SixNimmtGame = () => <TabletopGame game="six-nimmt" />;
 export const TelestrationsGame = () => <TabletopGame game="telestrations" />;
+export const MafiaGame = () => <TabletopGame game="mafia" />;
 export const PokerGame = () => <TabletopGame game="poker" />;
 
 export default TabletopGame;

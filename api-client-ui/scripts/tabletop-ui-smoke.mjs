@@ -26,7 +26,7 @@ const cases = [
   {
     path: "/app/games",
     label: "game hub",
-    expectedTexts: ["게임 목록", "카탄", "블로커스", "마헤", "달무티", "시티델"],
+    expectedTexts: ["게임 목록", "카탄", "블로커스", "마헤", "달무티", "마피아", "시티델"],
   },
   {
     path: "/app/games/catan",
@@ -64,6 +64,11 @@ const cases = [
     telestrationsPhase: "GUESS",
     expectedTexts: ["텔레스트레이션", "문장 추측", "보고 추측할 그림", "그림만 보고 떠오르는 문장을 적으세요"],
     assertTelestrationsImage: true,
+  },
+  {
+    path: "/app/games/mafia",
+    label: "mafia lobby",
+    expectedTexts: ["마피아", "방 만들기", "입장", "경찰+의사", "특수직 없음", "5~6명 1명"],
   },
   {
     path: "/app/games/citadels",
@@ -113,6 +118,12 @@ const variantsByGame = {
   telestrations: [
     variant("BASE", "본게임", false, 3, 8, "문장과 그림을 번갈아 넘기는 파티 게임", ["3~8인", "그림 릴레이", "리플레이 공개"]),
   ],
+  mafia: [
+    variant("BASE", "경찰+의사", false, 5, 12, "마피아, 경찰, 의사가 모두 들어가는 사회자 진행형 마피아", ["5~12인", "경찰", "의사"]),
+    variant("POLICE_ONLY", "경찰만", false, 5, 12, "경찰은 있고 의사는 없는 빠른 추리 규칙", ["5~12인", "경찰 포함", "의사 제외"]),
+    variant("DOCTOR_ONLY", "의사만", false, 5, 12, "의사는 있고 경찰은 없는 심리전 규칙", ["5~12인", "의사 포함", "경찰 제외"]),
+    variant("NO_SPECIALS", "특수직 없음", false, 5, 12, "마피아와 시민만으로 진행하는 단순 규칙", ["5~12인", "마피아", "시민"]),
+  ],
   poker: [
     variant("TEXAS_HOLDEM", "텍사스 홀덤", false, 2, 8, "홀카드 2장과 공용 카드 5장으로 가장 강한 5장 족보를 만듭니다.", ["2~8인", "블라인드", "족보 보조"]),
     variant("FIVE_CARD_DRAW", "5장 드로우", false, 2, 6, "손패 5장을 받고 한 번 교체한 뒤 족보를 비교합니다.", ["2~6인", "최대 3장 교체", "공식 룰"]),
@@ -130,6 +141,9 @@ const variantCreateCases = [
   { game: "blokus", variantCode: "TEAM" },
   { game: "dalmuti", variantCode: "STRIPPED_DECK" },
   { game: "dalmuti", variantCode: "FIRST_DEAL_REVOLUTION" },
+  { game: "mafia", variantCode: "POLICE_ONLY" },
+  { game: "mafia", variantCode: "DOCTOR_ONLY" },
+  { game: "mafia", variantCode: "NO_SPECIALS" },
 ];
 
 const mockState = {
@@ -269,6 +283,7 @@ const gameNames = {
   dalmuti: "달무티",
   "six-nimmt": "식스님트",
   telestrations: "텔레스트레이션",
+  mafia: "마피아",
   poker: "포커",
   citadels: "시티델",
   "las-vegas": "라스베가스",
@@ -280,6 +295,7 @@ const gameCodePrefix = {
   dalmuti: "DALM",
   "six-nimmt": "SIXN",
   telestrations: "TELE",
+  mafia: "MAFI",
   poker: "POKR",
   citadels: "CITD",
 };
@@ -742,6 +758,82 @@ function pokerSmokeGameState() {
   };
 }
 
+function mafiaSmokeGameState(room = roomFor("mafia", "host", "PLAYING")) {
+  const phaseEndsAt = Date.now() + 30000;
+  return {
+    game: "MAFIA",
+    variantCode: "BASE",
+    variant_code: "BASE",
+    variantName: "경찰+의사",
+    variant_name: "경찰+의사",
+    playerCount: 5,
+    player_count: 5,
+    mafiaCount: 1,
+    mafia_count: 1,
+    alivePlayerCount: 5,
+    alive_player_count: 5,
+    aliveMafiaCount: 1,
+    alive_mafia_count: 1,
+    aliveTownCount: 4,
+    alive_town_count: 4,
+    roundNo: 1,
+    round_no: 1,
+    phase: "NIGHT_MAFIA",
+    phaseStartedAt: Date.now() - 3000,
+    phase_started_at: Date.now() - 3000,
+    phaseEndsAt,
+    phase_ends_at: phaseEndsAt,
+    phaseDurationSeconds: 30,
+    phase_duration_seconds: 30,
+    turnSeconds: 30,
+    turn_seconds: 30,
+    policeEnabled: true,
+    police_enabled: true,
+    doctorEnabled: true,
+    doctor_enabled: true,
+    narratorLine: "1번째 밤입니다. 마피아는 제거할 대상을 고르세요.",
+    narrator_line: "1번째 밤입니다. 마피아는 제거할 대상을 고르세요.",
+    viewerSeatNo: 1,
+    viewer_seat_no: 1,
+    myRole: "MAFIA",
+    my_role: "MAFIA",
+    myTeam: "MAFIA",
+    my_team: "MAFIA",
+    myAlive: true,
+    my_alive: true,
+    mySubmitted: false,
+    my_submitted: false,
+    myTask: "마피아 대상을 선택하세요. 마피아끼리 같은 사람을 고르면 성공합니다.",
+    my_task: "마피아 대상을 선택하세요. 마피아끼리 같은 사람을 고르면 성공합니다.",
+    availableActions: ["MAFIA_KILL"],
+    available_actions: ["MAFIA_KILL"],
+    mafiaSeatNos: [1],
+    mafia_seat_nos: [1],
+    completedSeatNos: [],
+    completed_seat_nos: [],
+    votedSeatNos: [],
+    voted_seat_nos: [],
+    players: [
+      { seatNo: 1, seat_no: 1, role: "MAFIA", team: "MAFIA", alive: true },
+      { seatNo: 2, seat_no: 2, role: "", team: "", alive: true },
+      { seatNo: 3, seat_no: 3, role: "", team: "", alive: true },
+      { seatNo: 4, seat_no: 4, role: "", team: "", alive: true },
+      { seatNo: 5, seat_no: 5, role: "", team: "", alive: true },
+    ].slice(0, Math.max(5, room.players?.length || 5)),
+    events: [
+      {
+        eventNo: 1,
+        event_no: 1,
+        eventType: "PHASE_NIGHT_MAFIA",
+        event_type: "PHASE_NIGHT_MAFIA",
+        seatNo: 0,
+        seat_no: 0,
+        message: "1번째 밤입니다. 마피아는 제거할 대상을 고르세요.",
+      },
+    ],
+  };
+}
+
 function telestrationsSmokeRoom() {
   return {
     roomId: 32,
@@ -1095,6 +1187,8 @@ function routeMock(url, method, postData = "") {
             ? sixNimmtSmokeGameState(room)
             : game === "poker" && room.roomStatus === "PLAYING"
               ? pokerSmokeGameState(room)
+              : game === "mafia" && room.roomStatus === "PLAYING"
+                ? mafiaSmokeGameState(room)
               : null;
     return {
       status: 200,
@@ -1220,7 +1314,7 @@ async function resetGameStorage(ws) {
     localStorage.setItem("accessToken", "smoke-access-token");
     localStorage.setItem("refreshToken", "smoke-refresh-token");
     localStorage.setItem("userRoles", JSON.stringify(["ROLE_USER"]));
-    ["catan_last_room_id", "blokus_last_room_id", "mahe_last_room_id", "dalmuti_last_room_id", "six_nimmt_last_room_id", "telestrations_last_room_id", "poker_last_room_id", "citadels_last_room_id", "las_vegas_last_room_id", "no_thanks_last_room_id"].forEach((key) => localStorage.removeItem(key));
+    ["catan_last_room_id", "blokus_last_room_id", "mahe_last_room_id", "dalmuti_last_room_id", "six_nimmt_last_room_id", "telestrations_last_room_id", "mafia_last_room_id", "poker_last_room_id", "citadels_last_room_id", "las_vegas_last_room_id", "no_thanks_last_room_id"].forEach((key) => localStorage.removeItem(key));
     return true;
   })()`);
 }
@@ -1305,6 +1399,11 @@ async function runRoomFlowSmoke(ws, game) {
   if (game === "poker") {
     await waitForText(ws, "내 족보");
     await waitForText(ws, "추천 판단");
+  }
+  if (game === "mafia") {
+    await waitForText(ws, "내 역할");
+    await waitForText(ws, "습격 대상 확정");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-stage"]'))`, "mafia stage rendered");
   }
   assertRequest(game, "start", null, "start POST request");
 
@@ -1557,7 +1656,7 @@ async function main() {
       }
     }
     const flowResults = [];
-    const flowGames = ["catan", "blokus", "mahe", "dalmuti", "six-nimmt", "poker", "citadels"];
+    const flowGames = ["catan", "blokus", "mahe", "dalmuti", "six-nimmt", "poker", "mafia", "citadels"];
     for (const game of flowGames) {
       flowResults.push(await runRoomFlowSmoke(cdp, game));
     }
