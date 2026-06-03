@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
+import UserAvatar from "../../common/UserAvatar.jsx";
 
 const MenuSection = ({ title, items }) => (
     <div className="space-y-3">
@@ -94,9 +95,7 @@ export const AllMenu = () => {
         <div className="animate-fade-in space-y-8 pb-20">
             <div className="flex items-center justify-between rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/50">
                 <div className="flex items-center gap-5">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-gradient-to-tr from-primary-600 to-primary-400 text-2xl font-black text-white shadow-lg shadow-primary-200">
-                        {user?.name?.charAt(0) || "U"}
-                    </div>
+                    <UserAvatar name={user?.name || user?.email} profileUrl={user?.profileUrl || user?.profile_url} size="lg" className="h-16 w-16 rounded-[1.5rem] shadow-lg shadow-primary-200" />
                     <div>
                         <div className="leading-tight text-xl font-black text-slate-900">{user?.name || "사용자"}</div>
                         <div className="text-sm font-medium text-slate-400">{user?.email}</div>

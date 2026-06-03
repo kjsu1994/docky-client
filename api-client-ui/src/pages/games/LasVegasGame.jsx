@@ -4,6 +4,7 @@ import { CheckCircle2, Crown, Dices, MessageSquare, Play, TimerReset, Users } fr
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { DiceCountBadge, DiceFace, MoneyCard } from "../../common/LasVegasVisuals.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import UserAvatar from "../../common/UserAvatar.jsx";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import {
@@ -62,7 +63,7 @@ const CasinoPanel = ({ casino, statePlayers, isHot, isLastPlaced }) => {
     const playerMap = useMemo(() => {
         const map = new Map();
         (statePlayers || []).forEach((player) => {
-            map.set(Number(player.memberId), player.nickname);
+            map.set(Number(player.memberId), player);
         });
         return map;
     }, [statePlayers]);
@@ -95,12 +96,19 @@ const CasinoPanel = ({ casino, statePlayers, isHot, isLastPlaced }) => {
 
             <div className="space-y-1.5">
                 {!diceEntries.length && <div className="text-xs text-slate-400">배팅 주사위 없음</div>}
-                {diceEntries.map(([memberId, count]) => (
+                {diceEntries.map(([memberId, count]) => {
+                    const player = playerMap.get(Number(memberId));
+                    const name = player?.nickname || `P${toPlainInt(memberId, 0)}`;
+                    return (
                     <div key={`${casinoNo}-dice-${memberId}`} className="flex items-center justify-between rounded-xl bg-white/10 px-2.5 py-1.5 text-xs font-bold text-slate-100">
-                        <span className="line-clamp-1">{playerMap.get(Number(memberId)) || `P${toPlainInt(memberId, 0)}`}</span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                            <UserAvatar name={name} profileUrl={player?.profileUrl} size="xs" className="border-white/20 bg-white/15 text-white" />
+                            <span className="line-clamp-1">{name}</span>
+                        </span>
                         <DiceCountBadge value={casinoNo} count={toPlainInt(count, 0)} />
                     </div>
-                ))}
+                    );
+                })}
             </div>
         </article>
     );
@@ -1027,7 +1035,10 @@ export const LasVegasGame = () => {
                                         return (
                                             <div key={`player-${memberId}`} className={`rounded-xl border p-3 ${isCurrent ? "border-primary-400 bg-primary-50" : "border-slate-100 bg-slate-50"}`}>
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <div className="text-sm font-black text-slate-900">{player.nickname}</div>
+                                                    <div className="flex min-w-0 items-center gap-2">
+                                                        <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
+                                                        <div className="min-w-0 truncate text-sm font-black text-slate-900">{player.nickname}</div>
+                                                    </div>
                                                     {roomStatus === "WAITING" && (
                                                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${isReady ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
                                                             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1070,7 +1081,10 @@ export const LasVegasGame = () => {
                                     const normalized = normalizeMessage(msg);
                                     return (
                                     <div key={normalized.key || normalized.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                                        <div className="font-black text-slate-800">{normalized.senderName || "SYSTEM"}</div>
+                                        <div className="flex items-center gap-2 font-black text-slate-800">
+                                            <UserAvatar name={normalized.senderName || "SYSTEM"} profileUrl={normalized.senderProfileUrl} size="xs" />
+                                            <span className="min-w-0 truncate">{normalized.senderName || "SYSTEM"}</span>
+                                        </div>
                                         <div className="mt-0.5 text-slate-700">{normalized.message || ""}</div>
                                     </div>
                                     );

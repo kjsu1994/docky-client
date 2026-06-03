@@ -2,6 +2,13 @@
 
 React + Vite 기반의 커뮤니티/게임/운영 도구 프론트엔드입니다. 운영 배포는 Docker Compose 환경에서 `C:\compose\minio-data\client\dist`를 nginx가 정적 파일로 서빙하는 구조를 기준으로 합니다.
 
+## 2026-06-03 Profile Avatars / Naver Login
+
+- 공통 `UserAvatar` 컴포넌트를 추가하고 헤더, 일반 채팅, 플로팅 채팅, Tabletop/Citadels/Poker/Las Vegas/No Thanks 게임방의 유저 이름 옆에 프로필 사진을 표시합니다.
+- 채팅과 게임 어댑터가 `profileUrl`/`senderProfileUrl` 및 snake_case alias를 정규화해 서버 응답과 낙관적 메시지 모두에서 같은 아바타 표시를 유지합니다.
+- 로그인 화면에 Naver OAuth 버튼을 추가하고 OAuth 처리 문구를 소셜 로그인 공통 문구로 정리했습니다.
+- 검증: `npm run build` 통과, production bundle이 `C:\compose\minio-data\client\dist`에 생성되었습니다.
+
 ## 2026-06-03 Citadels / 게임 사운드 메모
 
 - `/app/games/citadels`는 별도 React 화면이지만 `src/adapters/tabletopGameAdapter.js`의 공통 방/상태/action 계약을 사용합니다.

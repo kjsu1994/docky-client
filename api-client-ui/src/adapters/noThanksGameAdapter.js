@@ -62,6 +62,7 @@ export const normalizeNoThanksPlayer = (player = {}) => {
 
     return {
         memberId,
+        profileUrl: normalizeText(pick(player, "profileUrl", "profile_url", "")),
         nickname: normalizeText(pick(player, "nickname", "nickname", ""), memberId ? `플레이어 ${memberId}` : "플레이어"),
         seatNo: toNumber(pick(player, "seatNo", "seat_no", 0)),
         ready: Boolean(pick(player, "ready", "ready", false)),

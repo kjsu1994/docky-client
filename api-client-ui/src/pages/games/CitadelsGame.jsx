@@ -15,6 +15,7 @@ import {
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import UserAvatar from "../../common/UserAvatar.jsx";
 
 const GAME_CODE = "citadels";
 const ROOM_STORAGE_KEY = "citadels_last_room_id";
@@ -879,7 +880,10 @@ export const CitadelsGame = () => {
                     return (
                       <div key={memberIdOf(player)} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
                         <div className="flex items-center justify-between gap-2 text-sm font-black text-slate-800">
-                          <span className="min-w-0 truncate">{player.nickname}</span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="xs" />
+                            <span className="min-w-0 truncate">{player.nickname}</span>
+                          </span>
                           {host ? <Crown className="h-4 w-4 shrink-0 text-amber-500" /> : <CheckCircle2 className={`h-4 w-4 shrink-0 ${isReady(player) ? "text-emerald-500" : "text-slate-300"}`} />}
                         </div>
                         <div className="mt-1 text-[11px] font-bold text-slate-500">{host ? "방장" : isReady(player) ? "준비 완료" : "준비 대기"}</div>

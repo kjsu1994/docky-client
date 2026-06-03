@@ -211,6 +211,7 @@ export const normalizeMessage = (msg = {}) => {
         messageId: getFirst(msg, ["messageId", "message_id"], rawId),
         roomId: getFirst(msg, ["roomId", "chatRoomId", "room_id", "chat_room_id"], null),
         senderId: getFirst(msg, ["senderId", "sender_id"], null),
+        senderProfileUrl: getFirst(msg, ["senderProfileUrl", "sender_profile_url"], ""),
         senderName: getFirst(msg, ["senderName", "sender_name"], "익명"),
         message,
         type,

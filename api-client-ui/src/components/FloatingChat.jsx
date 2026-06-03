@@ -27,6 +27,7 @@ import { useBottomNavVisibility } from "../hooks/useBottomNavVisibility.js";
 import { logClientError } from "../utils/clientDiagnostics.js";
 import { trapFocus } from "../utils/focusTrap.js";
 import { notifyError, notifySuccess } from "../utils/toast.js";
+import UserAvatar from "../common/UserAvatar.jsx";
 import {
     buildFilePayload,
     buildTalkPayload,
@@ -543,6 +544,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             const optimisticMsg = normalizeMessage({ 
                 ...messagePayload, 
                 id: tempId,
+                senderProfileUrl: user?.profileUrl || user?.profile_url || "",
                 senderName: user.name || "익명", 
                 createdAt: new Date().toISOString() 
             });
@@ -586,6 +588,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             const optimisticMsg = normalizeMessage({
                 ...messagePayload,
                 id: tempId,
+                senderProfileUrl: user?.profileUrl || user?.profile_url || "",
                 senderName: user.name || "익명",
                 createdAt: new Date().toISOString()
             });
@@ -1125,7 +1128,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                             return (
                                                 <div key={normalized.key || normalized.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                                                     <div className={`flex max-w-[85%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
-                                                        {!isMe && <div className="w-8 h-8 rounded-xl bg-white shadow-sm border border-slate-100 shrink-0 flex items-center justify-center text-[11px] font-black text-primary-600">{normalized.senderName?.charAt(0).toUpperCase()}</div>}
+                                                        {!isMe && <UserAvatar name={normalized.senderName} profileUrl={normalized.senderProfileUrl} size="sm" className="rounded-xl border-slate-100 bg-white" />}
                                                         <div className="flex flex-col">
                                                             {!isMe && <span className="text-[10px] font-bold text-slate-400 mb-1 ml-1">{normalized.senderName}</span>}
                                                             <div className={`px-4 py-2.5 rounded-2xl text-[13px] font-medium shadow-sm leading-relaxed ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-700 border border-slate-100 rounded-bl-none"}`}>
@@ -1226,7 +1229,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                             <div className="flex-1 overflow-y-auto p-2 space-y-1">
                                                 {membersToList.map(m => (
                                                     <div key={getMemberId(m)} className="flex items-center gap-3 p-3 rounded-[1.25rem] bg-slate-50/50 border border-transparent hover:bg-white hover:border-slate-100 hover:shadow-lg transition-all">
-                                                        <div className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center font-black text-xs text-primary-600">{m.name?.charAt(0).toUpperCase()}</div>
+                                                        <UserAvatar name={m.name} profileUrl={m.profileUrl || m.profile_url} size="md" className="rounded-2xl bg-white" />
                                                         <div className="min-w-0 flex-1"><div className="text-sm font-black truncate text-slate-900 flex items-center gap-2">{m.name}{getMemberId(m) === getMemberId(user) && <span className="text-[9px] px-1.5 py-0.5 bg-primary-600 text-white rounded-lg">나</span>}</div><div className="text-[10px] font-bold text-slate-400 truncate">{m.email}</div></div>
                                                     </div>
                                                 ))}
@@ -1329,7 +1332,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                             const isSelected = selectedMembers.find(sm => getMemberId(sm) === mId);
                                             return (
                                                 <button key={mId} onClick={() => toggleMemberSelection(m)} className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all border ${isSelected ? "bg-primary-50 text-primary-700 border-primary-200 shadow-sm" : "bg-white hover:bg-slate-50 border-slate-100 shadow-sm"}`}>
-                                                    <div className="flex items-center gap-3"><div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-xs ${isSelected ? "bg-primary-600 text-white shadow-lg shadow-primary-200" : "bg-slate-100 text-slate-400"}`}>{m.name?.charAt(0)}</div><div className="text-left min-w-0 flex-1"><div className="font-black text-sm truncate">{m.name}</div><div className="text-[9px] font-bold opacity-50 truncate">{m.email}</div></div></div>
+                                                    <div className="flex items-center gap-3"><UserAvatar name={m.name} profileUrl={m.profileUrl || m.profile_url} size="sm" className={`rounded-2xl ${isSelected ? "border-primary-200 bg-primary-600 text-white shadow-lg shadow-primary-200" : "bg-slate-100 text-slate-400"}`} /><div className="text-left min-w-0 flex-1"><div className="font-black text-sm truncate">{m.name}</div><div className="text-[9px] font-bold opacity-50 truncate">{m.email}</div></div></div>
                                                     {isSelected && <div className="p-1 rounded-lg bg-primary-600 text-white shadow-md"><Check className="h-3.5 w-3.5" /></div>}
                                                 </button>
                                             );

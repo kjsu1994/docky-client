@@ -30,6 +30,7 @@ import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import UserAvatar from "../../common/UserAvatar.jsx";
 
 const gameConfigs = {
   catan: {
@@ -7406,7 +7407,10 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
               const done = completedSeatNos.has(seatNo);
               return (
                 <div key={seatNo} className={`rounded-lg px-3 py-2 ${done ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500"}`}>
-                  <div className="truncate text-sm font-black">{player.nickname}</div>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="xs" />
+                    <div className="truncate text-sm font-black">{player.nickname}</div>
+                  </div>
                   <div className="text-[10px] font-black">{done ? "제출 완료" : "대기 중"}</div>
                 </div>
               );
@@ -7474,6 +7478,11 @@ const pokerPlayerName = (roomPlayers, player) => {
   const seatNo = Number(get(player, "seat_no", "seatNo", 0));
   if (get(player, "bot", "bot", false)) return get(player, "name", "name", `AI ${seatNo}`);
   return roomPlayers.find((roomPlayer) => seatNoOf(roomPlayer) === seatNo)?.nickname || get(player, "name", "name", `플레이어 ${seatNo}`);
+};
+
+const pokerPlayerProfileUrl = (roomPlayers, player) => {
+  const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+  return roomPlayers.find((roomPlayer) => seatNoOf(roomPlayer) === seatNo)?.profileUrl || "";
 };
 
 const roughPokerAdvice = (myCards, communityCards, callAmount, pot) => {
@@ -7570,9 +7579,12 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
                 return (
                   <div key={seatNo} className={`rounded-2xl border px-3 py-2 ${isActive ? "border-amber-300 bg-white text-slate-900" : "border-white/10 bg-zinc-950/45 text-white"} ${folded ? "opacity-55" : ""}`}>
                     <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <UserAvatar name={pokerPlayerName(roomPlayers, player)} profileUrl={bot ? "" : pokerPlayerProfileUrl(roomPlayers, player)} size="xs" />
+                        <div className="min-w-0">
                         <div className="truncate text-sm font-black">{pokerPlayerName(roomPlayers, player)}</div>
                         <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}{seatNo === dealerSeatNo ? " · 딜러" : ""}</div>
+                        </div>
                       </div>
                       {bot ? <Bot className="h-4 w-4 shrink-0" /> : <Crown className="h-4 w-4 shrink-0 text-amber-400" />}
                     </div>
@@ -7640,9 +7652,12 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
               const seatNo = Number(get(player, "seat_no", "seatNo", 0));
               return (
                 <div key={seatNo} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${seatNo === activeSeatNo ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
-                  <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <UserAvatar name={pokerPlayerName(roomPlayers, player)} profileUrl={get(player, "bot", "bot", false) ? "" : pokerPlayerProfileUrl(roomPlayers, player)} size="xs" />
+                    <div className="min-w-0">
                     <div className="truncate text-sm font-black text-slate-900">{pokerPlayerName(roomPlayers, player)}</div>
                     <div className="text-[11px] font-bold text-slate-500">좌석 {seatNo}{get(player, "bot", "bot", false) ? " · AI" : ""}</div>
+                    </div>
                   </div>
                   <div className="text-right text-sm font-black text-slate-900">{Number(get(player, "chips", "chips", 0))}칩</div>
                 </div>
@@ -8640,9 +8655,12 @@ const PlayersPanel = ({ players, selectedRoom, status }) => (
         const host = pid === hostMemberIdOf(selectedRoom);
         return (
           <div key={pid} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
+              <div className="min-w-0">
               <div className="truncate text-sm font-black text-slate-900">{player.nickname}</div>
               <div className="text-[11px] font-bold text-slate-500">{host ? "방장" : `좌석 ${seatNoOf(player)}`}</div>
+              </div>
             </div>
             {status === "WAITING" && host && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">

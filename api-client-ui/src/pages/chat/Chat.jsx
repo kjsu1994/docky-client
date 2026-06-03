@@ -41,6 +41,7 @@ import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from
 import { logClientError } from "../../utils/clientDiagnostics.js";
 import { trapFocus } from "../../utils/focusTrap.js";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
+import UserAvatar from "../../common/UserAvatar.jsx";
 
 const MESSAGE_PAGE_SIZE = 20;
 
@@ -375,6 +376,7 @@ export const Chat = () => {
             const optimisticMsg = normalizeMessage({
                 ...messagePayload,
                 id: tempId,
+                senderProfileUrl: user?.profileUrl || user?.profile_url || "",
                 senderName: user.name || "익명",
                 createdAt: new Date().toISOString()
             });
@@ -419,6 +421,7 @@ export const Chat = () => {
             const optimisticMsg = normalizeMessage({
                 ...messagePayload,
                 id: tempId,
+                senderProfileUrl: user?.profileUrl || user?.profile_url || "",
                 senderName: user.name || "익명",
                 createdAt: new Date().toISOString()
             });
@@ -664,7 +667,7 @@ export const Chat = () => {
                                         return (
                                             <div key={normalized.key || normalized.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                                                 <div className={`flex max-w-[80%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
-                                                    {!isMe && <div className="w-8 h-8 rounded-lg bg-slate-200 flex-shrink-0 flex items-center justify-center text-xs font-bold text-slate-600">{normalized.senderName?.charAt(0).toUpperCase()}</div>}
+                                                    {!isMe && <UserAvatar name={normalized.senderName} profileUrl={normalized.senderProfileUrl} size="sm" className="rounded-lg border-slate-100" />}
                                                     <div className="flex flex-col">
                                                         {!isMe && <span className="text-[10px] text-slate-500 mb-1 ml-1">{normalized.senderName}</span>}
                                                         <div className={`px-4 py-2 rounded-2xl text-sm shadow-sm ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-800 border border-slate-100 rounded-bl-none"}`}>
@@ -765,7 +768,7 @@ export const Chat = () => {
                                             const isMe = getMemberId(m) === getMemberId(user);
                                             return (
                                                 <div key={getMemberId(m)} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs text-slate-600">{m.name?.charAt(0).toUpperCase()}</div>
+                                                    <UserAvatar name={m.name} profileUrl={m.profileUrl || m.profile_url} size="sm" />
                                                     <div className="min-w-0">
                                                         <div className="text-xs font-bold truncate flex items-center gap-1">{m.name}{isMe && <span className="text-[9px] px-1 py-0.5 bg-primary-100 text-primary-600 rounded">나</span>}</div>
                                                         <div className="text-[10px] text-slate-400 truncate">{m.email}</div>
@@ -832,7 +835,7 @@ export const Chat = () => {
                                                 const isSelected = selectedMembers.find(sm => getMemberId(sm) === mId);
                                                 return (
                                                     <button key={mId} type="button" aria-pressed={Boolean(isSelected)} onClick={() => toggleMemberSelection(m)} className={`w-full flex items-center justify-between p-3 rounded-xl text-sm transition-all ${isSelected ? "bg-primary-600 text-white shadow-md" : "hover:bg-white hover:shadow-sm"}`}>
-                                                        <div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${isSelected ? "bg-white/20" : "bg-slate-200 text-slate-600"}`}>{m.name?.charAt(0).toUpperCase()}</div><div className="text-left"><div className="font-bold">{m.name}</div><div className={`text-[10px] ${isSelected ? "text-white/70" : "text-slate-400"}`}>{m.email}</div></div></div>
+                                                        <div className="flex items-center gap-3"><UserAvatar name={m.name} profileUrl={m.profileUrl || m.profile_url} size="md" className={isSelected ? "border-white/30 bg-white/20 text-white" : ""} /><div className="text-left"><div className="font-bold">{m.name}</div><div className={`text-[10px] ${isSelected ? "text-white/70" : "text-slate-400"}`}>{m.email}</div></div></div>
                                                         {isSelected && <Check className="h-5 w-5" />}
                                                     </button>
                                                 );

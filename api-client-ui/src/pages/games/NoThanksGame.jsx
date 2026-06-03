@@ -17,6 +17,7 @@ import {
   normalizeNoThanksState,
 } from "../../adapters/noThanksGameAdapter.js";
 import { useGameSound } from "../../hooks/useGameSound.js";
+import UserAvatar from "../../common/UserAvatar.jsx";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
@@ -758,7 +759,10 @@ export const NoThanksGame = () => {
                     return (
                       <div key={id} className={`rounded-xl border p-3 ${isCurrent ? "border-primary-400 bg-primary-50" : "border-slate-100 bg-slate-50"}`}>
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-sm font-black text-slate-900">{player.nickname}</div>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
+                            <div className="min-w-0 truncate text-sm font-black text-slate-900">{player.nickname}</div>
+                          </div>
                           {roomStatus === "WAITING" && (
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${readyMemberIds.has(id) ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
                               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -784,7 +788,10 @@ export const NoThanksGame = () => {
                   const normalized = normalizeMessage(message);
                   return (
                   <div key={normalized.key || normalized.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                    <div className="font-black text-slate-800">{normalized.senderName || "SYSTEM"}</div>
+                    <div className="flex items-center gap-2 font-black text-slate-800">
+                      <UserAvatar name={normalized.senderName || "SYSTEM"} profileUrl={normalized.senderProfileUrl} size="xs" />
+                      <span className="min-w-0 truncate">{normalized.senderName || "SYSTEM"}</span>
+                    </div>
                     <div className="mt-0.5 text-slate-700">{normalized.message || ""}</div>
                   </div>
                   );

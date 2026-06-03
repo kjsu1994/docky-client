@@ -2,12 +2,12 @@ import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 
 import { Link, NavLink, useLocation } from "react-router-dom";
 import {
     CalendarDays,
-    User,
     LogOut,
     Menu,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { isAdminUser } from "../utils/authorization";
+import UserAvatar from "../common/UserAvatar.jsx";
 
 const HeaderMenuDialog = lazy(() =>
     import("./HeaderMenuDialog.jsx").then((module) => ({ default: module.HeaderMenuDialog }))
@@ -98,9 +98,7 @@ export const Header = () => {
                                 to="/app/mypage"
                                 className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-bold text-slate-600 transition-all hover:bg-slate-50"
                             >
-                                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-slate-100 shadow-sm">
-                                    <User className="h-4 w-4 text-slate-400" />
-                                </div>
+                                <UserAvatar name={user?.name || user?.email} profileUrl={user?.profileUrl || user?.profile_url} size="sm" />
                                 <span className="hidden md:inline">{user?.name || user?.email || "내 정보"}</span>
                                 {isAdmin && (
                                     <span className="hidden rounded-lg bg-primary-100 px-2 py-0.5 text-[9px] font-black text-primary-700 md:inline-block">

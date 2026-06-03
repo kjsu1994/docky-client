@@ -21,6 +21,7 @@ export const Login = () => {
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [naverLoading, setNaverLoading] = useState(false);
     const [lockInfo, setLockInfo] = useState(null);
     const [releaseReason, setReleaseReason] = useState("");
     const [releaseLoading, setReleaseLoading] = useState(false);
@@ -50,7 +51,7 @@ export const Login = () => {
 
         if (oauthError) {
             window.history.replaceState({}, document.title, window.location.pathname);
-            notifyError("구글 로그인에 실패했습니다. 다시 시도해주세요.");
+            notifyError("소셜 로그인에 실패했습니다. 다시 시도해주세요.");
             oauthHandledRef.current = true;
             setOauthProcessing(false);
             return;
@@ -66,16 +67,18 @@ export const Login = () => {
 
         const run = async () => {
             setGoogleLoading(true);
+            setNaverLoading(true);
             try {
                 await loginWithTokens({ accessToken, refreshToken });
-                notifySuccess("구글 로그인 성공!");
+                notifySuccess("소셜 로그인 성공!");
             } catch (error) {
                 const { extractAuthErrorMessage } = await loadAuthAdapter();
-                notifyError(extractAuthErrorMessage(error, "구글 로그인 처리에 실패했습니다."));
+                notifyError(extractAuthErrorMessage(error, "소셜 로그인 처리에 실패했습니다."));
                 oauthHandledRef.current = false;
                 setOauthProcessing(false);
             } finally {
                 setGoogleLoading(false);
+                setNaverLoading(false);
             }
         };
 
@@ -120,6 +123,11 @@ export const Login = () => {
         window.location.href = "/api/oauth2/authorization/google";
     };
 
+    const handleNaverLogin = () => {
+        setNaverLoading(true);
+        window.location.href = "/api/oauth2/authorization/naver";
+    };
+
     const closeLockDialog = () => {
         if (releaseLoadingRef.current) return;
         setLockInfo(null);
@@ -132,7 +140,7 @@ export const Login = () => {
                     <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600/10 text-primary-600 mx-auto">
                         <Leaf className="h-7 w-7 animate-pulse" />
                     </div>
-                    <h1 className="text-xl font-black text-slate-900">구글 로그인 처리중</h1>
+                    <h1 className="text-xl font-black text-slate-900">소셜 로그인 처리중</h1>
                     <p className="text-sm text-slate-500">잠시만 기다려주세요. 자동으로 이동합니다.</p>
                     <div className="flex items-center justify-center gap-2 text-primary-600 font-bold text-sm">
                         <div className="loading-spinner !w-4 !h-4 !border-2 border-primary-200 border-t-primary-600" />
@@ -268,6 +276,17 @@ export const Login = () => {
                             >
                                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="구글" className="h-5 w-5" />
                                 <span className="tracking-tight">{googleLoading ? "이동 중..." : "구글로 로그인"}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleNaverLogin}
+                                disabled={naverLoading}
+                                aria-busy={naverLoading}
+                                data-busy-indicator="true"
+                                className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl border border-[#03c75a] bg-[#03c75a] px-4 font-black text-white shadow-sm transition-all hover:bg-[#02b351] disabled:cursor-wait disabled:opacity-70"
+                            >
+                                <span className="flex h-5 w-5 items-center justify-center rounded bg-white text-sm font-black text-[#03c75a]">N</span>
+                                <span className="tracking-tight">{naverLoading ? "이동 중..." : "네이버로 로그인"}</span>
                             </button>
                         </div>
                     </form>
