@@ -3,7 +3,9 @@ import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import {
   ArrowUp,
   Ban,
+  Bot,
   CheckCircle2,
+  CircleDollarSign,
   Copy,
   Crown,
   Dices,
@@ -27,6 +29,7 @@ import {
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useGameSound } from "../../hooks/useGameSound.js";
+import { confirmAction } from "../../common/confirmAction.jsx";
 
 const gameConfigs = {
   catan: {
@@ -117,6 +120,72 @@ const gameConfigs = {
       },
     ],
   },
+  "six-nimmt": {
+    title: "6 nimmt!",
+    eyebrow: "동시 카드 선택 · 4개 행 · 66벌점 종료",
+    description: "손패에서 카드를 동시에 고르고, 낮은 카드부터 행에 붙입니다. 여섯 번째 카드가 되면 그 행을 가져가 벌점을 받는 카드 게임입니다.",
+    storageKey: "six_nimmt_last_room_id",
+    accent: "from-rose-500 via-amber-500 to-lime-500",
+    board: "six-nimmt",
+    guide: [
+      {
+        title: "카드 놓기",
+        items: ["모두 한 장씩 고르면 숫자가 낮은 카드부터 처리됩니다.", "내 카드보다 작은 끝 카드 중 가장 큰 행에 자동으로 붙습니다."],
+      },
+      {
+        title: "벌점",
+        items: ["붙이면 여섯 번째가 되는 행은 기존 5장을 가져가고 내 카드가 새 행의 시작이 됩니다.", "어느 행 끝보다도 카드가 작으면 직접 가져갈 행을 선택합니다."],
+      },
+      {
+        title: "종료",
+        items: ["손패 10장을 모두 쓰면 라운드가 끝나고 벌점을 합산합니다.", "누군가 66벌점 이상이 되면 총 벌점이 가장 낮은 플레이어가 승리합니다."],
+      },
+    ],
+  },
+  telestrations: {
+    title: "텔레스트레이션",
+    eyebrow: "문장 · 그림 · 추측 · 리플레이",
+    description: "처음 문장을 적고, 다음 사람은 그림을 그리고, 또 다음 사람은 그림을 보고 문장을 추측하는 파티형 릴레이 게임입니다.",
+    storageKey: "telestrations_last_room_id",
+    accent: "from-sky-500 via-fuchsia-500 to-amber-400",
+    board: "telestrations",
+    guide: [
+      {
+        title: "진행 흐름",
+        items: ["각자 시작 문장을 적으면 책자가 옆 사람에게 넘어갑니다.", "홀수 단계는 그림, 짝수 단계는 추측 문장으로 서버가 동시에 진행합니다."],
+      },
+      {
+        title: "공개 리플레이",
+        items: ["모든 단계가 끝나면 책자별로 문장과 그림이 순서대로 공개됩니다.", "이전 사람이 무엇을 보고 다음 사람이 어떻게 바꿨는지 한 장씩 넘겨 볼 수 있습니다."],
+      },
+      {
+        title: "데이터 정리",
+        items: ["공개 후 호스트가 종료하면 저장된 문장과 그림 데이터는 즉시 삭제됩니다.", "강제종료나 다시 준비도 게임 상태를 비워 대기방으로 돌아갑니다."],
+      },
+    ],
+  },
+  poker: {
+    title: "포커",
+    eyebrow: "리밋 텍사스 홀덤 · 칩 세션 · AI 봇",
+    description: "1명부터 8명까지 방을 만들고, 혼자 시작하면 AI 봇이 자동으로 들어오는 칩 기반 텍사스 홀덤입니다.",
+    storageKey: "poker_last_room_id",
+    accent: "from-emerald-700 via-zinc-900 to-rose-700",
+    board: "poker",
+    guide: [
+      {
+        title: "게임 흐름",
+        items: ["홀카드 2장과 커뮤니티 카드 5장으로 가장 강한 5장 족보를 만듭니다.", "프리플롭, 플롭, 턴, 리버마다 체크/콜/레이즈/폴드를 선택합니다."],
+      },
+      {
+        title: "칩 세션",
+        items: ["방 규칙에서 시작 칩과 블라인드가 다른 빠른판, 표준, 딥스택을 고릅니다.", "정해진 핸드 수가 끝나거나 한 명만 칩이 남으면 가장 많은 칩을 가진 사람이 승리합니다."],
+      },
+      {
+        title: "초보자 보조",
+        items: ["내 차례에는 필요한 콜 금액, 팟 오즈, 추천 판단을 같이 표시합니다.", "혼자 시작하면 AI 봇 3명이 자동으로 채워져 바로 연습할 수 있습니다."],
+      },
+    ],
+  },
 };
 
 const mobileJumpLinksByGame = {
@@ -136,6 +205,20 @@ const mobileJumpLinksByGame = {
     { href: "#dalmuti-status-panel", label: "판세" },
     { href: "#dalmuti-hand-panel", label: "손패" },
     { href: "#dalmuti-action-strip", label: "제출" },
+  ],
+  "six-nimmt": [
+    { href: "#six-nimmt-board-panel", label: "행" },
+    { href: "#six-nimmt-hand-panel", label: "손패" },
+    { href: "#six-nimmt-action-strip", label: "선택" },
+  ],
+  telestrations: [
+    { href: "#telestrations-task-panel", label: "입력" },
+    { href: "#telestrations-replay-panel", label: "공개" },
+  ],
+  poker: [
+    { href: "#poker-table-panel", label: "테이블" },
+    { href: "#poker-action-panel", label: "액션" },
+    { href: "#poker-players-panel", label: "칩" },
   ],
 };
 
@@ -725,6 +808,14 @@ const variantFeatureTags = (game, variant) => {
     if (code === "FIRST_DEAL_REVOLUTION") return ["첫 손 세금 없음", "혁명 선택", "공식 선택 규칙"];
     return ["4~8인", "세금", "혁명"];
   }
+  if (game === "telestrations") {
+    return ["3~8인", "그림 릴레이", "리플레이 공개"];
+  }
+  if (game === "poker") {
+    if (code === "SHORT") return ["1~8인", "100칩", "빠른판"];
+    if (code === "DEEP") return ["1~8인", "500칩", "딥스택"];
+    return ["1~8인", "200칩", "AI 봇"];
+  }
   return [];
 };
 
@@ -768,12 +859,17 @@ const variantGroupLabelsByGame = {
     optional: "공식 선택 규칙",
     other: "선택 규칙",
   },
+  poker: {
+    base: "칩 프리셋",
+    other: "칩 프리셋",
+  },
 };
 
 const variantGroupOrderByGame = {
   blokus: ["base", "duo", "playerCount", "team", "other"],
   mahe: ["base", "other"],
   dalmuti: ["base", "optional", "other"],
+  poker: ["base", "other"],
 };
 
 const variantGroupOf = (game, variant) => {
@@ -1071,6 +1167,44 @@ const BoardPreview = ({ type, room }) => {
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+  if (type === "telestrations") {
+    return (
+      <div className="grid w-full max-w-[560px] gap-3 rounded-2xl bg-slate-950 p-5 shadow-2xl sm:grid-cols-3">
+        {[
+          { label: "문장", body: "달 위의 요리사", tone: "bg-sky-50 text-sky-800" },
+          { label: "그림", body: "✎", tone: "bg-white text-slate-900" },
+          { label: "추측", body: "우주 식당", tone: "bg-amber-50 text-amber-800" },
+        ].map((item) => (
+          <div key={item.label} className={`min-h-36 rounded-lg border border-white/20 p-4 shadow-lg ${item.tone}`}>
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-60">{item.label}</div>
+            <div className="mt-6 text-center text-2xl font-black">{item.body}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (type === "poker") {
+    return (
+      <div className="relative aspect-[4/3] w-full max-w-[560px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-emerald-900 via-emerald-700 to-zinc-950 p-5 shadow-2xl">
+        <div className="absolute inset-5 rounded-[2rem] border border-amber-200/30 bg-emerald-800/80 shadow-inner" />
+        <div className="absolute left-1/2 top-1/2 grid w-40 -translate-x-1/2 -translate-y-1/2 grid-cols-5 gap-1.5">
+          {["A", "K", "Q", "J", "10"].map((rank, index) => (
+            <div key={rank} className={`aspect-[2/3] rounded-lg bg-white px-1 py-1 text-center text-sm font-black shadow ${index % 2 ? "text-slate-900" : "text-rose-600"}`}>
+              {rank}
+            </div>
+          ))}
+        </div>
+        <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
+          {[0, 1, 2].map((index) => (
+            <span key={index} className="h-9 w-9 rounded-full border-4 border-white/70 bg-rose-500 shadow" />
+          ))}
+        </div>
+        <div className="absolute left-6 top-6 rounded-full bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-50">
+          Limit Hold'em
+        </div>
       </div>
     );
   }
@@ -6704,6 +6838,835 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
   );
 };
 
+const sixNimmtPhaseLabels = {
+  SELECTING: "카드 선택",
+  ROW_CHOICE: "행 선택",
+  FINISHED: "게임 종료",
+};
+
+const sixNimmtEventLabels = {
+  ROUND_STARTED: "라운드 시작",
+  SELECT_CARD: "카드 선택",
+  CARD_PLACED: "카드 배치",
+  TAKE_ROW: "행 회수",
+  ROW_TAKEN: "행 회수",
+  ROUND_FINISHED: "라운드 종료",
+  GAME_FINISHED: "게임 종료",
+};
+
+const sixNimmtCardValue = (card) => Number(get(card, "value", "value", 0));
+const sixNimmtCardBulls = (card) => Number(get(card, "bulls", "bulls", 0));
+const sixNimmtCardId = (card) => get(card, "id", "id", "");
+const sixNimmtRowCards = (row) => listOf(get(row, "cards", "cards", []));
+const sixNimmtRowPenalty = (row) => sixNimmtRowCards(row).reduce((sum, card) => sum + sixNimmtCardBulls(card), 0);
+
+const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note = "" }) => {
+  const clickable = typeof onClick === "function";
+  const className = [
+    "min-h-[92px] rounded-2xl border bg-white p-3 text-left shadow-sm transition",
+    selected ? "border-slate-900 ring-4 ring-slate-900/10" : "border-slate-200",
+    disabled ? "opacity-50" : "",
+    clickable && !disabled ? "hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-200" : "",
+  ].join(" ");
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-2xl font-black leading-none text-slate-950">{sixNimmtCardValue(card)}</div>
+        <div className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-black text-rose-700">{sixNimmtCardBulls(card)}벌점</div>
+      </div>
+      {note && <div className="mt-2 min-h-[30px] text-[11px] font-bold leading-snug text-slate-500">{note}</div>}
+    </>
+  );
+  return clickable ? (
+    <button type="button" disabled={disabled} className={className} onClick={onClick}>{content}</button>
+  ) : (
+    <div className={className}>{content}</div>
+  );
+};
+
+const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }) => {
+  const [selectedCardId, setSelectedCardId] = useState("");
+  const phase = get(gameState, "phase", "phase", "");
+  const rows = listOf(get(gameState, "rows", "rows", []));
+  const statePlayers = listOf(get(gameState, "players", "players", []));
+  const selectedSeatNos = new Set(listOf(get(gameState, "selected_seat_nos", "selectedSeatNos", [])).map(Number));
+  const activeSeatNo = Number(get(gameState, "active_seat_no", "activeSeatNo", 0));
+  const pendingCard = get(gameState, "pending_card", "pendingCard", null);
+  const events = listOf(get(gameState, "events", "events", []));
+  const roundNo = Number(get(gameState, "round_no", "roundNo", 0));
+  const turnNo = Number(get(gameState, "turn_no", "turnNo", 0));
+  const myPlayer = statePlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(mySeatNo)) || null;
+  const myHand = listOf(get(myPlayer, "hand", "hand", [])).slice().sort((a, b) => sixNimmtCardValue(a) - sixNimmtCardValue(b));
+  const myHandKey = myHand.map(sixNimmtCardId).join("|");
+  const mySelected = Boolean(get(myPlayer, "selected", "selected", false)) || selectedSeatNos.has(Number(mySeatNo));
+  const selectedCard = myHand.find((card) => sixNimmtCardId(card) === selectedCardId) || null;
+  const needsRowChoice = phase === "ROW_CHOICE" && activeSeatNo === Number(mySeatNo) && pendingCard;
+  const waitingSelection = phase === "SELECTING" && !mySelected;
+  const playerNameBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
+  const recommendedRowIndex = rows.reduce((best, row, index) => {
+    const penalty = sixNimmtRowPenalty(row);
+    return best.index < 0 || penalty < best.penalty ? { index, penalty } : best;
+  }, { index: -1, penalty: Number.MAX_SAFE_INTEGER }).index;
+
+  useEffect(() => {
+    if (!myHand.some((card) => sixNimmtCardId(card) === selectedCardId)) setSelectedCardId("");
+  }, [myHandKey, selectedCardId]);
+
+  const rowTail = (row) => {
+    const cards = sixNimmtRowCards(row);
+    return cards[cards.length - 1] || null;
+  };
+
+  const previewForCard = (card) => {
+    const value = sixNimmtCardValue(card);
+    let bestIndex = -1;
+    let bestTail = -1;
+    rows.forEach((row, index) => {
+      const tailValue = sixNimmtCardValue(rowTail(row));
+      if (tailValue < value && tailValue > bestTail) {
+        bestTail = tailValue;
+        bestIndex = index;
+      }
+    });
+    if (bestIndex < 0) return { label: "행 선택 필요", tone: "text-amber-700", rowIndex: -1, penalty: 0 };
+    const row = rows[bestIndex];
+    if (sixNimmtRowCards(row).length >= 5) {
+      return { label: `${bestIndex + 1}행 회수`, tone: "text-rose-700", rowIndex: bestIndex, penalty: sixNimmtRowPenalty(row) };
+    }
+    return { label: `${bestIndex + 1}행 배치`, tone: "text-emerald-700", rowIndex: bestIndex, penalty: 0 };
+  };
+
+  const selectCard = async () => {
+    if (!selectedCardId || !waitingSelection) return;
+    await onAction({ actionType: "SELECT_CARD", cardIds: [selectedCardId] });
+  };
+  const chooseRow = async (rowIndex) => {
+    if (!needsRowChoice) return;
+    await onAction({ actionType: "CHOOSE_ROW", anchorX: rowIndex });
+  };
+
+  const selectedPreview = selectedCard ? previewForCard(selectedCard) : null;
+  const phaseLabel = sixNimmtPhaseLabels[phase] || phase || "-";
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <main className="space-y-4">
+        <section id="six-nimmt-board-panel" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-black text-slate-500">라운드 {roundNo} · 턴 {turnNo}</div>
+              <div className="mt-1 text-2xl font-black text-slate-900">{phaseLabel}</div>
+              <div className="mt-2 max-w-2xl text-xs font-bold leading-relaxed text-slate-500">
+                모두 카드를 한 장씩 고르면 낮은 숫자부터 처리됩니다. 내 카드보다 작은 끝 카드 중 가장 큰 행에 붙고, 여섯 번째가 되면 그 행의 벌점을 가져갑니다.
+              </div>
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
+              <div className="text-[11px] font-black text-slate-400">선택 완료</div>
+              <div className="text-lg font-black text-slate-900">{selectedSeatNos.size}/{statePlayers.length}</div>
+            </div>
+          </div>
+
+          {needsRowChoice && (
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold leading-relaxed text-amber-800">
+              {playerNameBySeat(activeSeatNo)}님이 {sixNimmtCardValue(pendingCard)} 카드를 놓을 행을 선택해야 합니다. 벌점이 가장 낮은 행이 기본 추천입니다.
+            </div>
+          )}
+
+          <div className="mt-4 grid gap-3">
+            {rows.map((row, index) => {
+              const cards = sixNimmtRowCards(row);
+              const penalty = sixNimmtRowPenalty(row);
+              const selectedRow = selectedPreview?.rowIndex === index;
+              const recommended = needsRowChoice && recommendedRowIndex === index;
+              return (
+                <div key={index} className={`rounded-2xl border p-3 transition ${selectedRow ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-black text-slate-900">{index + 1}행</div>
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
+                      <span className="rounded-full bg-white px-2 py-1 text-slate-600">{cards.length}/5장</span>
+                      <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">{penalty}벌점</span>
+                      {recommended && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">추천</span>}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {cards.map((card) => <SixNimmtCard key={sixNimmtCardId(card)} card={card} />)}
+                    {Array.from({ length: Math.max(0, 5 - cards.length) }).map((_, emptyIndex) => (
+                      <div key={`empty-${emptyIndex}`} className="min-h-[92px] rounded-2xl border border-dashed border-slate-200 bg-white/70" />
+                    ))}
+                  </div>
+                  {needsRowChoice && (
+                    <button type="button" onClick={() => chooseRow(index)} className="mt-3 min-h-10 w-full rounded-xl bg-slate-900 px-3 text-xs font-black text-white">
+                      이 행 가져가기 · {penalty}벌점
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section id="six-nimmt-hand-panel" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-lg font-black text-slate-900">내 손패</div>
+              <div className="mt-1 text-xs font-bold text-slate-500">{mySelected ? "이번 턴 카드를 제출했습니다." : "카드를 고르면 예상 배치와 벌점을 먼저 볼 수 있습니다."}</div>
+            </div>
+            {selectedPreview && (
+              <div className={`rounded-full bg-slate-100 px-3 py-1 text-xs font-black ${selectedPreview.tone}`}>
+                {selectedPreview.label}{selectedPreview.penalty ? ` · ${selectedPreview.penalty}벌점` : ""}
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {myHand.map((card) => {
+              const preview = previewForCard(card);
+              return (
+                <SixNimmtCard
+                  key={sixNimmtCardId(card)}
+                  card={card}
+                  selected={sixNimmtCardId(card) === selectedCardId}
+                  disabled={!waitingSelection}
+                  onClick={() => setSelectedCardId(sixNimmtCardId(card))}
+                  note={`${preview.label}${preview.penalty ? ` · ${preview.penalty}벌점` : ""}`}
+                />
+              );
+            })}
+          </div>
+          <div id="six-nimmt-action-strip" className="tabletop-mobile-action-strip sticky bottom-3 z-20 mt-4 scroll-mt-24 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur xl:static xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none">
+            {waitingSelection ? (
+              <button type="button" disabled={!selectedCardId} onClick={selectCard} className="min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">선택한 카드 제출</button>
+            ) : needsRowChoice ? (
+              <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-black leading-relaxed text-amber-800">가져갈 행을 위에서 선택하세요.</div>
+            ) : (
+              <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-black leading-relaxed text-slate-500">다른 플레이어의 선택을 기다리는 중입니다.</div>
+            )}
+          </div>
+        </section>
+      </main>
+
+      <aside className="space-y-4">
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 text-sm font-black text-slate-900">벌점 현황</div>
+          <div className="grid gap-2">
+            {statePlayers.map((player) => {
+              const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+              const totalPenalty = Number(get(player, "total_penalty", "totalPenalty", 0));
+              const roundPenalty = Number(get(player, "round_penalty", "roundPenalty", 0));
+              const winner = Boolean(get(player, "winner", "winner", false));
+              return (
+                <div key={seatNo} className={`rounded-2xl border px-3 py-2 ${seatNo === Number(mySeatNo) ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-black text-slate-900">{playerNameBySeat(seatNo)}</div>
+                    {winner && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">승리</span>}
+                  </div>
+                  <div className="mt-1 text-xs font-bold text-slate-500">총 {totalPenalty} · 이번 라운드 {roundPenalty} · 손패 {get(player, "hand_count", "handCount", 0)}장</div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 text-sm font-black text-slate-900">최근 기록</div>
+          <div className="max-h-[420px] space-y-2 overflow-auto pr-1">
+            {[...events].slice(-12).reverse().map((event) => {
+              const eventType = get(event, "event_type", "eventType", "");
+              const seatNo = Number(get(event, "seat_no", "seatNo", 0));
+              const cardValue = get(event, "card_value", "cardValue", "");
+              const value = get(event, "value", "value", "");
+              return (
+                <div key={get(event, "event_no", "eventNo", eventType)} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+                  <div className="font-black text-slate-800">{sixNimmtEventLabels[eventType] || eventType}</div>
+                  <div className="mt-1">{seatNo ? playerNameBySeat(seatNo) : "시스템"}{cardValue ? ` · 카드 ${cardValue}` : ""}{value ? ` · ${value}` : ""}</div>
+                </div>
+              );
+            })}
+            {!events.length && <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">아직 기록 없음</div>}
+          </div>
+        </section>
+      </aside>
+    </div>
+  );
+};
+
+const telestrationsPhaseLabels = {
+  PROMPT: "시작 문장",
+  DRAW: "그림 그리기",
+  GUESS: "문장 추측",
+  REVEAL: "공개 리플레이",
+  FINISHED: "종료",
+};
+
+const TelestrationsEntry = ({ entry, playerNameBySeat, compact = false }) => {
+  if (!entry) {
+    return <div className="rounded-lg bg-slate-50 p-4 text-sm font-bold text-slate-400">아직 공개된 내용이 없습니다.</div>;
+  }
+  const type = get(entry, "type", "type", "");
+  const text = get(entry, "text", "text", "");
+  const imageData = get(entry, "image_data", "imageData", "");
+  const authorSeatNo = Number(get(entry, "author_seat_no", "authorSeatNo", 0));
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600">
+          {type === "DRAW" ? "그림" : "문장"}
+        </span>
+        <span className="text-[11px] font-black text-slate-400">{playerNameBySeat(authorSeatNo)}</span>
+      </div>
+      {imageData ? (
+        <img src={imageData} alt={`${playerNameBySeat(authorSeatNo)} 그림`} className={`w-full rounded-lg border border-slate-100 bg-white object-contain ${compact ? "max-h-48" : "max-h-[420px]"}`} />
+      ) : (
+        <div className={`flex items-center justify-center rounded-lg bg-slate-50 px-4 text-center font-black leading-relaxed text-slate-900 ${compact ? "min-h-24 text-base" : "min-h-52 text-2xl"}`}>
+          {text || "비공개"}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = false, onAction }) => {
+  const phase = get(gameState, "phase", "phase", "");
+  const currentStep = Number(get(gameState, "current_step", "currentStep", 0));
+  const totalSteps = Number(get(gameState, "total_steps", "totalSteps", 0));
+  const playerCount = Number(get(gameState, "player_count", "playerCount", roomPlayers.length));
+  const completedSeatNos = new Set(listOf(get(gameState, "completed_seat_nos", "completedSeatNos", [])).map(Number));
+  const activeBook = get(gameState, "active_book", "activeBook", null);
+  const activeEntries = listOf(get(activeBook, "entries", "entries", []));
+  const previousEntry = activeEntries.find((entry) => Number(get(entry, "step_no", "stepNo", -1)) === currentStep - 1) || activeEntries[0] || null;
+  const mySubmitted = Boolean(get(gameState, "my_submitted", "mySubmitted", false)) || completedSeatNos.has(Number(mySeatNo));
+  const books = listOf(get(gameState, "books", "books", []));
+  const events = listOf(get(gameState, "events", "events", []));
+  const currentTask = get(gameState, "current_task", "currentTask", "");
+  const [text, setText] = useState("");
+  const [replayBookIndex, setReplayBookIndex] = useState(0);
+  const [replayEntryIndex, setReplayEntryIndex] = useState(0);
+  const [brushColor, setBrushColor] = useState("#111827");
+  const [brushSize, setBrushSize] = useState(5);
+  const [hasInk, setHasInk] = useState(false);
+  const canvasRef = useRef(null);
+  const drawingRef = useRef({ active: false, x: 0, y: 0 });
+  const playerNameBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
+  const phaseLabel = telestrationsPhaseLabels[phase] || phase || "-";
+  const revealBook = books[replayBookIndex] || books[0] || null;
+  const revealEntries = listOf(get(revealBook, "entries", "entries", []));
+  const revealEntry = revealEntries[replayEntryIndex] || revealEntries[0] || null;
+
+  useEffect(() => {
+    setText("");
+  }, [phase, currentStep]);
+
+  useEffect(() => {
+    if (replayBookIndex >= books.length) setReplayBookIndex(0);
+  }, [books.length, replayBookIndex]);
+
+  useEffect(() => {
+    if (replayEntryIndex >= revealEntries.length) setReplayEntryIndex(0);
+  }, [replayEntries.length, replayEntryIndex]);
+
+  useEffect(() => {
+    if (phase !== "DRAW") return;
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    setHasInk(false);
+  }, [phase, currentStep]);
+
+  const pointOf = (event) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / Math.max(1, rect.width)) * canvas.width,
+      y: ((event.clientY - rect.top) / Math.max(1, rect.height)) * canvas.height,
+    };
+  };
+
+  const beginDraw = (event) => {
+    if (phase !== "DRAW" || mySubmitted) return;
+    event.preventDefault();
+    const point = pointOf(event);
+    drawingRef.current = { active: true, x: point.x, y: point.y };
+  };
+
+  const moveDraw = (event) => {
+    if (!drawingRef.current.active || phase !== "DRAW" || mySubmitted) return;
+    event.preventDefault();
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    const point = pointOf(event);
+    context.strokeStyle = brushColor;
+    context.lineWidth = brushSize;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.beginPath();
+    context.moveTo(drawingRef.current.x, drawingRef.current.y);
+    context.lineTo(point.x, point.y);
+    context.stroke();
+    drawingRef.current = { active: true, x: point.x, y: point.y };
+    setHasInk(true);
+  };
+
+  const endDraw = () => {
+    drawingRef.current.active = false;
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    setHasInk(false);
+  };
+
+  const imageFromCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return "";
+    let imageData = canvas.toDataURL("image/jpeg", 0.72);
+    if (imageData.length <= 150000) return imageData;
+    const scaled = document.createElement("canvas");
+    scaled.width = 480;
+    scaled.height = 315;
+    const context = scaled.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, scaled.width, scaled.height);
+    context.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+    imageData = scaled.toDataURL("image/jpeg", 0.62);
+    return imageData;
+  };
+
+  const submitPrompt = async () => {
+    const value = text.trim();
+    if (!value || mySubmitted) return;
+    await onAction({ actionType: "SUBMIT_PROMPT", text: value });
+  };
+
+  const submitGuess = async () => {
+    const value = text.trim();
+    if (!value || mySubmitted) return;
+    await onAction({ actionType: "SUBMIT_GUESS", text: value });
+  };
+
+  const submitDrawing = async () => {
+    if (!hasInk || mySubmitted) return;
+    await onAction({ actionType: "SUBMIT_DRAWING", imageData: imageFromCanvas() });
+  };
+
+  const endGame = async () => {
+    const confirmed = await confirmAction({
+      title: "텔레스트레이션 종료",
+      message: "공개 리플레이의 문장과 그림 데이터를 삭제하고 게임을 종료할까요?",
+      confirmText: "삭제하고 종료",
+      cancelText: "계속 보기",
+      danger: true,
+    });
+    if (confirmed) await onAction({ actionType: "END_GAME" });
+  };
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <main className="space-y-4">
+        <section id="telestrations-task-panel" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500">Step {Math.min(currentStep + 1, totalSteps)}/{totalSteps}</div>
+              <h2 className="mt-1 text-2xl font-black text-slate-900">{phaseLabel}</h2>
+              <p className="mt-2 max-w-2xl text-sm font-bold leading-relaxed text-slate-500">
+                {phase === "REVEAL" ? "책자별로 문장과 그림이 어떻게 바뀌었는지 순서대로 넘겨 볼 수 있습니다." : currentTask || "현재 단계의 입력을 제출하세요."}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 px-4 py-3 text-right">
+              <div className="text-[10px] font-black text-slate-400">제출 완료</div>
+              <div className="text-xl font-black text-slate-900">{completedSeatNos.size}/{playerCount}</div>
+            </div>
+          </div>
+
+          {phase === "PROMPT" && (
+            <div className="mt-4 grid gap-3">
+              <textarea
+                value={text}
+                onChange={(event) => setText(event.target.value.slice(0, 120))}
+                disabled={mySubmitted}
+                className="min-h-28 resize-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-base font-bold text-slate-900 outline-none focus:border-sky-400 focus:bg-white"
+                placeholder="예: 달 위에서 라면을 먹는 탐험가"
+              />
+              <button type="button" onClick={submitPrompt} disabled={mySubmitted || !text.trim()} className="min-h-12 rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+                {mySubmitted ? "제출 완료" : "문장 제출"}
+              </button>
+            </div>
+          )}
+
+          {phase === "DRAW" && (
+            <div className="mt-4 grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+              <div>
+                <div className="mb-2 text-sm font-black text-slate-900">보고 그릴 문장</div>
+                <TelestrationsEntry entry={previousEntry} playerNameBySeat={playerNameBySeat} compact />
+              </div>
+              <div>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-black text-slate-900">내 그림</div>
+                  <div className="flex items-center gap-1.5">
+                    {["#111827", "#dc2626", "#2563eb", "#16a34a"].map((color) => (
+                      <button key={color} type="button" className={`h-8 w-8 rounded-full border-2 ${brushColor === color ? "border-slate-900" : "border-white"}`} style={{ backgroundColor: color }} onClick={() => setBrushColor(color)} aria-label={`색상 ${color}`} />
+                    ))}
+                    <select value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-black">
+                      <option value={3}>얇게</option>
+                      <option value={5}>보통</option>
+                      <option value={9}>굵게</option>
+                    </select>
+                    <button type="button" onClick={clearCanvas} disabled={mySubmitted} className="h-8 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-600 disabled:opacity-40">지우기</button>
+                  </div>
+                </div>
+                <canvas
+                  ref={canvasRef}
+                  width={640}
+                  height={420}
+                  className="h-auto w-full touch-none rounded-lg border border-slate-200 bg-white shadow-inner"
+                  onPointerDown={beginDraw}
+                  onPointerMove={moveDraw}
+                  onPointerUp={endDraw}
+                  onPointerLeave={endDraw}
+                />
+                <button type="button" onClick={submitDrawing} disabled={mySubmitted || !hasInk} className="mt-3 min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+                  {mySubmitted ? "제출 완료" : "그림 제출"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {phase === "GUESS" && (
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <TelestrationsEntry entry={previousEntry} playerNameBySeat={playerNameBySeat} />
+              <div className="space-y-3">
+                <textarea
+                  value={text}
+                  onChange={(event) => setText(event.target.value.slice(0, 120))}
+                  disabled={mySubmitted}
+                  className="min-h-40 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-base font-bold text-slate-900 outline-none focus:border-sky-400 focus:bg-white"
+                  placeholder="그림만 보고 떠오르는 문장을 적으세요"
+                />
+                <button type="button" onClick={submitGuess} disabled={mySubmitted || !text.trim()} className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+                  {mySubmitted ? "제출 완료" : "추측 제출"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mySubmitted && phase !== "REVEAL" && (
+            <div className="mt-4 rounded-lg bg-sky-50 px-4 py-3 text-sm font-black text-sky-700">
+              내 제출은 완료됐습니다. 다른 참가자의 입력을 기다리는 중입니다.
+            </div>
+          )}
+        </section>
+
+        {phase === "REVEAL" && (
+          <section id="telestrations-replay-panel" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-500">Replay</div>
+                <h2 className="mt-1 text-2xl font-black text-slate-900">{playerNameBySeat(get(revealBook, "owner_seat_no", "ownerSeatNo", 0))}님의 책</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select value={replayBookIndex} onChange={(event) => { setReplayBookIndex(Number(event.target.value)); setReplayEntryIndex(0); }} className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black">
+                  {books.map((book, index) => (
+                    <option key={get(book, "owner_seat_no", "ownerSeatNo", index)} value={index}>{playerNameBySeat(get(book, "owner_seat_no", "ownerSeatNo", 0))}의 책</option>
+                  ))}
+                </select>
+                {isHost && <button type="button" onClick={endGame} className="min-h-10 rounded-lg bg-rose-600 px-4 text-sm font-black text-white">데이터 삭제 후 종료</button>}
+              </div>
+            </div>
+            <div className="mt-4">
+              <TelestrationsEntry entry={revealEntry} playerNameBySeat={playerNameBySeat} />
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <button type="button" onClick={() => setReplayEntryIndex((value) => Math.max(0, value - 1))} disabled={replayEntryIndex <= 0} className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-700 disabled:opacity-40">이전</button>
+                <div className="flex items-center justify-center rounded-lg bg-slate-50 text-xs font-black text-slate-500">{replayEntryIndex + 1}/{Math.max(1, revealEntries.length)}</div>
+                <button type="button" onClick={() => setReplayEntryIndex((value) => Math.min(revealEntries.length - 1, value + 1))} disabled={replayEntryIndex >= revealEntries.length - 1} className="min-h-10 rounded-lg bg-slate-900 px-3 text-xs font-black text-white disabled:opacity-40">다음</button>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
+              {revealEntries.map((entry, index) => (
+                <button key={`${get(entry, "step_no", "stepNo", index)}-${index}`} type="button" onClick={() => setReplayEntryIndex(index)} className={`rounded-lg border p-2 text-left ${index === replayEntryIndex ? "border-fuchsia-300 bg-fuchsia-50" : "border-slate-200 bg-slate-50"}`}>
+                  <div className="text-[10px] font-black text-slate-400">#{index + 1} · {get(entry, "type", "type", "") === "DRAW" ? "그림" : "문장"}</div>
+                  <div className="mt-1 truncate text-xs font-black text-slate-700">{playerNameBySeat(get(entry, "author_seat_no", "authorSeatNo", 0))}</div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
+
+      <aside className="space-y-4">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 text-sm font-black text-slate-900">진행 현황</div>
+          <div className="grid grid-cols-2 gap-2">
+            {roomPlayers.map((player) => {
+              const seatNo = seatNoOf(player);
+              const done = completedSeatNos.has(seatNo);
+              return (
+                <div key={seatNo} className={`rounded-lg px-3 py-2 ${done ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500"}`}>
+                  <div className="truncate text-sm font-black">{player.nickname}</div>
+                  <div className="text-[10px] font-black">{done ? "제출 완료" : "대기 중"}</div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 text-sm font-black text-slate-900">최근 기록</div>
+          <div className="max-h-72 space-y-2 overflow-auto pr-1">
+            {[...events].slice(-10).reverse().map((event) => (
+              <div key={get(event, "event_no", "eventNo", "")} className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+                <div className="font-black text-slate-800">{get(event, "event_type", "eventType", "")}</div>
+                <div className="mt-1">{Number(get(event, "seat_no", "seatNo", 0)) ? playerNameBySeat(get(event, "seat_no", "seatNo", 0)) : "시스템"}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </aside>
+    </div>
+  );
+};
+
+const pokerPhaseLabels = {
+  PREFLOP: "프리플롭",
+  FLOP: "플롭",
+  TURN: "턴",
+  RIVER: "리버",
+  HAND_FINISHED: "핸드 종료",
+  FINISHED: "게임 종료",
+};
+
+const pokerSuitSymbols = {
+  SPADES: "♠",
+  HEARTS: "♥",
+  DIAMONDS: "♦",
+  CLUBS: "♣",
+};
+
+const pokerSuitTone = (suit) => (suit === "HEARTS" || suit === "DIAMONDS" ? "text-rose-600" : "text-slate-900");
+
+const pokerCardRank = (card) => get(card, "rank", "rank", "");
+const pokerCardSuit = (card) => get(card, "suit", "suit", "");
+const pokerCardValue = (card) => Number(get(card, "value", "value", 0));
+
+const PokerCard = ({ card, hidden = false, compact = false }) => {
+  const sizeClass = compact ? "h-16 w-11 rounded-lg text-sm" : "h-24 w-16 rounded-xl text-lg";
+  if (hidden || !card) {
+    return (
+      <div className={`${sizeClass} flex items-center justify-center border border-emerald-200/30 bg-gradient-to-br from-zinc-900 via-emerald-950 to-zinc-800 shadow-lg`}>
+        <Dices className="h-5 w-5 text-emerald-100/80" />
+      </div>
+    );
+  }
+  const suit = pokerCardSuit(card);
+  return (
+    <div className={`${sizeClass} flex flex-col justify-between border border-slate-200 bg-white p-1.5 font-black shadow-lg ${pokerSuitTone(suit)}`}>
+      <span>{pokerCardRank(card)}</span>
+      <span className="self-center text-xl leading-none">{pokerSuitSymbols[suit] || suit}</span>
+      <span className="self-end rotate-180">{pokerCardRank(card)}</span>
+    </div>
+  );
+};
+
+const pokerPlayerName = (roomPlayers, player) => {
+  const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+  if (get(player, "bot", "bot", false)) return get(player, "name", "name", `AI ${seatNo}`);
+  return roomPlayers.find((roomPlayer) => seatNoOf(roomPlayer) === seatNo)?.nickname || get(player, "name", "name", `플레이어 ${seatNo}`);
+};
+
+const roughPokerAdvice = (myCards, communityCards, callAmount, pot) => {
+  if (!myCards.length) return "내 카드가 공개되면 추천이 표시됩니다.";
+  const cards = [...myCards, ...communityCards];
+  const values = cards.map(pokerCardValue).filter(Boolean);
+  const counts = values.reduce((acc, value) => ({ ...acc, [value]: (acc[value] || 0) + 1 }), {});
+  const maxCount = Math.max(0, ...Object.values(counts));
+  const pairCount = Object.values(counts).filter((count) => count >= 2).length;
+  const suitCounts = cards.reduce((acc, card) => {
+    const suit = pokerCardSuit(card);
+    return suit ? { ...acc, [suit]: (acc[suit] || 0) + 1 } : acc;
+  }, {});
+  const flushDraw = Math.max(0, ...Object.values(suitCounts)) >= 4;
+  const highCards = myCards.filter((card) => pokerCardValue(card) >= 11).length;
+  const potOdds = callAmount > 0 ? callAmount / Math.max(1, pot + callAmount) : 0;
+  if (!communityCards.length) {
+    if (myCards[0] && myCards[1] && pokerCardValue(myCards[0]) === pokerCardValue(myCards[1])) return "포켓 페어입니다. 큰 레이즈가 아니면 적극적으로 볼 만합니다.";
+    if (highCards >= 2) return "높은 카드 두 장입니다. 콜 비용이 낮으면 참여 가치가 있습니다.";
+    if (callAmount === 0) return "무료 체크가 가능하면 플롭을 보고 판단하세요.";
+    return "초반 패가 약합니다. 콜 비용이 크면 폴드가 안전합니다.";
+  }
+  if (maxCount >= 3) return "트리플 이상입니다. 팟을 키울 수 있는 강한 상황입니다.";
+  if (pairCount >= 2) return "투페어 이상 가능성이 있습니다. 상대 베팅 크기만 확인하세요.";
+  if (pairCount === 1) return "페어가 있습니다. 콜 비용이 과하지 않으면 이어갈 만합니다.";
+  if (flushDraw) return "플러시 드로우가 있습니다. 팟오즈가 낮으면 콜 가치가 있습니다.";
+  if (callAmount === 0) return "완성 족보가 약해도 무료 체크로 다음 카드를 볼 수 있습니다.";
+  return potOdds <= 0.18 ? "콜 비용이 낮습니다. 한 장 더 보는 선택이 가능합니다." : "완성된 족보가 약합니다. 큰 콜은 피하는 편이 안전합니다.";
+};
+
+const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }) => {
+  const phase = get(gameState, "phase", "phase", "");
+  const pokerPlayers = listOf(get(gameState, "players", "players", []));
+  const communityCards = listOf(get(gameState, "community_cards", "communityCards", []));
+  const activeSeatNo = Number(get(gameState, "active_seat_no", "activeSeatNo", 0));
+  const dealerSeatNo = Number(get(gameState, "dealer_seat_no", "dealerSeatNo", 0));
+  const smallBlind = Number(get(gameState, "small_blind", "smallBlind", 0));
+  const bigBlind = Number(get(gameState, "big_blind", "bigBlind", 0));
+  const handNo = Number(get(gameState, "hand_no", "handNo", 0));
+  const maxHands = Number(get(gameState, "max_hands", "maxHands", 0));
+  const pot = Number(get(gameState, "pot", "pot", 0));
+  const lastPot = Number(get(gameState, "last_pot", "lastPot", 0));
+  const winnerSeatNo = Number(get(gameState, "winner_seat_no", "winnerSeatNo", 0));
+  const callAmount = Number(get(gameState, "call_amount", "callAmount", 0));
+  const fixedBet = Number(get(gameState, "fixed_bet", "fixedBet", bigBlind));
+  const availableActions = listOf(get(gameState, "available_actions", "availableActions", []));
+  const events = listOf(get(gameState, "events", "events", []));
+  const myPlayer = pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(mySeatNo));
+  const myCards = listOf(get(myPlayer, "hole_cards", "holeCards", []));
+  const myTurn = isBettingPokerPhase(phase) && activeSeatNo === Number(mySeatNo);
+  const phaseLabel = pokerPhaseLabels[phase] || phase || "-";
+  const potOddsText = callAmount > 0 ? `${Math.round((callAmount / Math.max(1, pot + callAmount)) * 100)}%` : "0%";
+  const advice = roughPokerAdvice(myCards, communityCards, callAmount, pot);
+  const winnerName = pokerPlayerName(roomPlayers, pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === winnerSeatNo) || {});
+  const canUse = (action) => myTurn && (!availableActions.length || availableActions.includes(action));
+  const send = (actionType) => onAction({ actionType });
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <main className="space-y-4">
+        <section id="poker-table-panel" className="scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-emerald-900 bg-zinc-950 p-3 text-white shadow-2xl sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-300">Limit Texas Hold'em</div>
+              <h2 className="mt-1 text-xl font-black">핸드 {handNo}/{maxHands || "-"}</h2>
+              <div className="mt-1 text-xs font-bold text-emerald-100/80">{phaseLabel} · 블라인드 {smallBlind}/{bigBlind}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-right">
+              <div className="rounded-2xl bg-white/10 px-3 py-2">
+                <div className="text-[10px] font-black text-emerald-100/70">POT</div>
+                <div className="text-lg font-black">{pot || lastPot}</div>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-3 py-2">
+                <div className="text-[10px] font-black text-emerald-100/70">현재 순번</div>
+                <div className="text-lg font-black">{activeSeatNo ? `${activeSeatNo}번` : "-"}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative mt-5 rounded-[2rem] border border-amber-200/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-emerald-950 p-4 shadow-inner">
+            <div className="flex min-h-28 flex-wrap items-center justify-center gap-2">
+              {Array.from({ length: 5 }, (_, index) => (
+                <PokerCard key={index} card={communityCards[index]} hidden={!communityCards[index]} />
+              ))}
+            </div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {pokerPlayers.map((player) => {
+                const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+                const isActive = activeSeatNo === seatNo;
+                const folded = Boolean(get(player, "folded", "folded", false));
+                const allIn = Boolean(get(player, "all_in", "allIn", false));
+                const bot = Boolean(get(player, "bot", "bot", false));
+                const holeCards = listOf(get(player, "hole_cards", "holeCards", []));
+                return (
+                  <div key={seatNo} className={`rounded-2xl border px-3 py-2 ${isActive ? "border-amber-300 bg-white text-slate-900" : "border-white/10 bg-zinc-950/45 text-white"} ${folded ? "opacity-55" : ""}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-black">{pokerPlayerName(roomPlayers, player)}</div>
+                        <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}{seatNo === dealerSeatNo ? " · 딜러" : ""}</div>
+                      </div>
+                      {bot ? <Bot className="h-4 w-4 shrink-0" /> : <Crown className="h-4 w-4 shrink-0 text-amber-400" />}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="flex gap-1">
+                        {[0, 1].map((index) => <PokerCard key={index} card={holeCards[index]} hidden={!holeCards[index]} compact />)}
+                      </div>
+                      <div className="text-right text-xs font-black">
+                        <div>{Number(get(player, "chips", "chips", 0))}칩</div>
+                        {!!Number(get(player, "current_bet", "currentBet", 0)) && <div className="text-amber-300">베팅 {get(player, "current_bet", "currentBet", 0)}</div>}
+                        {folded && <div className="text-rose-300">폴드</div>}
+                        {allIn && <div className="text-sky-300">올인</div>}
+                      </div>
+                    </div>
+                    {get(player, "hand_rank_label", "handRankLabel", "") && (
+                      <div className="mt-2 rounded-full bg-white/10 px-2 py-1 text-center text-[11px] font-black">{get(player, "hand_rank_label", "handRankLabel", "")}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section id="poker-action-panel" className="tabletop-mobile-action-strip sticky bottom-3 z-20 scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur xl:static xl:bg-white">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-black text-slate-900">{phase === "FINISHED" ? "최종 결과" : phase === "HAND_FINISHED" ? "핸드 결과" : myTurn ? "내 차례" : "대기 중"}</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
+                {phase === "FINISHED" ? `${winnerName} 최종 승리` : phase === "HAND_FINISHED" ? `팟 ${lastPot}칩 정산 완료` : myTurn ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : `${activeSeatNo || "-"}번 차례를 기다리는 중`}
+              </div>
+            </div>
+            <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black leading-relaxed text-emerald-700">
+              {advice}
+            </div>
+          </div>
+
+          {phase === "HAND_FINISHED" ? (
+            <button type="button" onClick={() => send("NEXT_HAND")} className="mt-3 min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white">
+              다음 핸드
+            </button>
+          ) : phase === "FINISHED" ? (
+            <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm font-black text-amber-700">게임이 종료되었습니다. 다시 하기는 방장 메뉴에서 진행하세요.</div>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <button type="button" disabled={!canUse("FOLD")} onClick={() => send("FOLD")} className="min-h-11 rounded-xl bg-rose-50 px-3 text-sm font-black text-rose-700 disabled:opacity-40">폴드</button>
+              <button type="button" disabled={!canUse(callAmount > 0 ? "CALL" : "CHECK")} onClick={() => send(callAmount > 0 ? "CALL" : "CHECK")} className="min-h-11 rounded-xl bg-slate-900 px-3 text-sm font-black text-white disabled:opacity-40">
+                {callAmount > 0 ? `콜 ${callAmount}` : "체크"}
+              </button>
+              <button type="button" disabled={!canUse("RAISE")} onClick={() => send("RAISE")} className="min-h-11 rounded-xl bg-amber-500 px-3 text-sm font-black text-white disabled:opacity-40">레이즈 +{fixedBet}</button>
+              <button type="button" disabled={!canUse("ALL_IN")} onClick={() => send("ALL_IN")} className="min-h-11 rounded-xl bg-zinc-800 px-3 text-sm font-black text-white disabled:opacity-40">올인</button>
+            </div>
+          )}
+        </section>
+      </main>
+
+      <aside id="poker-players-panel" className="scroll-mt-24 space-y-4">
+        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+            <CircleDollarSign className="h-4 w-4 text-emerald-600" />
+            칩 현황
+          </div>
+          <div className="space-y-2">
+            {pokerPlayers.map((player) => {
+              const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+              return (
+                <div key={seatNo} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${seatNo === activeSeatNo ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-slate-900">{pokerPlayerName(roomPlayers, player)}</div>
+                    <div className="text-[11px] font-bold text-slate-500">좌석 {seatNo}{get(player, "bot", "bot", false) ? " · AI" : ""}</div>
+                  </div>
+                  <div className="text-right text-sm font-black text-slate-900">{Number(get(player, "chips", "chips", 0))}칩</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
+          <div className="mb-3 text-sm font-black text-slate-900">최근 진행</div>
+          <div className="space-y-2">
+            {events.slice(-6).reverse().map((event) => (
+              <div key={get(event, "event_no", "eventNo", 0)} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-600">
+                {get(event, "message", "message", get(event, "event_type", "eventType", ""))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+};
+
+const isBettingPokerPhase = (phase) => ["PREFLOP", "FLOP", "TURN", "RIVER"].includes(phase);
+
 export const TabletopGame = ({ game }) => {
   const config = gameConfigs[game];
   const { user } = useAuth();
@@ -6908,7 +7871,7 @@ export const TabletopGame = ({ game }) => {
         return;
       }
       if (payload.room) setSelectedRoom(payload.room);
-      if ((game === "dalmuti" || game === "catan") && payload.gameState) {
+      if ((game === "dalmuti" || game === "catan" || game === "six-nimmt" || game === "telestrations" || game === "poker") && payload.gameState) {
         fetchState(roomId, roomSeq).catch((error) => {
           if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 정보를 갱신하지 못했습니다.");
         });
@@ -7213,6 +8176,12 @@ export const TabletopGame = ({ game }) => {
       notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
+    const confirmed = await confirmAction({
+      title: "진행 중인 게임을 종료할까요?",
+      description: "현재 판을 중단하고 같은 방의 대기 상태로 돌아갑니다.",
+      confirmText: "종료",
+    });
+    if (!confirmed) return;
     busyRef.current = true;
     try {
       setBusy(true);
@@ -7615,6 +8584,12 @@ export const TabletopGame = ({ game }) => {
               <MaheBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
             ) : game === "dalmuti" && gameState ? (
               <DalmutiBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
+            ) : game === "six-nimmt" && gameState ? (
+              <SixNimmtBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
+            ) : game === "telestrations" && gameState ? (
+              <TelestrationsBoard gameState={gameState} players={players} mySeatNo={mySeatNo} isHost={isHost} onAction={sendAction} />
+            ) : game === "poker" && gameState ? (
+              <PokerBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
             ) : (
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
@@ -7727,5 +8702,8 @@ export const CatanGame = () => <TabletopGame game="catan" />;
 export const BlokusGame = () => <TabletopGame game="blokus" />;
 export const MaheGame = () => <TabletopGame game="mahe" />;
 export const DalmutiGame = () => <TabletopGame game="dalmuti" />;
+export const SixNimmtGame = () => <TabletopGame game="six-nimmt" />;
+export const TelestrationsGame = () => <TabletopGame game="telestrations" />;
+export const PokerGame = () => <TabletopGame game="poker" />;
 
 export default TabletopGame;

@@ -67,13 +67,15 @@ export const AllMenu = () => {
 
     const games = [
         { title: "게임 허브", to: "/app/games", icon: Dices, color: "bg-amber-50 text-amber-700" },
-        { title: "플린코", to: "/app/plinko", icon: Dices, color: "bg-violet-50 text-violet-600" },
+        { title: "포커", to: "/app/poker", icon: Dices, color: "bg-emerald-50 text-emerald-700" },
         { title: "라스베거스", to: "/app/games/las-vegas", icon: BadgeDollarSign, color: "bg-orange-50 text-orange-600" },
         { title: "노땡스", to: "/app/games/no-thanks", icon: BadgeX, color: "bg-slate-50 text-orange-600" },
         { title: "카탄", to: "/app/games/catan", icon: Dices, color: "bg-lime-50 text-lime-700" },
         { title: "블로커스", to: "/app/games/blokus", icon: Dices, color: "bg-blue-50 text-blue-700" },
         { title: "마헤", to: "/app/games/mahe", icon: Dices, color: "bg-emerald-50 text-emerald-700" },
         { title: "달무티", to: "/app/games/dalmuti", icon: Dices, color: "bg-rose-50 text-rose-700" },
+        { title: "6 nimmt!", to: "/app/games/six-nimmt", icon: Dices, color: "bg-rose-50 text-rose-700" },
+        { title: "텔레스트레이션", to: "/app/games/telestrations", icon: Dices, color: "bg-sky-50 text-sky-700" },
         { title: "Citadels", to: "/app/games/citadels", icon: Dices, color: "bg-amber-50 text-zinc-800" },
     ];
 

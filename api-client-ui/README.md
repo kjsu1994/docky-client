@@ -7,7 +7,7 @@ React + Vite 기반의 커뮤니티/게임/운영 도구 프론트엔드입니�
 - `/app/games/citadels`는 별도 React 화면이지만 `src/adapters/tabletopGameAdapter.js`의 공통 방/상태/action 계약을 사용합니다.
 - 게임 허브, 전체 메뉴, 헤더 메뉴, 페이지 도움말에 Citadels 진입점을 추가했습니다.
 - 시타델 화면은 마헤처럼 현재 선택의 비용/이득을 짧게 보여주는 보조 UX를 포함합니다. 모바일에서는 `지금 할 일`과 핵심 수치만 먼저 보이고, 세부 캐릭터/점수 도움은 데스크톱 사이드 패널 중심으로 노출합니다.
-- `src/hooks/useGameSound.js`는 사용자 입력 뒤에만 짧은 턴/액션 알림음을 재생합니다. Las Vegas와 Lucky Plinko에는 적용하지 않았습니다.
+- `src/hooks/useGameSound.js`는 사용자 입력 뒤에만 짧은 턴/액션 알림음을 재생합니다. Las Vegas, No Thanks, Tabletop 계열 게임에 볼륨 보정이 적용됩니다.
 - 검증: `npm.cmd run build`, `npm.cmd run smoke:hub-ui`, `npm.cmd run smoke:tabletop-ui` 통과.
 
 ## 실행
@@ -523,3 +523,9 @@ npm run build
 - 2026-06-02 verify: No client source changes were needed for the backend inactive game-room cleanup batch pass. `npm.cmd run smoke:las-vegas-ui`, `npm.cmd run smoke:no-thanks-ui`, `npm.cmd run smoke:tabletop-ui`, `npm.cmd run smoke:text-quality`, and `npm.cmd run build` passed to confirm the game screens still match the existing API contract.
 - 2026-06-02 UX: The medical facility admin CSV reload flow now treats non-`RUNNING` start responses as blocked/failed instead of showing a success toast and progress spinner. Stale start-lock responses clear the pending UI and show the Korean server guidance so admins can retry instead of being stuck on "작업 진행중".
 - 2026-06-02 verify: `node --check scripts\facility-ui-smoke.mjs`, `npm.cmd run smoke:facility-ui`, `npm.cmd run smoke:text-quality`, and `npm.cmd run build` passed after the medical import start-lock UX pass.
+- 2026-06-03 UX/game: Citadels waiting room now has visible lobby artwork, start readiness checks, and a host start CTA. Tabletop added `6 nimmt!` with row/hand/action mobile anchors and card-placement penalty prediction, plus `텔레스트레이션` with canvas drawing, stage submission status, final replay, and host data-delete finish confirmation. Lucky Plinko was replaced by `/app/poker`; legacy `/app/plinko` redirects to Poker.
+- 2026-06-03 UX/audio: common tabletop sounds use a 4x multiplier, and Las Vegas/No Thanks separate effects also use a 4x multiplier. Force-finish actions across Las Vegas, No Thanks, Tabletop games, and Citadels use `confirmAction`.
+- 2026-06-03 verify: `npm run build` passed after the game additions and wrote the production bundle to `C:\compose\minio-data\client\dist`. Server verification paired with this client pass: `.\gradlew.bat test --tests "community.game.tabletop.service.TelestrationsRulesTest"` and `.\gradlew.bat compileJava`.
+- 2026-06-03 UX/game correction: `/app/poker` is now a Tabletop room-based Limit Texas Hold'em game instead of the old single-player practice screen. It supports 1~8 players, AI bots for solo starts, chip/blind presets, private hole-card refresh, pot/chip/player state, and a mobile sticky action panel with call amount, pot odds, and beginner advice. Legacy `/app/plinko` still redirects to `/app/poker`.
+- 2026-06-03 UX/game correction: Citadels now shows lobby artwork before room selection and inside the waiting room, and non-host users see a clear host-start-waiting state instead of an apparently missing start control.
+- 2026-06-03 verify: `npm run build` passed after the Poker and Citadels corrections and wrote the production bundle to `C:\compose\minio-data\client\dist`.

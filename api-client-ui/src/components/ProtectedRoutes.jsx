@@ -21,13 +21,15 @@ const Ranks = lazy(() => import("../pages/home/Ranks.jsx").then((module) => ({ d
 const News = lazy(() => import("../pages/facility/News.jsx").then((module) => ({ default: module.News })));
 const Mypage = lazy(() => import("../pages/home/Mypage.jsx").then((module) => ({ default: module.Mypage })));
 const MypageEdit = lazy(() => import("../pages/home/MypageEdit.jsx").then((module) => ({ default: module.MypageEdit })));
-const LuckyPlinko = lazy(() => import("../pages/games/LuckyPlinko.jsx").then((module) => ({ default: module.LuckyPlinko })));
 const LasVegasGame = lazy(() => import("../pages/games/LasVegasGame.jsx").then((module) => ({ default: module.LasVegasGame })));
 const NoThanksGame = lazy(() => import("../pages/games/NoThanksGame.jsx").then((module) => ({ default: module.NoThanksGame })));
 const CatanGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.CatanGame })));
 const BlokusGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.BlokusGame })));
 const MaheGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.MaheGame })));
 const DalmutiGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.DalmutiGame })));
+const SixNimmtGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.SixNimmtGame })));
+const TelestrationsGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.TelestrationsGame })));
+const PokerGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.PokerGame })));
 const CitadelsGame = lazy(() => import("../pages/games/CitadelsGame.jsx").then((module) => ({ default: module.CitadelsGame })));
 const MeetingOptimizer = lazy(() => import("../pages/facility/MeetingOptimizer.jsx").then((module) => ({ default: module.MeetingOptimizer })));
 const FacilityFinder = lazy(() => import("../pages/facility/FacilityFinder.jsx").then((module) => ({ default: module.FacilityFinder })));
@@ -68,13 +70,16 @@ export const ProtectedRoutes = () => (
                         <Route path="news" element={<News />} />
                         <Route path="mypage" element={<Mypage />} />
                         <Route path="mypage/edit" element={<MypageEdit />} />
-                        <Route path="plinko" element={<LuckyPlinko />} />
+                        <Route path="poker" element={<PokerGame />} />
+                        <Route path="plinko" element={<Navigate to="/app/poker" replace />} />
                         <Route path="games/las-vegas" element={<LasVegasGame />} />
                         <Route path="games/no-thanks" element={<NoThanksGame />} />
                         <Route path="games/catan" element={<CatanGame />} />
                         <Route path="games/blokus" element={<BlokusGame />} />
                         <Route path="games/mahe" element={<MaheGame />} />
                         <Route path="games/dalmuti" element={<DalmutiGame />} />
+                        <Route path="games/six-nimmt" element={<SixNimmtGame />} />
+                        <Route path="games/telestrations" element={<TelestrationsGame />} />
                         <Route path="games/citadels" element={<CitadelsGame />} />
                         <Route path="optimizer" element={<MeetingOptimizer />} />
                         <Route path="facility" element={<FacilityFinder />} />

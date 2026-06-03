@@ -10,30 +10,30 @@ const sharedRoomStartSteps = [
 ];
 
 const gameManuals = {
-  plinko: {
-    subtitle: "주사위 결과로 구슬을 얻고, 구슬이 떨어진 배율 칸으로 포인트를 노리는 1인 아케이드 게임입니다.",
-    tags: ["1인", "즉시 플레이", "포인트 보상"],
+  poker: {
+    subtitle: "1~8명이 방을 만들고 칩을 걸며 이어가는 리밋 텍사스 홀덤입니다. 혼자 시작하면 AI 봇이 자동으로 참여합니다.",
+    tags: ["1~8인", "AI 봇", "칩 세션"],
     sections: [
       {
         title: "처음 시작 순서",
         items: [
-          "입장하면 별도 방 생성 없이 바로 플레이 화면이 열립니다.",
-          "첫 굴림 버튼으로 주사위를 굴리고, 남기고 싶은 주사위를 선택한 뒤 나머지를 다시 굴릴 수 있습니다.",
-          "확정된 주사위 족보에 따라 구슬 수가 정해지고, 바로 시작 또는 구슬 투입 버튼으로 플링코 보드에 구슬을 떨어뜨립니다.",
+          "방을 만들 때 빠른판, 표준, 딥스택 중 시작 칩과 블라인드 프리셋을 고릅니다.",
+          "혼자 시작하면 AI 봇 3명이 자동으로 채워지고, 2명 이상이면 참가자끼리 바로 시작합니다.",
+          "내 차례에는 폴드, 체크/콜, 레이즈, 올인을 선택합니다.",
         ],
       },
       {
         title: "목표",
         items: [
-          "좋은 주사위 족보를 만들어 더 많은 구슬을 확보하는 것이 1차 목표입니다.",
-          "구슬이 높은 배율 슬롯에 들어갈수록 획득 포인트가 커집니다.",
+          "홀카드 2장과 커뮤니티 카드 5장 중 가장 강한 5장 족보로 팟을 가져갑니다.",
+          "정해진 핸드 수가 끝나거나 한 명만 칩이 남으면 가장 많은 칩을 가진 플레이어가 승리합니다.",
         ],
       },
       {
         title: "초보 팁",
         items: [
-          "첫 굴림에서 같은 눈이 2개 이상이면 그 눈을 보존하고 나머지를 다시 굴리는 전략이 안정적입니다.",
-          "구슬이 적어도 높은 배율에 들어가면 보상이 커질 수 있으므로, 결과 화면의 획득 포인트를 확인하고 새 게임을 시작하세요.",
+          "액션 패널의 콜 금액과 팟오즈를 먼저 보고, 비용이 큰 약한 패는 폴드해도 됩니다.",
+          "페어, 투페어, 플러시 드로우처럼 이어갈 근거가 있으면 콜 또는 레이즈를 고려하세요.",
         ],
       },
     ],
@@ -108,6 +108,64 @@ const gameManuals = {
         items: [
           "내가 이미 가진 숫자와 이어지는 카드는 생각보다 싸게 처리할 수 있습니다.",
           "초반부터 칩을 모두 쓰면 강제로 카드를 가져가게 되므로, 적어도 몇 개는 방어용으로 남겨두는 편이 안전합니다.",
+        ],
+      },
+    ],
+  },
+  sixNimmt: {
+    subtitle: "1~104 카드 중 한 장을 동시에 고르고, 네 행에 붙이거나 행을 가져가며 벌점을 피하는 카드게임입니다.",
+    tags: ["2~10인", "동시 선택", "벌점 예측"],
+    sections: [
+      { title: "처음 시작 순서", items: sharedRoomStartSteps },
+      {
+        title: "목표",
+        items: [
+          "카드에 표시된 벌점을 최대한 적게 가져가는 것이 목표입니다.",
+          "누군가 총 66벌점 이상이 되면 게임이 끝나고, 총 벌점이 가장 낮은 플레이어가 승리합니다.",
+        ],
+      },
+      {
+        title: "카드 배치",
+        items: [
+          "모든 플레이어가 손패에서 카드 1장을 고르면 낮은 숫자부터 차례대로 처리됩니다.",
+          "카드는 자기보다 작은 끝 카드 중 가장 숫자가 큰 행에 붙습니다.",
+          "붙일 행이 없으면 직접 한 행을 가져가고, 내 카드가 새 행의 시작 카드가 됩니다.",
+        ],
+      },
+      {
+        title: "벌점",
+        items: [
+          "카드를 붙이면 여섯 번째 카드가 되는 행은 기존 5장을 가져가 벌점이 됩니다.",
+          "화면에서 선택한 카드의 예상 행과 예상 벌점을 먼저 보여주므로, 벌점을 비교하고 제출하면 됩니다.",
+        ],
+      },
+    ],
+  },
+  telestrations: {
+    subtitle: "문장과 그림을 번갈아 넘기고 마지막에 전체 변화를 순서대로 공개하는 파티 게임입니다.",
+    tags: ["3~8인", "그림 릴레이", "리플레이"],
+    sections: [
+      { title: "처음 시작 순서", items: sharedRoomStartSteps },
+      {
+        title: "목표",
+        items: [
+          "정답을 맞히는 게임이 아니라, 문장과 그림이 어떻게 바뀌는지 함께 보는 파티 게임입니다.",
+          "마지막 공개에서 각 책자의 시작 문장, 그림, 추측 문장을 순서대로 넘겨 보며 흐름을 확인합니다.",
+        ],
+      },
+      {
+        title: "진행",
+        items: [
+          "처음에는 각자 비밀 시작 문장을 적습니다.",
+          "다음 단계부터는 이전 사람의 문장을 보고 그림을 그리거나, 이전 사람의 그림을 보고 문장을 추측합니다.",
+          "모두 제출해야 다음 단계로 넘어가므로, 화면의 제출 완료 상태를 확인하면 됩니다.",
+        ],
+      },
+      {
+        title: "데이터",
+        items: [
+          "공개 리플레이 중에는 문장과 그림을 볼 수 있습니다.",
+          "호스트가 종료하면 게임 데이터가 삭제되고 같은 방은 다시 준비 상태로 쓸 수 있습니다.",
         ],
       },
     ],
@@ -303,18 +361,18 @@ const gameManuals = {
 
 const games = [
   {
-    title: "Lucky Plinko",
-    description: "(1인) 혼자 플레이하는 빠칭코",
-    to: "/app/plinko",
-    tone: "from-emerald-500 via-teal-500 to-cyan-500",
-    players: "1인",
+    title: "포커",
+    description: "(1~8인) 리밋 텍사스 홀덤 / 칩 세션과 AI 봇을 지원합니다.",
+    to: "/app/poker",
+    tone: "from-emerald-800 via-slate-900 to-rose-900",
+    players: "1~8인",
     minPlayers: 1,
-    maxPlayers: 1,
-    mode: "싱글",
-    preview: "plinko",
-    highlights: ["즉시 플레이", "혼자 진행"],
-    manual: gameManuals.plinko,
-    featured: false,
+    maxPlayers: 8,
+    mode: "텍사스 홀덤",
+    preview: "poker",
+    highlights: ["AI 봇", "칩 세션", "팟오즈"],
+    manual: gameManuals.poker,
+    featured: true,
   },
   {
     title: "Las Vegas",
@@ -401,6 +459,34 @@ const games = [
     featured: true,
   },
   {
+    title: "6 nimmt!",
+    description: "(2~10인) 동시 카드 선택과 4개 행 벌점 관리를 서버 판정으로 지원합니다.",
+    to: "/app/games/six-nimmt",
+    tone: "from-rose-500 via-amber-500 to-lime-500",
+    players: "2~10인",
+    minPlayers: 2,
+    maxPlayers: 10,
+    mode: "벌점 카드",
+    preview: "six-nimmt",
+    highlights: ["동시 선택", "벌점 예측", "66벌점 종료"],
+    manual: gameManuals.sixNimmt,
+    featured: true,
+  },
+  {
+    title: "텔레스트레이션",
+    description: "(3~8인) 문장과 그림을 번갈아 넘기고 마지막 공개 리플레이로 함께 확인합니다.",
+    to: "/app/games/telestrations",
+    tone: "from-sky-500 via-fuchsia-500 to-amber-400",
+    players: "3~8인",
+    minPlayers: 3,
+    maxPlayers: 8,
+    mode: "그림 릴레이",
+    preview: "telestrations",
+    highlights: ["동시 제출", "캔버스", "리플레이"],
+    manual: gameManuals.telestrations,
+    featured: true,
+  },
+  {
     title: "Citadels",
     description: "(2~7인) 비밀 캐릭터 선택과 도시 건설을 서버 판정으로 진행합니다.",
     to: "/app/games/citadels",
@@ -417,12 +503,15 @@ const games = [
 ];
 
 const gameRoutePreloads = {
+  "/app/poker": () => import("./TabletopGame.jsx"),
   "/app/games/las-vegas": () => import("./LasVegasGame.jsx"),
   "/app/games/no-thanks": () => import("./NoThanksGame.jsx"),
   "/app/games/catan": () => import("./TabletopGame.jsx"),
   "/app/games/blokus": () => import("./TabletopGame.jsx"),
   "/app/games/mahe": () => import("./TabletopGame.jsx"),
   "/app/games/dalmuti": () => import("./TabletopGame.jsx"),
+  "/app/games/six-nimmt": () => import("./TabletopGame.jsx"),
+  "/app/games/telestrations": () => import("./TabletopGame.jsx"),
   "/app/games/citadels": () => import("./CitadelsGame.jsx"),
 };
 
@@ -655,6 +744,80 @@ const GamePreview = ({ type }) => {
             <span className="rotate-180 text-xs font-black">{card.rank}</span>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (type === "six-nimmt") {
+    const rows = [
+      [12, 23, 39, 48, 60],
+      [7, 31, 44],
+      [18, 26, 55, 71],
+      [3, 16],
+    ];
+    return (
+      <div className="grid h-36 w-56 max-w-full gap-2 rounded-2xl bg-slate-950/75 p-3 shadow-inner">
+        {rows.map((row, rowIndex) => (
+          <div key={rowIndex} className="grid grid-cols-5 gap-1">
+            {row.map((value) => (
+              <span key={`${rowIndex}-${value}`} className={`flex items-center justify-center rounded-lg border border-white/70 bg-white text-xs font-black ${value === 55 ? "text-rose-700" : "text-slate-800"}`}>
+                {value}
+              </span>
+            ))}
+            {Array.from({ length: 5 - row.length }).map((_, index) => (
+              <span key={`empty-${rowIndex}-${index}`} className="rounded-lg border border-dashed border-white/20 bg-white/5" />
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "telestrations") {
+    return (
+      <div className="relative h-36 w-60 max-w-full rounded-lg bg-slate-950 p-3 shadow-inner">
+        <div className="grid h-full grid-cols-3 gap-2">
+          {[
+            { title: "문장", body: "달 위의 요리사", tone: "bg-sky-50 text-sky-800" },
+            { title: "그림", body: "✎", tone: "bg-white text-slate-900" },
+            { title: "추측", body: "우주 식당", tone: "bg-amber-50 text-amber-800" },
+          ].map((page, index) => (
+            <div key={page.title} className={`flex flex-col justify-between rounded-lg border border-white/30 p-2 shadow-lg ${page.tone}`} style={{ transform: `translateY(${index % 2 ? 8 : 0}px)` }}>
+              <span className="text-[10px] font-black opacity-60">{page.title}</span>
+              <span className="text-center text-sm font-black leading-tight">{page.body}</span>
+              <span className="h-1 rounded-full bg-current opacity-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "poker") {
+    const cards = [
+      { rank: "A", suit: "♠", color: "text-slate-950", x: -64, rotate: -10 },
+      { rank: "A", suit: "♥", color: "text-rose-600", x: -32, rotate: -5 },
+      { rank: "K", suit: "♣", color: "text-slate-950", x: 0, rotate: 0 },
+      { rank: "Q", suit: "♦", color: "text-rose-600", x: 32, rotate: 5 },
+      { rank: "J", suit: "♠", color: "text-slate-950", x: 64, rotate: 10 },
+    ];
+    return (
+      <div className="relative h-36 w-60 max-w-full rounded-lg bg-emerald-950 p-3 shadow-inner">
+        <div className="absolute inset-x-4 top-3 h-5 rounded-full bg-amber-300/80" />
+        {cards.map((card) => (
+          <div
+            key={`${card.rank}-${card.suit}`}
+            className="absolute left-1/2 top-8 flex h-24 w-16 -translate-x-1/2 flex-col justify-between rounded-lg border border-white bg-white p-2 shadow-lg"
+            style={{ transform: `translateX(calc(-50% + ${card.x}px)) rotate(${card.rotate}deg)` }}
+          >
+            <span className={`text-sm font-black ${card.color}`}>{card.rank}</span>
+            <span className={`text-center text-3xl font-black ${card.color}`}>{card.suit}</span>
+            <span className={`rotate-180 self-end text-sm font-black ${card.color}`}>{card.rank}</span>
+          </div>
+        ))}
+        <div className="absolute bottom-3 left-3 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black text-emerald-100">
+          HOLD 확률
+        </div>
       </div>
     );
   }

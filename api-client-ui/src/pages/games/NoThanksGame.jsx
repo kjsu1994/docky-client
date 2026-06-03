@@ -20,7 +20,7 @@ import { useGameSound } from "../../hooks/useGameSound.js";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
-const NO_THANKS_SOUND_VOLUME_MULTIPLIER = 2;
+const NO_THANKS_SOUND_VOLUME_MULTIPLIER = 4;
 
 const roomIdOf = getNoThanksRoomId;
 const chatRoomIdOf = getNoThanksChatRoomId;

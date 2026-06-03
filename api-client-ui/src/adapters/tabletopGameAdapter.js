@@ -171,6 +171,8 @@ export const buildTabletopActionPayload = (payload = {}) => {
     assignIfPresent(next, "resource_type", pick(payload, "resourceType", "resource_type"));
     assignIfPresent(next, "target_resource_type", pick(payload, "targetResourceType", "target_resource_type"));
     assignIfPresent(next, "improvement_type", pick(payload, "improvementType", "improvement_type"));
+    assignIfPresent(next, "text", pick(payload, "text", "text"));
+    assignIfPresent(next, "image_data", pick(payload, "imageData", "image_data"));
     assignIfPresent(next, "resources", pick(payload, "resources", "resources"));
     assignIfPresent(next, "commodities", pick(payload, "commodities", "commodities"));
     assignIfPresent(next, "target_resources", pick(payload, "targetResources", "target_resources"));
