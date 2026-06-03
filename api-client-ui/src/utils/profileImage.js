@@ -51,6 +51,15 @@ export const normalizeProfileImageUrl = (value) => {
 
     const raw = value.trim();
     if (!raw) return "";
+    const compact = raw.replace(/[\u0000-\u001F\u007F\s]+/g, "").toLowerCase();
+    if (
+        compact.startsWith("javascript:") ||
+        compact.startsWith("vbscript:") ||
+        compact.startsWith("data:") ||
+        raw.startsWith("//")
+    ) {
+        return "";
+    }
 
     if (raw.startsWith("/api/image/view")) {
         try {
@@ -68,9 +77,14 @@ export const normalizeProfileImageUrl = (value) => {
         return toProfileProxyUrl(raw.replace(/^\/upload-files\//, ""));
     }
 
+    if (raw.startsWith("/") && !raw.startsWith("//")) {
+        return raw;
+    }
+
     if (ABSOLUTE_URL_PATTERN.test(raw)) {
         try {
             const parsed = new URL(raw);
+            if (!["http:", "https:"].includes(parsed.protocol)) return "";
             if (parsed.pathname === "/api/image/view") {
                 return isTrustedProfileStorageUrl(parsed)
                     ? toProfileProxyUrl(parsed.searchParams.get("path"))
@@ -83,5 +97,5 @@ export const normalizeProfileImageUrl = (value) => {
         }
     }
 
-    return raw;
+    return toProfileProxyUrl(raw);
 };

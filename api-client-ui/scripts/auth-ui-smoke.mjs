@@ -491,7 +491,7 @@ async function inspectAuth(cdp, sessionId) {
     }, sessionId);
 
     await cdp.send("Page.navigate", { url: `${baseUrl}/login?error` }, sessionId);
-    await waitForText(cdp, sessionId, "구글 로그인에 실패했습니다. 다시 시도해주세요.");
+    await waitForText(cdp, sessionId, "소셜 로그인에 실패했습니다. 다시 시도해주세요.");
     await waitFor(cdp, sessionId, `location.pathname === "/login" && location.search === ""`, "oauth error query cleanup");
     await waitForText(cdp, sessionId, "로그인");
     await assertNoBlockedText(cdp, sessionId, "oauth error");

@@ -9,13 +9,32 @@ import { loadToast, notifyError, notifySuccess } from "../../utils/toast.js";
 
 const loadAuthAdapter = () => import("../../adapters/authAdapter.js");
 
+const readOauthRedirectParams = () => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const rawHash = window.location.hash?.startsWith("#")
+        ? window.location.hash.slice(1)
+        : "";
+    const hashParams = new URLSearchParams(rawHash.startsWith("?") ? rawHash.slice(1) : rawHash);
+    const value = (camelKey, snakeKey) => (
+        searchParams.get(camelKey) ||
+        searchParams.get(snakeKey) ||
+        hashParams.get(camelKey) ||
+        hashParams.get(snakeKey)
+    );
+
+    return {
+        accessToken: value("accessToken", "access_token"),
+        refreshToken: value("refreshToken", "refresh_token"),
+        error: searchParams.has("error") || hashParams.has("error"),
+    };
+};
+
 export const Login = () => {
     const [oauthProcessing, setOauthProcessing] = useState(() => {
-        const params = new URLSearchParams(window.location.search);
+        const params = readOauthRedirectParams();
         return Boolean(
-            params.get("accessToken") ||
-            params.get("access_token") ||
-            params.has("error")
+            params.accessToken ||
+            params.error
         );
     });
     const [email, setEmail] = useState("");
@@ -23,6 +42,7 @@ export const Login = () => {
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [naverLoading, setNaverLoading] = useState(false);
+    const [oauthErrorMessage, setOauthErrorMessage] = useState("");
     const [lockInfo, setLockInfo] = useState(null);
     const [releaseReason, setReleaseReason] = useState("");
     const [releaseLoading, setReleaseLoading] = useState(false);
@@ -45,14 +65,17 @@ export const Login = () => {
     useEffect(() => {
         if (oauthHandledRef.current) return;
 
-        const params = new URLSearchParams(window.location.search);
-        const accessToken = params.get("accessToken") || params.get("access_token");
-        const refreshToken = params.get("refreshToken") || params.get("refresh_token");
-        const oauthError = params.has("error");
+        const {
+            accessToken,
+            refreshToken,
+            error: oauthError,
+        } = readOauthRedirectParams();
 
         if (oauthError) {
+            const message = "소셜 로그인에 실패했습니다. 다시 시도해주세요.";
             window.history.replaceState({}, document.title, window.location.pathname);
-            notifyError("소셜 로그인에 실패했습니다. 다시 시도해주세요.");
+            setOauthErrorMessage(message);
+            notifyError(message);
             oauthHandledRef.current = true;
             setOauthProcessing(false);
             return;
@@ -121,11 +144,13 @@ export const Login = () => {
 
     const handleGoogleLogin = () => {
         setGoogleLoading(true);
+        setOauthErrorMessage("");
         window.location.href = "/api/oauth2/authorization/google";
     };
 
     const handleNaverLogin = () => {
         setNaverLoading(true);
+        setOauthErrorMessage("");
         window.location.href = "/api/oauth2/authorization/naver";
     };
 
@@ -155,6 +180,7 @@ export const Login = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setOauthErrorMessage("");
         try {
             await login(email, password);
         } catch (error) {
@@ -212,6 +238,14 @@ export const Login = () => {
 
                 {/* 로그인 폼 */}
                 <div className="card p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50">
+                    {oauthErrorMessage && (
+                        <div
+                            role="alert"
+                            className="mb-5 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700"
+                        >
+                            {oauthErrorMessage}
+                        </div>
+                    )}
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
                             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">

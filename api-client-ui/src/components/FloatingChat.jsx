@@ -51,6 +51,7 @@ import {
     isAiRoom,
 } from "../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../adapters/realtimeAdapter.js";
+import AuthenticatedAttachmentImage from "./AuthenticatedAttachmentImage.jsx";
 
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
 const MESSAGE_PAGE_SIZE = 20;
@@ -162,6 +163,15 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
     const dragStartRef = useRef({ pointerX: 0, pointerY: 0, x: 0, y: 0 });
     const didDragRef = useRef(false);
     const skipNextAutoScrollRef = useRef(false);
+
+    const handleDownloadAttachment = useCallback(async (fileUrl, fileName) => {
+        try {
+            await chatAdapter.downloadAttachment(fileUrl, fileName || "attachment");
+        } catch (error) {
+            logClientError("floating-chat.attachment.download", error);
+            notifyError(extractChatErrorMessage(error, "첨부파일을 다운로드할 수 없습니다."));
+        }
+    }, []);
 
     const upsertRoomPreview = (roomId, previewText, createdAt, nextUnreadCount) => {
         if (!roomId) return;
@@ -1150,11 +1160,10 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                                         </div>
                                                                     ) : normalized.fileImage ? (
                                                                         <div className="space-y-2">
-                                                                            <img
+                                                                            <AuthenticatedAttachmentImage
                                                                                 src={messageFileUrl}
                                                                                 alt={normalized.fileName || "이미지"}
                                                                                 className="max-w-[200px] rounded-xl cursor-pointer"
-                                                                                onClick={() => window.open(messageFileUrl, "_blank", "noopener,noreferrer")}
                                                                             />
                                                                             {!!(normalized.fileName || normalized.message) && (
                                                                                 <div className={`text-[10px] font-bold ${isMe ? "text-white/80" : "text-slate-400"}`}>
@@ -1163,12 +1172,10 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                                             )}
                                                                         </div>
                                                                     ) : (
-                                                                        <a
-                                                                            href={messageFileUrl}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className={`flex min-w-[180px] items-center gap-2 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-2.5`}
-                                                                            download={normalized.fileName || undefined}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleDownloadAttachment(messageFileUrl, normalized.fileName || normalized.message)}
+                                                                            className={`flex min-w-[180px] items-center gap-2 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-2.5 text-left`}
                                                                         >
                                                                             <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-primary-50 text-primary-600"}`}>
                                                                                 <Download className="h-4 w-4" />
@@ -1182,7 +1189,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
                                                                                     </span>
                                                                                 </div>
                                                                             </div>
-                                                                        </a>
+                                                                        </button>
                                                                     )
                                                                 ) : normalized.message}
                                                             </div>

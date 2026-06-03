@@ -1,5 +1,6 @@
 import api from "../utils/api.js";
 import { logClientError } from "../utils/clientDiagnostics.js";
+import { normalizeExternalUrl } from "../utils/helpers.js";
 import { statsAdapter } from "./statsAdapter.js";
 
 export const unwrapHomeData = (response) => response?.data?.data ?? response?.data ?? null;
@@ -39,6 +40,47 @@ const toValidBannerId = (value) => {
 };
 
 const isExternalBannerUrl = (value) => /^https?:\/\//i.test(String(value || ""));
+const BANNER_INTERNAL_PATH_MAX_LENGTH = 300;
+
+const normalizeBannerInternalPath = (value) => {
+    const raw = String(value || "").trim();
+    if (
+        !raw ||
+        raw.length > BANNER_INTERNAL_PATH_MAX_LENGTH ||
+        raw.startsWith("//") ||
+        /["'\\\u0000-\u001F\u007F]/.test(raw)
+    ) {
+        return "";
+    }
+    if (!raw.startsWith("/")) return "";
+
+    try {
+        const parsed = new URL(raw, "https://ctfmon.shop");
+        const target = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        if (
+            target === "/" ||
+            target === "/login" ||
+            target === "/register" ||
+            target === "/queue" ||
+            target.startsWith("/queue?") ||
+            target === "/app" ||
+            target.startsWith("/app/") ||
+            target.startsWith("/app?")
+        ) {
+            return target;
+        }
+    } catch {
+        return "";
+    }
+
+    return "";
+};
+
+export const normalizeHomeBannerLinkUrl = (value) => {
+    const externalUrl = normalizeExternalUrl(value);
+    if (externalUrl) return externalUrl;
+    return normalizeBannerInternalPath(value);
+};
 
 const normalizeBannerAssetUrl = (value) => {
     const url = String(value || "").trim();
@@ -290,7 +332,7 @@ export const normalizeHomeBanners = (response, fallbackName) => {
     const items = data?.items || data?.content || data || [];
     if (Array.isArray(items) && items.length) {
         return items.map((item, idx) => {
-            const linkUrl = normalizeBannerAssetUrl(item.linkUrl ?? item.link_url ?? "");
+            const linkUrl = normalizeHomeBannerLinkUrl(item.linkUrl ?? item.link_url ?? "");
             const imageUrl = normalizeBannerAssetUrl(item.imageUrl ?? item.image_url ?? "");
 
             return {

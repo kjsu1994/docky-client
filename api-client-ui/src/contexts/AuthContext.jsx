@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { normalizePostOauthRedirect } from "../utils/authRedirect.js";
 import { logClientError } from "../utils/clientDiagnostics.js";
 import { notifyError, notifySuccess } from "../utils/toast.js";
 
 const AuthContext = createContext(null);
 const loadAuthAdapter = () => import("../adapters/authAdapter.js");
+export { normalizePostOauthRedirect } from "../utils/authRedirect.js";
 
 const parseStoredRoles = () => {
     try {
@@ -123,9 +125,9 @@ export const AuthProvider = ({ children }) => {
         const userData = await authAdapter.fetchCurrentMember();
         setUser(withRolesFallback(userData, parseStoredRoles()));
 
-        const postOauthRedirect = localStorage.getItem("postOauthRedirect");
+        const postOauthRedirect = normalizePostOauthRedirect(localStorage.getItem("postOauthRedirect"));
+        localStorage.removeItem("postOauthRedirect");
         if (postOauthRedirect) {
-            localStorage.removeItem("postOauthRedirect");
             navigate(postOauthRedirect, { replace: true });
             return;
         }

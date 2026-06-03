@@ -32,6 +32,15 @@ const requiredTexts = [
     "광고 개인화 설정을 선택하면 이 영역이 활성화됩니다.",
     "테스트 게시글",
     "1분 미만 전",
+    "개인정보처리방침",
+    "상세 내용 보기",
+    "사업자 정보",
+    "CTFMON",
+    "김진수",
+    "kjsu1701@naver.com",
+    "전화번호",
+    "호스팅서비스 제공자",
+    "구매안전서비스",
 ];
 const blockedTexts = ["Sponsored", "Notice", "Learn more", "Invest", "FREE_BOARD", "ADMIN_NOTICE"];
 

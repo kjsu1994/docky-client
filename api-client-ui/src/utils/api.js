@@ -65,6 +65,36 @@ const normalizeUrl = (url = "") => {
     return String(url).replace(/^\/api/, "");
 };
 
+const browserOrigin = () => {
+    if (typeof window !== "undefined" && window.location?.origin) {
+        return window.location.origin;
+    }
+    return "http://localhost";
+};
+
+const combineBaseAndRequestUrl = (baseURL = "", requestUrl = "") => {
+    const rawRequestUrl = String(requestUrl || "");
+    if (/^https?:\/\//i.test(rawRequestUrl)) {
+        return rawRequestUrl;
+    }
+    const rawBaseUrl = String(baseURL || "");
+    if (!rawBaseUrl) {
+        return rawRequestUrl;
+    }
+    return `${rawBaseUrl.replace(/\/+$/, "")}/${rawRequestUrl.replace(/^\/+/, "")}`;
+};
+
+export const isSameOriginApiRequest = (config = {}) => {
+    try {
+        const origin = browserOrigin();
+        const combined = combineBaseAndRequestUrl(config.baseURL ?? api.defaults.baseURL, config.url);
+        const resolved = new URL(combined || "/", origin);
+        return resolved.origin === origin && (resolved.pathname === "/api" || resolved.pathname.startsWith("/api/"));
+    } catch {
+        return false;
+    }
+};
+
 const isPublicAuthRequest = (config) => {
     const url = normalizeUrl(config?.url);
     return PUBLIC_AUTH_PATHS.some((path) => url === path || url.startsWith(`${path}?`));
@@ -231,7 +261,7 @@ api.interceptors.request.use(
         }
 
         const token = localStorage.getItem("accessToken");
-        if (token) {
+        if (token && isSameOriginApiRequest(config) && !isPublicAuthRequest(config)) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
@@ -260,6 +290,7 @@ api.interceptors.response.use(
         const canRefresh =
             error.response?.status === 401 &&
             !originalRequest._retry &&
+            isSameOriginApiRequest(originalRequest) &&
             !isPublicAuthRequest(originalRequest) &&
             normalizeUrl(originalRequest.url) !== "/auth/reissue";
 

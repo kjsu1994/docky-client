@@ -6,6 +6,19 @@ export { MEMBER_SEARCH_KEYWORD_MAX_LENGTH } from "./memberSearchBounds.js";
 
 export const CHAT_MESSAGE_MAX_LENGTH = 2000;
 
+const toApiEndpoint = (url) => {
+    const raw = String(url || "").trim();
+    if (!raw) return "";
+
+    try {
+        const parsed = new URL(raw, window.location.origin);
+        if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith("/api/chat/file/")) return "";
+        return `${parsed.pathname.slice("/api".length)}${parsed.search}`;
+    } catch {
+        return "";
+    }
+};
+
 const unwrapChatData = (response) => response?.data?.data ?? response?.data ?? response ?? null;
 
 const toArray = (value) => {
@@ -390,5 +403,24 @@ export const chatAdapter = {
     async uploadRoomFile(roomId, formData, options = {}) {
         const response = await uploadFiles(`/chat/room/${roomId}/file`, formData, "post", options);
         return normalizeAttachment(response, formData.get?.("file"));
+    },
+
+    async downloadAttachment(fileUrl, fileName = "attachment") {
+        const endpoint = toApiEndpoint(fileUrl);
+        if (!endpoint) {
+            throw new Error("Invalid chat attachment URL.");
+        }
+        const response = await api.get(endpoint, {
+            responseType: "blob",
+            meta: { trackNetwork: false },
+        });
+        const blobUrl = URL.createObjectURL(response.data);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = fileName || "attachment";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     },
 };

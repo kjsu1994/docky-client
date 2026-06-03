@@ -42,6 +42,7 @@ import { logClientError } from "../../utils/clientDiagnostics.js";
 import { trapFocus } from "../../utils/focusTrap.js";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
 import UserAvatar from "../../common/UserAvatar.jsx";
+import AuthenticatedAttachmentImage from "../../components/AuthenticatedAttachmentImage.jsx";
 
 const MESSAGE_PAGE_SIZE = 20;
 
@@ -110,6 +111,15 @@ export const Chat = () => {
     const skipNextAutoScrollRef = useRef(false);
     const modalPanelRef = useRef(null);
     const modalCloseButtonRef = useRef(null);
+
+    const handleDownloadAttachment = useCallback(async (fileUrl, fileName) => {
+        try {
+            await chatAdapter.downloadAttachment(fileUrl, fileName || "attachment");
+        } catch (error) {
+            logClientError("chat.attachment.download", error);
+            notifyError(extractChatErrorMessage(error, "첨부파일을 다운로드할 수 없습니다."));
+        }
+    }, []);
 
     const closeMemberModal = useCallback(() => {
         setShowCreateModal(false);
@@ -689,11 +699,10 @@ export const Chat = () => {
                                                                     </div>
                                                                 ) : normalized.fileImage ? (
                                                                     <div className="space-y-2">
-                                                                        <img
+                                                                        <AuthenticatedAttachmentImage
                                                                             src={messageFileUrl}
                                                                             alt={normalized.fileName || "이미지"}
                                                                             className="max-w-xs rounded-xl cursor-pointer"
-                                                                            onClick={() => window.open(messageFileUrl, "_blank", "noopener,noreferrer")}
                                                                         />
                                                                         {!!(normalized.fileName || normalized.message) && (
                                                                             <div className={`text-[11px] ${isMe ? "text-white/80" : "text-slate-500"}`}>
@@ -702,12 +711,10 @@ export const Chat = () => {
                                                                         )}
                                                                     </div>
                                                                 ) : (
-                                                                    <a
-                                                                        href={messageFileUrl}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className={`flex min-w-[220px] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3 transition-colors hover:opacity-90`}
-                                                                        download={normalized.fileName || undefined}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDownloadAttachment(messageFileUrl, normalized.fileName || normalized.message)}
+                                                                        className={`flex min-w-[220px] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3 text-left transition-colors hover:opacity-90`}
                                                                     >
                                                                         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-primary-50 text-primary-600"}`}>
                                                                             <Download className="h-5 w-5" />
@@ -721,7 +728,7 @@ export const Chat = () => {
                                                                                 </span>
                                                                             </div>
                                                                         </div>
-                                                                    </a>
+                                                                    </button>
                                                                 )
                                                             ) : normalized.message}
                                                         </div>
