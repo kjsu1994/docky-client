@@ -26,7 +26,7 @@ const cases = [
   {
     path: "/app/games",
     label: "game hub",
-    expectedTexts: ["게임 목록", "카탄", "블로커스", "마헤", "달무티", "Citadels"],
+    expectedTexts: ["게임 목록", "카탄", "블로커스", "마헤", "달무티", "시티델"],
   },
   {
     path: "/app/games/catan",
@@ -49,9 +49,36 @@ const cases = [
     expectedTexts: ["달무티", "방 만들기", "입장", "본게임", "첫 손 세금 없음"],
   },
   {
+    path: "/app/games/six-nimmt",
+    label: "six nimmt lobby",
+    expectedTexts: ["6 nimmt!", "방 만들기", "입장", "본게임", "벌점"],
+  },
+  {
+    path: "/app/games/telestrations",
+    label: "telestrations prompt room",
+    expectedTexts: ["텔레스트레이션", "방 코드", "시작 문장", "내 비밀 시작 문장을 입력하세요.", "진행 현황"],
+  },
+  {
+    path: "/app/games/telestrations",
+    label: "telestrations guess image room",
+    telestrationsPhase: "GUESS",
+    expectedTexts: ["텔레스트레이션", "문장 추측", "보고 추측할 그림", "그림만 보고 떠오르는 문장을 적으세요"],
+    assertTelestrationsImage: true,
+  },
+  {
     path: "/app/games/citadels",
     label: "citadels lobby",
-    expectedTexts: ["Citadels", "방 만들기", "입장", "본게임", "비밀 캐릭터"],
+    expectedTexts: ["시티델", "방 만들기", "입장", "본게임", "비밀 캐릭터"],
+  },
+  {
+    path: "/app/poker",
+    label: "poker lobby",
+    expectedTexts: ["포커", "방 만들기", "입장", "텍사스 홀덤", "5장 드로우"],
+  },
+  {
+    path: "/app/games/no-thanks",
+    label: "no thanks lobby",
+    expectedTexts: ["노땡스", "방 만들기", "입장", "토큰 개수", "대기 중인 방"],
   },
   {
     path: "/app/games/las-vegas",
@@ -80,6 +107,16 @@ const variantsByGame = {
     variant("STRIPPED_DECK", "줄인 덱", true, 4, 5, "4~5인 공식 선택 규칙", ["4~5인", "일부 계급 제외", "빠른 패"]),
     variant("FIRST_DEAL_REVOLUTION", "첫 손 세금 없음", true, 4, 8, "첫 판 혁명 선택 규칙", ["첫 손 세금 없음", "혁명 선택", "공식 선택 규칙"]),
   ],
+  "six-nimmt": [
+    variant("BASE", "본게임", false, 2, 10, "숫자 카드를 행에 붙이고 벌점을 피하는 공식 규칙", ["2~10인", "6번째 회수", "66벌점"]),
+  ],
+  telestrations: [
+    variant("BASE", "본게임", false, 3, 8, "문장과 그림을 번갈아 넘기는 파티 게임", ["3~8인", "그림 릴레이", "리플레이 공개"]),
+  ],
+  poker: [
+    variant("TEXAS_HOLDEM", "텍사스 홀덤", false, 2, 8, "홀카드 2장과 공용 카드 5장으로 가장 강한 5장 족보를 만듭니다.", ["2~8인", "블라인드", "족보 보조"]),
+    variant("FIVE_CARD_DRAW", "5장 드로우", false, 2, 6, "손패 5장을 받고 한 번 교체한 뒤 족보를 비교합니다.", ["2~6인", "최대 3장 교체", "공식 룰"]),
+  ],
   citadels: [
     variant("BASE", "본게임", false, 2, 7, "기본 8개 캐릭터와 8구역 종료 조건", ["2~7인", "비밀 캐릭터", "도시 건설"]),
   ],
@@ -99,7 +136,17 @@ const mockState = {
   nextRoomId: 1000,
   activeRoomsByGame: new Map(),
   requests: [],
+  telestrationsPhase: "PROMPT",
 };
+
+const TELESTRATIONS_SMOKE_IMAGE = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <rect width="640" height="420" fill="#fff7ed"/>
+  <circle cx="188" cy="172" r="78" fill="#38bdf8" stroke="#0f172a" stroke-width="10"/>
+  <rect x="308" y="110" width="176" height="154" rx="28" fill="#facc15" stroke="#0f172a" stroke-width="10"/>
+  <path d="M145 302c82-66 202-68 308-4" fill="none" stroke="#16a34a" stroke-width="20" stroke-linecap="round"/>
+  <path d="M426 85l55-42 9 68 65 16-60 30 5 70-49-51-69 22 33-61z" fill="#fb7185" stroke="#0f172a" stroke-width="8" stroke-linejoin="round"/>
+</svg>`)}`;
 
 function assertTabletopRealtimeSource() {
   const source = readFileSync("src/pages/games/TabletopGame.jsx", "utf8");
@@ -112,6 +159,7 @@ function assertTabletopRealtimeSource() {
     ["client.beforeConnect = () =>", "refreshes STOMP auth headers before reconnect"],
     ["await fetchState(roomId, roomSeq).catch", "loads a REST snapshot before relying on realtime"],
     ["client.subscribe(`/sub/game/${game}/room/${roomId}`", "subscribes to the active tabletop room topic"],
+    ['game === "telestrations") && payload.gameState', "refetches viewer-specific Telestrations state after realtime broadcasts"],
   ];
   for (const [snippet, description] of requiredSnippets) {
     if (!source.includes(snippet)) {
@@ -219,7 +267,10 @@ const gameNames = {
   blokus: "블로커스",
   mahe: "마헤",
   dalmuti: "달무티",
-  citadels: "Citadels",
+  "six-nimmt": "식스님트",
+  telestrations: "텔레스트레이션",
+  poker: "포커",
+  citadels: "시티델",
   "las-vegas": "라스베가스",
 };
 const gameCodePrefix = {
@@ -227,6 +278,9 @@ const gameCodePrefix = {
   blokus: "BLOK",
   mahe: "MAHE",
   dalmuti: "DALM",
+  "six-nimmt": "SIXN",
+  telestrations: "TELE",
+  poker: "POKR",
   citadels: "CITD",
 };
 
@@ -253,6 +307,29 @@ function parseJson(raw) {
   } catch {
     return {};
   }
+}
+
+function formatRuntimeException(details = {}) {
+  const exception = details.exception || {};
+  return [
+    details.text,
+    exception.description,
+    exception.value,
+  ].filter(Boolean).join(": ");
+}
+
+function formatConsoleArgs(args = []) {
+  return args
+    .map((arg) => {
+      if (arg.value !== undefined) return typeof arg.value === "string" ? arg.value : JSON.stringify(arg.value);
+      if (arg.description) return arg.description;
+      if (arg.preview?.properties?.length) {
+        return `{${arg.preview.properties.map((property) => `${property.name}:${property.value}`).join(",")}}`;
+      }
+      return arg.type || "";
+    })
+    .filter(Boolean)
+    .join(" ");
 }
 
 function player(memberId, seatNo, ready, nickname = `검증 ${seatNo}`) {
@@ -521,6 +598,283 @@ function maheSmokeGameState() {
   };
 }
 
+function sixNimmtCard(value) {
+  const bulls = value === 55 ? 7 : value % 11 === 0 ? 5 : value % 10 === 5 ? 2 : 1;
+  return { id: `C${value}`, value, bulls };
+}
+
+function sixNimmtSmokeGameState() {
+  return {
+    game: "SIX_NIMMT",
+    variantCode: "BASE",
+    variant_code: "BASE",
+    phase: "SELECTING",
+    roundNo: 1,
+    round_no: 1,
+    turnNo: 1,
+    turn_no: 1,
+    activeSeatNo: 0,
+    active_seat_no: 0,
+    pendingCard: null,
+    pending_card: null,
+    selectedSeatNos: [2],
+    selected_seat_nos: [2],
+    rows: [
+      { cards: [sixNimmtCard(12), sixNimmtCard(18)] },
+      { cards: [sixNimmtCard(29), sixNimmtCard(35), sixNimmtCard(42)] },
+      { cards: [sixNimmtCard(51)] },
+      { cards: [sixNimmtCard(72), sixNimmtCard(88)] },
+    ],
+    players: [
+      {
+        seatNo: 1,
+        seat_no: 1,
+        hand: [8, 24, 37, 55, 63, 77, 91, 99, 103, 104].map(sixNimmtCard),
+        selected: false,
+        totalPenalty: 0,
+        total_penalty: 0,
+        roundPenalty: 0,
+        round_penalty: 0,
+        handCount: 10,
+        hand_count: 10,
+      },
+      {
+        seatNo: 2,
+        seat_no: 2,
+        hand: [],
+        selected: true,
+        totalPenalty: 3,
+        total_penalty: 3,
+        roundPenalty: 3,
+        round_penalty: 3,
+        handCount: 9,
+        hand_count: 9,
+      },
+    ],
+    events: [
+      { eventNo: 1, event_no: 1, eventType: "ROUND_STARTED", event_type: "ROUND_STARTED", seatNo: 0, seat_no: 0 },
+    ],
+  };
+}
+
+function pokerCard(rank, suit, value) {
+  return { id: `${rank}${suit.slice(0, 1)}`, rank, suit, value };
+}
+
+function pokerSmokeGameState() {
+  return {
+    game: "POKER",
+    variantCode: "TEXAS_HOLDEM",
+    variant_code: "TEXAS_HOLDEM",
+    variantName: "텍사스 홀덤",
+    variant_name: "텍사스 홀덤",
+    mode: "TEXAS_HOLDEM",
+    phase: "FLOP",
+    handNo: 1,
+    hand_no: 1,
+    maxHands: 8,
+    max_hands: 8,
+    activeSeatNo: 1,
+    active_seat_no: 1,
+    dealerSeatNo: 1,
+    dealer_seat_no: 1,
+    smallBlind: 5,
+    small_blind: 5,
+    bigBlind: 10,
+    big_blind: 10,
+    fixedBet: 10,
+    fixed_bet: 10,
+    ante: 0,
+    pot: 35,
+    lastPot: 0,
+    last_pot: 0,
+    callAmount: 10,
+    call_amount: 10,
+    maxDrawCards: 3,
+    max_draw_cards: 3,
+    winnerSeatNo: 0,
+    winner_seat_no: 0,
+    availableActions: ["FOLD", "CALL", "RAISE", "ALL_IN"],
+    available_actions: ["FOLD", "CALL", "RAISE", "ALL_IN"],
+    communityCards: [
+      pokerCard("A", "SPADES", 14),
+      pokerCard("7", "CLUBS", 7),
+      pokerCard("K", "DIAMONDS", 13),
+    ],
+    community_cards: [
+      pokerCard("A", "SPADES", 14),
+      pokerCard("7", "CLUBS", 7),
+      pokerCard("K", "DIAMONDS", 13),
+    ],
+    players: [
+      {
+        seatNo: 1,
+        seat_no: 1,
+        name: "검증 사용자",
+        bot: false,
+        chips: 980,
+        currentBet: 10,
+        current_bet: 10,
+        folded: false,
+        allIn: false,
+        all_in: false,
+        holeCards: [pokerCard("A", "HEARTS", 14), pokerCard("Q", "SPADES", 12)],
+        hole_cards: [pokerCard("A", "HEARTS", 14), pokerCard("Q", "SPADES", 12)],
+      },
+      {
+        seatNo: 2,
+        seat_no: 2,
+        name: "AI 2",
+        bot: true,
+        chips: 970,
+        currentBet: 20,
+        current_bet: 20,
+        folded: false,
+        allIn: false,
+        all_in: false,
+        holeCards: [],
+        hole_cards: [],
+      },
+    ],
+    events: [
+      { eventNo: 1, event_no: 1, message: "플롭이 공개되었습니다.", eventType: "FLOP", event_type: "FLOP" },
+    ],
+  };
+}
+
+function telestrationsSmokeRoom() {
+  return {
+    roomId: 32,
+    room_id: 32,
+    gameCode: "telestrations",
+    game_code: "telestrations",
+    gameName: "텔레스트레이션",
+    game_name: "텔레스트레이션",
+    variantCode: "BASE",
+    variant_code: "BASE",
+    variantName: "본게임",
+    variant_name: "본게임",
+    variantSummary: "문장과 그림을 번갈아 넘기는 파티 게임",
+    variant_summary: "문장과 그림을 번갈아 넘기는 파티 게임",
+    variantFeatureTags: ["3~8인", "그림 릴레이", "리플레이 공개"],
+    variant_feature_tags: ["3~8인", "그림 릴레이", "리플레이 공개"],
+    roomCode: "TELE0032",
+    room_code: "TELE0032",
+    title: "텔레스트레이션 스모크 방",
+    roomStatus: "PLAYING",
+    room_status: "PLAYING",
+    hostMemberId: 999,
+    host_member_id: 999,
+    chatRoomId: 9032,
+    chat_room_id: 9032,
+    minPlayers: 3,
+    min_players: 3,
+    maxPlayers: 8,
+    max_players: 8,
+    turnTimeSeconds: 30,
+    turn_time_seconds: 30,
+    players: [
+      player(999, 1, false, "검증 사용자"),
+      player(126, 2, true, "준비 게스트 2"),
+      player(4, 3, true, "준비 게스트 3"),
+    ],
+  };
+}
+
+function telestrationsSmokeGameState(phase = mockState.telestrationsPhase || "PROMPT") {
+  const normalizedPhase = String(phase || "PROMPT").toUpperCase();
+  const promptEntry = {
+    type: "PROMPT",
+    stepNo: 0,
+    step_no: 0,
+    authorSeatNo: 1,
+    author_seat_no: 1,
+    text: "달 위에서 라면을 먹는 탐험가",
+  };
+  const drawingEntry = {
+    type: "DRAW",
+    stepNo: 1,
+    step_no: 1,
+    authorSeatNo: 2,
+    author_seat_no: 2,
+    imageData: TELESTRATIONS_SMOKE_IMAGE,
+    image_data: TELESTRATIONS_SMOKE_IMAGE,
+  };
+  const guessEntry = {
+    type: "GUESS",
+    stepNo: 2,
+    step_no: 2,
+    authorSeatNo: 3,
+    author_seat_no: 3,
+    text: "달에서 점심을 먹는 우주비행사",
+  };
+  const activeEntries = normalizedPhase === "PROMPT"
+    ? []
+    : normalizedPhase === "DRAW"
+      ? [promptEntry]
+      : [promptEntry, drawingEntry];
+  const revealEntries = [promptEntry, drawingEntry, guessEntry];
+  const books = normalizedPhase === "REVEAL"
+    ? [
+        { ownerSeatNo: 1, owner_seat_no: 1, entries: revealEntries },
+        { ownerSeatNo: 2, owner_seat_no: 2, entries: revealEntries },
+        { ownerSeatNo: 3, owner_seat_no: 3, entries: revealEntries },
+      ]
+    : [
+        { ownerSeatNo: 1, owner_seat_no: 1, entries: activeEntries },
+        { ownerSeatNo: 2, owner_seat_no: 2, entries: [] },
+        { ownerSeatNo: 3, owner_seat_no: 3, entries: [] },
+      ];
+  const currentStepByPhase = {
+    PROMPT: 0,
+    DRAW: 1,
+    GUESS: 2,
+    REVEAL: 3,
+  };
+  const currentTaskByPhase = {
+    PROMPT: "내 비밀 시작 문장을 입력하세요.",
+    DRAW: "문장을 보고 그림을 그리세요.",
+    GUESS: "그림만 보고 떠오르는 문장을 적으세요.",
+    REVEAL: "책자별 변화를 순서대로 확인하세요.",
+  };
+  return {
+    game: "TELESTRATIONS",
+    variantCode: "BASE",
+    variant_code: "BASE",
+    variantName: "본게임",
+    variant_name: "본게임",
+    playerCount: 3,
+    player_count: 3,
+    currentStep: currentStepByPhase[normalizedPhase] ?? 0,
+    current_step: currentStepByPhase[normalizedPhase] ?? 0,
+    totalSteps: 3,
+    total_steps: 3,
+    phase: normalizedPhase,
+    activeSeatNo: 0,
+    active_seat_no: 0,
+    completedSeatNos: [],
+    completed_seat_nos: [],
+    books,
+    events: [
+      {
+        eventNo: 1,
+        event_no: 1,
+        eventType: "GAME_STARTED",
+        event_type: "GAME_STARTED",
+        seatNo: 0,
+        seat_no: 0,
+        message: "각자 시작 문장을 적습니다.",
+      },
+    ],
+    activeBook: { ownerSeatNo: 1, owner_seat_no: 1, entries: activeEntries },
+    active_book: { ownerSeatNo: 1, owner_seat_no: 1, entries: activeEntries },
+    mySubmitted: false,
+    my_submitted: false,
+    currentTask: currentTaskByPhase[normalizedPhase] || "현재 단계의 입력을 제출하세요.",
+    current_task: currentTaskByPhase[normalizedPhase] || "현재 단계의 입력을 제출하세요.",
+  };
+}
+
 function lasVegasSmokeRoom() {
   return {
     roomId: 9090,
@@ -665,6 +1019,28 @@ function routeMock(url, method, postData = "") {
       return { status: 200, body: lasVegasSmokeState() };
     }
   }
+  if (game === "telestrations") {
+    if (method === "GET" && suffix === "rooms") {
+      return { status: 200, body: [] };
+    }
+    if (method === "GET" && suffix === "rooms/me") {
+      return { status: 200, body: [telestrationsSmokeRoom()] };
+    }
+    if (method === "GET" && /^rooms\/\d+\/state$/.test(suffix)) {
+      return {
+        status: 200,
+        body: {
+          eventType: "snapshot",
+          event_type: "snapshot",
+          message: null,
+          room: telestrationsSmokeRoom(),
+          variants: variantsByGame.telestrations,
+          gameState: telestrationsSmokeGameState(),
+          game_state: telestrationsSmokeGameState(),
+        },
+      };
+    }
+  }
   if (method === "GET" && suffix === "variants") {
     return { status: 200, body: variantsByGame[game] || [] };
   }
@@ -715,7 +1091,11 @@ function routeMock(url, method, postData = "") {
         ? blokusSmokeGameState(room)
         : game === "mahe" && room.roomStatus === "PLAYING"
           ? maheSmokeGameState(room)
-          : null;
+          : game === "six-nimmt" && room.roomStatus === "PLAYING"
+            ? sixNimmtSmokeGameState(room)
+            : game === "poker" && room.roomStatus === "PLAYING"
+              ? pokerSmokeGameState(room)
+              : null;
     return {
       status: 200,
       body: {
@@ -840,7 +1220,7 @@ async function resetGameStorage(ws) {
     localStorage.setItem("accessToken", "smoke-access-token");
     localStorage.setItem("refreshToken", "smoke-refresh-token");
     localStorage.setItem("userRoles", JSON.stringify(["ROLE_USER"]));
-    ["catan_last_room_id", "blokus_last_room_id", "mahe_last_room_id", "dalmuti_last_room_id", "citadels_last_room_id", "las_vegas_last_room_id"].forEach((key) => localStorage.removeItem(key));
+    ["catan_last_room_id", "blokus_last_room_id", "mahe_last_room_id", "dalmuti_last_room_id", "six_nimmt_last_room_id", "telestrations_last_room_id", "poker_last_room_id", "citadels_last_room_id", "las_vegas_last_room_id", "no_thanks_last_room_id"].forEach((key) => localStorage.removeItem(key));
     return true;
   })()`);
 }
@@ -853,7 +1233,8 @@ async function navigateToGame(ws, game) {
     mobile: false,
   });
   await resetGameStorage(ws);
-  await send(ws, "Page.navigate", { url: `${baseUrl}/app/games/${game}` });
+  const path = game === "poker" ? "/app/poker" : `/app/games/${game}`;
+  await send(ws, "Page.navigate", { url: `${baseUrl}${path}` });
   await waitForText(ws, "방 만들기");
   await waitForEnabledButton(ws, "방 만들기");
 }
@@ -874,10 +1255,11 @@ async function runRoomFlowSmoke(ws, game) {
   await setInputByAriaLabel(ws, "방 제목", title);
   await clickButtonByText(ws, "방 만들기");
   await waitForText(ws, "방 코드");
-  await waitForEnabledButton(ws, "시작");
+  const startButtonText = game === "citadels" ? "시작하기" : "시작";
+  await waitForEnabledButton(ws, startButtonText);
   assertRequest(game, "create", (request) => request.body?.title === title, "create-room POST payload");
 
-  await clickButtonByText(ws, "시작");
+  await clickButtonByText(ws, startButtonText);
   await waitForText(ws, "진행 중");
   if (game === "catan") {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-rule-brief"]'))`, "catan selected rule brief");
@@ -910,6 +1292,19 @@ async function runRoomFlowSmoke(ws, game) {
       })()`,
       "mahe duplicate dice panel hidden on mobile"
     );
+    await waitForExpression(
+      ws,
+      `document.querySelectorAll('[data-smoke="mahe-turtle-token"]').length >= 2`,
+      "mahe turtle tokens rendered"
+    );
+  }
+  if (game === "six-nimmt") {
+    await waitForText(ws, "내 손패");
+    await waitForText(ws, "선택한 카드 제출");
+  }
+  if (game === "poker") {
+    await waitForText(ws, "내 족보");
+    await waitForText(ws, "추천 판단");
   }
   assertRequest(game, "start", null, "start POST request");
 
@@ -946,6 +1341,7 @@ async function runVariantCreateSmoke(ws, { game, variantCode }) {
 }
 
 async function inspectPage(ws, testCase, viewport) {
+  mockState.telestrationsPhase = testCase.telestrationsPhase || "PROMPT";
   await send(ws, "Emulation.setDeviceMetricsOverride", {
     width: viewport.width,
     height: viewport.height,
@@ -990,6 +1386,17 @@ async function inspectPage(ws, testCase, viewport) {
           minPlayers: Number(card.getAttribute("data-min-players")),
           maxPlayers: Number(card.getAttribute("data-max-players")),
         })),
+        variantChoiceGrids: Array.from(document.querySelectorAll('[data-smoke="variant-choice-grid"]')).map((grid) => {
+          const rect = grid.getBoundingClientRect();
+          const style = getComputedStyle(grid);
+          return {
+            compact: grid.getAttribute("data-compact") === "true",
+            overflowY: style.overflowY,
+            clientHeight: Math.round(grid.clientHeight),
+            scrollHeight: Math.round(grid.scrollHeight),
+            rectHeight: Math.round(rect.height),
+          };
+        }),
       };
     })()`,
   });
@@ -1003,6 +1410,13 @@ async function inspectPage(ws, testCase, viewport) {
   }
   if (value.text.includes("로그인") && !testCase.expectedTexts.includes("로그인")) {
     throw new Error(`${testCase.label} ${viewport.name}: redirected to login at ${value.url}`);
+  }
+  const trappedVariantGrid = value.variantChoiceGrids.find((grid) => {
+    const canScrollInternally = ["auto", "scroll"].includes(grid.overflowY) && grid.scrollHeight > grid.clientHeight + 2;
+    return canScrollInternally && (!grid.compact || viewport.mobile);
+  });
+  if (trappedVariantGrid) {
+    throw new Error(`${testCase.label} ${viewport.name}: variant choice grid must use page scroll, not an inner scroll trap ${JSON.stringify(trappedVariantGrid)}`);
   }
   const overflow = Math.max(value.scrollWidth, value.bodyWidth) - value.clientWidth;
   if (overflow > 3) {
@@ -1024,6 +1438,35 @@ async function inspectPage(ws, testCase, viewport) {
     });
     if (unsortedPair) {
       throw new Error(`${testCase.label} ${viewport.name}: game cards must be sorted by min players, then max players: ${JSON.stringify(value.gameCards)}`);
+    }
+  }
+  if (testCase.assertTelestrationsImage) {
+    await waitForExpression(
+      ws,
+      `(() => {
+        const image = document.querySelector('[data-smoke="telestrations-entry-image"]');
+        if (!image) return false;
+        const rect = image.getBoundingClientRect();
+        return image.complete && image.naturalWidth > 0 && rect.width > 100 && rect.height > 100;
+      })()`,
+      `${testCase.label} rendered image`
+    );
+    const imageStats = await evaluate(ws, `(() => {
+      const frame = document.querySelector('[data-smoke="telestrations-entry-image-frame"]');
+      const image = document.querySelector('[data-smoke="telestrations-entry-image"]');
+      const frameRect = frame?.getBoundingClientRect();
+      const imageRect = image?.getBoundingClientRect();
+      return {
+        frameWidth: Math.round(frameRect?.width || 0),
+        frameHeight: Math.round(frameRect?.height || 0),
+        imageWidth: Math.round(imageRect?.width || 0),
+        imageHeight: Math.round(imageRect?.height || 0),
+        naturalWidth: image?.naturalWidth || 0,
+        naturalHeight: image?.naturalHeight || 0,
+      };
+    })()`);
+    if (!imageStats || imageStats.frameHeight < 180 || imageStats.imageHeight < 100 || imageStats.naturalWidth <= 0) {
+      throw new Error(`${testCase.label} ${viewport.name}: Telestrations image did not render with a stable frame ${JSON.stringify(imageStats)}`);
     }
   }
   return {
@@ -1078,7 +1521,15 @@ async function main() {
           }
         });
       } else if (message.method === "Runtime.exceptionThrown") {
-        runtimeErrors.push(message.params?.exceptionDetails?.text || "Runtime exception");
+        const errorText = formatRuntimeException(message.params?.exceptionDetails) || "Runtime exception";
+        runtimeErrors.push(errorText);
+        console.error(errorText);
+      } else if (message.method === "Runtime.consoleAPICalled" && message.params?.type === "error") {
+        const errorText = formatConsoleArgs(message.params.args);
+        if (errorText) {
+          runtimeErrors.push(errorText);
+          console.error(errorText);
+        }
       }
     });
     await send(cdp, "Page.enable");
@@ -1095,6 +1546,7 @@ async function main() {
         localStorage.setItem("accessToken", "smoke-access-token");
         localStorage.setItem("refreshToken", "smoke-refresh-token");
         localStorage.setItem("userRoles", JSON.stringify(["ROLE_USER"]));
+        localStorage.setItem("ctfmon_debug_console", "1");
       `,
     });
 
@@ -1105,7 +1557,8 @@ async function main() {
       }
     }
     const flowResults = [];
-    for (const game of ["catan", "blokus", "mahe", "dalmuti", "citadels"]) {
+    const flowGames = ["catan", "blokus", "mahe", "dalmuti", "six-nimmt", "poker", "citadels"];
+    for (const game of flowGames) {
       flowResults.push(await runRoomFlowSmoke(cdp, game));
     }
     const variantResults = [];
@@ -1113,8 +1566,8 @@ async function main() {
       variantResults.push(await runVariantCreateSmoke(cdp, item));
     }
     const expectedPageChecks = cases.length * viewports.length;
-    if (results.length !== expectedPageChecks || flowResults.length !== 5 || variantResults.length !== variantCreateCases.length) {
-      throw new Error(`Incomplete tabletop smoke coverage: pages ${results.length}/${expectedPageChecks}, flows ${flowResults.length}/5, variants ${variantResults.length}/${variantCreateCases.length}`);
+    if (results.length !== expectedPageChecks || flowResults.length !== flowGames.length || variantResults.length !== variantCreateCases.length) {
+      throw new Error(`Incomplete tabletop smoke coverage: pages ${results.length}/${expectedPageChecks}, flows ${flowResults.length}/${flowGames.length}, variants ${variantResults.length}/${variantCreateCases.length}`);
     }
     if (runtimeErrors.length) {
       throw new Error(`Runtime errors: ${runtimeErrors.join(" | ")}`);

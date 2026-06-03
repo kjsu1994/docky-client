@@ -77,7 +77,7 @@ export const AllMenu = () => {
         { title: "달무티", to: "/app/games/dalmuti", icon: Dices, color: "bg-rose-50 text-rose-700" },
         { title: "6 nimmt!", to: "/app/games/six-nimmt", icon: Dices, color: "bg-rose-50 text-rose-700" },
         { title: "텔레스트레이션", to: "/app/games/telestrations", icon: Dices, color: "bg-sky-50 text-sky-700" },
-        { title: "Citadels", to: "/app/games/citadels", icon: Dices, color: "bg-amber-50 text-zinc-800" },
+        { title: "시티델", to: "/app/games/citadels", icon: Dices, color: "bg-amber-50 text-zinc-800" },
     ];
 
     const account = [

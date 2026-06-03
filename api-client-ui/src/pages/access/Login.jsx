@@ -2,6 +2,7 @@
 import { Link } from "react-router-dom";
 import { Mail, Lock, Leaf } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
+import { BrandMark } from "../../common/BrandLogo.jsx";
 import { trapFocus } from "../../utils/focusTrap.js";
 import { logClientError } from "../../utils/clientDiagnostics.js";
 import { loadToast, notifyError, notifySuccess } from "../../utils/toast.js";
@@ -199,16 +200,13 @@ export const Login = () => {
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
             <div className="w-full max-w-md relative z-10">
-                {/* 로고 & 타이틀 */}
                 <div className="text-center mb-10">
-                    <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-primary-600 to-primary-400 text-white mb-6 shadow-2xl shadow-primary-200 group hover:scale-110 transition-transform duration-500">
-                        <span className="text-3xl font-black italic tracking-tighter">C</span>
-                    </div>
+                    <BrandMark className="mx-auto mb-6 h-24 max-w-[18rem] transition-transform duration-500 hover:scale-105" />
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">
                         로그인
                     </h1>
                     <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">
-                        벌꿀오소리 커뮤니티
+                        CTFMON community
                     </p>
                 </div>
 

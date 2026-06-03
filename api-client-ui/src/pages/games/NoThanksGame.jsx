@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
 import { CheckCircle2, Crown, MessageSquare, Play, TimerReset } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
@@ -586,9 +587,14 @@ export const NoThanksGame = () => {
       `}</style>
       {!selectedRoom && (
         <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-            <Play className="h-3.5 w-3.5 text-emerald-500" />
-            노땡스
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+              <Play className="h-3.5 w-3.5 text-emerald-500" />
+              노땡스
+            </div>
+            <Link to="/app/games" className="hidden min-h-10 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+              게임 목록
+            </Link>
           </div>
           <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">노땡스</h1>
           <p className="mt-3 text-sm font-medium text-slate-500 sm:text-base">
@@ -626,8 +632,8 @@ export const NoThanksGame = () => {
               <div className="text-lg font-black text-slate-900">대기 중인 방</div>
               <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={() => fetchRooms().catch(() => {})}>새로고침</button>
             </div>
-            <form onSubmit={joinByCode} className="mt-4 flex gap-2">
-              <input className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase" placeholder="방 코드로 입장" value={joinCode} maxLength={8} onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
+            <form onSubmit={joinByCode} className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <input className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase" placeholder="방 코드로 입장" value={joinCode} maxLength={8} onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
               <button type="submit" className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white">입장</button>
             </form>
             <div className="mt-4 space-y-2.5">
@@ -655,6 +661,9 @@ export const NoThanksGame = () => {
                 <div className="text-xs text-slate-500">방 코드 {selectedRoom.roomCode}</div>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Link to="/app/games" className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+                  게임 목록
+                </Link>
                 {isHost && roomStatus === "PLAYING" && <button className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700" onClick={forceFinishGame}>강제 종료</button>}
                 <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>준비 토글</button>
                 {isHost && roomStatus === "WAITING" && <button className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white" onClick={startGame}>시작</button>}
@@ -685,7 +694,7 @@ export const NoThanksGame = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <div className="space-y-4">
               <div className={`rounded-[1.8rem] border p-5 shadow-xl ${isMyTurn ? "border-sky-200 bg-sky-50" : "border-slate-200 bg-white"}`}>
                 <div className="flex flex-wrap items-center gap-2 text-xs font-black text-slate-700">
@@ -782,7 +791,7 @@ export const NoThanksGame = () => {
 
             <aside className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">
               <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900"><MessageSquare className="h-4 w-4" />방 채팅</div>
-              <div ref={chatScrollRef} className="mb-3 h-[420px] space-y-2 overflow-auto rounded-2xl bg-slate-50 p-3 text-xs">
+              <div ref={chatScrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-2xl bg-slate-50 p-3 text-xs sm:h-[320px] xl:h-[420px]">
                 {!chatMessages.length && <div className="text-slate-400">채팅 내역이 없습니다.</div>}
                 {chatMessages.map((message) => {
                   const normalized = normalizeMessage(message);
@@ -798,7 +807,7 @@ export const NoThanksGame = () => {
                 })}
               </div>
               <div className="flex gap-2">
-                <input className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="메시지를 입력하세요" value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendChat(); } }} />
+                <input className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="메시지를 입력하세요" value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendChat(); } }} />
                 <button className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white" onClick={sendChat}>전송</button>
               </div>
             </aside>

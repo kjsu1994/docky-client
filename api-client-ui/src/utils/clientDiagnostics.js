@@ -6,6 +6,17 @@ const compactObject = (value) => {
     );
 };
 
+const hasConsoleDebugOptIn = () => {
+    if (typeof window === "undefined") return false;
+    try {
+        const searchParams = new URLSearchParams(window.location.search);
+        return searchParams.get("debug_console") === "1"
+            || window.localStorage?.getItem("ctfmon_debug_console") === "1";
+    } catch {
+        return false;
+    }
+};
+
 const toSafePath = (url) => {
     if (typeof url !== "string" || !url.trim()) return undefined;
 
@@ -36,7 +47,7 @@ export const safeClientError = (error) => {
 };
 
 export const logClientError = (label, error) => {
-    if (!import.meta.env.DEV || typeof console === "undefined" || typeof console.error !== "function") {
+    if ((!import.meta.env.DEV && !hasConsoleDebugOptIn()) || typeof console === "undefined" || typeof console.error !== "function") {
         return;
     }
 

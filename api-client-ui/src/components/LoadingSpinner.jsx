@@ -1,3 +1,5 @@
+import { BrandMark } from "../common/BrandLogo.jsx";
+
 export const LoadingSpinner = ({ size = "md", text = "" }) => {
     const sizeClasses = {
         sm: "h-4 w-4 border-2",
@@ -18,8 +20,8 @@ export const LoadingSpinner = ({ size = "md", text = "" }) => {
 
 export const LoadingPage = () => {
     return (
-        <div className="min-h-screen flex items-center justify-center">
-            <LoadingSpinner size="lg" text="불러오는 중..." />
+        <div className="flex min-h-screen items-center justify-center bg-white px-6">
+            <BrandMark className="h-28 max-w-[min(88vw,34rem)]" />
         </div>
     );
 };

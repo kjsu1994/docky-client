@@ -11,13 +11,13 @@ const sharedRoomStartSteps = [
 
 const gameManuals = {
   poker: {
-    subtitle: "1~8명이 방을 만들고 칩을 걸며 이어가는 리밋 텍사스 홀덤입니다. 혼자 시작하면 AI 봇이 자동으로 참여합니다.",
-    tags: ["1~8인", "AI 봇", "칩 세션"],
+    subtitle: "텍사스 홀덤과 5장 드로우 포커를 고를 수 있는 칩 세션입니다. 혼자 시작하면 AI 봇이 자동으로 참여합니다.",
+    tags: ["1~8인", "5장 드로우", "족보 보조"],
     sections: [
       {
         title: "처음 시작 순서",
         items: [
-          "방을 만들 때 빠른판, 표준, 딥스택 중 시작 칩과 블라인드 프리셋을 고릅니다.",
+          "방을 만들 때 텍사스 홀덤 칩 프리셋 또는 5장 드로우 포커를 고릅니다.",
           "혼자 시작하면 AI 봇 3명이 자동으로 채워지고, 2명 이상이면 참가자끼리 바로 시작합니다.",
           "내 차례에는 폴드, 체크/콜, 레이즈, 올인을 선택합니다.",
         ],
@@ -25,15 +25,16 @@ const gameManuals = {
       {
         title: "목표",
         items: [
-          "홀카드 2장과 커뮤니티 카드 5장 중 가장 강한 5장 족보로 팟을 가져갑니다.",
+          "홀덤은 홀카드 2장과 커뮤니티 카드 5장 중 가장 강한 5장 족보로 팟을 가져갑니다.",
+          "5장 드로우는 손패 5장을 받은 뒤 한 번 최대 3장까지 교체하고 족보를 비교합니다.",
           "정해진 핸드 수가 끝나거나 한 명만 칩이 남으면 가장 많은 칩을 가진 플레이어가 승리합니다.",
         ],
       },
       {
         title: "초보 팁",
         items: [
-          "액션 패널의 콜 금액과 팟오즈를 먼저 보고, 비용이 큰 약한 패는 폴드해도 됩니다.",
-          "페어, 투페어, 플러시 드로우처럼 이어갈 근거가 있으면 콜 또는 레이즈를 고려하세요.",
+          "액션 패널의 현재 족보, 콜 금액, 팟오즈를 먼저 보고, 비용이 큰 약한 패는 폴드해도 됩니다.",
+          "5장 드로우에서는 추천 교체 카드가 표시됩니다. 페어 이상은 유지하고 낮은 카드를 바꾸는 식으로 판단하세요.",
         ],
       },
     ],
@@ -362,15 +363,15 @@ const gameManuals = {
 const games = [
   {
     title: "포커",
-    description: "(1~8인) 리밋 텍사스 홀덤 / 칩 세션과 AI 봇을 지원합니다.",
+    description: "(1~8인) 텍사스 홀덤과 5장 드로우 / 족보 보조와 AI 봇을 지원합니다.",
     to: "/app/poker",
     tone: "from-emerald-800 via-slate-900 to-rose-900",
     players: "1~8인",
     minPlayers: 1,
     maxPlayers: 8,
-    mode: "텍사스 홀덤",
+    mode: "홀덤 · 드로우",
     preview: "poker",
-    highlights: ["AI 봇", "칩 세션", "팟오즈"],
+    highlights: ["AI 봇", "족보 보조", "5장 드로우"],
     manual: gameManuals.poker,
     featured: true,
   },
@@ -487,7 +488,7 @@ const games = [
     featured: true,
   },
   {
-    title: "Citadels",
+    title: "시티델",
     description: "(2~7인) 비밀 캐릭터 선택과 도시 건설을 서버 판정으로 진행합니다.",
     to: "/app/games/citadels",
     tone: "from-zinc-900 via-red-900 to-amber-600",
@@ -559,23 +560,25 @@ const GameCard = ({ game, onOpenManual }) => {
         className="block h-full min-w-0 rounded-[calc(1rem-1px)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200/70"
         onFocus={() => preloadGameRoute(game.to)}
       >
-        <div className="flex h-full min-w-0 flex-col rounded-[calc(1rem-1px)] bg-white/95 p-4 backdrop-blur sm:p-5">
-          <div className={`overflow-hidden rounded-2xl bg-gradient-to-br ${game.tone} p-3`} aria-hidden="true">
-            <div className="flex min-h-36 min-w-0 items-center justify-center rounded-xl bg-white/20 p-3">
-              <GamePreview type={game.preview} />
+        <div className="flex h-full min-w-0 flex-col rounded-[calc(1rem-1px)] bg-white/95 p-2.5 backdrop-blur sm:p-5">
+          <div className={`overflow-hidden rounded-xl bg-gradient-to-br ${game.tone} p-2 sm:rounded-2xl sm:p-3`} aria-hidden="true">
+            <div className="flex h-24 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-white/20 p-1 sm:h-auto sm:min-h-36 sm:rounded-xl sm:p-3">
+              <div className="scale-75 sm:scale-100">
+                <GamePreview type={game.preview} />
+              </div>
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-2 pr-12">
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600">
+          <div className="mt-2 flex flex-wrap items-center gap-1 pr-9 sm:mt-4 sm:gap-2 sm:pr-12">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600 sm:px-3 sm:py-1 sm:text-[11px]">
               <Dices className="h-3 w-3" />
               {game.players}
             </span>
-            <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black text-white">{game.mode}</span>
+            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white sm:px-3 sm:py-1 sm:text-[11px]">{game.mode}</span>
           </div>
-          <h2 id={titleId} className="mt-4 text-xl font-black text-slate-900 sm:text-2xl">{game.title}</h2>
-          <p id={descId} className="mt-2 text-sm font-medium leading-relaxed text-slate-500">{game.description}</p>
+          <h2 id={titleId} className="mt-2 text-sm font-black leading-tight text-slate-900 sm:mt-4 sm:text-2xl">{game.title}</h2>
+          <p id={descId} className="mt-2 hidden text-sm font-medium leading-relaxed text-slate-500 sm:block">{game.description}</p>
           {!!game.highlights?.length && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-3 hidden flex-wrap gap-1.5 sm:flex">
               {game.highlights.map((highlight) => (
                 <span key={highlight} className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600">
                   {highlight}
@@ -584,7 +587,7 @@ const GameCard = ({ game, onOpenManual }) => {
             </div>
           )}
           <div className="flex-1" />
-          <div className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white transition-all group-hover:bg-primary-600 sm:w-auto">
+          <div className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-black text-white transition-all group-hover:bg-primary-600 sm:mt-6 sm:min-h-11 sm:w-auto sm:gap-2 sm:rounded-xl sm:px-4 sm:text-sm">
             입장하기
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </div>
@@ -592,7 +595,7 @@ const GameCard = ({ game, onOpenManual }) => {
       </Link>
       <button
         type="button"
-        className="absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-lg shadow-slate-900/10 transition hover:scale-105 hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/80"
+        className="absolute right-2 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-lg shadow-slate-900/10 transition hover:scale-105 hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/80 sm:right-4 sm:top-4 sm:h-11 sm:w-11"
         aria-label={`${game.title} 설명서 열기`}
         title={`${game.title} 설명서`}
         onClick={(event) => {
@@ -601,7 +604,7 @@ const GameCard = ({ game, onOpenManual }) => {
           onOpenManual(game);
         }}
       >
-        <CircleHelp className="h-5 w-5" />
+        <CircleHelp className="h-4 w-4 sm:h-5 sm:w-5" />
       </button>
     </article>
   );
@@ -1033,7 +1036,7 @@ export const GamesHub = () => {
             </div>
             <div className="text-[11px] font-black text-slate-400">{section.games.length}개</div>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
             {section.games.map((game) => (
               <GameCard key={game.to} game={game} onOpenManual={setManualGame} />
             ))}

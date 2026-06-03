@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import { CheckCircle2, Crown, Dices, MessageSquare, Play, TimerReset, Users } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
@@ -773,12 +774,17 @@ export const LasVegasGame = () => {
             `}</style>
             {!selectedRoom && (
                 <section className="rounded-[2rem] border border-white/20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-slate-100 shadow-2xl">
-                <div className="mb-4 flex items-center gap-3">
-                    <div className="rounded-2xl bg-white/10 p-2.5"><Dices className="h-5 w-5" /></div>
-                    <div>
-                        <h1 className="text-xl font-black tracking-tight">라스베가스 라이브 테이블</h1>
-                        <p className="text-xs text-slate-300">방장 설정 + 실시간 턴 + 자동 타임아웃 액션</p>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-2xl bg-white/10 p-2.5"><Dices className="h-5 w-5" /></div>
+                        <div>
+                            <h1 className="text-xl font-black tracking-tight">라스베가스 라이브 테이블</h1>
+                            <p className="text-xs text-slate-300">방장 설정 + 실시간 턴 + 자동 타임아웃 액션</p>
+                        </div>
                     </div>
+                    <Link to="/app/games" className="hidden min-h-10 items-center justify-center rounded-xl bg-white/10 px-4 text-sm font-black text-white transition hover:bg-white hover:text-slate-900 sm:inline-flex">
+                        게임 목록
+                    </Link>
                 </div>
                 <div className="mb-3 grid grid-cols-1 gap-2 text-xs text-slate-300 md:grid-cols-3">
                     <div className="rounded-xl bg-white/10 px-3 py-2">
@@ -881,6 +887,9 @@ export const LasVegasGame = () => {
                                 )}
                             </div>
                             <div className="flex flex-wrap gap-2">
+                                <Link to="/app/games" className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+                                    게임 목록
+                                </Link>
                                 <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>준비하기</button>
                                 {isHost && <button className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white" onClick={startGame}>시작</button>}
                                 <button className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" onClick={leaveRoom}>퇴장</button>
@@ -929,7 +938,7 @@ export const LasVegasGame = () => {
                         )}
                     </div>
 
-                    <div className={`grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px] ${myTurn ? "rounded-[1.8rem] bg-sky-100/70 p-3 ring-2 ring-sky-300/70" : ""}`}>
+                    <div className={`grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] ${myTurn ? "rounded-[1.8rem] bg-sky-100/70 p-3 ring-2 ring-sky-300/70" : ""}`}>
                         <div className="space-y-4">
                             <div className={`rounded-[1.8rem] border p-4 shadow-2xl transition-all ${
                                 myTurn
@@ -1075,7 +1084,7 @@ export const LasVegasGame = () => {
                                 <MessageSquare className="h-4 w-4" />
                                 방 채팅
                             </div>
-                            <div ref={chatScrollRef} className="mb-3 h-[420px] space-y-2 overflow-auto rounded-2xl bg-slate-50 p-3 text-xs">
+                            <div ref={chatScrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-2xl bg-slate-50 p-3 text-xs sm:h-[320px] xl:h-[420px]">
                                 {!chatMessages.length && <div className="text-slate-400">채팅 내역이 없습니다.</div>}
                                 {chatMessages.map((msg) => {
                                     const normalized = normalizeMessage(msg);
@@ -1092,7 +1101,7 @@ export const LasVegasGame = () => {
                             </div>
                             <div className="flex gap-2">
                                 <input
-                                    className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                    className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
                                     placeholder="메시지를 입력하세요"
                                     value={chatInput}
                                     onChange={(e) => setChatInput(e.target.value)}

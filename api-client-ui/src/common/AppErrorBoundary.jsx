@@ -5,6 +5,11 @@ const AppErrorFallback = React.lazy(() =>
     import("./AppErrorFallback.jsx").then((module) => ({ default: module.AppErrorFallback }))
 );
 
+const isDynamicImportError = (error) => {
+    const text = `${error?.name || ""} ${error?.message || ""}`;
+    return /ChunkLoadError|Loading chunk|dynamically imported module|module script/i.test(text);
+};
+
 export class AppErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
@@ -17,6 +22,13 @@ export class AppErrorBoundary extends React.Component {
 
     componentDidCatch(error) {
         logClientError("app.render", error);
+        if (isDynamicImportError(error) && typeof window !== "undefined") {
+            const key = `ctfmon:chunk-reload:${window.location.pathname}`;
+            if (window.sessionStorage?.getItem(key) !== "1") {
+                window.sessionStorage?.setItem(key, "1");
+                window.location.reload();
+            }
+        }
     }
 
     componentDidUpdate(prevProps) {

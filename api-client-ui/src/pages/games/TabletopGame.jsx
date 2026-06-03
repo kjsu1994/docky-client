@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import {
   ArrowUp,
@@ -167,15 +168,15 @@ const gameConfigs = {
   },
   poker: {
     title: "포커",
-    eyebrow: "리밋 텍사스 홀덤 · 칩 세션 · AI 봇",
-    description: "1명부터 8명까지 방을 만들고, 혼자 시작하면 AI 봇이 자동으로 들어오는 칩 기반 텍사스 홀덤입니다.",
+    eyebrow: "텍사스 홀덤 · 5장 드로우 · 족보 보조",
+    description: "텍사스 홀덤과 5장 드로우 포커를 고르고, 혼자 시작하면 AI 봇이 자동으로 들어오는 칩 기반 포커입니다.",
     storageKey: "poker_last_room_id",
     accent: "from-emerald-700 via-zinc-900 to-rose-700",
     board: "poker",
     guide: [
       {
         title: "게임 흐름",
-        items: ["홀카드 2장과 커뮤니티 카드 5장으로 가장 강한 5장 족보를 만듭니다.", "프리플롭, 플롭, 턴, 리버마다 체크/콜/레이즈/폴드를 선택합니다."],
+        items: ["텍사스 홀덤은 홀카드 2장과 커뮤니티 카드 5장 중 가장 강한 5장 족보를 만듭니다.", "5장 드로우는 손패 5장을 받은 뒤 한 번 최대 3장까지 교체하고 족보를 비교합니다."],
       },
       {
         title: "칩 세션",
@@ -183,7 +184,7 @@ const gameConfigs = {
       },
       {
         title: "초보자 보조",
-        items: ["내 차례에는 필요한 콜 금액, 팟 오즈, 추천 판단을 같이 표시합니다.", "혼자 시작하면 AI 봇 3명이 자동으로 채워져 바로 연습할 수 있습니다."],
+        items: ["내 차례에는 현재 족보, 기준 카드, 콜 금액, 팟 오즈, 추천 판단을 같이 표시합니다.", "5장 드로우에서는 유지할 카드와 교체 후보를 표시해 족보를 몰라도 선택할 수 있게 돕습니다."],
       },
     ],
   },
@@ -244,8 +245,12 @@ const colorBgSoft = {
   GREEN: "bg-emerald-50 border-emerald-100",
 };
 
-const MobileGameJumpNav = ({ game }) => {
-  const links = mobileJumpLinksByGame[game] || [];
+const MobileGameJumpNav = ({ game, gameState }) => {
+  const phase = String(gameState?.phase || "").toUpperCase();
+  let links = mobileJumpLinksByGame[game] || [];
+  if (game === "telestrations" && phase !== "REVEAL") {
+    links = links.filter((link) => link.href !== "#telestrations-replay-panel");
+  }
   if (!links.length) return null;
 
   return (
@@ -814,6 +819,7 @@ const variantFeatureTags = (game, variant) => {
   }
   if (game === "poker") {
     if (code === "SHORT") return ["1~8인", "100칩", "빠른판"];
+    if (code === "FIVE_CARD_DRAW") return ["1~6인", "5장 손패", "1회 교체"];
     if (code === "DEEP") return ["1~8인", "500칩", "딥스택"];
     return ["1~8인", "200칩", "AI 봇"];
   }
@@ -861,8 +867,9 @@ const variantGroupLabelsByGame = {
     other: "선택 규칙",
   },
   poker: {
-    base: "칩 프리셋",
-    other: "칩 프리셋",
+    base: "텍사스 홀덤",
+    draw: "5장 드로우",
+    other: "텍사스 홀덤",
   },
 };
 
@@ -870,7 +877,7 @@ const variantGroupOrderByGame = {
   blokus: ["base", "duo", "playerCount", "team", "other"],
   mahe: ["base", "other"],
   dalmuti: ["base", "optional", "other"],
-  poker: ["base", "other"],
+  poker: ["base", "draw", "other"],
 };
 
 const variantGroupOf = (game, variant) => {
@@ -883,6 +890,7 @@ const variantGroupOf = (game, variant) => {
     if (code === "TEAM") return "team";
   }
   if (game === "dalmuti" && (code === "STRIPPED_DECK" || code === "FIRST_DEAL_REVOLUTION")) return "optional";
+  if (game === "poker" && code === "FIVE_CARD_DRAW") return "draw";
   return "other";
 };
 
@@ -967,12 +975,18 @@ const VariantFeatureTags = ({ game, variant, selected = false, disabled = false,
 const VariantChoiceGrid = ({ game, variants, value, onChange, compact = false, disabledCodes = new Set(), disabledReasonByCode = {} }) => {
   const groups = variantGroupsFor(game, variants);
   if (!groups.length) return null;
+  const wrapperClassName = compact
+    ? "space-y-3 overflow-visible pr-0 md:max-h-[min(54vh,360px)] md:overflow-auto md:overscroll-contain md:pr-1"
+    : "space-y-3 overflow-visible pr-0";
+  const groupHeaderClassName = compact
+    ? "md:sticky md:top-0 z-10 -mx-1 flex items-center justify-between gap-2 bg-white/95 px-1 py-1 backdrop-blur"
+    : "-mx-1 flex items-center justify-between gap-2 bg-white px-1 py-1";
 
   return (
-    <div className={`space-y-3 ${compact ? "max-h-[min(44vh,320px)]" : "max-h-[min(58vh,420px)]"} overflow-auto overscroll-contain pr-1`} role="radiogroup" aria-label={`${gameConfigs[game]?.title || "보드게임"} 규칙과 확장 선택`}>
+    <div className={wrapperClassName} role="radiogroup" aria-label={`${gameConfigs[game]?.title || "보드게임"} 규칙과 확장 선택`} data-smoke="variant-choice-grid" data-compact={compact ? "true" : "false"}>
       {groups.map((group) => (
         <div key={group.key} className="space-y-2">
-          <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between gap-2 bg-white/95 px-1 py-1 backdrop-blur">
+          <div className={groupHeaderClassName}>
             <div className="text-[11px] font-black text-slate-500">{group.label}</div>
             <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">{group.variants.length}개</div>
             <div className="h-px flex-1 bg-slate-100" />
@@ -1204,7 +1218,7 @@ const BoardPreview = ({ type, room }) => {
           ))}
         </div>
         <div className="absolute left-6 top-6 rounded-full bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-50">
-          Limit Hold'em
+          Hold'em / Draw
         </div>
       </div>
     );
@@ -2026,16 +2040,41 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
   );
 };
 
-const TurtleStack = ({ seatNos = [], compact = false }) => (
-  <div className="flex -space-x-1">
-    {seatNos.map((seatNo, index) => (
-      <span
-        key={`${seatNo}-${index}`}
-        className={`flex items-center justify-center rounded-full border font-black shadow-sm ${compact ? "h-4 w-4 text-[9px]" : "h-5 w-5 text-[10px]"} ${seatTokenClasses[(seatNo - 1) % seatTokenClasses.length]}`}
-        title={`${seatNo}번`}
-      >
+const maheTurtlePalettes = [
+  { shell: "bg-emerald-400 border-emerald-700 text-emerald-950", body: "bg-lime-300 border-lime-600" },
+  { shell: "bg-sky-400 border-sky-700 text-sky-950", body: "bg-cyan-200 border-cyan-500" },
+  { shell: "bg-amber-300 border-amber-600 text-amber-950", body: "bg-yellow-200 border-yellow-500" },
+  { shell: "bg-rose-400 border-rose-700 text-rose-950", body: "bg-pink-200 border-pink-500" },
+  { shell: "bg-violet-400 border-violet-700 text-violet-950", body: "bg-fuchsia-200 border-fuchsia-500" },
+  { shell: "bg-teal-400 border-teal-700 text-teal-950", body: "bg-emerald-200 border-emerald-500" },
+  { shell: "bg-orange-300 border-orange-700 text-orange-950", body: "bg-amber-200 border-amber-500" },
+  { shell: "bg-slate-300 border-slate-600 text-slate-950", body: "bg-slate-200 border-slate-400" },
+];
+
+const MaheTurtleToken = ({ seatNo, compact = false }) => {
+  const palette = maheTurtlePalettes[(Number(seatNo) - 1) % maheTurtlePalettes.length] || maheTurtlePalettes[0];
+  return (
+    <span
+      className={`relative inline-flex shrink-0 items-center justify-center ${compact ? "h-5 w-6 text-[8px]" : "h-6 w-8 text-[9px]"} font-black`}
+      title={`${seatNo}번 거북이`}
+      aria-label={`${seatNo}번 거북이`}
+      data-smoke="mahe-turtle-token"
+    >
+      <span className={`absolute right-0 top-1/2 z-0 -translate-y-1/2 rounded-full border ${palette.body} ${compact ? "h-2.5 w-2.5" : "h-3 w-3"}`} />
+      <span className={`absolute left-0 top-1/2 z-0 -translate-y-1/2 rotate-45 rounded-[2px] border ${palette.body} ${compact ? "h-2 w-2" : "h-2.5 w-2.5"}`} />
+      <span className={`absolute left-[20%] top-0 z-0 -rotate-12 rounded-full border ${palette.body} ${compact ? "h-1.5 w-2.5" : "h-2 w-3"}`} />
+      <span className={`absolute bottom-0 left-[20%] z-0 rotate-12 rounded-full border ${palette.body} ${compact ? "h-1.5 w-2.5" : "h-2 w-3"}`} />
+      <span className={`relative z-10 flex items-center justify-center rounded-full border-2 shadow-sm ${palette.shell} ${compact ? "h-4 w-5" : "h-5 w-6"}`}>
         {seatNo}
       </span>
+    </span>
+  );
+};
+
+const TurtleStack = ({ seatNos = [], compact = false }) => (
+  <div className={`flex items-center ${compact ? "-space-x-2" : "-space-x-1.5"}`}>
+    {seatNos.map((seatNo, index) => (
+      <MaheTurtleToken key={`${seatNo}-${index}`} seatNo={seatNo} compact={compact} />
     ))}
   </div>
 );
@@ -6861,10 +6900,11 @@ const sixNimmtCardId = (card) => get(card, "id", "id", "");
 const sixNimmtRowCards = (row) => listOf(get(row, "cards", "cards", []));
 const sixNimmtRowPenalty = (row) => sixNimmtRowCards(row).reduce((sum, card) => sum + sixNimmtCardBulls(card), 0);
 
-const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note = "" }) => {
+const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note = "", compact = false }) => {
   const clickable = typeof onClick === "function";
   const className = [
-    "min-h-[92px] rounded-2xl border bg-white p-3 text-left shadow-sm transition",
+    compact ? "min-h-[46px] rounded-md p-1 sm:min-h-[76px] sm:rounded-xl sm:p-2" : "min-h-[70px] rounded-xl p-2 sm:min-h-[92px] sm:rounded-2xl sm:p-3",
+    "border bg-white text-left shadow-sm transition",
     selected ? "border-slate-900 ring-4 ring-slate-900/10" : "border-slate-200",
     disabled ? "opacity-50" : "",
     clickable && !disabled ? "hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-200" : "",
@@ -6872,10 +6912,10 @@ const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note 
   const content = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <div className="text-2xl font-black leading-none text-slate-950">{sixNimmtCardValue(card)}</div>
-        <div className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-black text-rose-700">{sixNimmtCardBulls(card)}벌점</div>
+        <div className={`${compact ? "text-sm sm:text-xl" : "text-xl sm:text-2xl"} font-black leading-none text-slate-950`}>{sixNimmtCardValue(card)}</div>
+        <div className={`${compact ? "px-0.5 py-0.5 text-[7px] sm:px-1.5 sm:text-[9px]" : "px-2 py-1 text-[10px]"} rounded-full bg-rose-100 font-black text-rose-700`}>{sixNimmtCardBulls(card)}벌점</div>
       </div>
-      {note && <div className="mt-2 min-h-[30px] text-[11px] font-bold leading-snug text-slate-500">{note}</div>}
+      {note && <div className={`${compact ? "mt-0.5 max-h-[22px] overflow-hidden text-[8px] leading-tight sm:mt-1 sm:max-h-none sm:text-[10px] sm:leading-snug" : "mt-2 min-h-[30px] text-[11px]"} font-bold text-slate-500`}>{note}</div>}
     </>
   );
   return clickable ? (
@@ -6887,6 +6927,7 @@ const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note 
 
 const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }) => {
   const [selectedCardId, setSelectedCardId] = useState("");
+  const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const phase = get(gameState, "phase", "phase", "");
   const rows = listOf(get(gameState, "rows", "rows", []));
   const statePlayers = listOf(get(gameState, "players", "players", []));
@@ -6910,7 +6951,10 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
   }, { index: -1, penalty: Number.MAX_SAFE_INTEGER }).index;
 
   useEffect(() => {
-    if (!myHand.some((card) => sixNimmtCardId(card) === selectedCardId)) setSelectedCardId("");
+    if (!myHand.some((card) => sixNimmtCardId(card) === selectedCardId)) {
+      setSelectedCardId("");
+      setSelectedRowIndex(null);
+    }
   }, [myHandKey, selectedCardId]);
 
   const rowTail = (row) => {
@@ -6918,7 +6962,14 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
     return cards[cards.length - 1] || null;
   };
 
-  const previewForCard = (card) => {
+  const possibleRowsForCard = (card) => {
+    const value = sixNimmtCardValue(card);
+    return rows
+      .map((row, index) => ({ index, row, tail: sixNimmtCardValue(rowTail(row)), penalty: sixNimmtRowPenalty(row), full: sixNimmtRowCards(row).length >= 5 }))
+      .filter((item) => item.tail < value);
+  };
+
+  const previewForCard = (card, rowOverride = null) => {
     const value = sixNimmtCardValue(card);
     let bestIndex = -1;
     let bestTail = -1;
@@ -6929,74 +6980,96 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
         bestIndex = index;
       }
     });
-    if (bestIndex < 0) return { label: "행 선택 필요", tone: "text-amber-700", rowIndex: -1, penalty: 0 };
-    const row = rows[bestIndex];
+    const possibleRows = possibleRowsForCard(card);
+    if (bestIndex < 0) return { label: "행 선택 필요", tone: "text-amber-700", rowIndex: -1, penalty: 0, possibleRows };
+    const chosenIndex = rowOverride !== null && possibleRows.some((item) => item.index === rowOverride) ? rowOverride : bestIndex;
+    const row = rows[chosenIndex];
     if (sixNimmtRowCards(row).length >= 5) {
-      return { label: `${bestIndex + 1}행 회수`, tone: "text-rose-700", rowIndex: bestIndex, penalty: sixNimmtRowPenalty(row) };
+      return { label: `${chosenIndex + 1}행 회수`, tone: "text-rose-700", rowIndex: chosenIndex, penalty: sixNimmtRowPenalty(row), possibleRows };
     }
-    return { label: `${bestIndex + 1}행 배치`, tone: "text-emerald-700", rowIndex: bestIndex, penalty: 0 };
+    return { label: `${chosenIndex + 1}행 배치`, tone: "text-emerald-700", rowIndex: chosenIndex, penalty: 0, possibleRows };
   };
 
   const selectCard = async () => {
     if (!selectedCardId || !waitingSelection) return;
-    await onAction({ actionType: "SELECT_CARD", cardIds: [selectedCardId] });
+    if (selectedPreview?.possibleRows?.length > 1 && selectedAnchorX === null) return;
+    await onAction({ actionType: "SELECT_CARD", cardIds: [selectedCardId], anchorX: selectedAnchorX });
   };
   const chooseRow = async (rowIndex) => {
     if (!needsRowChoice) return;
     await onAction({ actionType: "CHOOSE_ROW", anchorX: rowIndex });
   };
 
-  const selectedPreview = selectedCard ? previewForCard(selectedCard) : null;
+  const selectedPreview = selectedCard ? previewForCard(selectedCard, selectedRowIndex) : null;
+  const selectedAnchorX = selectedPreview?.possibleRows?.some((item) => item.index === selectedRowIndex) ? selectedRowIndex : null;
+  const selectedNeedsRowTap = waitingSelection && selectedPreview?.possibleRows?.length > 1 && selectedAnchorX === null;
   const phaseLabel = sixNimmtPhaseLabels[phase] || phase || "-";
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <main className="space-y-4">
-        <section id="six-nimmt-board-panel" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-4">
+      <main className="space-y-2 xl:space-y-4">
+        <section id="six-nimmt-board-panel" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg sm:rounded-[1.5rem] sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
             <div>
-              <div className="text-sm font-black text-slate-500">라운드 {roundNo} · 턴 {turnNo}</div>
-              <div className="mt-1 text-2xl font-black text-slate-900">{phaseLabel}</div>
-              <div className="mt-2 max-w-2xl text-xs font-bold leading-relaxed text-slate-500">
+              <div className="text-xs font-black text-slate-500 sm:text-sm">라운드 {roundNo} · 턴 {turnNo}</div>
+              <div className="mt-0.5 text-lg font-black text-slate-900 sm:mt-1 sm:text-2xl">{phaseLabel}</div>
+              <div className="mt-2 hidden max-w-2xl text-[11px] font-bold leading-relaxed text-slate-500 sm:block sm:text-xs">
                 모두 카드를 한 장씩 고르면 낮은 숫자부터 처리됩니다. 내 카드보다 작은 끝 카드 중 가장 큰 행에 붙고, 여섯 번째가 되면 그 행의 벌점을 가져갑니다.
               </div>
             </div>
-            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
-              <div className="text-[11px] font-black text-slate-400">선택 완료</div>
-              <div className="text-lg font-black text-slate-900">{selectedSeatNos.size}/{statePlayers.length}</div>
+            <div className="rounded-lg bg-slate-50 px-2 py-1.5 text-right sm:rounded-2xl sm:px-4 sm:py-3">
+              <div className="text-[9px] font-black text-slate-400 sm:text-[11px]">선택 완료</div>
+              <div className="text-base font-black text-slate-900 sm:text-lg">{selectedSeatNos.size}/{statePlayers.length}</div>
             </div>
           </div>
 
           {needsRowChoice && (
-            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold leading-relaxed text-amber-800">
+            <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-2 text-xs font-bold leading-relaxed text-amber-800 sm:mt-4 sm:rounded-2xl sm:p-3 sm:text-sm">
               {playerNameBySeat(activeSeatNo)}님이 {sixNimmtCardValue(pendingCard)} 카드를 놓을 행을 선택해야 합니다. 벌점이 가장 낮은 행이 기본 추천입니다.
             </div>
           )}
 
-          <div className="mt-4 grid gap-3">
+          {selectedNeedsRowTap && (
+            <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50 px-2 py-1.5 text-[11px] font-black leading-relaxed text-sky-700 sm:mt-3 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs">
+              이 카드는 여러 행에 놓을 수 있습니다. 아래 행 중 하나를 터치해 배치 행을 고른 뒤 제출하세요.
+            </div>
+          )}
+
+          <div className="mt-2 grid gap-1.5 sm:mt-4 sm:gap-3">
             {rows.map((row, index) => {
               const cards = sixNimmtRowCards(row);
               const penalty = sixNimmtRowPenalty(row);
               const selectedRow = selectedPreview?.rowIndex === index;
+              const manualRowCandidate = waitingSelection && selectedPreview?.possibleRows?.some((item) => item.index === index);
+              const manuallySelected = selectedRowIndex === index;
               const recommended = needsRowChoice && recommendedRowIndex === index;
               return (
-                <div key={index} className={`rounded-2xl border p-3 transition ${selectedRow ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-sm font-black text-slate-900">{index + 1}행</div>
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
-                      <span className="rounded-full bg-white px-2 py-1 text-slate-600">{cards.length}/5장</span>
-                      <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">{penalty}벌점</span>
-                      {recommended && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">추천</span>}
+                <div key={index} className={`rounded-lg border p-1.5 transition sm:rounded-2xl sm:p-3 ${selectedRow ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"} ${manuallySelected ? "ring-4 ring-sky-200" : ""}`}>
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-1 sm:mb-2 sm:gap-2">
+                    <div className="text-xs font-black text-slate-900 sm:text-sm">{index + 1}행</div>
+                    <div className="flex flex-wrap items-center gap-1 text-[9px] font-black sm:gap-1.5 sm:text-[11px]">
+                      <span className="rounded-full bg-white px-1.5 py-0.5 text-slate-600 sm:px-2 sm:py-1">{cards.length}/5장</span>
+                      <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-rose-700 sm:px-2 sm:py-1">{penalty}벌점</span>
+                      {manualRowCandidate && <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-sky-700 sm:px-2 sm:py-1">배치 가능</span>}
+                      {recommended && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-emerald-700 sm:px-2 sm:py-1">추천</span>}
                     </div>
                   </div>
-                  <div className="grid grid-cols-5 gap-2">
-                    {cards.map((card) => <SixNimmtCard key={sixNimmtCardId(card)} card={card} />)}
+                  <button
+                    type="button"
+                    disabled={!manualRowCandidate}
+                    onClick={() => setSelectedRowIndex(index)}
+                    className="block w-full rounded-lg text-left disabled:cursor-default"
+                    aria-label={`${index + 1}행 배치 선택`}
+                  >
+                    <div className="grid grid-cols-5 gap-1 sm:gap-2">
+                    {cards.map((card) => <SixNimmtCard key={sixNimmtCardId(card)} card={card} compact />)}
                     {Array.from({ length: Math.max(0, 5 - cards.length) }).map((_, emptyIndex) => (
-                      <div key={`empty-${emptyIndex}`} className="min-h-[92px] rounded-2xl border border-dashed border-slate-200 bg-white/70" />
+                      <div key={`empty-${emptyIndex}`} className="min-h-[46px] rounded-md border border-dashed border-slate-200 bg-white/70 sm:min-h-[76px] sm:rounded-xl" />
                     ))}
-                  </div>
+                    </div>
+                  </button>
                   {needsRowChoice && (
-                    <button type="button" onClick={() => chooseRow(index)} className="mt-3 min-h-10 w-full rounded-xl bg-slate-900 px-3 text-xs font-black text-white">
+                    <button type="button" onClick={() => chooseRow(index)} className="mt-2 min-h-9 w-full rounded-xl bg-slate-900 px-3 text-xs font-black text-white sm:mt-3 sm:min-h-10">
                       이 행 가져가기 · {penalty}벌점
                     </button>
                   )}
@@ -7006,36 +7079,45 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           </div>
         </section>
 
-        <section id="six-nimmt-hand-panel" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <section id="six-nimmt-hand-panel" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg sm:rounded-[1.5rem] sm:p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3">
             <div>
-              <div className="text-lg font-black text-slate-900">내 손패</div>
-              <div className="mt-1 text-xs font-bold text-slate-500">{mySelected ? "이번 턴 카드를 제출했습니다." : "카드를 고르면 예상 배치와 벌점을 먼저 볼 수 있습니다."}</div>
+              <div className="text-sm font-black text-slate-900 sm:text-lg">내 손패</div>
+              <div className="mt-0.5 text-[11px] font-bold text-slate-500 sm:mt-1 sm:text-xs">{mySelected ? "이번 턴 카드를 제출했습니다." : "카드를 고르면 예상 배치와 벌점을 먼저 볼 수 있습니다."}</div>
             </div>
             {selectedPreview && (
-              <div className={`rounded-full bg-slate-100 px-3 py-1 text-xs font-black ${selectedPreview.tone}`}>
+              <div className={`rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black sm:px-3 sm:text-xs ${selectedPreview.tone}`}>
                 {selectedPreview.label}{selectedPreview.penalty ? ` · ${selectedPreview.penalty}벌점` : ""}
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-5 gap-1 sm:gap-2 lg:grid-cols-5">
             {myHand.map((card) => {
               const preview = previewForCard(card);
+              const possibleRowLabel = preview.possibleRows.length
+                ? `${preview.possibleRows.map((item) => item.index + 1).join(",")}행 가능`
+                : "행 회수 선택";
               return (
                 <SixNimmtCard
                   key={sixNimmtCardId(card)}
                   card={card}
                   selected={sixNimmtCardId(card) === selectedCardId}
                   disabled={!waitingSelection}
-                  onClick={() => setSelectedCardId(sixNimmtCardId(card))}
-                  note={`${preview.label}${preview.penalty ? ` · ${preview.penalty}벌점` : ""}`}
+                  onClick={() => {
+                    setSelectedCardId(sixNimmtCardId(card));
+                    setSelectedRowIndex(preview.possibleRows.length === 1 ? preview.possibleRows[0].index : null);
+                  }}
+                  note={`${possibleRowLabel} · ${preview.label}${preview.penalty ? ` · ${preview.penalty}벌점` : ""}`}
+                  compact
                 />
               );
             })}
           </div>
-          <div id="six-nimmt-action-strip" className="tabletop-mobile-action-strip sticky bottom-3 z-20 mt-4 scroll-mt-24 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur xl:static xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none">
+          <div id="six-nimmt-action-strip" className="tabletop-mobile-action-strip sticky bottom-3 z-20 mt-2 scroll-mt-24 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur sm:mt-4 sm:p-3 xl:static xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none">
             {waitingSelection ? (
-              <button type="button" disabled={!selectedCardId} onClick={selectCard} className="min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">선택한 카드 제출</button>
+              <button type="button" disabled={!selectedCardId || selectedNeedsRowTap} onClick={selectCard} className="min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+                {selectedNeedsRowTap ? "배치 행을 먼저 선택" : "선택한 카드 제출"}
+              </button>
             ) : needsRowChoice ? (
               <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-black leading-relaxed text-amber-800">가져갈 행을 위에서 선택하세요.</div>
             ) : (
@@ -7099,13 +7181,22 @@ const telestrationsPhaseLabels = {
 };
 
 const TelestrationsEntry = ({ entry, playerNameBySeat, compact = false }) => {
+  const imageData = entry ? get(entry, "image_data", "imageData", "") : "";
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageData]);
+
   if (!entry) {
     return <div className="rounded-lg bg-slate-50 p-4 text-sm font-bold text-slate-400">아직 공개된 내용이 없습니다.</div>;
   }
   const type = get(entry, "type", "type", "");
   const text = get(entry, "text", "text", "");
-  const imageData = get(entry, "image_data", "imageData", "");
   const authorSeatNo = Number(get(entry, "author_seat_no", "authorSeatNo", 0));
+  const imageFrameClass = compact
+    ? "h-40 max-h-48 min-h-32"
+    : "h-[52vh] max-h-[520px] min-h-[240px]";
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -7114,30 +7205,47 @@ const TelestrationsEntry = ({ entry, playerNameBySeat, compact = false }) => {
         </span>
         <span className="text-[11px] font-black text-slate-400">{playerNameBySeat(authorSeatNo)}</span>
       </div>
-      {imageData ? (
-        <img src={imageData} alt={`${playerNameBySeat(authorSeatNo)} 그림`} className={`w-full rounded-lg border border-slate-100 bg-white object-contain ${compact ? "max-h-48" : "max-h-[420px]"}`} />
+      {imageData && !imageFailed ? (
+        <div className={`${imageFrameClass} w-full overflow-hidden rounded-lg border border-slate-100 bg-white`} data-smoke="telestrations-entry-image-frame">
+          <img
+            src={imageData}
+            alt={`${playerNameBySeat(authorSeatNo)} 그림`}
+            className="block h-full w-full object-contain"
+            data-smoke="telestrations-entry-image"
+            onError={() => setImageFailed(true)}
+          />
+        </div>
       ) : (
         <div className={`flex items-center justify-center rounded-lg bg-slate-50 px-4 text-center font-black leading-relaxed text-slate-900 ${compact ? "min-h-24 text-base" : "min-h-52 text-2xl"}`}>
-          {text || "비공개"}
+          {imageData ? "그림을 불러오지 못했습니다." : (text || "비공개")}
         </div>
       )}
     </div>
   );
 };
 
+const safeObject = (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : null);
+const telestrationsBooksOf = (value) => listOf(value).filter((book) => safeObject(book));
+const telestrationsEntriesOf = (book) => listOf(get(safeObject(book), "entries", "entries", [])).filter((entry) => safeObject(entry));
+
 const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = false, onAction }) => {
-  const phase = get(gameState, "phase", "phase", "");
-  const currentStep = Number(get(gameState, "current_step", "currentStep", 0));
-  const totalSteps = Number(get(gameState, "total_steps", "totalSteps", 0));
-  const playerCount = Number(get(gameState, "player_count", "playerCount", roomPlayers.length));
-  const completedSeatNos = new Set(listOf(get(gameState, "completed_seat_nos", "completedSeatNos", [])).map(Number));
-  const activeBook = get(gameState, "active_book", "activeBook", null);
-  const activeEntries = listOf(get(activeBook, "entries", "entries", []));
-  const previousEntry = activeEntries.find((entry) => Number(get(entry, "step_no", "stepNo", -1)) === currentStep - 1) || activeEntries[0] || null;
-  const mySubmitted = Boolean(get(gameState, "my_submitted", "mySubmitted", false)) || completedSeatNos.has(Number(mySeatNo));
-  const books = listOf(get(gameState, "books", "books", []));
-  const events = listOf(get(gameState, "events", "events", []));
-  const currentTask = get(gameState, "current_task", "currentTask", "");
+  const safeGameState = safeObject(gameState) || {};
+  const safeRoomPlayers = Array.isArray(roomPlayers) ? roomPlayers : [];
+  const phase = get(safeGameState, "phase", "phase", "");
+  const currentStep = Math.max(0, Number(get(safeGameState, "current_step", "currentStep", 0)) || 0);
+  const totalSteps = Math.max(1, Number(get(safeGameState, "total_steps", "totalSteps", safeRoomPlayers.length || 1)) || 1);
+  const playerCount = Math.max(1, Number(get(safeGameState, "player_count", "playerCount", safeRoomPlayers.length || 1)) || 1);
+  const completedSeatNos = new Set(listOf(get(safeGameState, "completed_seat_nos", "completedSeatNos", [])).map(Number));
+  const activeBook = safeObject(get(safeGameState, "active_book", "activeBook", null));
+  const activeEntries = telestrationsEntriesOf(activeBook);
+  const previousEntry = activeEntries.find((entry) => Number(get(entry, "step_no", "stepNo", -1)) === currentStep - 1)
+    || [...activeEntries].reverse().find((entry) => Number(get(entry, "step_no", "stepNo", -1)) < currentStep)
+    || activeEntries[activeEntries.length - 1]
+    || null;
+  const mySubmitted = Boolean(get(safeGameState, "my_submitted", "mySubmitted", false)) || completedSeatNos.has(Number(mySeatNo));
+  const books = telestrationsBooksOf(get(safeGameState, "books", "books", []));
+  const events = listOf(get(safeGameState, "events", "events", [])).filter((event) => safeObject(event));
+  const currentTask = get(safeGameState, "current_task", "currentTask", "");
   const [text, setText] = useState("");
   const [replayBookIndex, setReplayBookIndex] = useState(0);
   const [replayEntryIndex, setReplayEntryIndex] = useState(0);
@@ -7146,11 +7254,12 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
   const [hasInk, setHasInk] = useState(false);
   const canvasRef = useRef(null);
   const drawingRef = useRef({ active: false, x: 0, y: 0 });
-  const playerNameBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
+  const playerNameBySeat = (seatNo) => safeRoomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
   const phaseLabel = telestrationsPhaseLabels[phase] || phase || "-";
   const revealBook = books[replayBookIndex] || books[0] || null;
-  const revealEntries = listOf(get(revealBook, "entries", "entries", []));
+  const revealEntries = telestrationsEntriesOf(revealBook);
   const revealEntry = revealEntries[replayEntryIndex] || revealEntries[0] || null;
+  const awaitingPreviousEntry = (phase === "DRAW" || phase === "GUESS") && !previousEntry;
 
   useEffect(() => {
     setText("");
@@ -7162,7 +7271,7 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
 
   useEffect(() => {
     if (replayEntryIndex >= revealEntries.length) setReplayEntryIndex(0);
-  }, [replayEntries.length, replayEntryIndex]);
+  }, [revealEntries.length, replayEntryIndex]);
 
   useEffect(() => {
     if (phase !== "DRAW") return;
@@ -7183,15 +7292,28 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
     };
   };
 
+  const paintDot = (point) => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    context.fillStyle = brushColor;
+    context.beginPath();
+    context.arc(point.x, point.y, Math.max(1.5, brushSize / 2), 0, Math.PI * 2);
+    context.fill();
+    setHasInk(true);
+  };
+
   const beginDraw = (event) => {
-    if (phase !== "DRAW" || mySubmitted) return;
+    if (phase !== "DRAW" || mySubmitted || awaitingPreviousEntry) return;
     event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     const point = pointOf(event);
     drawingRef.current = { active: true, x: point.x, y: point.y };
+    paintDot(point);
   };
 
   const moveDraw = (event) => {
-    if (!drawingRef.current.active || phase !== "DRAW" || mySubmitted) return;
+    if (!drawingRef.current.active || phase !== "DRAW" || mySubmitted || awaitingPreviousEntry) return;
     event.preventDefault();
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
@@ -7246,12 +7368,12 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
 
   const submitGuess = async () => {
     const value = text.trim();
-    if (!value || mySubmitted) return;
+    if (!value || mySubmitted || awaitingPreviousEntry) return;
     await onAction({ actionType: "SUBMIT_GUESS", text: value });
   };
 
   const submitDrawing = async () => {
-    if (!hasInk || mySubmitted) return;
+    if (!hasInk || mySubmitted || awaitingPreviousEntry) return;
     await onAction({ actionType: "SUBMIT_DRAWING", imageData: imageFromCanvas() });
   };
 
@@ -7283,6 +7405,12 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
               <div className="text-xl font-black text-slate-900">{completedSeatNos.size}/{playerCount}</div>
             </div>
           </div>
+
+          {awaitingPreviousEntry && (
+            <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm font-black text-amber-700">
+              이전 플레이어의 입력을 불러오는 중입니다. 잠시 후 자동으로 갱신됩니다.
+            </div>
+          )}
 
           {phase === "PROMPT" && (
             <div className="mt-4 grid gap-3">
@@ -7324,13 +7452,15 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
                   ref={canvasRef}
                   width={640}
                   height={420}
-                  className="h-auto w-full touch-none rounded-lg border border-slate-200 bg-white shadow-inner"
+                  className={`h-auto w-full touch-none rounded-lg border border-slate-200 bg-white shadow-inner ${awaitingPreviousEntry ? "pointer-events-none opacity-60" : ""}`}
+                  aria-disabled={awaitingPreviousEntry ? "true" : undefined}
                   onPointerDown={beginDraw}
                   onPointerMove={moveDraw}
                   onPointerUp={endDraw}
                   onPointerLeave={endDraw}
+                  onPointerCancel={endDraw}
                 />
-                <button type="button" onClick={submitDrawing} disabled={mySubmitted || !hasInk} className="mt-3 min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+                <button type="button" onClick={submitDrawing} disabled={mySubmitted || !hasInk || awaitingPreviousEntry} className="mt-3 min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
                   {mySubmitted ? "제출 완료" : "그림 제출"}
                 </button>
               </div>
@@ -7338,17 +7468,20 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
           )}
 
           {phase === "GUESS" && (
-            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <TelestrationsEntry entry={previousEntry} playerNameBySeat={playerNameBySeat} />
+            <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(360px,1fr)_minmax(280px,360px)]">
+              <div className="min-w-0">
+                <div className="mb-2 text-sm font-black text-slate-900">보고 추측할 그림</div>
+                <TelestrationsEntry entry={previousEntry} playerNameBySeat={playerNameBySeat} />
+              </div>
               <div className="space-y-3">
                 <textarea
                   value={text}
                   onChange={(event) => setText(event.target.value.slice(0, 120))}
-                  disabled={mySubmitted}
+                  disabled={mySubmitted || awaitingPreviousEntry}
                   className="min-h-40 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-base font-bold text-slate-900 outline-none focus:border-sky-400 focus:bg-white"
                   placeholder="그림만 보고 떠오르는 문장을 적으세요"
                 />
-                <button type="button" onClick={submitGuess} disabled={mySubmitted || !text.trim()} className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+                <button type="button" onClick={submitGuess} disabled={mySubmitted || !text.trim() || awaitingPreviousEntry} className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
                   {mySubmitted ? "제출 완료" : "추측 제출"}
                 </button>
               </div>
@@ -7402,7 +7535,7 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
           <div className="mb-3 text-sm font-black text-slate-900">진행 현황</div>
           <div className="grid grid-cols-2 gap-2">
-            {roomPlayers.map((player) => {
+            {safeRoomPlayers.map((player) => {
               const seatNo = seatNoOf(player);
               const done = completedSeatNos.has(seatNo);
               return (
@@ -7434,10 +7567,13 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
 };
 
 const pokerPhaseLabels = {
+  OPENING_BET: "첫 베팅",
   PREFLOP: "프리플롭",
   FLOP: "플롭",
   TURN: "턴",
   RIVER: "리버",
+  DRAW: "카드 교체",
+  FINAL_BET: "마지막 베팅",
   HAND_FINISHED: "핸드 종료",
   FINISHED: "게임 종료",
 };
@@ -7454,8 +7590,139 @@ const pokerSuitTone = (suit) => (suit === "HEARTS" || suit === "DIAMONDS" ? "tex
 const pokerCardRank = (card) => get(card, "rank", "rank", "");
 const pokerCardSuit = (card) => get(card, "suit", "suit", "");
 const pokerCardValue = (card) => Number(get(card, "value", "value", 0));
+const pokerCardId = (card) => get(card, "id", "id", `${pokerCardRank(card)}-${pokerCardSuit(card)}`);
 
-const PokerCard = ({ card, hidden = false, compact = false }) => {
+const pokerValueLabel = (value) => {
+  if (value === 14) return "A";
+  if (value === 13) return "K";
+  if (value === 12) return "Q";
+  if (value === 11) return "J";
+  return String(value || "");
+};
+
+const pokerHandTone = (category) => {
+  if (category >= 6) return "bg-rose-50 text-rose-700";
+  if (category >= 4) return "bg-amber-50 text-amber-700";
+  if (category >= 2) return "bg-emerald-50 text-emerald-700";
+  if (category >= 1) return "bg-sky-50 text-sky-700";
+  return "bg-slate-100 text-slate-600";
+};
+
+const comparePokerRanks = (left = [], right = []) => {
+  const max = Math.max(left.length, right.length);
+  for (let index = 0; index < max; index += 1) {
+    const a = left[index] || 0;
+    const b = right[index] || 0;
+    if (a !== b) return a - b;
+  }
+  return 0;
+};
+
+const pokerStraightHigh = (valuesDesc) => {
+  const values = [...new Set(valuesDesc)];
+  if (values.includes(14)) values.push(1);
+  for (const start of values) {
+    if ([1, 2, 3, 4].every((offset) => values.includes(start - offset))) return start;
+  }
+  return 0;
+};
+
+const evaluateFivePokerCards = (cards) => {
+  const counts = cards.reduce((acc, card) => {
+    const value = pokerCardValue(card);
+    if (!value) return acc;
+    acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
+  const valuesDesc = Object.keys(counts).map(Number).sort((a, b) => b - a);
+  const flush = cards.length === 5 && new Set(cards.map(pokerCardSuit)).size === 1;
+  const straightHigh = pokerStraightHigh(valuesDesc);
+  const ranksWithCount = (count) => valuesDesc.filter((value) => counts[value] === count);
+  const highestExcept = (...excluded) => valuesDesc.find((value) => !excluded.includes(value)) || 0;
+
+  if (flush && straightHigh) return { category: 8, ranks: [straightHigh], label: "스트레이트 플러시" };
+  const fours = ranksWithCount(4);
+  if (fours.length) return { category: 7, ranks: [fours[0], highestExcept(fours[0])], label: "포카드" };
+  const threes = ranksWithCount(3);
+  const pairs = ranksWithCount(2);
+  if (threes.length && (pairs.length || threes.length > 1)) {
+    return { category: 6, ranks: [threes[0], pairs[0] || threes[1]], label: "풀하우스" };
+  }
+  if (flush) return { category: 5, ranks: valuesDesc, label: "플러시" };
+  if (straightHigh) return { category: 4, ranks: [straightHigh], label: "스트레이트" };
+  if (threes.length) return { category: 3, ranks: [threes[0], ...valuesDesc.filter((value) => value !== threes[0]).slice(0, 2)], label: "트리플" };
+  if (pairs.length >= 2) return { category: 2, ranks: [pairs[0], pairs[1], highestExcept(pairs[0], pairs[1])], label: "투페어" };
+  if (pairs.length === 1) return { category: 1, ranks: [pairs[0], ...valuesDesc.filter((value) => value !== pairs[0]).slice(0, 3)], label: "원페어" };
+  return { category: 0, ranks: valuesDesc, label: "하이카드" };
+};
+
+const evaluatePokerHand = (cards) => {
+  const validCards = cards.filter((card) => pokerCardValue(card));
+  if (validCards.length < 5) {
+    return { ready: false, category: 0, ranks: [], label: "아직 5장 미만", summary: "공개 카드가 더 필요합니다." };
+  }
+  let best = null;
+  for (let a = 0; a < validCards.length - 4; a += 1) {
+    for (let b = a + 1; b < validCards.length - 3; b += 1) {
+      for (let c = b + 1; c < validCards.length - 2; c += 1) {
+        for (let d = c + 1; d < validCards.length - 1; d += 1) {
+          for (let e = d + 1; e < validCards.length; e += 1) {
+            const value = evaluateFivePokerCards([validCards[a], validCards[b], validCards[c], validCards[d], validCards[e]]);
+            if (!best || value.category > best.category || (value.category === best.category && comparePokerRanks(value.ranks, best.ranks) > 0)) {
+              best = value;
+            }
+          }
+        }
+      }
+    }
+  }
+  const highText = best?.ranks?.length ? `${pokerValueLabel(best.ranks[0])} 기준` : "";
+  return { ready: true, ...best, summary: highText };
+};
+
+const drawPokerAdvice = (cards) => {
+  if (cards.length < 5) return { message: "5장이 보이면 교체 추천이 표시됩니다.", suggestedIds: [] };
+  const hand = evaluatePokerHand(cards);
+  if (hand.category >= 4) return { message: `${hand.label}입니다. 이미 강한 족보라 교체 없이 유지가 안전합니다.`, suggestedIds: [] };
+
+  const counts = cards.reduce((acc, card) => {
+    const value = pokerCardValue(card);
+    acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
+  const keepRanks = Object.entries(counts).filter(([, count]) => count >= 2).map(([value]) => Number(value));
+  if (keepRanks.length) {
+    const suggestedIds = cards
+      .filter((card) => !keepRanks.includes(pokerCardValue(card)))
+      .sort((a, b) => pokerCardValue(a) - pokerCardValue(b))
+      .slice(0, 3)
+      .map(pokerCardId);
+    return { message: `${hand.label}은 유지하고 나머지 낮은 카드를 교체하는 쪽이 무난합니다.`, suggestedIds };
+  }
+
+  const suitCounts = cards.reduce((acc, card) => {
+    const suit = pokerCardSuit(card);
+    acc[suit] = (acc[suit] || 0) + 1;
+    return acc;
+  }, {});
+  const flushSuit = Object.entries(suitCounts).find(([, count]) => count >= 4)?.[0];
+  if (flushSuit) {
+    const suggestedIds = cards.filter((card) => pokerCardSuit(card) !== flushSuit).slice(0, 1).map(pokerCardId);
+    return { message: "같은 무늬가 4장입니다. 다른 무늬 1장만 바꾸면 플러시를 노릴 수 있습니다.", suggestedIds };
+  }
+
+  const suggestedIds = cards
+    .filter((card) => pokerCardValue(card) < 11)
+    .sort((a, b) => pokerCardValue(a) - pokerCardValue(b))
+    .slice(0, 3)
+    .map(pokerCardId);
+  return {
+    message: suggestedIds.length ? "완성 족보가 없습니다. 낮은 카드부터 최대 3장 교체해 높은 카드나 페어를 노리세요." : "높은 카드가 많습니다. 큰 교체보다 0~1장 교체가 안정적입니다.",
+    suggestedIds,
+  };
+};
+
+const PokerCard = ({ card, hidden = false, compact = false, selected = false, suggested = false }) => {
   const sizeClass = compact ? "h-16 w-11 rounded-lg text-sm" : "h-24 w-16 rounded-xl text-lg";
   if (hidden || !card) {
     return (
@@ -7466,7 +7733,7 @@ const PokerCard = ({ card, hidden = false, compact = false }) => {
   }
   const suit = pokerCardSuit(card);
   return (
-    <div className={`${sizeClass} flex flex-col justify-between border border-slate-200 bg-white p-1.5 font-black shadow-lg ${pokerSuitTone(suit)}`}>
+    <div className={`${sizeClass} flex flex-col justify-between border border-slate-200 bg-white p-1.5 font-black shadow-lg ${pokerSuitTone(suit)} ${selected ? "ring-4 ring-sky-300" : suggested ? "ring-2 ring-amber-300" : ""}`}>
       <span>{pokerCardRank(card)}</span>
       <span className="self-center text-xl leading-none">{pokerSuitSymbols[suit] || suit}</span>
       <span className="self-end rotate-180">{pokerCardRank(card)}</span>
@@ -7485,8 +7752,14 @@ const pokerPlayerProfileUrl = (roomPlayers, player) => {
   return roomPlayers.find((roomPlayer) => seatNoOf(roomPlayer) === seatNo)?.profileUrl || "";
 };
 
-const roughPokerAdvice = (myCards, communityCards, callAmount, pot) => {
+const roughPokerAdvice = (myCards, communityCards, callAmount, pot, { isFiveCardDraw = false } = {}) => {
   if (!myCards.length) return "내 카드가 공개되면 추천이 표시됩니다.";
+  if (isFiveCardDraw && myCards.length >= 5) {
+    return drawPokerAdvice(myCards).message;
+  }
+  const handInfo = evaluatePokerHand([...myCards, ...communityCards]);
+  if (handInfo.ready && handInfo.category >= 3) return `${handInfo.label}입니다. 강한 완성 족보라 상대 베팅 크기를 보며 팟을 키울 수 있습니다.`;
+  if (handInfo.ready && handInfo.category >= 1) return `${handInfo.label}입니다. 콜 비용이 과하지 않으면 이어갈 만합니다.`;
   const cards = [...myCards, ...communityCards];
   const values = cards.map(pokerCardValue).filter(Boolean);
   const counts = values.reduce((acc, value) => ({ ...acc, [value]: (acc[value] || 0) + 1 }), {});
@@ -7514,13 +7787,19 @@ const roughPokerAdvice = (myCards, communityCards, callAmount, pot) => {
 };
 
 const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }) => {
+  const [drawSelection, setDrawSelection] = useState([]);
   const phase = get(gameState, "phase", "phase", "");
+  const variantCode = String(get(gameState, "variant_code", "variantCode", "") || "").toUpperCase();
+  const mode = String(get(gameState, "mode", "mode", "") || "").toUpperCase();
+  const isFiveCardDraw = mode === "FIVE_CARD_DRAW" || variantCode === "FIVE_CARD_DRAW";
   const pokerPlayers = listOf(get(gameState, "players", "players", []));
   const communityCards = listOf(get(gameState, "community_cards", "communityCards", []));
   const activeSeatNo = Number(get(gameState, "active_seat_no", "activeSeatNo", 0));
   const dealerSeatNo = Number(get(gameState, "dealer_seat_no", "dealerSeatNo", 0));
+  const ante = Number(get(gameState, "ante", "ante", 0));
   const smallBlind = Number(get(gameState, "small_blind", "smallBlind", 0));
   const bigBlind = Number(get(gameState, "big_blind", "bigBlind", 0));
+  const maxDrawCards = Number(get(gameState, "max_draw_cards", "maxDrawCards", 3)) || 3;
   const handNo = Number(get(gameState, "hand_no", "handNo", 0));
   const maxHands = Number(get(gameState, "max_hands", "maxHands", 0));
   const pot = Number(get(gameState, "pot", "pot", 0));
@@ -7532,13 +7811,33 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
   const events = listOf(get(gameState, "events", "events", []));
   const myPlayer = pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(mySeatNo));
   const myCards = listOf(get(myPlayer, "hole_cards", "holeCards", []));
-  const myTurn = isBettingPokerPhase(phase) && activeSeatNo === Number(mySeatNo);
+  const myTurn = (isBettingPokerPhase(phase) || phase === "DRAW") && activeSeatNo === Number(mySeatNo);
   const phaseLabel = pokerPhaseLabels[phase] || phase || "-";
   const potOddsText = callAmount > 0 ? `${Math.round((callAmount / Math.max(1, pot + callAmount)) * 100)}%` : "0%";
-  const advice = roughPokerAdvice(myCards, communityCards, callAmount, pot);
+  const handInfo = evaluatePokerHand(isFiveCardDraw ? myCards : [...myCards, ...communityCards]);
+  const drawHelp = isFiveCardDraw ? drawPokerAdvice(myCards) : { message: "", suggestedIds: [] };
+  const myCardKey = myCards.map(pokerCardId).join("|");
+  const advice = roughPokerAdvice(myCards, communityCards, callAmount, pot, { isFiveCardDraw });
   const winnerName = pokerPlayerName(roomPlayers, pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === winnerSeatNo) || {});
   const canUse = (action) => myTurn && (!availableActions.length || availableActions.includes(action));
-  const send = (actionType) => onAction({ actionType });
+  const send = (actionType, extra = {}) => onAction({ actionType, ...extra });
+  const tableLabel = isFiveCardDraw ? "Five-card Draw" : "Limit Texas Hold'em";
+  const holeCardSlots = isFiveCardDraw ? 5 : 2;
+  const canSubmitDraw = myTurn && phase === "DRAW" && drawSelection.length <= maxDrawCards;
+
+  useEffect(() => {
+    setDrawSelection([]);
+  }, [phase, myCardKey]);
+
+  const toggleDrawCard = (card) => {
+    const cardId = pokerCardId(card);
+    if (!cardId || !myTurn || phase !== "DRAW") return;
+    setDrawSelection((prev) => {
+      if (prev.includes(cardId)) return prev.filter((id) => id !== cardId);
+      if (prev.length >= maxDrawCards) return prev;
+      return [...prev, cardId];
+    });
+  };
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -7546,9 +7845,11 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
         <section id="poker-table-panel" className="scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-emerald-900 bg-zinc-950 p-3 text-white shadow-2xl sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-300">Limit Texas Hold'em</div>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-300">{tableLabel}</div>
               <h2 className="mt-1 text-xl font-black">핸드 {handNo}/{maxHands || "-"}</h2>
-              <div className="mt-1 text-xs font-bold text-emerald-100/80">{phaseLabel} · 블라인드 {smallBlind}/{bigBlind}</div>
+              <div className="mt-1 text-xs font-bold text-emerald-100/80">
+                {phaseLabel} · {isFiveCardDraw ? `앤티 ${ante} · 베팅 단위 ${bigBlind}` : `블라인드 ${smallBlind}/${bigBlind}`}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-right">
               <div className="rounded-2xl bg-white/10 px-3 py-2">
@@ -7564,9 +7865,16 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
 
           <div className="relative mt-5 rounded-[2rem] border border-amber-200/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-emerald-950 p-4 shadow-inner">
             <div className="flex min-h-28 flex-wrap items-center justify-center gap-2">
-              {Array.from({ length: 5 }, (_, index) => (
-                <PokerCard key={index} card={communityCards[index]} hidden={!communityCards[index]} />
-              ))}
+              {isFiveCardDraw ? (
+                <div className="max-w-sm rounded-2xl border border-white/15 bg-zinc-950/35 px-4 py-3 text-center">
+                  <div className="text-sm font-black text-white">공용 카드 없음</div>
+                  <div className="mt-1 text-xs font-bold leading-relaxed text-emerald-100/80">각자 받은 5장 중 최대 {maxDrawCards}장을 한 번 교체한 뒤 족보를 비교합니다.</div>
+                </div>
+              ) : (
+                Array.from({ length: 5 }, (_, index) => (
+                  <PokerCard key={index} card={communityCards[index]} hidden={!communityCards[index]} />
+                ))
+              )}
             </div>
             <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {pokerPlayers.map((player) => {
@@ -7589,8 +7897,28 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
                       {bot ? <Bot className="h-4 w-4 shrink-0" /> : <Crown className="h-4 w-4 shrink-0 text-amber-400" />}
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="flex gap-1">
-                        {[0, 1].map((index) => <PokerCard key={index} card={holeCards[index]} hidden={!holeCards[index]} compact />)}
+                      <div className={`flex flex-wrap gap-1 ${isFiveCardDraw ? "max-w-[14.5rem]" : ""}`}>
+                        {Array.from({ length: holeCardSlots }, (_, index) => {
+                          const card = holeCards[index];
+                          const cardId = pokerCardId(card);
+                          const selectable = Boolean(card) && phase === "DRAW" && myTurn && seatNo === Number(mySeatNo);
+                          const selected = drawSelection.includes(cardId);
+                          const suggested = drawHelp.suggestedIds.includes(cardId);
+                          if (!selectable) {
+                            return <PokerCard key={index} card={card} hidden={!card} compact selected={selected} suggested={suggested} />;
+                          }
+                          return (
+                            <button
+                              key={cardId || index}
+                              type="button"
+                              className="rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300"
+                              onClick={() => toggleDrawCard(card)}
+                              aria-label={`${pokerCardRank(card)} ${pokerSuitSymbols[pokerCardSuit(card)] || pokerCardSuit(card)} ${selected ? "교체 선택 해제" : "교체 선택"}`}
+                            >
+                              <PokerCard card={card} compact selected={selected} suggested={suggested} />
+                            </button>
+                          );
+                        })}
                       </div>
                       <div className="text-right text-xs font-black">
                         <div>{Number(get(player, "chips", "chips", 0))}칩</div>
@@ -7614,11 +7942,18 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
             <div>
               <div className="text-sm font-black text-slate-900">{phase === "FINISHED" ? "최종 결과" : phase === "HAND_FINISHED" ? "핸드 결과" : myTurn ? "내 차례" : "대기 중"}</div>
               <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
-                {phase === "FINISHED" ? `${winnerName} 최종 승리` : phase === "HAND_FINISHED" ? `팟 ${lastPot}칩 정산 완료` : myTurn ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : `${activeSeatNo || "-"}번 차례를 기다리는 중`}
+                {phase === "FINISHED" ? `${winnerName} 최종 승리` : phase === "HAND_FINISHED" ? `팟 ${lastPot}칩 정산 완료` : phase === "DRAW" && myTurn ? `교체 카드 ${drawSelection.length}/${maxDrawCards}장 선택` : myTurn ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : `${activeSeatNo || "-"}번 차례를 기다리는 중`}
               </div>
             </div>
-            <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black leading-relaxed text-emerald-700">
-              {advice}
+            <div className="grid min-w-[220px] flex-1 gap-2 sm:grid-cols-2">
+              <div className={`rounded-xl px-3 py-2 text-xs font-black leading-relaxed ${pokerHandTone(handInfo.category)}`}>
+                <div className="text-[10px] opacity-70">내 족보</div>
+                <div>{handInfo.ready ? `${handInfo.label}${handInfo.summary ? ` · ${handInfo.summary}` : ""}` : handInfo.summary}</div>
+              </div>
+              <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black leading-relaxed text-emerald-700">
+                <div className="text-[10px] opacity-70">추천 판단</div>
+                <div>{advice}</div>
+              </div>
             </div>
           </div>
 
@@ -7628,6 +7963,45 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
             </button>
           ) : phase === "FINISHED" ? (
             <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm font-black text-amber-700">게임이 종료되었습니다. 다시 하기는 방장 메뉴에서 진행하세요.</div>
+          ) : phase === "DRAW" ? (
+            <div className="mt-3 space-y-2">
+              {myTurn ? (
+                <>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-600">
+                    교체할 카드를 손패에서 누르세요. 최대 {maxDrawCards}장까지 바꿀 수 있고, 아무 카드도 고르지 않으면 현재 5장을 유지합니다.
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <button
+                      type="button"
+                      disabled={!drawHelp.suggestedIds.length}
+                      onClick={() => setDrawSelection(drawHelp.suggestedIds.slice(0, maxDrawCards))}
+                      className="min-h-11 rounded-xl bg-amber-50 px-3 text-sm font-black text-amber-700 disabled:opacity-40"
+                    >
+                      추천 카드 선택
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => send("DRAW_CARDS", { cardIds: [] })}
+                      className="min-h-11 rounded-xl bg-slate-100 px-3 text-sm font-black text-slate-700"
+                    >
+                      교체 없이 유지
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canSubmitDraw}
+                      onClick={() => send("DRAW_CARDS", { cardIds: drawSelection })}
+                      className="min-h-11 rounded-xl bg-slate-900 px-3 text-sm font-black text-white disabled:opacity-40"
+                    >
+                      선택 카드 교체
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-black text-slate-600">
+                  {activeSeatNo || "-"}번 플레이어가 교체할 카드를 고르는 중입니다.
+                </div>
+              )}
+            </div>
           ) : (
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <button type="button" disabled={!canUse("FOLD")} onClick={() => send("FOLD")} className="min-h-11 rounded-xl bg-rose-50 px-3 text-sm font-black text-rose-700 disabled:opacity-40">폴드</button>
@@ -7680,7 +8054,7 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
   );
 };
 
-const isBettingPokerPhase = (phase) => ["PREFLOP", "FLOP", "TURN", "RIVER"].includes(phase);
+const isBettingPokerPhase = (phase) => ["OPENING_BET", "PREFLOP", "FLOP", "TURN", "RIVER", "FINAL_BET"].includes(phase);
 
 export const TabletopGame = ({ game }) => {
   const config = gameConfigs[game];
@@ -7886,7 +8260,7 @@ export const TabletopGame = ({ game }) => {
         return;
       }
       if (payload.room) setSelectedRoom(payload.room);
-      if ((game === "dalmuti" || game === "catan" || game === "six-nimmt" || game === "telestrations" || game === "poker") && payload.gameState) {
+      if ((game === "dalmuti" || game === "catan" || game === "six-nimmt" || game === "poker" || game === "telestrations") && payload.gameState) {
         fetchState(roomId, roomSeq).catch((error) => {
           if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 정보를 갱신하지 못했습니다.");
         });
@@ -8155,8 +8529,15 @@ export const TabletopGame = ({ game }) => {
     busyRef.current = true;
     try {
       setBusy(true);
-      await tabletopGameAdapter.startGame(game, idOf(selectedRoom));
-      await fetchState(idOf(selectedRoom));
+      const roomId = idOf(selectedRoom);
+      await tabletopGameAdapter.startGame(game, roomId);
+      try {
+        await fetchState(roomId, roomOpenSeqRef.current);
+      } catch (error) {
+        if (game !== "telestrations") throw error;
+        setSelectedRoom((prev) => prev ? { ...prev, roomStatus: "PLAYING" } : prev);
+        notify("게임을 시작했습니다. 화면 상태를 동기화하는 중입니다.");
+      }
       notifySuccess("게임 시작");
     } catch {
       notifyError("인원과 준비 상태를 확인해주세요.");
@@ -8275,9 +8656,14 @@ export const TabletopGame = ({ game }) => {
     <div className={`tabletop-game tabletop-${game} animate-fade-in space-y-6`}>
       <section className={`overflow-hidden rounded-2xl bg-gradient-to-br ${config.accent} p-[1px] shadow-2xl sm:rounded-[2rem]`}>
         <div className="bg-white p-5 sm:p-8">
-          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
-            <Dices className="h-3.5 w-3.5 text-primary-500" />
-            {config.eyebrow}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
+              <Dices className="h-3.5 w-3.5 text-primary-500" />
+              {config.eyebrow}
+            </div>
+            <Link to="/app/games" className="hidden min-h-10 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+              게임 목록
+            </Link>
           </div>
           <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">{config.title}</h1>
           <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-600 sm:text-base">{config.description}</p>
@@ -8452,6 +8838,9 @@ export const TabletopGame = ({ game }) => {
                 <VariantFeatureTags game={game} variant={selectedRoomVariant} className="mt-2" />
               </div>
               <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:flex sm:flex-wrap">
+                <Link to="/app/games" className="hidden min-h-11 items-center justify-center rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+                  게임 목록
+                </Link>
                 {isHost && status === "PLAYING" && (
                   <button className="min-h-11 rounded-xl bg-amber-100 px-4 py-2 text-sm font-black text-amber-700 disabled:opacity-40" disabled={busy} onClick={forceFinish} aria-label={`${selectedRoom.title} 게임 강제 종료`}>
                     강제 종료
@@ -8581,7 +8970,7 @@ export const TabletopGame = ({ game }) => {
             )}
           </div>
 
-          {gameState && <MobileGameJumpNav game={game} />}
+          {gameState && <MobileGameJumpNav game={game} gameState={gameState} />}
 
           <div className="tabletop-board-shell relative" aria-busy={actionBusy ? "true" : "false"}>
             {actionBusy && gameState && (

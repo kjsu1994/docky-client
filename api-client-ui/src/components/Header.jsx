@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { isAdminUser } from "../utils/authorization";
+import { BrandLogo } from "../common/BrandLogo.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 
 const HeaderMenuDialog = lazy(() =>
@@ -53,13 +54,10 @@ export const Header = () => {
                         </button>
 
                         <Link to="/app" className="group flex items-center gap-3">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-[1.25rem] bg-gradient-to-tr from-primary-600 to-primary-400 text-xl font-black text-white shadow-xl shadow-primary-200 transition-transform duration-500 group-hover:scale-110">
-                                C
-                            </div>
-                            <div className="leading-tight">
-                                <div className="text-lg font-black tracking-tight text-slate-900 transition-colors group-hover:text-primary-600">커뮤니티</div>
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-primary-400">ctfmon shop</div>
-                            </div>
+                            <BrandLogo
+                                className="transition-transform duration-500 group-hover:scale-[1.03]"
+                                markClassName="h-12 max-w-[10rem]"
+                            />
                         </Link>
 
                         <Suspense fallback={null}>

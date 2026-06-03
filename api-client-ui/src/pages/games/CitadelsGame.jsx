@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { BookOpen, CheckCircle2, Coins, Crown, Hammer, RefreshCw, Shield, Sparkles, Target, Users } from "lucide-react";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
@@ -56,6 +57,46 @@ const colorLabels = {
   PURPLE: "특수",
 };
 
+const phaseLabels = {
+  CHARACTER_SELECTION: "캐릭터 선택",
+  DISTRICT_CHOICE: "구역 카드 선택",
+  GRAVEYARD_CHOICE: "묘지 선택",
+  TURN_ACTION: "차례 행동",
+  FINISHED: "게임 종료",
+};
+
+const districtNameLabels = {
+  TEMPLE: "사원",
+  CHURCH: "교회",
+  MONASTERY: "수도원",
+  CATHEDRAL: "대성당",
+  WATCHTOWER: "감시탑",
+  PRISON: "감옥",
+  BATTLEFIELD: "전장",
+  FORTRESS: "요새",
+  TAVERN: "선술집",
+  MARKET: "시장",
+  TRADING_POST: "교역소",
+  DOCKS: "부두",
+  HARBOR: "항구",
+  TOWN_HALL: "시청",
+  MANOR: "영지",
+  CASTLE: "성",
+  PALACE: "궁전",
+  HAUNTED_CITY: "유령 도시",
+  KEEP: "성채",
+  LABORATORY: "실험실",
+  SMITHY: "대장간",
+  OBSERVATORY: "천문대",
+  LIBRARY: "도서관",
+  GRAVEYARD: "묘지",
+  DRAGON_GATE: "용의 문",
+  UNIVERSITY: "대학교",
+  MAGIC_SCHOOL: "마법 학교",
+  GREAT_WALL: "만리장성",
+  QUARRY: "채석장",
+};
+
 const colorClasses = {
   YELLOW: "border-amber-200 bg-amber-50 text-amber-800",
   BLUE: "border-sky-200 bg-sky-50 text-sky-800",
@@ -90,7 +131,7 @@ const CitadelsLobbyPreview = ({ roomCode = "LOBBY", compact = false }) => (
       <div>
         <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-amber-100">
           <Crown className="h-3.5 w-3.5" />
-          Citadels Lobby
+          시티델 대기방
         </div>
         <div className="mt-3 text-xl font-black">캐릭터를 고르고 도시를 완성하는 게임입니다.</div>
         <div className="mt-1 max-w-2xl text-xs font-bold leading-relaxed text-amber-100/90">
@@ -160,7 +201,7 @@ const currentMemberIdOf = (user) => Number(user?.member_id || user?.memberId || 
 const characterName = (code) => characterLabels[code] || code || "-";
 const playerName = (players, seatNo) => players.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `좌석 ${seatNo}`;
 const cardIdOf = (card) => get(card, "id", "id", "");
-const cardNameOf = (card) => get(card, "name", "name", "-");
+const cardNameOf = (card) => districtNameLabels[templateCodeOf(card)] || get(card, "name", "name", "-");
 const cardColorOf = (card) => get(card, "color", "color", "");
 const cardCostOf = (card) => Number(get(card, "cost", "cost", 0));
 const templateCodeOf = (card) => get(card, "template_code", "templateCode", "");
@@ -346,6 +387,39 @@ export const CitadelsGame = () => {
     if (isMyTurn) return "필요한 특수 능력을 사용한 뒤 턴을 종료하세요.";
     return `${playerName(players, activeSeatNo)}님의 ${characterName(activeCharacter)} 차례입니다.`;
   })();
+  const currentPhaseLabel = phaseLabels[phase] || phase || "대기";
+  const beginnerSteps = (() => {
+    if (phase === "FINISHED") {
+      return ["최종 점수와 보너스를 확인합니다.", "방장이 다시 하기 또는 나가기를 선택할 수 있습니다.", "다음 판에서는 색상 5종 보너스를 먼저 노려보세요."];
+    }
+    if (isMySelection) {
+      return selectionStep === "DISCARD"
+        ? ["이번 라운드에서 제외할 캐릭터를 고릅니다.", "상대가 쓰면 위험한 능력부터 제거하는 편이 안전합니다.", "제외 후 다음 선택 차례를 기다립니다."]
+        : ["캐릭터 설명을 보고 이번 라운드 능력을 고릅니다.", "내 도시 색상과 맞는 수입 캐릭터를 우선 고려합니다.", "초보자는 왕, 상인, 건축가처럼 직접 이득이 보이는 캐릭터가 쉽습니다."];
+    }
+    if (phase === "CHARACTER_SELECTION") {
+      return ["다른 플레이어가 비밀 캐릭터를 고르는 중입니다.", "공개 제외 캐릭터를 확인해 이번 라운드에 없는 능력을 기억하세요.", "내 차례가 오면 화면의 캐릭터 카드를 터치합니다."];
+    }
+    if (isMyDistrictChoice) {
+      return [`${pendingKeepCount}장을 선택해 손패에 넣습니다.`, "금화가 많으면 바로 지을 수 있는 낮은 비용 카드를 우선 봅니다.", "색상 보너스가 부족하면 없는 색의 구역을 고르세요."];
+    }
+    if (phase === "DISTRICT_CHOICE") {
+      return ["다른 플레이어가 뽑은 구역 카드를 고르는 중입니다.", "선택이 끝나면 다음 차례가 자동으로 진행됩니다.", "오른쪽 도시 현황에서 상대 구역 수를 확인하세요."];
+    }
+    if (isMyGraveyardChoice) {
+      return ["파괴된 구역을 금화 1개로 회수할지 선택합니다.", "점수가 높거나 색상 보너스에 필요한 구역이면 회수하세요.", "금화가 부족하거나 가치가 낮으면 포기해도 됩니다."];
+    }
+    if (isMyTurn && !actionTaken) {
+      return ["먼저 금화 2개 받기 또는 구역 카드 뽑기 중 하나를 선택합니다.", "지을 카드가 손에 있고 금화가 부족하면 금화를 받으세요.", "손패가 약하거나 선택지가 없으면 구역 카드 뽑기가 안전합니다."];
+    }
+    if (isMyTurn && canBuild) {
+      return ["건설 가능한 카드를 확인합니다.", "색상 보너스에 필요한 색이나 높은 점수 구역을 우선 짓습니다.", "능력을 더 쓸 게 없으면 턴 종료를 누릅니다."];
+    }
+    if (isMyTurn) {
+      return ["캐릭터 특수 능력을 사용할지 확인합니다.", "수입 버튼이나 마술사/장군 능력이 활성화되어 있으면 먼저 판단하세요.", "할 일이 끝났다면 턴 종료를 누릅니다."];
+    }
+    return [`${playerName(players, activeSeatNo)}님의 차례를 기다립니다.`, "현재 호출된 캐릭터와 능력을 확인하세요.", "상대 도시의 8구역 완성 여부와 색상 보너스를 지켜보세요."];
+  })();
 
   const fetchVariants = async () => {
     const list = await tabletopGameAdapter.fetchVariants(GAME_CODE);
@@ -381,7 +455,7 @@ export const CitadelsGame = () => {
         void notifyRealtimeError({
           scope: "citadels-game",
           error: frame,
-          fallbackMessage: "Citadels 실시간 연결에 문제가 생겼습니다. 잠시 뒤 다시 시도해주세요.",
+          fallbackMessage: "시티델 실시간 연결에 문제가 생겼습니다. 잠시 뒤 다시 시도해주세요.",
         });
       };
       client.beforeConnect = () => {
@@ -498,7 +572,7 @@ export const CitadelsGame = () => {
       });
       await openRoom(room);
       await fetchRooms();
-      notifySuccess("Citadels 방을 만들었습니다.");
+      notifySuccess("시티델 방을 만들었습니다.");
     }, "방 생성에 실패했습니다.");
   };
 
@@ -533,7 +607,7 @@ export const CitadelsGame = () => {
   const startGame = () => withBusy(async () => {
     await tabletopGameAdapter.startGame(GAME_CODE, roomIdOf(selectedRoom));
     await fetchState(roomIdOf(selectedRoom));
-    notifySuccess("Citadels를 시작했습니다.");
+    notifySuccess("시티델을 시작했습니다.");
   }, "인원과 준비 상태를 확인해주세요.");
 
   const forceFinishGame = async () => {
@@ -734,11 +808,16 @@ export const CitadelsGame = () => {
     <div className="animate-fade-in space-y-6">
       <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-red-900 to-amber-600 p-[1px] shadow-2xl sm:rounded-[2rem]">
         <div className="bg-white p-5 sm:p-8">
-          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
-            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-            Tabletop
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+              Tabletop
+            </div>
+            <Link to="/app/games" className="hidden min-h-10 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+              게임 목록
+            </Link>
           </div>
-          <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">Citadels</h1>
+          <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">시티델</h1>
           <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-600 sm:text-base">
             비밀 캐릭터 선택, 금화 관리, 구역 건설을 한 화면에서 진행할 수 있도록 구성했습니다.
           </p>
@@ -753,7 +832,7 @@ export const CitadelsGame = () => {
             <div className="text-lg font-black text-slate-900">방 만들기</div>
             <div className="mt-4 space-y-3">
               <input aria-label="방 제목" className="min-h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="방 제목" value={createForm.title} onChange={(event) => setCreateForm((prev) => ({ ...prev, title: event.target.value }))} />
-              <select aria-label="Citadels 규칙 선택" className="min-h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" value={createForm.variantCode} onChange={(event) => setCreateForm((prev) => ({ ...prev, variantCode: event.target.value }))}>
+              <select aria-label="시티델 규칙 선택" className="min-h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" value={createForm.variantCode} onChange={(event) => setCreateForm((prev) => ({ ...prev, variantCode: event.target.value }))}>
                 {variants.map((variant) => (
                   <option key={variant.code} value={variant.code}>{variant.displayName} · {variant.minPlayers}~{variant.maxPlayers}명</option>
                 ))}
@@ -812,6 +891,9 @@ export const CitadelsGame = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Link to="/app/games" className="hidden min-h-10 items-center justify-center rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+                  게임 목록
+                </Link>
                 {status === "WAITING" && !isHost && (
                   <>
                     <button type="button" disabled={busy} onClick={toggleReady} className="min-h-10 rounded-xl bg-slate-100 px-4 text-xs font-black text-slate-700">
@@ -930,6 +1012,33 @@ export const CitadelsGame = () => {
                       </div>
                     </div>
                   </div>
+                </section>
+
+                <section className="rounded-2xl border border-amber-100 bg-white p-4 shadow-lg">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-600">시티델 도우미</div>
+                      <div className="mt-1 text-lg font-black text-slate-900">{currentPhaseLabel}</div>
+                    </div>
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                      {myGold}금화 · {myHand.length}손패 · {myCity.length}구역
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    {beginnerSteps.map((step, index) => (
+                      <div key={`${currentPhaseLabel}-${index}`} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                        <div className="flex items-start gap-2">
+                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-white">{index + 1}</span>
+                          <div className="text-xs font-bold leading-relaxed text-slate-600">{step}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {!colorProgress.completed && (
+                    <div className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700">
+                      색상 보너스까지 부족한 색: {colorProgress.missingText}
+                    </div>
+                  )}
                 </section>
 
                 {phase === "CHARACTER_SELECTION" && (
