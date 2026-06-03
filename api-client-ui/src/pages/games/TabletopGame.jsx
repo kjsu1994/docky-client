@@ -6992,6 +6992,35 @@ const sixNimmtCardId = (card) => get(card, "id", "id", "");
 const sixNimmtRowCards = (row) => listOf(get(row, "cards", "cards", []));
 const sixNimmtRowPenalty = (row) => sixNimmtRowCards(row).reduce((sum, card) => sum + sixNimmtCardBulls(card), 0);
 
+const mergeSixNimmtRealtimeState = (previousState, realtimeState, mySeatNo) => {
+  if (!realtimeState) return previousState || null;
+  if (!previousState || !mySeatNo) return realtimeState;
+  const previousPlayers = listOf(get(previousState, "players", "players", []));
+  const realtimePlayers = listOf(get(realtimeState, "players", "players", []));
+  const previousBySeat = new Map(previousPlayers.map((player) => [Number(get(player, "seat_no", "seatNo", 0)), player]));
+  return {
+    ...previousState,
+    ...realtimeState,
+    players: realtimePlayers.map((player) => {
+      const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+      if (seatNo !== Number(mySeatNo)) return player;
+      const previousPlayer = previousBySeat.get(seatNo);
+      if (!previousPlayer) return player;
+      const realtimeHand = listOf(get(player, "hand", "hand", []));
+      const hasRealtimeSelectedCard = Object.prototype.hasOwnProperty.call(player, "selectedCard")
+        || Object.prototype.hasOwnProperty.call(player, "selected_card");
+      return {
+        ...previousPlayer,
+        ...player,
+        hand: realtimeHand.length ? realtimeHand : listOf(get(previousPlayer, "hand", "hand", [])),
+        selectedCard: hasRealtimeSelectedCard
+          ? get(player, "selected_card", "selectedCard", null)
+          : get(previousPlayer, "selected_card", "selectedCard", null),
+      };
+    }),
+  };
+};
+
 const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note = "", compact = false }) => {
   const clickable = typeof onClick === "function";
   const className = [
@@ -8674,7 +8703,9 @@ export const TabletopGame = ({ game }) => {
         return;
       }
       if (payload.room) setSelectedRoom(payload.room);
-      if ((game === "dalmuti" || game === "catan" || game === "six-nimmt" || game === "poker" || game === "telestrations") && payload.gameState) {
+      if (game === "six-nimmt" && payload.gameState) {
+        setGameState((prev) => mergeSixNimmtRealtimeState(prev, payload.gameState, mySeatNo));
+      } else if ((game === "dalmuti" || game === "catan" || game === "poker" || game === "telestrations") && payload.gameState) {
         fetchState(roomId, roomSeq).catch((error) => {
           if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 정보를 갱신하지 못했습니다.");
         });
@@ -8972,7 +9003,11 @@ export const TabletopGame = ({ game }) => {
     try {
       const result = await tabletopGameAdapter.sendAction(game, idOf(selectedRoom), payload);
       if (result?.room) setSelectedRoom(result.room);
-      setGameState(result?.gameState || null);
+      if (game === "six-nimmt" && result?.gameState) {
+        setGameState((prev) => mergeSixNimmtRealtimeState(prev, result.gameState, mySeatNo));
+      } else {
+        setGameState(result?.gameState || null);
+      }
       return result;
     } finally {
       actionBusyRef.current = false;

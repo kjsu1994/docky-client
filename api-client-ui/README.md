@@ -65,7 +65,7 @@ npm run build
 - `npm run smoke:las-vegas-ui`는 Chrome 또는 Edge headless 브라우저로 라스베가스 방 목록, 방 생성, 상태/카지노 렌더링, 설정 저장, 서버 snake_case 응답 정규화, 데스크톱/모바일 가로 오버플로를 확인합니다.
 - `npm run smoke:facility-ui`는 Chrome 또는 Edge headless 브라우저로 시설 하위 탭, 주소 검색 120자 제한, 시설 키워드 60자 제한, 지도 mock 렌더링, 지도 팝업 HTML escape 경계, 데스크톱/모바일 가로 오버플로를 확인합니다.
 - `npm run smoke:optimizer-ui`는 Chrome 또는 Edge headless 브라우저로 중간장소 주소 선택, 계산 결과, 지도 mock 렌더링, 데스크톱/모바일 가로 오버플로를 확인합니다.
-- `npm run smoke:invest-ui`는 Chrome 또는 Edge headless 브라우저로 투자 분석, 차트 전환, 추천 레이어, 데스크톱/모바일 가로 오버플로를 확인합니다.
+- `npm run smoke:invest-ui`는 Chrome 또는 Edge headless 브라우저로 투자 분석, 차트 전환, 투자 판단 매트릭스, 데스크톱/모바일 가로 오버플로를 확인합니다.
 - `npm run smoke:stats-ui`는 Chrome 또는 Edge headless 브라우저로 통계 화면의 한국어 문구, 기간 변경, 데스크톱/모바일 가로 오버플로를 확인합니다.
 - `npm run smoke:todo-ui`는 Chrome 또는 Edge headless 브라우저로 할 일 화면의 한국어 문구, 생성 동작, 액션 중복 방지 가드, 데스크톱/모바일 가로 오버플로를 확인합니다.
 - `npm run smoke:tabletop-ui`는 Chrome 또는 Edge headless 브라우저로 게임 허브와 주요 보드게임 흐름, 서버 snake_case 응답 정규화, 데스크톱/태블릿/스마트폰 폭을 확인합니다.
@@ -332,10 +332,22 @@ npm run build
 - 2026-06-01 verify: `npm.cmd run build`, `npm.cmd run smoke:optimizer-ui`, `npm.cmd run smoke:text-quality` passed after normalizing optimizer adapter routes to avoid `/api/api/optimizer/*`.
 - 2026-06-01 verify: optimizer error-contract recheck passed `npm run smoke:text-quality`, `npm run build`, and `npm run smoke:optimizer-ui`.
 - 2026-06-02 verify: `node --check scripts\optimizer-ui-smoke.mjs`, `node --check src\adapters\optimizerAdapter.js`, `npm.cmd run smoke:optimizer-ui`, `npm.cmd run smoke:facility-ui`, `npm.cmd run smoke:text-quality`, `npm.cmd run build`, and server optimizer bounded-request tests passed after the optimizer participant/address-bound pass.
-- `/app/invest`의 종목 추천, 분석 v1/v2/v3, 차트 조회는 `src/adapters/investAdapter.js`를 경유하며, `smoke:invest-ui`로 분석 결과, 차트 주기 전환, 추천 레이어, 반응형 overflow를 검증합니다.
+- `/app/invest`의 종목 추천, 분석 v1/v2/v3, 차트 조회는 `src/adapters/investAdapter.js`를 경유하며, `smoke:invest-ui`로 분석 결과, 차트 주기 전환, 투자 판단 매트릭스, 반응형 overflow를 검증합니다.
 - 투자 화면은 서버의 KIS/DART/SEC EDGAR timeout/표준 에러 응답을 `src/adapters/investAdapter.js` 경계에서 한국어 오류와 제공자 경고로 표시합니다.
 - 투자 분석 `limitations`의 미국 제공자 경고 판별도 `src/adapters/investAdapter.js`에서 처리해 서버가 한글 우선 문구를 내려도 화면 경고가 유지됩니다.
 - 투자 종목 검색창은 서버 경계와 맞춰 검색어 80자, 선택 종목코드 20자 제한을 표시하고 `smoke:invest-ui`에서 `maxLength`와 안내 문구를 확인합니다.
+- 국내 종목 검색 결과가 비거나 제공자 응답이 실패해도 검색 드롭다운에서 직접 종목코드 입력 경로를 안내합니다. 서버는 KIS 마스터 실패 시 seed/DART fallback을 사용하고, 화면은 결과를 최대 5개까지 표시합니다.
+- 투자 판단 매트릭스는 v3 `recommendation.factors`의 요인별 점수/가중치 근거를 노출하고, 단일 종목 집중 투자 경고를 첫 화면에 표시합니다.
+- 투자 전 리스크 가드는 API 추가 없이 화면에서 총 투자자산, 매수 예정금액, 한 종목 허용 비중, 1회 손실 예산을 계산해 편입 비중, 재검토 하락폭, 분할 매수 금액, 데이터 체크리스트를 보여줍니다.
+- 투자 전 리스크 가드의 실행 계획서는 현재가와 95% 일간 VaR을 사용해 예상 수량, VaR 한도 수량, 재검토 기준가, 하단 알림 후보를 계산합니다.
+- v3 `scenario_stress_snapshot`이 있으면 투자 전 리스크 가드가 1/5/20거래일 과거 최악 구간을 매수 예정금액 기준 손실액으로 환산해 보여줍니다.
+- v3 `risk_adjusted_return_snapshot`이 있으면 위험 대비 수익 카드가 Sharpe, Sortino, Calmar, 연환산 수익률, 하방 변동성, 상승일 비율을 보여줍니다.
+- v3 `strategy_backtest_snapshot`이 있으면 퀀트 전략 검증 카드에서 SMA20/SMA60 추세 필터와 단순 보유의 수익률, 최대낙폭, 노출 비중, 진입 횟수, 보유일 승률을 비교합니다.
+- 현재가 차트는 증권사형 가격축, 십자선, 선택 캔들 요약, 이동평균, 볼린저, RSI, MACD 토글을 제공합니다.
+- 투자 판단 매트릭스와 리스크 체크리스트는 `risk_adjusted_return`, `scenario_stress`, `strategy_backtest` 요인을 함께 표시합니다.
+- 상단 안전 경고 옆의 방법론 참고 링크는 SEC 자산배분, FINRA 분산투자/리스크, Fidelity 종목 분석 자료를 연결합니다.
+- `/invest/portfolio`와 연결된 내 투자 후보 카드에서 현재 분석 종목, 수량, 매수 예정금액, 허용 비중, 손실 예산, 평균단가, 메모를 저장하고 삭제할 수 있습니다.
+- 2026-06-03 verify: invest decision-support pass after domestic search fallback, matrix UX, and position risk guard passed `node --check scripts\invest-ui-smoke.mjs`, `npm.cmd run build`, `npm.cmd run smoke:invest-ui`, and `npm.cmd run smoke:text-quality`.
 - 2026-06-01 verify: investment timeout handling recheck passed `npm.cmd run smoke:text-quality`, `npm.cmd run build`, and `npm.cmd run smoke:invest-ui`.
 - Las Vegas and No Thanks action payload builders send only the action data (`action_type`, plus `casino_no` for Las Vegas); the server resolves the acting member from the STOMP JWT principal, so `member_id` is not sent.
 - 2026-06-01 verify: `npm.cmd run build`, `npm.cmd run smoke:las-vegas-ui`, `npm.cmd run smoke:no-thanks-ui`, `npm.cmd run smoke:text-quality` passed after removing `member_id` from Las Vegas/No Thanks STOMP action payload builders.
@@ -536,3 +548,13 @@ npm run build
 - 2026-06-03 UX/game correction: `/app/poker` is now a Tabletop room-based Limit Texas Hold'em game instead of the old single-player practice screen. It supports 1~8 players, AI bots for solo starts, chip/blind presets, private hole-card refresh, pot/chip/player state, and a mobile sticky action panel with call amount, pot odds, and beginner advice. Legacy `/app/plinko` still redirects to `/app/poker`.
 - 2026-06-03 UX/game correction: Citadels now shows lobby artwork before room selection and inside the waiting room, and non-host users see a clear host-start-waiting state instead of an apparently missing start control.
 - 2026-06-03 verify: `npm run build` passed after the Poker and Citadels corrections and wrote the production bundle to `C:\compose\minio-data\client\dist`.
+- 2026-06-03 invest UX: `/app/invest` now renders v3 `price_risk_snapshot` as a 가격 리스크 스냅샷 with annualized volatility, max drawdown, one-year return, and 95% daily VaR. The position risk guard also converts daily VaR into an estimated one-day loss amount for the user-entered planned purchase size.
+- 2026-06-03 invest matrix: the investment decision matrix fixture and UI now include the `price_risk` factor alongside fundamentals, growth, valuation, momentum, and news sentiment.
+- 2026-06-03 invest strategy: `/app/invest` now renders v3 `strategy_backtest_snapshot` as a 퀀트 전략 검증 card and includes the `strategy_backtest` factor in the matrix/checklist.
+- 2026-06-03 invest portfolio: `/app/invest` now fetches `/invest/portfolio`, saves the current analyzed symbol with quantity and risk-guard inputs, and renders the saved candidate list with delete controls.
+- 2026-06-03 invest portfolio valuation: saved candidates now display KIS-backed current quote, current value, unrealized P/L, current allocation, and alert status when quote data is available.
+- 2026-06-03 invest execution plan: the risk guard now converts planned amount, current price, loss budget, and 95% daily VaR into expected shares, VaR-capped shares, review price, and lower-alert candidate.
+- 2026-06-03 invest chart/stress: the chart now has broker-style price axis, crosshair, candle summary, indicator toggles, and v3 `scenario_stress_snapshot` is rendered as planned-amount loss scenarios in the risk guard and decision matrix.
+- 2026-06-03 invest risk-adjusted return: v3 `risk_adjusted_return_snapshot` is rendered as a Sharpe/Sortino/Calmar card and included in the decision checklist and matrix.
+- 2026-06-04 invest references: `/app/invest` exposes SEC, FINRA, and Fidelity methodology links beside the top safety warning, and the invest UI smoke checks the reference labels.
+- 2026-06-03 verify: `node --check scripts\invest-ui-smoke.mjs`, JSX transform for `src/pages/facility/InvestAssistant.jsx`, `npm.cmd run build`, `npm.cmd run smoke:invest-ui`, and `npm.cmd run smoke:text-quality` passed after the invest price-risk UX pass.

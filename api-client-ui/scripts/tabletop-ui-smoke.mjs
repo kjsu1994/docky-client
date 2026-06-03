@@ -180,6 +180,16 @@ function assertTabletopRealtimeSource() {
       throw new Error(`tabletop-ui-smoke: TabletopGame realtime source must ${description}.`);
     }
   }
+  const sixNimmtRealtimeBranch = source.match(/if \(game === "six-nimmt" && payload\.gameState\) \{([\s\S]*?)\} else if/);
+  if (!sixNimmtRealtimeBranch || !sixNimmtRealtimeBranch[1].includes("mergeSixNimmtRealtimeState")) {
+    throw new Error("tabletop-ui-smoke: Six Nimmt realtime must merge public selection updates immediately.");
+  }
+  if (sixNimmtRealtimeBranch[1].includes("fetchState(")) {
+    throw new Error("tabletop-ui-smoke: Six Nimmt realtime must not immediately refetch stale REST state after a public selection update.");
+  }
+  if (!source.includes('if (game === "six-nimmt" && result?.gameState)')) {
+    throw new Error("tabletop-ui-smoke: Six Nimmt actions must merge the viewer-specific action response.");
+  }
   if (source.includes("else client.onConnect = () =>")) {
     throw new Error("tabletop-ui-smoke: openRoom must not overwrite STOMP onConnect per room.");
   }

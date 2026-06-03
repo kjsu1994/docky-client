@@ -33,6 +33,9 @@ function assertStaticInvestToastRuntimeBoundary() {
     if (!source.includes("notifyError") || !source.includes("notifySuccess")) {
         throw new Error("invest-ui-smoke: InvestAssistant must keep success/error notifications on the dynamic toast runtime boundary.");
     }
+    if (!source.includes("Broker Chart") || !source.includes("cursor-crosshair") || !source.includes("가격 캔들 차트")) {
+        throw new Error("invest-ui-smoke: InvestAssistant chart must keep the broker-style chart header, crosshair, and accessible chart label.");
+    }
 }
 
 class PipeCdp {
@@ -227,7 +230,7 @@ const analysisV3 = {
     market: "KR",
     symbol: "005930",
     company_name: "삼성전자",
-    available_sections: ["overview", "financial_summary", "price_snapshot", "technical_indicators", "news_issues"],
+    available_sections: ["overview", "financial_summary", "price_snapshot", "technical_indicators", "price_risk", "risk_adjusted_return", "scenario_stress", "strategy_backtest", "news_issues"],
     overview: analysisV2.overview,
     price_snapshot: priceSnapshot,
     financial_summary: financialSummary,
@@ -280,6 +283,57 @@ const analysisV3 = {
         summary: "일반 상장주식입니다.",
         highlights: ["대형주", "반도체"],
     },
+    price_risk_snapshot: {
+        trading_days: 260,
+        trailing_return3m: 8.4,
+        trailing_return1y: 18.6,
+        annualized_volatility: 24.8,
+        average_daily_move: 1.1,
+        max_drawdown: -14.7,
+        daily_value_at_risk95: 2.6,
+        risk_score: 74,
+        risk_label: "LOW",
+        notes: ["최근 가격 변동성은 계산 기준상 관리 가능한 범위입니다."],
+    },
+    risk_adjusted_return_snapshot: {
+        trading_days: 260,
+        total_return: 18.6,
+        annualized_return: 17.8,
+        annualized_volatility: 24.8,
+        downside_deviation: 13.2,
+        sharpe_ratio: 0.72,
+        sortino_ratio: 1.35,
+        calmar_ratio: 1.21,
+        positive_day_ratio: 54.6,
+        efficiency_score: 68,
+        efficiency_label: "BALANCED",
+        notes: ["Sharpe, Sortino, Calmar are calculated from historical daily candles."],
+    },
+    strategy_backtest_snapshot: {
+        strategy_name: "SMA20/SMA60 추세 필터",
+        trading_days: 260,
+        benchmark_return: 18.6,
+        strategy_return: 23.4,
+        benchmark_max_drawdown: -14.7,
+        strategy_max_drawdown: -8.2,
+        exposure_percent: 64.8,
+        trade_count: 3,
+        win_rate: 55.2,
+        signal: "OUTPERFORMED",
+        summary: "최근 일봉 구간에서 추세 필터가 단순 보유 대비 성과 또는 낙폭 관리에 유리했습니다.",
+        notes: ["이 결과는 과거 일봉으로 계산한 보조 검증이며 미래 수익을 보장하지 않습니다."],
+    },
+    scenario_stress_snapshot: {
+        trading_days: 260,
+        risk_label: "MEDIUM",
+        summary: "과거 일봉 기준 20거래일 최악 구간 수익률은 -12.4%입니다.",
+        cases: [
+            { horizon: "1거래일", horizon_trading_days: 1, worst_return: -3.2, start_date: "2025-02-10", end_date: "2025-02-11" },
+            { horizon: "5거래일", horizon_trading_days: 5, worst_return: -7.1, start_date: "2025-03-03", end_date: "2025-03-10" },
+            { horizon: "20거래일", horizon_trading_days: 20, worst_return: -12.4, start_date: "2025-04-01", end_date: "2025-04-29" },
+        ],
+        notes: ["과거 최악 구간은 미래 손실을 보장하거나 제한하지 않습니다."],
+    },
     recommendation: {
         buy_percent: 60,
         neutral_percent: 30,
@@ -289,8 +343,56 @@ const analysisV3 = {
         summary: "장기 관점에서 긍정적입니다. 다만 단기 가격 변동성은 분할 접근이 필요합니다.",
         reasons: ["실적 회복 구간", "재무 안정성"],
         risks: ["업황 사이클"],
+        factors: [
+            { key: "fundamentals", label: "기초체력", score: 74, weight: 25, signal: "POSITIVE", summary: "이익과 재무안정성은 양호한 수준입니다." },
+            { key: "growth", label: "성장성", score: 62, weight: 20, signal: "NEUTRAL", summary: "매출 성장률 추이는 +5.80%입니다." },
+            { key: "valuation", label: "밸류에이션", score: 60, weight: 15, signal: "NEUTRAL", summary: "현재 PER은 14.2배입니다." },
+            { key: "momentum", label: "모멘텀", score: 67, weight: 20, signal: "POSITIVE", summary: "가격 흐름과 기술 추세는 양호한 수준입니다." },
+            { key: "price_risk", label: "가격 리스크", score: 74, weight: 15, signal: "POSITIVE", summary: "연 변동성 24.8%, 최대 낙폭 -14.7%, 일간 VaR 2.6% 기준 리스크 점수는 74점입니다." },
+            { key: "risk_adjusted_return", label: "위험 대비 수익", score: 68, weight: 10, signal: "POSITIVE", summary: "Sharpe 0.72, Sortino 1.35, Calmar 1.21 기준 효율 점수는 68점입니다." },
+            { key: "scenario_stress", label: "손실 시나리오", score: 56, weight: 10, signal: "NEUTRAL", summary: "20거래일 최악 구간 -12.4% 기준 손실 시나리오 리스크는 MEDIUM입니다." },
+            { key: "strategy_backtest", label: "전략 검증", score: 72, weight: 10, signal: "POSITIVE", summary: "SMA20/SMA60 추세 필터 수익률 +23.4%, 단순 보유 +18.6%입니다." },
+            { key: "sentiment", label: "뉴스 감성", score: 75, weight: 20, signal: "POSITIVE", summary: "최근 뉴스 평균 감성 점수는 0.62입니다." },
+        ],
     },
-    limitations: ["KR technical indicators still need a historical market-data provider."],
+    limitations: ["국내 ETF 구성종목과 애널리스트 컨센서스는 아직 연동되지 않았습니다."],
+};
+
+const portfolioResponse = {
+    items: [
+        {
+            item_id: 1,
+            market: "KR",
+            symbol: "005930",
+            company_name: "삼성전자",
+            item_type: "WATCHLIST",
+            quantity: 10,
+            planned_amount: 1000000,
+            target_allocation_percent: 10,
+            risk_budget_percent: 1,
+            average_price: 74200,
+            alert_above_price: 74000,
+            alert_below_price: 69000,
+            position_cost: 742000,
+            risk_budget_amount: 10000,
+            current_price: 76000,
+            current_change_percent: 1.25,
+            current_value: 760000,
+            unrealized_pnl: 18000,
+            unrealized_pnl_percent: 2.4259,
+            current_allocation_percent: 100,
+            alert_status: "TRIGGERED",
+            alert_messages: ["ALERT_ABOVE_TRIGGERED"],
+            quote_provider: "KIS",
+            quote_as_of_date: "2026-05-29",
+            memo: "장기 관점에서 분할 매수 후보로 검토합니다.",
+        },
+    ],
+    item_count: 1,
+    total_planned_amount: 1000000,
+    total_position_cost: 742000,
+    total_current_value: 760000,
+    provider_warnings: [],
 };
 
 function routeMock(url, method) {
@@ -343,6 +445,10 @@ function routeMock(url, method) {
 
     if (method === "GET" && pathname === "/api/invest/analysis/v3") {
         return { status: 200, body: { data: analysisV3 } };
+    }
+
+    if (method === "GET" && pathname === "/api/invest/portfolio") {
+        return { status: 200, body: { data: portfolioResponse } };
     }
 
     if (method === "GET" && pathname === "/api/invest/chart") {
@@ -462,8 +568,31 @@ async function inspectInvest(cdp, sessionId, viewport) {
     await waitForText(cdp, sessionId, "삼성전자");
     await waitForText(cdp, sessionId, "현재가 차트");
     await waitForText(cdp, sessionId, "기본 의견");
-    await waitForText(cdp, sessionId, "추천 레이어");
+    await waitForText(cdp, sessionId, "투자 전 리스크 가드");
+    await waitForText(cdp, sessionId, "가격 리스크 스냅샷");
+    await waitForText(cdp, sessionId, "위험 대비 수익");
+    await waitForText(cdp, sessionId, "Sharpe");
+    await waitForText(cdp, sessionId, "Sortino");
+    await waitForText(cdp, sessionId, "Calmar");
+    await waitForText(cdp, sessionId, "손실 시나리오");
+    await waitForText(cdp, sessionId, "내 투자 후보");
+    await waitForText(cdp, sessionId, "예정금액 입력합계");
+    await waitForText(cdp, sessionId, "현재가 평가합계");
+    await waitForText(cdp, sessionId, "평가손익");
+    await waitForText(cdp, sessionId, "알림 도달");
+    await waitForText(cdp, sessionId, "상단 알림가에 도달했습니다.");
+    await waitForText(cdp, sessionId, "퀀트 전략 검증");
+    await waitForText(cdp, sessionId, "SMA20/SMA60 추세 필터");
+    await waitForText(cdp, sessionId, "투자 판단 매트릭스");
+    await waitForText(cdp, sessionId, "VaR 1일 손실");
+    await waitForText(cdp, sessionId, "실행 계획서");
+    await waitForText(cdp, sessionId, "VaR 한도 수량");
+    await waitForText(cdp, sessionId, "재검토 기준가");
+    await waitForText(cdp, sessionId, "하단 알림 후보");
     await waitForText(cdp, sessionId, "장기 관점");
+    await waitForText(cdp, sessionId, "방법론 참고");
+    await waitForText(cdp, sessionId, "SEC 자산배분");
+    await waitForText(cdp, sessionId, "FINRA 분산투자");
     await clickByText(cdp, sessionId, "주봉");
     await delay(500);
 
@@ -492,7 +621,7 @@ async function inspectInvest(cdp, sessionId, viewport) {
         };
     })()`);
 
-    for (const text of ["투자 도우미", "삼성전자", "현재가 차트", "추천 레이어", "장기 관점", "매수", "출처 미상"]) {
+    for (const text of ["투자 도우미", "삼성전자", "현재가 차트", "투자 전 리스크 가드", "가격 리스크 스냅샷", "위험 대비 수익", "Sharpe", "Sortino", "Calmar", "손실 시나리오", "실행 계획서", "VaR 한도 수량", "재검토 기준가", "하단 알림 후보", "내 투자 후보", "예정금액 입력합계", "퀀트 전략 검증", "SMA20/SMA60 추세 필터", "투자 판단 매트릭스", "비중 주의", "VaR 1일 손실", "포지션 크기", "전략 검증", "가격 리스크", "기초체력", "장기 관점", "방법론 참고", "SEC 자산배분", "FINRA 분산투자", "매수", "출처 미상"]) {
         if (!value.text.includes(text)) {
             throw new Error(`invest ${viewport.name}: missing text ${text}`);
         }

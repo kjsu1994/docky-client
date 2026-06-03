@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Bot, CircleAlert, Globe2, Landmark, RefreshCw, Search, Sparkles } from "lucide-react";
+import { ArrowUpRight, Bot, BookmarkPlus, CircleAlert, Globe2, Landmark, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
 import {
     INVEST_SYMBOL_MAX_LENGTH,
     INVEST_SYMBOL_QUERY_MAX_LENGTH,
@@ -22,6 +22,13 @@ const PRESETS = {
     US: ["AAPL", "MSFT", "NVDA"],
 };
 
+const INVEST_METHOD_REFERENCES = [
+    { label: "SEC 자산배분", url: "https://www.sec.gov/investor/pubs/assetallocation.htm" },
+    { label: "FINRA 분산투자", url: "https://www.finra.org/investors/investing/investing-basics/asset-allocation-diversification" },
+    { label: "FINRA 리스크", url: "https://www.finra.org/investors/investing/investing-basics/risk" },
+    { label: "Fidelity 종목 분석", url: "https://www.fidelity.com/learning-center/trading-investing/stock-analysis" },
+];
+
 const AVAILABLE_SECTION_LABELS = {
     overview: "기업 개요",
     financial_summary: "재무 요약",
@@ -30,6 +37,10 @@ const AVAILABLE_SECTION_LABELS = {
     kr_financial_history: "국내 재무 추이",
     kr_quarterly_earnings: "국내 분기 실적",
     technical_indicators: "기술 지표",
+    price_risk: "가격 리스크",
+    risk_adjusted_return: "위험 대비 수익",
+    strategy_backtest: "전략 백테스트",
+    scenario_stress: "손실 시나리오",
     news_issues: "뉴스 / 이슈",
 };
 
@@ -68,11 +79,18 @@ const formatPercent = (value) => {
     return `${num > 0 ? "+" : ""}${num.toFixed(2)}%`;
 };
 
+const formatPlainPercent = (value) => {
+    if (value === null || value === undefined || value === "") return "-";
+    const num = Number(value);
+    if (!Number.isFinite(num)) return String(value);
+    return `${num.toFixed(2)}%`;
+};
+
 const formatAvailableSection = (value) => AVAILABLE_SECTION_LABELS[value] || value;
 
 const SIGNAL_LABELS = {
-    BUY: "매수",
-    SELL: "매도",
+    BUY: "매수 우위",
+    SELL: "매도 우위",
     HOLD: "보유",
     NEUTRAL: "중립",
     POSITIVE: "긍정",
@@ -81,9 +99,35 @@ const SIGNAL_LABELS = {
     UNKNOWN: "정보 부족",
     UNAVAILABLE: "산출 불가",
     INSUFFICIENT_DATA: "데이터 부족",
+    OUTPERFORMED: "전략 우위",
+    UNDERPERFORMED: "전략 열위",
+    MIXED: "혼합",
 };
 
 const formatSignalLabel = (value) => SIGNAL_LABELS[value] || value || "-";
+const PORTFOLIO_ITEM_LABELS = {
+    WATCHLIST: "관심",
+    HOLDING: "보유",
+};
+const formatPortfolioItemLabel = (value) => PORTFOLIO_ITEM_LABELS[value] || value || "관심";
+
+const PRICE_RISK_LABELS = {
+    LOW: "낮음",
+    MEDIUM: "보통",
+    HIGH: "높음",
+    UNAVAILABLE: "정보 부족",
+};
+
+const formatPriceRiskLabel = (value) => PRICE_RISK_LABELS[value] || value || "-";
+
+const RISK_ADJUSTED_RETURN_LABELS = {
+    EFFICIENT: "효율 우수",
+    BALANCED: "균형",
+    INEFFICIENT: "효율 낮음",
+    UNAVAILABLE: "정보 부족",
+};
+
+const formatRiskAdjustedReturnLabel = (value) => RISK_ADJUSTED_RETURN_LABELS[value] || value || "-";
 
 const formatValuationLabel = (value) => {
     const labels = {
@@ -184,11 +228,54 @@ const formatLimitation = (value) => {
     return exactMatches[value] || value;
 };
 
+const formatPortfolioProviderWarning = (value) => {
+    if (!value) return "-";
+    if (value === "KIS quote is not configured; saved item current valuation is unavailable.") {
+        return "KIS 현재가 설정 전까지 저장 후보의 현재가 평가는 비어 있습니다.";
+    }
+    const quoteUnavailable = String(value).match(/^([A-Z]{2})\s+(.+)\s+quote is unavailable\.$/);
+    if (quoteUnavailable) {
+        return `${quoteUnavailable[1]} ${quoteUnavailable[2]} 현재가를 확인하지 못했습니다.`;
+    }
+    return value;
+};
+
+const formatPortfolioAlertMessage = (value) => {
+    const labels = {
+        ALERT_ABOVE_TRIGGERED: "상단 알림가에 도달했습니다.",
+        ALERT_BELOW_TRIGGERED: "하단 알림가에 도달했습니다.",
+        ALERT_CLEAR: "설정한 알림가에는 아직 도달하지 않았습니다.",
+        ALERT_NOT_SET: "현재가 확인 완료. 설정한 알림가가 없습니다.",
+    };
+    return labels[value] || formatPortfolioProviderWarning(value);
+};
+
 const toneBySignal = (signal) => {
     if (["POSITIVE", "BUY"].includes(signal)) return "bg-emerald-100 text-emerald-700";
     if (["CAUTION", "NEGATIVE", "SELL"].includes(signal)) return "bg-rose-100 text-rose-700";
     if (["UNKNOWN", "UNAVAILABLE", "INSUFFICIENT_DATA"].includes(signal)) return "bg-slate-100 text-slate-600";
     return "bg-amber-100 text-amber-700";
+};
+
+const toneByPriceRisk = (riskLabel) => {
+    if (riskLabel === "LOW") return "bg-emerald-100 text-emerald-700";
+    if (riskLabel === "HIGH") return "bg-rose-100 text-rose-700";
+    if (riskLabel === "MEDIUM") return "bg-amber-100 text-amber-700";
+    return "bg-slate-100 text-slate-600";
+};
+
+const toneByBacktestSignal = (signal) => {
+    if (signal === "OUTPERFORMED") return "bg-emerald-100 text-emerald-700";
+    if (signal === "UNDERPERFORMED") return "bg-rose-100 text-rose-700";
+    if (signal === "MIXED") return "bg-amber-100 text-amber-700";
+    return "bg-slate-100 text-slate-600";
+};
+
+const riskAdjustedReturnStatus = (snapshot) => {
+    if (!snapshot) return "UNKNOWN";
+    if (snapshot.efficiency_label === "INEFFICIENT") return "CAUTION";
+    if (["EFFICIENT", "BALANCED"].includes(snapshot.efficiency_label)) return "PASS";
+    return "UNKNOWN";
 };
 
 const toneByValue = (value) => {
@@ -266,7 +353,372 @@ const DEFAULT_VISIBLE_INDICATORS = {
 const INDICATOR_STORAGE_KEY = "invest-chart-indicators-v1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const SYMBOL_SUGGEST_DISPLAY_LIMIT = 2;
+const SYMBOL_SUGGEST_DISPLAY_LIMIT = 5;
+
+const parsePositiveNumber = (value) => {
+    const normalized = String(value || "").replace(/[^\d.]/g, "");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const formatRiskAmount = (value, currency = "KRW") => {
+    if (!Number.isFinite(value)) return "-";
+    return formatCurrency(value, currency);
+};
+
+const formatShareCount = (value) => {
+    if (!Number.isFinite(value)) return "-";
+    const abs = Math.abs(value);
+    const maximumFractionDigits = abs >= 100 ? 0 : abs >= 10 ? 1 : abs >= 1 ? 2 : 4;
+    return `${value.toLocaleString("ko-KR", { maximumFractionDigits })}주`;
+};
+
+const statusMeta = (status) => {
+    const meta = {
+        PASS: { label: "확인", className: "bg-emerald-100 text-emerald-700" },
+        CAUTION: { label: "주의", className: "bg-amber-100 text-amber-700" },
+        BLOCK: { label: "중단 검토", className: "bg-rose-100 text-rose-700" },
+        UNKNOWN: { label: "정보 부족", className: "bg-slate-100 text-slate-600" },
+    };
+    return meta[status] || meta.UNKNOWN;
+};
+
+const portfolioAlertMeta = (status) => {
+    const meta = {
+        TRIGGERED: { label: "알림 도달", className: "bg-rose-100 text-rose-700" },
+        CLEAR: { label: "알림 없음", className: "bg-emerald-100 text-emerald-700" },
+        UNAVAILABLE: { label: "시세 대기", className: "bg-slate-100 text-slate-600" },
+    };
+    return meta[status] || meta.UNAVAILABLE;
+};
+
+const findRecommendationFactor = (recommendation, key) => (
+    recommendation?.factors?.find((factor) => factor?.key === key) || null
+);
+
+const buildPositionRiskGuard = ({
+    portfolioAmount,
+    plannedAmount,
+    maxSinglePositionPercent,
+    riskBudgetPercent,
+    currency,
+    isEtf,
+    priceRiskSnapshot,
+}) => {
+    if (!portfolioAmount || !plannedAmount || !maxSinglePositionPercent || !riskBudgetPercent) {
+        return {
+            status: "UNKNOWN",
+            label: "금액 입력 필요",
+            allocationPercent: null,
+            maxSinglePositionAmount: null,
+            riskBudgetAmount: null,
+            lossBudgetPercent: null,
+            trancheAmount: null,
+            messages: ["총 투자자산, 매수 예정금액, 허용 비중, 손실 예산을 입력하면 포지션 리스크를 계산합니다."],
+        };
+    }
+
+    const allocationPercent = plannedAmount * 100 / portfolioAmount;
+    const maxSinglePositionAmount = portfolioAmount * maxSinglePositionPercent / 100;
+    const riskBudgetAmount = portfolioAmount * riskBudgetPercent / 100;
+    const lossBudgetPercent = riskBudgetAmount * 100 / plannedAmount;
+    const trancheAmount = plannedAmount / 3;
+    const dailyVarPercent = Number(priceRiskSnapshot?.daily_value_at_risk95);
+    const dailyVarLossAmount = Number.isFinite(dailyVarPercent) ? plannedAmount * dailyVarPercent / 100 : null;
+    const messages = [];
+    let status = "PASS";
+
+    if (plannedAmount > portfolioAmount) {
+        status = "BLOCK";
+        messages.push("매수 예정금액이 총 투자자산보다 큽니다.");
+    }
+    if (allocationPercent >= 95) {
+        status = "BLOCK";
+        messages.push("단일 종목에 거의 전액을 투입하는 구조입니다. 분산과 현금 비중을 먼저 재검토해야 합니다.");
+    } else if (allocationPercent > maxSinglePositionPercent) {
+        status = "BLOCK";
+        messages.push(`한 종목 허용 비중 ${maxSinglePositionPercent}%를 초과합니다.`);
+    } else if (!isEtf && allocationPercent > 5) {
+        status = status === "PASS" ? "CAUTION" : status;
+        messages.push("개별 종목 비중이 5%를 넘습니다. 포트폴리오 전체 변동성이 커질 수 있습니다.");
+    } else {
+        messages.push("입력한 기준에서는 한 종목 비중이 관리 범위 안에 있습니다.");
+    }
+
+    if (lossBudgetPercent < 3) {
+        status = status === "PASS" ? "CAUTION" : status;
+        messages.push("허용 손실 예산이 매수금액 대비 3% 미만입니다. 작은 가격 변동에도 기준을 넘을 수 있습니다.");
+    } else {
+        messages.push(`손실 예산 기준으로 약 ${lossBudgetPercent.toFixed(1)}% 하락 시 재검토 기준에 도달합니다.`);
+    }
+
+    if (dailyVarLossAmount != null) {
+        if (dailyVarLossAmount > riskBudgetAmount) {
+            status = status === "PASS" ? "CAUTION" : status;
+            messages.push(`과거 95% 일간 VaR 기준 예상 손실액 ${formatRiskAmount(dailyVarLossAmount, currency)}이 손실 예산을 넘을 수 있습니다.`);
+        } else {
+            messages.push(`과거 95% 일간 VaR 기준 예상 손실액은 약 ${formatRiskAmount(dailyVarLossAmount, currency)}입니다.`);
+        }
+    }
+
+    if (status !== "BLOCK") {
+        messages.push(`일괄 매수 대신 3회 분할 시 회당 약 ${formatRiskAmount(trancheAmount, currency)}입니다.`);
+    }
+
+    return {
+        status,
+        label: status === "PASS" ? "관리 가능" : status === "CAUTION" ? "비중 주의" : "위험 과다",
+        allocationPercent,
+        maxSinglePositionAmount,
+        riskBudgetAmount,
+        lossBudgetPercent,
+        trancheAmount,
+        dailyVarLossAmount,
+        messages,
+    };
+};
+
+const buildExecutionPlan = ({
+    plannedAmount,
+    quantity,
+    currentPrice,
+    riskGuard,
+    priceRiskSnapshot,
+    currency,
+    alertBelowPrice,
+}) => {
+    const price = Number(currentPrice);
+    const planned = Number(plannedAmount);
+    const inputQuantity = Number(quantity);
+    const riskBudgetAmount = Number(riskGuard?.riskBudgetAmount);
+    const maxSinglePositionAmount = Number(riskGuard?.maxSinglePositionAmount);
+    const lossBudgetPercent = Number(riskGuard?.lossBudgetPercent);
+    const dailyVarPercent = Number(priceRiskSnapshot?.daily_value_at_risk95);
+    const plannedShares = Number.isFinite(inputQuantity) && inputQuantity > 0
+        ? inputQuantity
+        : (Number.isFinite(price) && price > 0 && Number.isFinite(planned) && planned > 0 ? planned / price : null);
+    const positionLimitShares = Number.isFinite(price) && price > 0 && Number.isFinite(maxSinglePositionAmount) && maxSinglePositionAmount > 0
+        ? maxSinglePositionAmount / price
+        : null;
+    const varMaxShares = Number.isFinite(price) && price > 0 && Number.isFinite(riskBudgetAmount) && riskBudgetAmount > 0 && Number.isFinite(dailyVarPercent) && dailyVarPercent > 0
+        ? riskBudgetAmount / (price * dailyVarPercent / 100)
+        : null;
+    const reviewDropPercent = Number.isFinite(lossBudgetPercent) && lossBudgetPercent > 0
+        ? lossBudgetPercent
+        : (Number.isFinite(dailyVarPercent) && dailyVarPercent > 0 ? dailyVarPercent : null);
+    const reviewPrice = Number.isFinite(price) && price > 0 && reviewDropPercent
+        ? price * (1 - reviewDropPercent / 100)
+        : null;
+    const lowerAlertCandidate = Number.isFinite(price) && price > 0 && Number.isFinite(dailyVarPercent) && dailyVarPercent > 0
+        ? price * (1 - dailyVarPercent / 100)
+        : reviewPrice;
+    const upperAlertCandidate = Number.isFinite(price) && price > 0 && Number.isFinite(dailyVarPercent) && dailyVarPercent > 0
+        ? price * (1 + dailyVarPercent / 100)
+        : null;
+    const messages = [];
+    let status = riskGuard?.status || "UNKNOWN";
+
+    if (!Number.isFinite(price) || price <= 0) {
+        return {
+            status: "UNKNOWN",
+            label: "현재가 필요",
+            plannedShares,
+            positionLimitShares,
+            varMaxShares,
+            reviewPrice,
+            lowerAlertCandidate,
+            upperAlertCandidate,
+            messages: ["현재가를 확인해야 실행 계획을 계산할 수 있습니다."],
+        };
+    }
+
+    if (plannedShares != null) {
+        messages.push(`입력 기준 예상 수량은 약 ${formatShareCount(plannedShares)}입니다.`);
+    } else {
+        messages.push("매수 예정금액 또는 수량을 입력하면 예상 수량을 계산합니다.");
+        status = "UNKNOWN";
+    }
+
+    if (varMaxShares != null && plannedShares != null) {
+        if (plannedShares > varMaxShares) {
+            status = status === "BLOCK" ? "BLOCK" : "CAUTION";
+            messages.push(`95% 일간 VaR 기준 한도 ${formatShareCount(varMaxShares)}보다 예정 수량이 큽니다.`);
+        } else {
+            messages.push(`95% 일간 VaR 기준 한도는 약 ${formatShareCount(varMaxShares)}입니다.`);
+        }
+    } else {
+        messages.push("VaR 기반 수량 한도는 일봉 리스크 데이터와 손실 예산이 있어야 계산됩니다.");
+    }
+
+    if (positionLimitShares != null && plannedShares != null && plannedShares > positionLimitShares) {
+        status = "BLOCK";
+        messages.push(`한 종목 허용 비중 기준 수량 ${formatShareCount(positionLimitShares)}를 초과합니다.`);
+    }
+
+    if (reviewPrice != null) {
+        messages.push(`손실 예산 기준 재검토 가격은 약 ${formatRiskAmount(reviewPrice, currency)}입니다.`);
+    }
+
+    if (lowerAlertCandidate != null && !alertBelowPrice) {
+        messages.push(`하단 알림가 후보는 ${formatRiskAmount(lowerAlertCandidate, currency)}입니다.`);
+    } else if (lowerAlertCandidate != null && Number(alertBelowPrice) < reviewPrice) {
+        messages.push("입력한 하단 알림가가 손실 예산 기준가보다 낮아, 알림이 늦게 울릴 수 있습니다.");
+    }
+
+    return {
+        status,
+        label: status === "PASS" ? "실행 가능 범위" : status === "CAUTION" ? "실행 전 조정" : status === "BLOCK" ? "실행 중단 검토" : "정보 입력 필요",
+        plannedShares,
+        positionLimitShares,
+        varMaxShares,
+        reviewPrice,
+        lowerAlertCandidate,
+        upperAlertCandidate,
+        messages,
+    };
+};
+
+const buildScenarioLossPlan = ({ scenarioStressSnapshot, plannedAmount, currency }) => {
+    const cases = Array.isArray(scenarioStressSnapshot?.cases)
+        ? scenarioStressSnapshot.cases
+            .map((item) => {
+                const worstReturn = Number(item?.worst_return);
+                const lossPercent = Number.isFinite(worstReturn) ? Math.max(0, -worstReturn) : null;
+                const lossAmount = lossPercent != null && Number.isFinite(Number(plannedAmount))
+                    ? Number(plannedAmount) * lossPercent / 100
+                    : null;
+                return {
+                    ...item,
+                    worstReturn,
+                    lossPercent,
+                    lossAmount,
+                };
+            })
+            .filter((item) => Number.isFinite(item.worstReturn))
+        : [];
+
+    if (!cases.length) {
+        return {
+            status: "UNKNOWN",
+            label: "시나리오 부족",
+            cases: [],
+            worstLossAmount: null,
+            messages: ["일봉 기반 최악 손실 시나리오 데이터가 부족합니다."],
+        };
+    }
+
+    const worstCase = cases.reduce((selected, item) => {
+        if (!selected) return item;
+        return (item.lossPercent || 0) > (selected.lossPercent || 0) ? item : selected;
+    }, null);
+    const status = scenarioStressSnapshot?.risk_label === "HIGH"
+        ? "CAUTION"
+        : scenarioStressSnapshot?.risk_label === "MEDIUM"
+            ? "CAUTION"
+            : "PASS";
+    const messages = [
+        scenarioStressSnapshot?.summary || "과거 최악 구간 기준 손실 시나리오입니다.",
+    ];
+    if (worstCase?.lossAmount != null) {
+        messages.push(`입력한 예정금액 기준 최대 시나리오 손실액은 약 ${formatRiskAmount(worstCase.lossAmount, currency)}입니다.`);
+    } else {
+        messages.push("매수 예정금액을 입력하면 최악 구간 손실액을 금액으로 환산합니다.");
+    }
+
+    return {
+        status,
+        label: scenarioStressSnapshot?.risk_label === "HIGH" ? "급락 주의" : scenarioStressSnapshot?.risk_label === "MEDIUM" ? "손실 점검" : "관리 가능",
+        cases,
+        worstLossAmount: worstCase?.lossAmount ?? null,
+        messages,
+    };
+};
+
+const buildDecisionChecklist = ({
+    summary,
+    recommendation,
+    indicatorAnalysis,
+    newsIssues,
+    limitations,
+    riskGuard,
+    priceRiskSnapshot,
+    riskAdjustedReturnSnapshot,
+    strategyBacktestSnapshot,
+    scenarioStressSnapshot,
+}) => {
+    const fundamental = findRecommendationFactor(recommendation, "fundamentals");
+    const valuation = findRecommendationFactor(recommendation, "valuation");
+    const momentum = findRecommendationFactor(recommendation, "momentum");
+    const sentiment = findRecommendationFactor(recommendation, "sentiment");
+    const riskAdjustedReturn = findRecommendationFactor(recommendation, "risk_adjusted_return");
+    const scenarioStress = findRecommendationFactor(recommendation, "scenario_stress");
+
+    return [
+        {
+            label: "데이터 커버리지",
+            status: summary && recommendation ? "PASS" : "UNKNOWN",
+            message: summary && recommendation
+                ? "재무 요약과 판단 매트릭스가 모두 준비되었습니다."
+                : "재무 또는 판단 매트릭스 데이터가 부족합니다.",
+        },
+        {
+            label: "기초체력",
+            status: !fundamental || fundamental.signal === "UNKNOWN" ? "UNKNOWN" : fundamental.signal === "NEGATIVE" ? "CAUTION" : "PASS",
+            message: fundamental?.summary || "기초체력 요인 점수가 없습니다.",
+        },
+        {
+            label: "밸류에이션",
+            status: !valuation || valuation.signal === "UNKNOWN" ? "UNKNOWN" : valuation.signal === "NEGATIVE" ? "CAUTION" : "PASS",
+            message: valuation?.summary || "PER 등 밸류에이션 데이터가 부족합니다.",
+        },
+        {
+            label: "모멘텀",
+            status: momentum?.signal === "NEGATIVE" || indicatorAnalysis?.score <= 40 ? "CAUTION" : momentum?.signal === "UNKNOWN" ? "UNKNOWN" : "PASS",
+            message: momentum?.summary || indicatorAnalysis?.label || "차트 기반 모멘텀 데이터가 부족합니다.",
+        },
+        {
+            label: "뉴스 감성",
+            status: sentiment?.signal === "NEGATIVE" ? "CAUTION" : newsIssues?.length ? "PASS" : "UNKNOWN",
+            message: sentiment?.summary || (newsIssues?.length ? "뉴스 이슈가 확인되었습니다." : "최근 뉴스 감성 데이터가 부족합니다."),
+        },
+        {
+            label: "포지션 크기",
+            status: riskGuard?.status || "UNKNOWN",
+            message: riskGuard?.messages?.[0] || "포지션 입력값이 필요합니다.",
+        },
+        {
+            label: "가격 리스크",
+            status: !priceRiskSnapshot ? "UNKNOWN" : priceRiskSnapshot.risk_label === "HIGH" ? "CAUTION" : "PASS",
+            message: priceRiskSnapshot
+                ? `연 변동성 ${formatPlainPercent(priceRiskSnapshot.annualized_volatility)}, 최대 낙폭 ${formatPlainPercent(priceRiskSnapshot.max_drawdown)} 기준입니다.`
+                : "일봉 기반 가격 리스크 데이터가 부족합니다.",
+        },
+        {
+            label: "위험 대비 수익",
+            status: riskAdjustedReturnStatus(riskAdjustedReturnSnapshot),
+            message: riskAdjustedReturn?.summary || (riskAdjustedReturnSnapshot
+                ? `Sharpe ${formatCompact(riskAdjustedReturnSnapshot.sharpe_ratio)}, Sortino ${formatCompact(riskAdjustedReturnSnapshot.sortino_ratio)}, Calmar ${formatCompact(riskAdjustedReturnSnapshot.calmar_ratio)} 기준입니다.`
+                : "Sharpe, Sortino, Calmar 기반 위험 대비 수익 데이터가 부족합니다."),
+        },
+        {
+            label: "손실 시나리오",
+            status: !scenarioStressSnapshot ? "UNKNOWN" : scenarioStressSnapshot.risk_label === "HIGH" ? "CAUTION" : "PASS",
+            message: scenarioStress?.summary || scenarioStressSnapshot?.summary || "과거 최악 구간 손실 데이터가 부족합니다.",
+        },
+        {
+            label: "전략 검증",
+            status: !strategyBacktestSnapshot ? "UNKNOWN" : strategyBacktestSnapshot.signal === "UNDERPERFORMED" ? "CAUTION" : "PASS",
+            message: strategyBacktestSnapshot
+                ? `${strategyBacktestSnapshot.strategy_name || "추세 필터"} 결과는 ${formatSignalLabel(strategyBacktestSnapshot.signal)}입니다.`
+                : "일봉 기반 전략 백테스트 데이터가 부족합니다.",
+        },
+        {
+            label: "제공자 제약",
+            status: limitations?.length ? "CAUTION" : "PASS",
+            message: limitations?.length ? "제공자 제약사항이 있으므로 누락 데이터를 확인해야 합니다." : "표시 중인 제공자 제약사항이 없습니다.",
+        },
+    ];
+};
 
 const buildIndicatorSeries = (points) => {
     const source = Array.isArray(points) ? points : [];
@@ -662,6 +1114,29 @@ const CandlestickChart = ({ points, currency, interval }) => {
         const rate = changeRate(value);
         return `${label} ${formatCurrency(value, currency)}${rate == null ? '' : ` (${formatPercent(rate)})`}`;
     };
+    const rangeReturn = first?.close ? ((latest.close - first.close) / first.close) * 100 : null;
+    const formatAxisPrice = (value) => {
+        if (!Number.isFinite(Number(value))) return "-";
+        return currency === "USD" ? `$${formatCompact(value, 2)}` : formatCompact(value, 0);
+    };
+    const priceTicks = [max, max - spread / 3, max - (spread * 2) / 3, min];
+    const hoveredIndexForOverlay = hoveredIndex == null ? visibleCandles.length - 1 : hoveredIndex;
+    const hoveredX = paddingX + slotWidth * hoveredIndexForOverlay + slotWidth / 2;
+    const hoveredCloseY = Number.isFinite(hovered?.close) ? toPriceY(hovered.close) : null;
+    const priceBadgeY = hoveredCloseY == null ? candleTop : clamp(hoveredCloseY - 10, candleTop + 2, candleBottom - 18);
+    const dateBadgeX = clamp(hoveredX - 46, paddingX, width - paddingX - 92);
+    const handleChartPointerMove = (event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const relativeX = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * width;
+        const nextIndex = clamp(Math.floor((relativeX - paddingX) / slotWidth), 0, visibleCandles.length - 1);
+        setHoveredIndex(nextIndex);
+    };
+    const indicatorToggleItems = [
+        { key: 'sma', label: '이동평균', swatch: 'bg-sky-500' },
+        { key: 'bollinger', label: '볼린저', swatch: 'bg-fuchsia-500' },
+        { key: 'rsi', label: 'RSI', swatch: 'bg-violet-500' },
+        { key: 'macd', label: 'MACD', swatch: 'bg-blue-600' },
+    ];
     const tickIndexes = visibleCandles.length <= 1
         ? [0]
         : Array.from(new Set([
@@ -694,32 +1169,56 @@ const CandlestickChart = ({ points, currency, interval }) => {
     return (
         <div className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <div className="text-xs font-black text-slate-400">캔들 차트</div>
-                    <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
-                        국내와 미국 모두 동일한 캔들 차트를 사용하며, 볼린저 밴드와 RSI, MACD를 함께 확인할 수 있습니다.
-                    </p>
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Broker Chart</div>
+                        <Badge className={trendUp ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}>
+                            기간 수익률 {formatPercent(rangeReturn)}
+                        </Badge>
+                        <Badge className="bg-slate-100 text-slate-700">{visibleCandles.length}개 캔들</Badge>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                            <div className="text-[11px] font-black text-slate-400">선택일</div>
+                            <div className="mt-1 text-sm font-black text-slate-900">{hovered?.trading_date || "-"}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                            <div className="text-[11px] font-black text-slate-400">종가</div>
+                            <div className={`mt-1 text-sm font-black ${toneByValue(changeRate(hovered?.close))}`}>{formatCurrency(hovered?.close, currency)}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                            <div className="text-[11px] font-black text-slate-400">고가 / 저가</div>
+                            <div className="mt-1 text-sm font-black text-slate-900">{formatCurrency(hovered?.high, currency)} / {formatCurrency(hovered?.low, currency)}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2">
+                            <div className="text-[11px] font-black text-slate-400">거래량</div>
+                            <div className="mt-1 text-sm font-black text-slate-900">{hovered?.volume != null ? formatCompact(hovered.volume) : "-"}</div>
+                        </div>
+                    </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                        {[
-                            { key: 'sma', label: '이동평균' },
-                            { key: 'bollinger', label: '볼린저 밴드' },
-                            { key: 'rsi', label: 'RSI' },
-                            { key: 'macd', label: 'MACD' },
-                        ].map((item) => (
+                        {indicatorToggleItems.map((item) => (
                             <button
                                 key={item.key}
                                 type="button"
-                                className={`rounded-full px-3 py-1.5 text-[11px] font-black ${visibleIndicators[item.key] ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}
+                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black ${visibleIndicators[item.key] ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}
                                 onClick={() => toggleIndicator(item.key)}
                             >
+                                <span className={`h-2 w-2 rounded-full ${item.swatch}`} />
                                 {item.label}
                             </button>
                         ))}
                     </div>
+                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-black text-slate-500">
+                        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />상승 캔들</span>
+                        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-rose-500" />하락 캔들</span>
+                        <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-sky-500" />SMA20</span>
+                        <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-amber-500" />SMA5</span>
+                        <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-fuchsia-500" />Bollinger</span>
+                    </div>
                 </div>
-                <div className="min-w-[300px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600 shadow-sm">
+                <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600 shadow-sm xl:w-[360px]">
                     <div className="text-sm font-black text-slate-900">{hovered?.trading_date || '-'}</div>
-                    <div className="mt-2 grid gap-4 grid-cols-[0.95fr_1.05fr] items-start">
+                    <div className="mt-2 grid gap-4 sm:grid-cols-[0.95fr_1.05fr] items-start">
                         <div className="grid grid-cols-1 gap-y-1.5">
                             <span>{renderPriceLine('시가', hovered?.open)}</span>
                             <span>{renderPriceLine('고가', hovered?.high)}</span>
@@ -741,12 +1240,26 @@ const CandlestickChart = ({ points, currency, interval }) => {
             </div>
 
             <div className="overflow-x-auto rounded-[1.4rem] bg-white/70 p-2">
-                <svg viewBox={`0 0 ${width} ${height}`} className="h-[32rem] min-w-[760px] w-full">
+                <svg
+                    viewBox={`0 0 ${width} ${height}`}
+                    className="h-[32rem] min-w-[760px] w-full cursor-crosshair"
+                    role="img"
+                    aria-label="가격 캔들 차트"
+                    onMouseMove={handleChartPointerMove}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                >
                     <text x={paddingX} y={rsiTop - 4} fill="#7c3aed" fontSize="11" fontWeight="800">RSI (기준 30 / 50 / 70)</text>
                     <text x={paddingX} y={macdTop - 4} fill="#2563eb" fontSize="11" fontWeight="800">MACD (중심선 0 / Signal / Histogram)</text>
-                    {[0, 1, 2, 3].map((step) => {
-                        const y = candleTop + (candleAreaHeight * step) / 3;
-                        return <line key={`price-grid-${step}`} x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#e2e8f0" strokeWidth="1" />;
+                    {priceTicks.map((tick, index) => {
+                        const y = toPriceY(tick);
+                        return (
+                            <g key={`price-grid-${index}`}>
+                                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#e2e8f0" strokeWidth="1" />
+                                <text x={width - 8} y={y - 4} textAnchor="end" fill="#64748b" fontSize="10" fontWeight="800">
+                                    {formatAxisPrice(tick)}
+                                </text>
+                            </g>
+                        );
                     })}
                     <line x1={paddingX} y1={candleBottom} x2={width - paddingX} y2={candleBottom} stroke="#cbd5e1" strokeWidth="1" />
                     <line x1={paddingX} y1={volumeBottom} x2={width - paddingX} y2={volumeBottom} stroke="#e2e8f0" strokeWidth="1" />
@@ -795,6 +1308,20 @@ const CandlestickChart = ({ points, currency, interval }) => {
                             </g>
                         );
                     })}
+                    {hoveredCloseY != null ? (
+                        <g pointerEvents="none">
+                            <line x1={hoveredX} y1={candleTop} x2={hoveredX} y2={macdBottom} stroke="#0f172a" strokeDasharray="3 4" strokeWidth="1" opacity="0.5" />
+                            <line x1={paddingX} y1={hoveredCloseY} x2={width - paddingX} y2={hoveredCloseY} stroke="#0f172a" strokeDasharray="3 4" strokeWidth="1" opacity="0.5" />
+                            <rect x={width - 120} y={priceBadgeY} width="112" height="18" rx="5" fill="#0f172a" opacity="0.94" />
+                            <text x={width - 64} y={priceBadgeY + 13} textAnchor="middle" fill="#ffffff" fontSize="10" fontWeight="900">
+                                {formatAxisPrice(hovered.close)}
+                            </text>
+                            <rect x={dateBadgeX} y={height - 28} width="92" height="20" rx="6" fill="#0f172a" opacity="0.92" />
+                            <text x={dateBadgeX + 46} y={height - 14} textAnchor="middle" fill="#ffffff" fontSize="10" fontWeight="900">
+                                {hovered?.trading_date || "-"}
+                            </text>
+                        </g>
+                    ) : null}
                     {tickIndexes.map((index) => {
                         const item = visibleCandles[index];
                         if (!item) return null;
@@ -927,6 +1454,7 @@ const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [items, setItems] = useState([]);
+    const [message, setMessage] = useState("");
     const rootRef = useRef(null);
 
     useEffect(() => {
@@ -942,6 +1470,7 @@ const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
         const formattedSelection = /\([A-Za-z0-9._-]+\)$/.test(keyword);
         if (keyword.length < 2 || formattedSelection) {
             setItems([]);
+            setMessage("");
             setOpen(false);
             return;
         }
@@ -952,10 +1481,15 @@ const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
                 const suggestions = await investAdapter.fetchSymbolSuggestions({ market, query: keyword, limit: 5 });
                 if (!cancelled) {
                     setItems(suggestions.items.slice(0, SYMBOL_SUGGEST_DISPLAY_LIMIT));
-                    setOpen(suggestions.items.length > 0);
+                    setMessage(suggestions.items.length > 0 ? "" : "검색 결과가 없습니다. 종목코드를 직접 입력해도 됩니다.");
+                    setOpen(true);
                 }
-            } catch {
-                if (!cancelled) setItems([]);
+            } catch (fetchError) {
+                if (!cancelled) {
+                    setItems([]);
+                    setMessage(extractInvestErrorMessage(fetchError, "종목 검색 제공자 응답을 사용할 수 없습니다. 종목코드를 직접 입력해 주세요."));
+                    setOpen(true);
+                }
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -993,7 +1527,7 @@ const SymbolSuggestBox = ({ market, value, onChange, onSelect }) => {
                                 <div className="mt-1 text-xs font-medium text-slate-500">{[item.company_name, item.symbol].filter(Boolean).join(" · ") || item.symbol}</div>
                             </button>
                         ))}
-                        {!loading && items.length === 0 ? <div className="px-3 py-2 text-xs font-semibold text-slate-400">일치하는 종목이 없습니다.</div> : null}
+                        {!loading && message ? <div className="px-3 py-2 text-xs font-semibold text-slate-500">{message}</div> : null}
                     </div>
                 ) : null}
             </div>
@@ -1021,6 +1555,16 @@ export const InvestAssistant = () => {
     const [chartLoading, setChartLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [portfolioInput, setPortfolioInput] = useState("10000000");
+    const [plannedAmountInput, setPlannedAmountInput] = useState("1000000");
+    const [quantityInput, setQuantityInput] = useState("");
+    const [positionLimitInput, setPositionLimitInput] = useState("10");
+    const [riskBudgetInput, setRiskBudgetInput] = useState("1");
+    const [alertAboveInput, setAlertAboveInput] = useState("");
+    const [alertBelowInput, setAlertBelowInput] = useState("");
+    const [savedPortfolio, setSavedPortfolio] = useState({ items: [], item_count: 0, total_planned_amount: null, total_position_cost: null, total_current_value: null, provider_warnings: [] });
+    const [portfolioLoading, setPortfolioLoading] = useState(false);
+    const [portfolioSaving, setPortfolioSaving] = useState(false);
 
     const currentMarket = useMemo(() => MARKETS.find((item) => item.value === market) || MARKETS[0], [market]);
     const price = v3?.price_snapshot || v2?.price_snapshot || v1?.price_snapshot;
@@ -1035,11 +1579,121 @@ export const InvestAssistant = () => {
     const krFinancialHistory = v3?.kr_financial_history || [];
     const krQuarterlyEarnings = v3?.kr_quarterly_earnings || [];
     const dividend = v3?.dividend_snapshot;
+    const priceRisk = v3?.price_risk_snapshot;
+    const riskAdjustedReturn = v3?.risk_adjusted_return_snapshot;
+    const strategyBacktest = v3?.strategy_backtest_snapshot;
+    const scenarioStress = v3?.scenario_stress_snapshot;
     const dividendCurrency = market === "US" ? "USD" : "KRW";
     const usProviderWarning = findUsProviderWarningLimitation({ isKr, hasSummary: !!summary, limitations });
     const indicatorAnalysis = useMemo(() => analyzeIndicatorState(chartData?.points), [chartData?.points]);
     const indicatorSnapshot = useMemo(() => buildIndicatorSnapshot(chartData?.points), [chartData?.points]);
     const indicatorMessages = indicatorAnalysis.messages || [];
+    const portfolioAmount = useMemo(() => parsePositiveNumber(portfolioInput), [portfolioInput]);
+    const plannedAmount = useMemo(() => parsePositiveNumber(plannedAmountInput), [plannedAmountInput]);
+    const quantity = useMemo(() => parsePositiveNumber(quantityInput), [quantityInput]);
+    const positionLimitPercent = useMemo(() => parsePositiveNumber(positionLimitInput), [positionLimitInput]);
+    const riskBudgetPercent = useMemo(() => parsePositiveNumber(riskBudgetInput), [riskBudgetInput]);
+    const alertAbovePrice = useMemo(() => parsePositiveNumber(alertAboveInput), [alertAboveInput]);
+    const alertBelowPrice = useMemo(() => parsePositiveNumber(alertBelowInput), [alertBelowInput]);
+    const positionRiskGuard = useMemo(() => buildPositionRiskGuard({
+        portfolioAmount,
+        plannedAmount,
+        maxSinglePositionPercent: positionLimitPercent,
+        riskBudgetPercent,
+        currency,
+        isEtf: Boolean(v3?.etf_profile?.etf),
+        priceRiskSnapshot: priceRisk,
+    }), [portfolioAmount, plannedAmount, positionLimitPercent, riskBudgetPercent, currency, v3?.etf_profile?.etf, priceRisk]);
+    const executionPlan = useMemo(() => buildExecutionPlan({
+        plannedAmount,
+        quantity,
+        currentPrice: price?.price,
+        riskGuard: positionRiskGuard,
+        priceRiskSnapshot: priceRisk,
+        currency,
+        alertBelowPrice,
+    }), [plannedAmount, quantity, price?.price, positionRiskGuard, priceRisk, currency, alertBelowPrice]);
+    const scenarioLossPlan = useMemo(() => buildScenarioLossPlan({
+        scenarioStressSnapshot: scenarioStress,
+        plannedAmount,
+        currency,
+    }), [scenarioStress, plannedAmount, currency]);
+    const riskAdjustedReturnMeta = statusMeta(riskAdjustedReturnStatus(riskAdjustedReturn));
+    const decisionChecklist = useMemo(() => buildDecisionChecklist({
+        summary,
+        recommendation,
+        indicatorAnalysis,
+        newsIssues,
+        limitations,
+        riskGuard: positionRiskGuard,
+        priceRiskSnapshot: priceRisk,
+        riskAdjustedReturnSnapshot: riskAdjustedReturn,
+        strategyBacktestSnapshot: strategyBacktest,
+        scenarioStressSnapshot: scenarioStress,
+    }), [summary, recommendation, indicatorAnalysis, newsIssues, limitations, positionRiskGuard, priceRisk, riskAdjustedReturn, strategyBacktest, scenarioStress]);
+
+    const fetchPortfolio = async ({ silent = true } = {}) => {
+        setPortfolioLoading(true);
+        try {
+            const nextPortfolio = await investAdapter.fetchPortfolio();
+            setSavedPortfolio(nextPortfolio);
+        } catch (fetchError) {
+            if (!silent) {
+                notifyError(extractInvestErrorMessage(fetchError, "저장한 투자 후보를 불러오지 못했습니다."));
+            }
+        } finally {
+            setPortfolioLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchPortfolio();
+    }, []);
+
+    const saveCurrentPortfolioItem = async () => {
+        const symbol = normalizeSymbol(selectedSymbol || symbolInput);
+        if (!symbol || !v1) {
+            notifyError("분석한 종목을 먼저 선택해 주세요.");
+            return;
+        }
+        setPortfolioSaving(true);
+        try {
+            await investAdapter.savePortfolioItem({
+                market,
+                symbol,
+                company_name: v3?.company_name || v2?.company_name || v1?.company_name || symbol,
+                item_type: "WATCHLIST",
+                quantity: quantity ?? null,
+                average_price: price?.price ?? null,
+                planned_amount: plannedAmount ?? null,
+                target_allocation_percent: positionLimitPercent ?? null,
+                risk_budget_percent: riskBudgetPercent ?? null,
+                alert_above_price: alertAbovePrice ?? null,
+                alert_below_price: alertBelowPrice ?? null,
+                memo: recommendation?.summary || opinion?.summary || "",
+            });
+            await fetchPortfolio();
+            notifySuccess("현재 종목과 리스크 기준을 저장했습니다.");
+        } catch (fetchError) {
+            notifyError(extractInvestErrorMessage(fetchError, "투자 후보를 저장하지 못했습니다."));
+        } finally {
+            setPortfolioSaving(false);
+        }
+    };
+
+    const deletePortfolioItem = async (itemId) => {
+        if (!itemId) return;
+        setPortfolioSaving(true);
+        try {
+            await investAdapter.deletePortfolioItem(itemId);
+            await fetchPortfolio();
+            notifySuccess("저장한 투자 후보를 삭제했습니다.");
+        } catch (fetchError) {
+            notifyError(extractInvestErrorMessage(fetchError, "투자 후보를 삭제하지 못했습니다."));
+        } finally {
+            setPortfolioSaving(false);
+        }
+    };
 
     const fetchChart = async (nextMarket, symbol, interval, fallbackSource = {}) => {
         setChartLoading(true);
@@ -1120,7 +1774,18 @@ export const InvestAssistant = () => {
             <section className="card bg-white p-4 sm:p-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-black text-sky-700"><Bot className="h-3.5 w-3.5" />투자 작업공간</div>
                 <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-5xl">투자 도우미.</h1>
-                <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">종목 검색 후 현재가, 일봉/주봉/월봉 차트, 기본 분석, 뉴스, 추천 레이어까지 한 번에 확인할 수 있습니다.</p>
+                <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">종목 검색 후 현재가, 일봉/주봉/월봉 차트, 기본 분석, 뉴스, 판단 매트릭스까지 한 번에 확인할 수 있습니다.</p>
+                <div className="mt-4 rounded-[1.4rem] border border-amber-100 bg-amber-50/80 p-4 text-sm font-semibold leading-relaxed text-amber-900">
+                    단일 종목에 전재산을 투입하는 결정은 피하고, 이 화면의 점수는 분산, 투자 기간, 현금 필요 시점, 손실 감내 범위와 함께 확인해 주세요.
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">방법론 참고</span>
+                    {INVEST_METHOD_REFERENCES.map((item) => (
+                        <a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-900 hover:text-white">
+                            {item.label}<ArrowUpRight className="h-3 w-3" />
+                        </a>
+                    ))}
+                </div>
 
                 <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -1175,15 +1840,267 @@ export const InvestAssistant = () => {
                             <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{dividend?.dividend_yield != null ? "현재 배당수익률" : "시가총액"}</div><div className="mt-1 text-lg font-black text-slate-900">{dividend?.dividend_yield != null ? formatPercent(dividend.dividend_yield) : (summary?.market_cap != null ? formatCompact(summary.market_cap) : "-")}</div></div>
                             <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">{dividend?.dividend_per_share != null ? "연간 DPS" : "매출 성장률"}</div><div className={`mt-1 text-lg font-black ${dividend?.dividend_per_share != null ? "text-slate-900" : toneByValue(summary?.revenue_growth_rate)}`}>{dividend?.dividend_per_share != null ? formatCurrency(dividend.dividend_per_share, dividendCurrency) : (summary?.revenue_growth_rate != null ? formatPercent(summary.revenue_growth_rate) : "-")}</div></div>
                         </div>
+                        <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <button type="button" className="btn-secondary inline-flex items-center gap-2" onClick={saveCurrentPortfolioItem} disabled={portfolioSaving}>
+                                <BookmarkPlus className="h-4 w-4" />
+                                {portfolioSaving ? "저장 중..." : "현재 기준 저장"}
+                            </button>
+                            <p className="text-xs font-semibold leading-relaxed text-slate-500">수량, 매수 예정금액, 허용 비중, 손실 예산, 알림가를 함께 저장합니다.</p>
+                        </div>
                     </Card>
 
-                    <Card title="현재가 차트" subtitle="종목 검색 후 일봉, 주봉, 월봉으로 전환할 수 있습니다.">
+                    <Card title="증권사형 현재가 차트" subtitle="캔들, 거래량, 가격축, 십자선, 이동평균, 볼린저, RSI, MACD를 한 화면에서 확인">
                         <div className="mb-4 flex flex-wrap gap-2">
                             {CHART_INTERVALS.map((item) => (
                                 <button key={item.value} type="button" className={`rounded-full px-4 py-2 text-sm font-black ${chartInterval === item.value ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`} onClick={() => { setChartInterval(item.value); if (selectedSymbol) { fetchChart(market, selectedSymbol, item.value, { priceSnapshot: price, currency: summary?.currency || (market === "US" ? "USD" : "KRW"), source: price?.source }); } }} disabled={chartLoading}>{item.label}</button>
                             ))}
                         </div>
                         {chartLoading ? <LoadingSpinner text="차트 데이터를 불러오는 중입니다..." /> : <CandlestickChart points={chartData?.points} currency={currency} interval={chartData?.interval} />}
+                    </Card>
+
+                    <Card title="투자 전 리스크 가드" subtitle="포지션 크기, 손실 예산, 데이터 체크리스트">
+                        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                            <div className="rounded-[1.6rem] border border-slate-100 bg-slate-50/70 p-4">
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-black text-slate-400">총 투자자산</span>
+                                        <input className="input-base" inputMode="numeric" value={portfolioInput} onChange={(event) => setPortfolioInput(event.target.value.slice(0, 14))} />
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-black text-slate-400">매수 예정금액</span>
+                                        <input className="input-base" inputMode="numeric" value={plannedAmountInput} onChange={(event) => setPlannedAmountInput(event.target.value.slice(0, 14))} />
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-black text-slate-400">보유/예정 수량</span>
+                                        <input className="input-base" inputMode="decimal" value={quantityInput} onChange={(event) => setQuantityInput(event.target.value.slice(0, 12))} />
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-black text-slate-400">한 종목 허용 비중(%)</span>
+                                        <input className="input-base" inputMode="decimal" value={positionLimitInput} onChange={(event) => setPositionLimitInput(event.target.value.slice(0, 5))} />
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-black text-slate-400">1회 손실 예산(%)</span>
+                                        <input className="input-base" inputMode="decimal" value={riskBudgetInput} onChange={(event) => setRiskBudgetInput(event.target.value.slice(0, 5))} />
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-black text-slate-400">상단 알림가</span>
+                                        <input className="input-base" inputMode="numeric" value={alertAboveInput} onChange={(event) => setAlertAboveInput(event.target.value.slice(0, 14))} />
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-xs font-black text-slate-400">하단 알림가</span>
+                                        <input className="input-base" inputMode="numeric" value={alertBelowInput} onChange={(event) => setAlertBelowInput(event.target.value.slice(0, 14))} />
+                                    </label>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    <Badge className={statusMeta(positionRiskGuard.status).className}>{positionRiskGuard.label}</Badge>
+                                    {positionRiskGuard.allocationPercent != null ? <Badge className="bg-slate-100 text-slate-700">편입 비중 {positionRiskGuard.allocationPercent.toFixed(1)}%</Badge> : null}
+                                    {positionRiskGuard.lossBudgetPercent != null ? <Badge className="bg-slate-100 text-slate-700">재검토 하락폭 {positionRiskGuard.lossBudgetPercent.toFixed(1)}%</Badge> : null}
+                                </div>
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">허용 상한</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(positionRiskGuard.maxSinglePositionAmount, currency)}</div></div>
+                                    <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">손실 예산</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(positionRiskGuard.riskBudgetAmount, currency)}</div></div>
+                                    <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">VaR 1일 손실</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(positionRiskGuard.dailyVarLossAmount, currency)}</div></div>
+                                    <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">3회 분할</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(positionRiskGuard.trancheAmount, currency)}</div></div>
+                                </div>
+                                <div className="mt-4 rounded-[1.4rem] border border-slate-100 bg-white p-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="text-sm font-black text-slate-900">실행 계획서</div>
+                                        <Badge className={statusMeta(executionPlan.status).className}>{executionPlan.label}</Badge>
+                                    </div>
+                                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                        <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">예상 수량</div><div className="mt-1 text-sm font-black text-slate-900">{formatShareCount(executionPlan.plannedShares)}</div></div>
+                                        <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">VaR 한도 수량</div><div className="mt-1 text-sm font-black text-slate-900">{formatShareCount(executionPlan.varMaxShares)}</div></div>
+                                        <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">재검토 기준가</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(executionPlan.reviewPrice, currency)}</div></div>
+                                        <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">하단 알림 후보</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(executionPlan.lowerAlertCandidate, currency)}</div></div>
+                                    </div>
+                                    <div className="mt-3 space-y-1">
+                                        {executionPlan.messages.map((item, index) => (
+                                            <p key={`${item}-${index}`} className="text-xs font-semibold leading-relaxed text-slate-500">• {item}</p>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {positionRiskGuard.messages.map((item, index) => (
+                                        <p key={`${item}-${index}`} className="text-sm font-medium leading-relaxed text-slate-600">• {item}</p>
+                                    ))}
+                                </div>
+                                {priceRisk ? (
+                                    <div className="mt-4 rounded-[1.4rem] border border-slate-100 bg-white p-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="text-sm font-black text-slate-900">가격 리스크 스냅샷</div>
+                                            <Badge className={toneByPriceRisk(priceRisk.risk_label)}>리스크 {formatPriceRiskLabel(priceRisk.risk_label)}</Badge>
+                                        </div>
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">연 변동성</div><div className="mt-1 text-sm font-black text-slate-900">{formatPlainPercent(priceRisk.annualized_volatility)}</div></div>
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">최대 낙폭</div><div className="mt-1 text-sm font-black text-rose-600">{formatPlainPercent(priceRisk.max_drawdown)}</div></div>
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">1년 수익률</div><div className={`mt-1 text-sm font-black ${toneByValue(priceRisk.trailing_return1y)}`}>{formatPercent(priceRisk.trailing_return1y)}</div></div>
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">95% 일간 VaR</div><div className="mt-1 text-sm font-black text-slate-900">{formatPlainPercent(priceRisk.daily_value_at_risk95)}</div></div>
+                                        </div>
+                                        {priceRisk.notes?.length ? (
+                                            <div className="mt-3 space-y-1">
+                                                {priceRisk.notes.map((item, index) => <p key={`${item}-${index}`} className="text-xs font-medium leading-relaxed text-slate-500">• {item}</p>)}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                                {riskAdjustedReturn ? (
+                                    <div className="mt-4 rounded-[1.4rem] border border-slate-100 bg-white p-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="text-sm font-black text-slate-900">위험 대비 수익</div>
+                                            <Badge className={riskAdjustedReturnMeta.className}>{formatRiskAdjustedReturnLabel(riskAdjustedReturn.efficiency_label)}</Badge>
+                                        </div>
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">Sharpe</div><div className="mt-1 text-sm font-black text-slate-900">{formatCompact(riskAdjustedReturn.sharpe_ratio)}</div></div>
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">Sortino</div><div className="mt-1 text-sm font-black text-slate-900">{formatCompact(riskAdjustedReturn.sortino_ratio)}</div></div>
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">Calmar</div><div className="mt-1 text-sm font-black text-slate-900">{formatCompact(riskAdjustedReturn.calmar_ratio)}</div></div>
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">연환산 수익률</div><div className={`mt-1 text-sm font-black ${toneByValue(riskAdjustedReturn.annualized_return)}`}>{formatPercent(riskAdjustedReturn.annualized_return)}</div></div>
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">하방 변동성</div><div className="mt-1 text-sm font-black text-slate-900">{formatPlainPercent(riskAdjustedReturn.downside_deviation)}</div></div>
+                                            <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] font-black text-slate-400">상승일 비율</div><div className="mt-1 text-sm font-black text-slate-900">{formatPlainPercent(riskAdjustedReturn.positive_day_ratio)}</div></div>
+                                        </div>
+                                        {riskAdjustedReturn.notes?.length ? (
+                                            <div className="mt-3 space-y-1">
+                                                {riskAdjustedReturn.notes.map((item, index) => <p key={`${item}-${index}`} className="text-xs font-medium leading-relaxed text-slate-500">• {item}</p>)}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                                {scenarioStress ? (
+                                    <div className="mt-4 rounded-[1.4rem] border border-slate-100 bg-white p-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="text-sm font-black text-slate-900">손실 시나리오</div>
+                                            <Badge className={statusMeta(scenarioLossPlan.status).className}>{scenarioLossPlan.label}</Badge>
+                                        </div>
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                            {scenarioLossPlan.cases.map((item) => (
+                                                <div key={`${item.horizon}-${item.end_date}`} className="rounded-2xl bg-slate-50 p-3">
+                                                    <div className="text-[11px] font-black text-slate-400">{item.horizon || `${item.horizon_trading_days}거래일`} 최악</div>
+                                                    <div className={`mt-1 text-sm font-black ${toneByValue(item.worstReturn)}`}>{formatPercent(item.worstReturn)}</div>
+                                                    <div className="mt-1 text-[11px] font-semibold text-slate-500">{formatRiskAmount(item.lossAmount, currency)}</div>
+                                                    <div className="mt-1 text-[10px] font-semibold text-slate-400">{item.start_date || "-"} ~ {item.end_date || "-"}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-3 space-y-1">
+                                            {scenarioLossPlan.messages.map((item, index) => (
+                                                <p key={`${item}-${index}`} className="text-xs font-semibold leading-relaxed text-slate-500">• {item}</p>
+                                            ))}
+                                            {scenarioStress.notes?.map((item, index) => (
+                                                <p key={`${item}-${index}`} className="text-xs font-medium leading-relaxed text-slate-500">• {item}</p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                            <div className="space-y-3">
+                                {decisionChecklist.map((item) => {
+                                    const meta = statusMeta(item.status);
+                                    return (
+                                        <div key={item.label} className="flex items-start gap-3 rounded-[1.4rem] border border-slate-100 bg-white p-4">
+                                            <Badge className={`${meta.className} shrink-0`}>{meta.label}</Badge>
+                                            <div>
+                                                <div className="text-sm font-black text-slate-900">{item.label}</div>
+                                                <p className="mt-1 text-sm font-medium leading-relaxed text-slate-500">{item.message}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card title="내 투자 후보" subtitle="저장한 관심 종목과 보유 후보를 포트폴리오 관점에서 다시 확인">
+                        <div className="flex flex-wrap gap-2">
+                            <Badge className="bg-slate-900 text-white">{savedPortfolio.item_count || 0}개 저장</Badge>
+                            <Badge className="bg-slate-100 text-slate-700">예정금액 입력합계 {formatCompact(savedPortfolio.total_planned_amount)}</Badge>
+                            <Badge className="bg-slate-100 text-slate-700">평균단가 입력합계 {formatCompact(savedPortfolio.total_position_cost)}</Badge>
+                            <Badge className="bg-sky-100 text-sky-700">현재가 평가합계 {formatCompact(savedPortfolio.total_current_value)}</Badge>
+                            <button type="button" className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 hover:bg-slate-200" onClick={() => fetchPortfolio({ silent: false })} disabled={portfolioLoading}>
+                                {portfolioLoading ? "갱신 중" : "갱신"}
+                            </button>
+                        </div>
+                        <p className="mt-2 text-xs font-semibold text-slate-400">국내/미국 종목이 섞인 경우 합계는 환산값이 아니라 사용자가 입력한 숫자의 단순합계입니다.</p>
+                        {savedPortfolio.provider_warnings?.length ? (
+                            <div className="mt-3 rounded-[1.2rem] border border-amber-100 bg-amber-50/70 p-3">
+                                {savedPortfolio.provider_warnings.map((item, index) => (
+                                    <p key={`${item}-${index}`} className="text-xs font-semibold leading-relaxed text-amber-900">• {formatPortfolioProviderWarning(item)}</p>
+                                ))}
+                            </div>
+                        ) : null}
+                        {savedPortfolio.items?.length ? (
+                            <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                                {savedPortfolio.items.map((item) => {
+                                    const itemCurrency = item.market === "US" ? "USD" : "KRW";
+                                    const alertMeta = portfolioAlertMeta(item.alert_status);
+                                    return (
+                                        <div key={item.item_id || `${item.market}-${item.symbol}`} className="rounded-[1.4rem] border border-slate-100 bg-slate-50/70 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <Badge className="bg-white text-slate-700">{formatPortfolioItemLabel(item.item_type)}</Badge>
+                                                        <Badge className="bg-sky-100 text-sky-700">{item.market}</Badge>
+                                                        <Badge className={alertMeta.className}>{alertMeta.label}</Badge>
+                                                    </div>
+                                                    <div className="mt-2 text-base font-black text-slate-900">{item.company_name || item.symbol}</div>
+                                                    <div className="text-xs font-semibold text-slate-400">{item.symbol}</div>
+                                                </div>
+                                                <button type="button" className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-rose-600" aria-label={`${item.symbol} 삭제`} onClick={() => deletePortfolioItem(item.item_id)} disabled={portfolioSaving}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                                <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">현재가</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(item.current_price, itemCurrency)}</div></div>
+                                                <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">평가금액</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(item.current_value, itemCurrency)}</div></div>
+                                                <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">평가손익</div><div className={`mt-1 text-sm font-black ${toneByValue(item.unrealized_pnl)}`}>{formatRiskAmount(item.unrealized_pnl, itemCurrency)} <span className="text-[11px]">{formatPlainPercent(item.unrealized_pnl_percent)}</span></div></div>
+                                                <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">현재 비중</div><div className="mt-1 text-sm font-black text-slate-900">{formatPlainPercent(item.current_allocation_percent)}</div></div>
+                                                <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">예정금액</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(item.planned_amount, itemCurrency)}</div></div>
+                                                <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">허용 비중</div><div className="mt-1 text-sm font-black text-slate-900">{formatPlainPercent(item.target_allocation_percent)}</div></div>
+                                                <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">손실 예산</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(item.risk_budget_amount, itemCurrency)}</div></div>
+                                                <div className="rounded-2xl bg-white p-3"><div className="text-[11px] font-black text-slate-400">알림가</div><div className="mt-1 text-sm font-black text-slate-900">{formatRiskAmount(item.alert_below_price, itemCurrency)} / {formatRiskAmount(item.alert_above_price, itemCurrency)}</div></div>
+                                            </div>
+                                            {item.alert_messages?.length ? (
+                                                <div className="mt-3 space-y-1 rounded-[1.2rem] bg-white p-3">
+                                                    {item.alert_messages.map((message, index) => (
+                                                        <p key={`${message}-${index}`} className="text-xs font-semibold leading-relaxed text-slate-500">• {formatPortfolioAlertMessage(message)}</p>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                            {item.memo ? <p className="mt-3 line-clamp-2 text-xs font-medium leading-relaxed text-slate-500">{item.memo}</p> : null}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <EmptySlot message="저장한 투자 후보가 없습니다. 분석 결과에서 현재 기준 저장을 눌러 관심 종목을 남겨보세요." />
+                        )}
+                    </Card>
+
+                    <Card title="퀀트 전략 검증" subtitle="SMA20/SMA60 추세 필터와 단순 보유 결과 비교">
+                        {strategyBacktest ? (
+                            <>
+                                <div className="flex flex-wrap gap-2">
+                                    <Badge className={toneByBacktestSignal(strategyBacktest.signal)}>{formatSignalLabel(strategyBacktest.signal)}</Badge>
+                                    <Badge className="bg-slate-100 text-slate-700">{strategyBacktest.strategy_name || "추세 필터"}</Badge>
+                                    {strategyBacktest.trading_days ? <Badge className="bg-slate-100 text-slate-700">{strategyBacktest.trading_days}거래일</Badge> : null}
+                                </div>
+                                <p className="mt-4 text-sm font-medium leading-relaxed text-slate-600">{strategyBacktest.summary}</p>
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">전략 수익률</div><div className={`mt-1 text-lg font-black ${toneByValue(strategyBacktest.strategy_return)}`}>{formatPercent(strategyBacktest.strategy_return)}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">단순 보유 수익률</div><div className={`mt-1 text-lg font-black ${toneByValue(strategyBacktest.benchmark_return)}`}>{formatPercent(strategyBacktest.benchmark_return)}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">전략 최대낙폭</div><div className="mt-1 text-lg font-black text-rose-600">{formatPlainPercent(strategyBacktest.strategy_max_drawdown)}</div></div>
+                                    <div className="rounded-2xl bg-slate-50 p-4"><div className="text-xs font-black text-slate-400">단순 보유 최대낙폭</div><div className="mt-1 text-lg font-black text-rose-600">{formatPlainPercent(strategyBacktest.benchmark_max_drawdown)}</div></div>
+                                </div>
+                                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                    <div className="rounded-2xl border border-slate-100 bg-white p-4"><div className="text-xs font-black text-slate-400">전략 노출 비중</div><div className="mt-1 text-base font-black text-slate-900">{formatPlainPercent(strategyBacktest.exposure_percent)}</div></div>
+                                    <div className="rounded-2xl border border-slate-100 bg-white p-4"><div className="text-xs font-black text-slate-400">진입 횟수</div><div className="mt-1 text-base font-black text-slate-900">{strategyBacktest.trade_count ?? "-"}</div></div>
+                                    <div className="rounded-2xl border border-slate-100 bg-white p-4"><div className="text-xs font-black text-slate-400">보유일 승률</div><div className="mt-1 text-base font-black text-slate-900">{formatPlainPercent(strategyBacktest.win_rate)}</div></div>
+                                </div>
+                                {strategyBacktest.notes?.length ? (
+                                    <div className="mt-4 space-y-2 rounded-[1.4rem] border border-amber-100 bg-amber-50/70 p-4">
+                                        {strategyBacktest.notes.map((item, index) => <p key={`${item}-${index}`} className="text-sm font-semibold leading-relaxed text-amber-900">• {item}</p>)}
+                                    </div>
+                                ) : null}
+                            </>
+                        ) : <EmptySlot message="전략 백테스트 데이터가 없습니다." />}
                     </Card>
 
                     {isKr ? (
@@ -1271,7 +2188,7 @@ export const InvestAssistant = () => {
                             </Card>
                         ) : null}
 
-                        <Card title="추천 레이어" subtitle="v3 추천 모델">
+                        <Card title="투자 판단 매트릭스" subtitle="기초체력, 성장성, 밸류에이션, 모멘텀, 가격 리스크, 위험 대비 수익, 손실 시나리오, 전략 검증, 뉴스 감성을 가중 반영한 보조 판단">
                             {recommendation ? (
                                 <>
                                     <div className="flex flex-wrap gap-2">
@@ -1279,9 +2196,46 @@ export const InvestAssistant = () => {
                                         <Badge className="bg-slate-100 text-slate-700">신뢰도 {recommendation.confidence ?? 0}</Badge>
                                     </div>
                                     <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100"><div className="flex h-full w-full"><div className="bg-emerald-500" style={{ width: `${recommendation.buy_percent ?? 0}%` }} /><div className="bg-amber-400" style={{ width: `${recommendation.neutral_percent ?? 0}%` }} /><div className="bg-rose-500" style={{ width: `${recommendation.sell_percent ?? 0}%` }} /></div></div>
+                                    <div className="mt-3 grid gap-2 text-xs font-black text-slate-600 sm:grid-cols-3">
+                                        <div className="flex items-center justify-between"><span>매수 검토</span><span className="text-emerald-600">{recommendation.buy_percent ?? 0}%</span></div>
+                                        <div className="flex items-center justify-between"><span>관망</span><span className="text-amber-600">{recommendation.neutral_percent ?? 0}%</span></div>
+                                        <div className="flex items-center justify-between"><span>축소 검토</span><span className="text-rose-600">{recommendation.sell_percent ?? 0}%</span></div>
+                                    </div>
                                     <p className="mt-4 text-sm leading-relaxed text-slate-600">{recommendation.summary}</p>
+                                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <div className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">긍정 근거</div>
+                                            <div className="mt-2 space-y-2 text-sm font-medium leading-relaxed text-slate-600">
+                                                {recommendation.reasons?.length ? recommendation.reasons.map((item, index) => <p key={`${item}-${index}`}>• {item}</p>) : <p>강하게 확인된 긍정 근거가 없습니다.</p>}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-black uppercase tracking-[0.18em] text-rose-700">주의 근거</div>
+                                            <div className="mt-2 space-y-2 text-sm font-medium leading-relaxed text-slate-600">
+                                                {recommendation.risks?.length ? recommendation.risks.map((item, index) => <p key={`${item}-${index}`}>• {item}</p>) : <p>강하게 확인된 주의 근거가 없습니다.</p>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {recommendation.factors?.length ? (
+                                        <div className="mt-5 space-y-3">
+                                            {recommendation.factors.map((factor) => {
+                                                const score = Number(factor.score);
+                                                const width = Number.isFinite(score) ? clamp(score, 0, 100) : 0;
+                                                return (
+                                                    <div key={factor.key || factor.label} className="border-t border-slate-100 pt-3">
+                                                        <div className="flex items-center justify-between gap-3 text-sm font-black text-slate-800">
+                                                            <span>{factor.label || factor.key}</span>
+                                                            <span>{Number.isFinite(score) ? `${score}점` : "데이터 부족"}</span>
+                                                        </div>
+                                                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full ${factor.signal === "NEGATIVE" ? "bg-rose-500" : factor.signal === "POSITIVE" ? "bg-emerald-500" : "bg-amber-400"}`} style={{ width: `${width}%` }} /></div>
+                                                        <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">{factor.summary}</p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : null}
                                 </>
-                            ) : <EmptySlot message="v3 추천 데이터가 없습니다." />}
+                            ) : <EmptySlot message="투자 판단 매트릭스 데이터가 없습니다." />}
                         </Card>
 
                         <Card title={isKr ? "보조 진단값" : "v3 진단값"} subtitle={isKr ? "재무, 배당, 뉴스 기반 보조 해석" : "밸류, 배당, 기술, SEC 기준 보고 정보"}>

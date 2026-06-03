@@ -30,6 +30,7 @@ export const normalizeInvestPayload = (value) => {
 };
 
 const toNumberOrNull = (value) => {
+    if (value === null || value === undefined || value === "") return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
 };
@@ -85,6 +86,44 @@ export const normalizeChartResponse = (response) => {
 
 export const normalizeAnalysisResponse = (response) => normalizeInvestPayload(unwrapInvestData(response) || {});
 
+const normalizePortfolioItem = (item) => {
+    const normalized = normalizeInvestPayload(item || {});
+    return {
+        ...normalized,
+        quantity: toNumberOrNull(normalized.quantity),
+        average_price: toNumberOrNull(normalized.average_price),
+        planned_amount: toNumberOrNull(normalized.planned_amount),
+        target_allocation_percent: toNumberOrNull(normalized.target_allocation_percent),
+        risk_budget_percent: toNumberOrNull(normalized.risk_budget_percent),
+        alert_above_price: toNumberOrNull(normalized.alert_above_price),
+        alert_below_price: toNumberOrNull(normalized.alert_below_price),
+        position_cost: toNumberOrNull(normalized.position_cost),
+        risk_budget_amount: toNumberOrNull(normalized.risk_budget_amount),
+        current_price: toNumberOrNull(normalized.current_price),
+        current_change_percent: toNumberOrNull(normalized.current_change_percent),
+        current_value: toNumberOrNull(normalized.current_value),
+        unrealized_pnl: toNumberOrNull(normalized.unrealized_pnl),
+        unrealized_pnl_percent: toNumberOrNull(normalized.unrealized_pnl_percent),
+        current_allocation_percent: toNumberOrNull(normalized.current_allocation_percent),
+        alert_messages: Array.isArray(normalized.alert_messages) ? normalized.alert_messages : [],
+    };
+};
+
+export const normalizePortfolioResponse = (response) => {
+    const data = normalizeInvestPayload(unwrapInvestData(response) || {});
+    return {
+        ...data,
+        items: Array.isArray(data.items) ? data.items.map(normalizePortfolioItem) : [],
+        item_count: Number.isFinite(Number(data.item_count)) ? Number(data.item_count) : 0,
+        total_planned_amount: toNumberOrNull(data.total_planned_amount),
+        total_position_cost: toNumberOrNull(data.total_position_cost),
+        total_current_value: toNumberOrNull(data.total_current_value),
+        provider_warnings: Array.isArray(data.provider_warnings) ? data.provider_warnings : [],
+    };
+};
+
+export const normalizePortfolioItemResponse = (response) => normalizePortfolioItem(unwrapInvestData(response) || {});
+
 export const extractInvestErrorMessage = (error, fallbackMessage) => getApiErrorMessage(error, fallbackMessage);
 
 const US_PROVIDER_WARNING_PATTERN = /(alpha vantage|provider issue|api key|제공자 이슈|앱 키|시크릿|SEC 재무|KIS 현재가|실시간 현재가)/i;
@@ -123,5 +162,24 @@ export const investAdapter = {
             v2: normalizeAnalysisResponse(v2),
             v3: normalizeAnalysisResponse(v3),
         };
+    },
+
+    async fetchPortfolio() {
+        const response = await api.get("/invest/portfolio");
+        return normalizePortfolioResponse(response);
+    },
+
+    async savePortfolioItem(payload) {
+        const response = await api.post("/invest/portfolio", payload);
+        return normalizePortfolioItemResponse(response);
+    },
+
+    async updatePortfolioItem(itemId, payload) {
+        const response = await api.patch(`/invest/portfolio/${itemId}`, payload);
+        return normalizePortfolioItemResponse(response);
+    },
+
+    async deletePortfolioItem(itemId) {
+        await api.delete(`/invest/portfolio/${itemId}`);
     },
 };

@@ -169,11 +169,25 @@
   - `GET /invest/analysis?market={KR|US}&symbol={symbol}`
   - `GET /invest/analysis/v2?market={KR|US}&symbol={symbol}`
   - `GET /invest/analysis/v3?market={KR|US}&symbol={symbol}`
+  - `GET /invest/portfolio`
+  - `POST /invest/portfolio`
+  - `PATCH /invest/portfolio/{item-id}`
+  - `DELETE /invest/portfolio/{item-id}`
   - 투자 분석/차트/종목 추천 응답 shape은 `src/adapters/investAdapter.js`에서 정규화합니다.
   - 서버가 한글 우선 `limitations`를 반환해도 미국 제공자 경고 판별은 `src/adapters/investAdapter.js`에서 처리합니다.
   - 종목 검색창은 서버 입력 경계에 맞춰 검색어 80자, 선택 종목코드 20자 제한을 화면에서 안내하고 초과 종목코드 분석 요청을 사전에 막습니다.
+  - 국내 종목 검색은 서버의 KIS seed/DART fallback 결과를 그대로 표시하며, 결과 없음/제공자 실패 시 종목코드 직접 입력 안내를 드롭다운에 표시합니다.
   - KIS/DART/SEC EDGAR 제공자 지연은 서버 timeout 안에서 실패 처리되며, 화면은 기존 오류 상태와 `limitations` 경고를 사용합니다.
   - 국내/미국 종목 보조 데이터는 응답에 있을 때만 렌더링합니다.
+  - v3 `price_risk_snapshot`이 있으면 가격 리스크 스냅샷에서 연환산 변동성, 최대낙폭, 1년 수익률, 95% 일간 VaR을 표시합니다.
+  - v3 `risk_adjusted_return_snapshot`이 있으면 위험 대비 수익 카드에서 Sharpe, Sortino, Calmar, 연환산 수익률, 하방 변동성, 상승일 비율을 표시합니다.
+  - v3 `scenario_stress_snapshot`이 있으면 투자 전 리스크 가드에서 1/5/20거래일 과거 최악 구간을 매수 예정금액 기준 손실액으로 환산해 표시합니다.
+  - v3 `strategy_backtest_snapshot`이 있으면 퀀트 전략 검증 카드에서 SMA20/SMA60 추세 필터와 단순 보유 결과를 비교합니다.
+  - v3 `recommendation.factors`가 있으면 투자 판단 매트릭스에서 요인별 점수, 신호, 근거를 표시하며 `price_risk`, `risk_adjusted_return`, `scenario_stress`, `strategy_backtest` 요인도 함께 렌더링합니다.
+  - 현재가 차트는 증권사형 캔들 UX로 가격축, 십자선, 선택 캔들 요약, 거래량, 이동평균, 볼린저, RSI, MACD 토글을 표시합니다.
+  - 상단 안전 경고 옆에는 SEC 자산배분, FINRA 분산투자/리스크, Fidelity 종목 분석 링크를 방법론 참고로 노출합니다.
+  - 투자 전 리스크 가드는 화면 입력값과 v3/차트 데이터를 사용해 편입 비중, 손실 예산, 95% 일간 VaR 기준 예상 손실액, 최악 구간 시나리오 손실액, 분할 금액, VaR 한도 수량, 재검토 기준가, 하단 알림 후보, 데이터 체크리스트와 전략 검증 상태를 계산합니다.
+  - 내 투자 후보 카드는 `/invest/portfolio` 응답을 표시하고 현재 분석 종목을 수량/매수 예정금액/허용 비중/손실 예산/알림가와 함께 저장합니다. 저장 항목은 현재가, 평가금액, 평가손익, 현재 비중, 알림 상태를 보여주며 국내/미국 종목이 섞인 합계는 환산값이 아니라 입력값 단순합계로 안내합니다.
   - 투자 뉴스/이슈 원문 링크는 화면 렌더 직전에 `normalizeExternalUrl`로 다시 검증합니다.
 - `/app/facility`
   - 공용 `AddressSearchBox`
@@ -483,9 +497,10 @@
 - 공용 주소 자동완성/지오코딩 입력은 `ADDRESS_QUERY_MAX_LENGTH=120`을 공유하고, 전용 시설 스모크에서 `AddressSearchBox`의 `maxLength`와 안내 문구를 확인합니다.
 - Daum 우편번호 창은 `src/utils/daumPostcodeLoader.js` 공통 로더를 사용하며, 명시적 `https://` URL과 timeout으로 외부 스크립트 대기를 제한합니다.
 - `/app/optimizer`의 중간장소 계산은 `src/adapters/optimizerAdapter.js`를 경유하며, 전용 `npm run smoke:optimizer-ui`로 주소 선택, 계산 결과, 지도 mock 렌더링, 반응형 overflow를 확인합니다.
-- `/app/invest`의 투자 분석/차트/종목 추천은 `src/adapters/investAdapter.js`를 경유하며, 전용 `npm run smoke:invest-ui`로 분석 결과, 차트 주기 전환, 추천 레이어, 반응형 overflow를 확인합니다.
+- `/app/invest`의 투자 분석/차트/종목 추천은 `src/adapters/investAdapter.js`를 경유하며, 전용 `npm run smoke:invest-ui`로 분석 결과, 차트 주기 전환, 투자 판단 매트릭스, 반응형 overflow를 확인합니다.
 - `/app/invest`의 분석/차트/종목 추천 API는 서버에서 외부 DART/KIS/SEC 호출 전에 입력을 정리하고 크기를 제한합니다. `symbol`은 20자, 검색 `query`는 80자, 차트 `interval`은 10자를 넘으면 표준 오류 응답을 반환하며, 정상 응답 shape은 변경하지 않았습니다.
 - `/app/invest` 화면도 같은 상한을 사용해 종목 검색 입력에 `maxLength=80`과 안내 문구를 제공하고, 분석 시작 전 선택 종목코드가 20자를 넘으면 요청하지 않습니다.
+- 2026-06-03 invest-decision note: 국내 종목 검색은 KIS 마스터 실패 시에도 서버 fallback 후보를 받을 수 있고, 화면은 빈 결과/오류를 닫지 않고 직접 종목코드 입력 안내로 유지합니다. v3 추천은 `recommendation.factors`를 투자 판단 매트릭스에 표시하며, 투자 전 리스크 가드는 화면 입력값으로 포지션 크기, 손실 예산, VaR 한도 수량, 재검토 기준가, 과거 최악 손실 시나리오 금액을 계산하고 `risk_adjusted_return_snapshot`은 Sharpe/Sortino/Calmar 카드로, `strategy_backtest_snapshot`은 별도 전략 검증 카드로 표시합니다. 현재가 차트는 증권사형 가격축/십자선/보조지표 토글을 제공합니다. `/invest/portfolio`는 분석한 종목, 수량, 리스크 입력값을 저장해 재방문 시 같은 판단 기준을 이어가게 하며, KIS 현재가가 있으면 저장 후보의 평가금액/평가손익/알림 도달 상태를 표시합니다.
 - 2026-06-01 game mapping note: `/app/games` renders one player-count sorted game section. The sort key is `minPlayers`, then `maxPlayers`, with stable registration order for exact ties; `npm run smoke:hub-ui` asserts the visible card order and absence of the old new/existing group labels.
 - 2026-06-01 realtime mapping note: `/app/games/las-vegas`, `/app/games/no-thanks`, and `/app/games/{catan,blokus,mahe,dalmuti,citadels}` bind realtime subscriptions only after a REST state refresh and refresh STOMP auth headers through `beforeConnect`. Their dedicated smoke scripts include source assertions for the shared tabletop screen reconnect guard.
 - 2026-06-02 map-loader note: `/app/facility` and `/app/optimizer` use `src/utils/naverMapsLoader.js` to load the Naver Maps SDK only when those map screens mount. The SDK is not declared in `index.html`, keeping `/app` initial HTML parsing and home load timing independent from the external map provider.
