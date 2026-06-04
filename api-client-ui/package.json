@@ -23,6 +23,7 @@
     "smoke:ranks-ui": "node scripts/ranks-ui-smoke.mjs",
     "smoke:streaming-ui": "node scripts/streaming-ui-smoke.mjs",
     "smoke:admin-streaming-ui": "node scripts/admin-streaming-ui-smoke.mjs",
+    "smoke:admin-command-center-ui": "node scripts/admin-command-center-ui-smoke.mjs",
     "smoke:admin-anomalies-ui": "node scripts/admin-anomalies-ui-smoke.mjs",
     "smoke:admin-operations-ui": "node scripts/admin-operations-ui-smoke.mjs",
     "smoke:plinko-ui": "node scripts/plinko-ui-smoke.mjs",

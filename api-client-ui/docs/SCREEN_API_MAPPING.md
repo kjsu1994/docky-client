@@ -304,6 +304,30 @@
 
 ## 관리자
 
+- `/app/admin` (`ROLE_ADMIN` 또는 `ROLE_MASTER`)
+  - `GET /stats/summary`
+  - `GET /stats/anomalies?limit=50`
+  - `GET /admin/anomalies/kpi?days=7`
+  - `GET /admin/anomalies/rules`
+  - `GET /admin/anomalies/incidents?status=ALL&page=1&size=20`
+  - `GET /admin/notifications?readYn=false&page=1&size=12`
+  - `GET /admin/reports?status=OPEN&page=1&size=12`
+  - `GET /admin/sanctions?status=ACTIVE&page=1&size=12`
+  - `GET /admin/sanctions/release-requests?page=1&size=50`
+  - `GET /admin/moderation/boards?page=1&size=10`
+  - `GET /admin/moderation/comments?page=1&size=10`
+  - `GET /admin/audits?type=ALL&page=1&size=12`
+  - `GET /admin/roles/members?page=1&size=10` (`ROLE_MASTER`)
+  - `GET /admin/roles/audits?page=1&size=10` (`ROLE_MASTER`)
+  - `GET /admin/banners?page=1&size=50`
+  - `GET /admin/streaming/videos?page=1&size=20`
+  - `GET /admin/streaming/videos/inbox`
+  - 화면은 `src/adapters/adminAnomaliesAdapter.js`, `src/adapters/adminOperationsAdapter.js`, `src/adapters/streamingAdapter.js`를 조합해 관리자 시작 화면을 구성합니다.
+  - 핵심 조회는 `adminAnomaliesAdapter.fetchCommandCenter`에서 섹션별 부분 실패를 분리해 처리합니다. 한 섹션 실패가 전체 관리자 홈을 무너뜨리지 않아야 하며, 화면은 데이터 상태 패널에 정상/실패/권한 밖 상태를 표시합니다.
+  - 통합 처리 큐는 제재 해제 요청, 이상징후 사건, 접수 신고, 게시글/댓글 검토, 관리자 알림을 우선순위로 합쳐 보여줍니다.
+  - 큐 액션은 사건 상태 변경/대기열 차단, 신고 검토·해결·반려, 제재 해제 승인, 콘텐츠 숨김·복구, 알림 읽음 처리를 앱 내부 입력 토스트와 한국어 토스트 피드백으로 수행합니다.
+  - 회원 360은 `GET /members/list` 후보 검색과 `GET /admin/members/{member-id}` 상세를 사용하며, 선택 회원의 제재 등록/해제와 마스터 권한 변경을 같은 화면에서 수행합니다.
+  - 배너 활성화와 스트리밍 inbox 반입은 각각 기존 운영 도구와 스트리밍 스튜디오 API를 사용하고, 상세 편집은 기존 전문 화면으로 연결합니다.
 - `/app/admin/anomalies` (`ROLE_ADMIN`)
   - `GET /stats/summary`
   - `GET /stats/anomalies?limit={limit}`

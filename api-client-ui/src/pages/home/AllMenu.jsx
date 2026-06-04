@@ -11,6 +11,7 @@ import {
     Car,
     User,
     ShieldAlert,
+    ShieldCheck,
     Settings,
     LogOut,
     ChevronRight,
@@ -87,7 +88,8 @@ export const AllMenu = () => {
     ];
 
     const admin = [
-        { title: "관리자 콘솔", to: "/app/admin/anomalies", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
+        { title: "운영 커맨드 센터", to: "/app/admin", icon: ShieldCheck, color: "bg-emerald-100 text-emerald-700" },
+        { title: "관리자 대시보드", to: "/app/admin/anomalies", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
         { title: "운영 관리", to: "/app/admin/operations", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
         { title: "스트리밍 스튜디오", to: "/app/admin/streaming", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
     ];

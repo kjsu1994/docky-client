@@ -34,6 +34,7 @@ const PokerGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((mod
 const CitadelsGame = lazy(() => import("../pages/games/CitadelsGame.jsx").then((module) => ({ default: module.CitadelsGame })));
 const MeetingOptimizer = lazy(() => import("../pages/facility/MeetingOptimizer.jsx").then((module) => ({ default: module.MeetingOptimizer })));
 const FacilityFinder = lazy(() => import("../pages/facility/FacilityFinder.jsx").then((module) => ({ default: module.FacilityFinder })));
+const AdminCommandCenter = lazy(() => import("../pages/admin/AdminCommandCenter.jsx").then((module) => ({ default: module.AdminCommandCenter })));
 const AdminAnomalies = lazy(() => import("../pages/admin/AdminAnomalies.jsx").then((module) => ({ default: module.AdminAnomalies })));
 const AdminOperations = lazy(() => import("../pages/admin/AdminOperations.jsx").then((module) => ({ default: module.AdminOperations })));
 const AdminStreamingStudio = lazy(() => import("../pages/admin/AdminStreamingStudio.jsx").then((module) => ({ default: module.AdminStreamingStudio })));
@@ -86,6 +87,7 @@ export const ProtectedRoutes = () => (
                         <Route path="optimizer" element={<MeetingOptimizer />} />
                         <Route path="facility" element={<FacilityFinder />} />
                         <Route path="parking" element={<Navigate to="/app/facility" replace />} />
+                        <Route path="admin" element={<AdminCommandCenter />} />
                         <Route path="admin/anomalies" element={<AdminAnomalies />} />
                         <Route path="admin/operations" element={<AdminOperations />} />
                         <Route path="admin/streaming" element={<AdminStreamingStudio />} />

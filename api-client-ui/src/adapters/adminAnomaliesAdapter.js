@@ -121,6 +121,36 @@ export const buildRulePayload = ({ metric, hardLimitPerMinute, zScoreThreshold, 
     enabled: Boolean(enabled),
 });
 
+const commandCenterSection = async ({ key, label, enabled = true, disabledMessage = "", fallback, load }) => {
+    if (!enabled) {
+        return {
+            key,
+            data: fallback,
+            source: { key, label, ok: true, skipped: true, message: disabledMessage },
+        };
+    }
+
+    try {
+        return {
+            key,
+            data: await load(),
+            source: { key, label, ok: true, skipped: false, message: "" },
+        };
+    } catch (error) {
+        return {
+            key,
+            data: fallback,
+            source: {
+                key,
+                label,
+                ok: false,
+                skipped: false,
+                message: adminAnomaliesErrorMessage(error, `${label} 데이터를 불러오지 못했습니다.`),
+            },
+        };
+    }
+};
+
 export const adminAnomaliesAdapter = {
     async fetchIncidents(status, page, size = 20) {
         const response = await api.get("/admin/anomalies/incidents", { params: { status, page, size } });
@@ -270,6 +300,139 @@ export const adminAnomaliesAdapter = {
             roleMembers: normalizeAdminPage(roleMembersRes.data, 10),
             roleAudits: normalizeAdminPage(roleAuditsRes.data, 10),
         };
+    },
+
+    async fetchCommandCenter({ isMaster = false } = {}) {
+        const sectionSpecs = [
+            {
+                key: "summary",
+                label: "서비스 통계",
+                fallback: null,
+                load: async () => unwrapAdminData((await api.get("/stats/summary")).data),
+            },
+            {
+                key: "events",
+                label: "이상징후 이벤트",
+                fallback: [],
+                load: async () => normalizeAnomalyEvents((await api.get("/stats/anomalies", { params: { limit: 50 } })).data),
+            },
+            {
+                key: "kpi",
+                label: "이상징후 KPI",
+                fallback: null,
+                load: async () => unwrapAdminData((await api.get("/admin/anomalies/kpi", { params: { days: 7 } })).data),
+            },
+            {
+                key: "rules",
+                label: "이상징후 규칙",
+                fallback: [],
+                load: async () => {
+                    const rules = unwrapAdminData((await api.get("/admin/anomalies/rules")).data);
+                    return Array.isArray(rules) ? rules : [];
+                },
+            },
+            {
+                key: "incidents",
+                label: "이상징후 사건",
+                fallback: emptyAdminPage(20),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/anomalies/incidents", { params: { status: "ALL", page: 1, size: 20 } })).data,
+                    20,
+                ),
+            },
+            {
+                key: "notifications",
+                label: "관리자 알림",
+                fallback: emptyAdminPage(12),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/notifications", { params: { readYn: false, page: 1, size: 12 } })).data,
+                    12,
+                ),
+            },
+            {
+                key: "reports",
+                label: "신고",
+                fallback: emptyAdminPage(12),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/reports", { params: { status: "OPEN", page: 1, size: 12 } })).data,
+                    12,
+                ),
+            },
+            {
+                key: "sanctions",
+                label: "제재",
+                fallback: emptyAdminPage(12),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/sanctions", { params: { status: "ACTIVE", page: 1, size: 12 } })).data,
+                    12,
+                ),
+            },
+            {
+                key: "releaseRequests",
+                label: "제재 해제 요청",
+                fallback: emptyAdminPage(50),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/sanctions/release-requests", { params: { page: 1, size: 50 } })).data,
+                    50,
+                ),
+            },
+            {
+                key: "moderationBoards",
+                label: "게시글 검토",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/moderation/boards", { params: { hiddenYn: undefined, page: 1, size: 10 } })).data,
+                    10,
+                ),
+            },
+            {
+                key: "moderationComments",
+                label: "댓글 검토",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/moderation/comments", { params: { hiddenYn: undefined, page: 1, size: 10 } })).data,
+                    10,
+                ),
+            },
+            {
+                key: "audits",
+                label: "감사 이력",
+                fallback: emptyAdminPage(12),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/audits", { params: { type: "ALL", page: 1, size: 12 } })).data,
+                    12,
+                ),
+            },
+            {
+                key: "roleMembers",
+                label: "권한 회원",
+                enabled: isMaster,
+                disabledMessage: "마스터 권한에서만 조회됩니다.",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/roles/members", { params: { page: 1, size: 10 } })).data,
+                    10,
+                ),
+            },
+            {
+                key: "roleAudits",
+                label: "권한 감사",
+                enabled: isMaster,
+                disabledMessage: "마스터 권한에서만 조회됩니다.",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/roles/audits", { params: { page: 1, size: 10 } })).data,
+                    10,
+                ),
+            },
+        ];
+
+        const sections = await Promise.all(sectionSpecs.map(commandCenterSection));
+        return sections.reduce((acc, section) => {
+            acc[section.key] = section.data;
+            acc.sources[section.key] = section.source;
+            return acc;
+        }, { sources: {} });
     },
 
     async updateIncident(incidentId, draft) {

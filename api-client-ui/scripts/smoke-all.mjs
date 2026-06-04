@@ -18,6 +18,7 @@ const checks = [
     ["run", "smoke:ranks-ui"],
     ["run", "smoke:streaming-ui"],
     ["run", "smoke:admin-streaming-ui"],
+    ["run", "smoke:admin-command-center-ui"],
     ["run", "smoke:admin-anomalies-ui"],
     ["run", "smoke:admin-operations-ui"],
     ["run", "smoke:plinko-ui"],
