@@ -1,6 +1,7 @@
 ﻿import { Link } from "react-router-dom";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, BookOpen, CircleHelp, Dices, Sparkles, X } from "lucide-react";
+import { VideoGameArtwork, videoGameArtProfiles } from "./VideoGameArtwork.jsx";
 
 const sharedRoomStartSteps = [
   "카드의 입장하기를 누른 뒤 방 만들기 또는 방 코드 입장을 선택합니다.",
@@ -390,7 +391,86 @@ const gameManuals = {
   },
 };
 
-const games = [
+const videoGameManuals = {
+  arena: {
+    subtitle: "Good_ETC의 LAN Arena를 홈페이지 방 입장 흐름으로 옮기는 실시간 액션 게임입니다.",
+    tags: ["1~8인", "실시간 액션", "모바일 조작"],
+    sections: [
+      { title: "처음 시작 순서", items: sharedRoomStartSteps },
+      {
+        title: "이식 방향",
+        items: [
+          "방과 참가자 정보는 DB에 저장하고, 본게임 입력과 프레임 상태는 STOMP 실시간 채널을 사용합니다.",
+          "키보드 이동/공격 외에 모바일용 방향 패드와 액션 버튼을 함께 제공합니다.",
+        ],
+      },
+    ],
+  },
+  fortress: {
+    subtitle: "각도와 파워를 조절해 상대를 맞히는 Good_ETC 포트리스 게임입니다.",
+    tags: ["1~2인", "턴제 포격", "모바일 조준"],
+    sections: [
+      { title: "처음 시작 순서", items: sharedRoomStartSteps },
+      {
+        title: "이식 방향",
+        items: [
+          "방장은 방을 만들고 참가자는 코드로 입장한 뒤 준비 상태를 맞춥니다.",
+          "모바일에서는 이동, 각도, 파워, 발사를 큰 터치 컨트롤로 제공합니다.",
+        ],
+      },
+    ],
+  },
+  defense: {
+    subtitle: "웨이브를 막고 타워를 배치하는 Good_ETC 협동 디펜스 게임입니다.",
+    tags: ["1~4인", "타워 디펜스", "협동"],
+    sections: [
+      { title: "처음 시작 순서", items: sharedRoomStartSteps },
+      {
+        title: "이식 방향",
+        items: [
+          "방 상태와 참가자는 DB에 남기고, 웨이브/타워/스킬 상태는 실시간 채널로 동기화합니다.",
+          "모바일에서는 타일 선택, 건설, 업그레이드, 스킬 버튼을 하단 조작대로 제공합니다.",
+        ],
+      },
+    ],
+  },
+  party: {
+    subtitle: "Good_ETC의 카트, 폭탄, 스네이크, 코인 파티 게임을 같은 방 흐름으로 실행합니다.",
+    tags: ["1~8인", "파티 액션", "터치 조작"],
+    sections: [
+      { title: "처음 시작 순서", items: sharedRoomStartSteps },
+      {
+        title: "이식 방향",
+        items: [
+          "게임별 규칙은 Good_ETC 구현을 기준으로 유지하고, 방 입장/준비/시작 흐름은 홈페이지 보드게임과 맞춥니다.",
+          "모바일에서는 방향 패드와 게임별 액션 버튼을 고정 조작대로 제공합니다.",
+        ],
+      },
+    ],
+  },
+  rpg: {
+    subtitle: "Good_ETC의 솔로 RPG입니다. 진행 저장은 브라우저 localStorage를 우선 사용합니다.",
+    tags: ["1인", "솔로 RPG", "localStorage"],
+    sections: [
+      {
+        title: "처음 시작 순서",
+        items: [
+          "혼자 플레이용 방을 만들고 게임 시작을 누르면 내 진행 상태를 불러옵니다.",
+          "저장은 브라우저 localStorage를 우선 사용하며, 계정 단위 저장은 추후 DB 저장 API로 확장합니다.",
+        ],
+      },
+      {
+        title: "모바일",
+        items: [
+          "이동 방향, 상호작용, 메뉴 열기를 터치 버튼으로 제공합니다.",
+          "화면 크기에 맞춰 조작대와 로그 패널이 겹치지 않도록 분리합니다.",
+        ],
+      },
+    ],
+  },
+};
+
+const boardGames = [
   {
     title: "포커",
     description: "(1~8인) 텍사스 홀덤과 5장 드로우 / 족보 보조와 AI 봇을 지원합니다.",
@@ -547,6 +627,121 @@ const games = [
   },
 ];
 
+const videoGames = [
+  {
+    title: "LAN Arena",
+    description: "(1~8인) Good_ETC 실시간 아레나 슈터 / 이동, 회피, 발사를 방 단위로 동기화합니다.",
+    to: "/app/games/video/arena",
+    tone: "from-cyan-500 via-slate-900 to-emerald-500",
+    players: "1~8인",
+    minPlayers: 1,
+    maxPlayers: 8,
+    mode: "액션",
+    preview: "arena",
+    highlights: ["실시간 방", "터치 조작", "STOMP"],
+    manual: videoGameManuals.arena,
+    featured: true,
+  },
+  {
+    title: "Fortress",
+    description: "(1~2인) Good_ETC 포트리스 / 각도와 파워를 조절하는 턴제 포격 게임입니다.",
+    to: "/app/games/video/fortress",
+    tone: "from-amber-500 via-sky-600 to-slate-900",
+    players: "1~2인",
+    minPlayers: 1,
+    maxPlayers: 2,
+    mode: "포격",
+    preview: "fortress",
+    highlights: ["턴제", "조준", "방 입장"],
+    manual: videoGameManuals.fortress,
+    featured: true,
+  },
+  {
+    title: "Defense",
+    description: "(1~4인) Good_ETC 디펜스 / 타워 건설과 스킬로 웨이브를 막는 협동 게임입니다.",
+    to: "/app/games/video/defense",
+    tone: "from-lime-500 via-emerald-700 to-slate-950",
+    players: "1~4인",
+    minPlayers: 1,
+    maxPlayers: 4,
+    mode: "협동",
+    preview: "defense",
+    highlights: ["타워", "웨이브", "스킬"],
+    manual: videoGameManuals.defense,
+    featured: true,
+  },
+  {
+    title: "Kart Dash",
+    description: "(1~8인) Good_ETC 파티 카트 / 트랙 주행과 아이템 경쟁을 지원합니다.",
+    to: "/app/games/video/kart",
+    tone: "from-orange-500 via-rose-500 to-indigo-700",
+    players: "1~8인",
+    minPlayers: 1,
+    maxPlayers: 8,
+    mode: "파티",
+    preview: "kart",
+    highlights: ["레이스", "아이템", "터치"],
+    manual: videoGameManuals.party,
+    featured: false,
+  },
+  {
+    title: "Bomb Battle",
+    description: "(1~8인) Good_ETC 폭탄 배틀 / 폭탄 설치와 회피로 살아남는 파티 게임입니다.",
+    to: "/app/games/video/bomb",
+    tone: "from-rose-600 via-zinc-950 to-amber-500",
+    players: "1~8인",
+    minPlayers: 1,
+    maxPlayers: 8,
+    mode: "파티",
+    preview: "bomb",
+    highlights: ["폭탄", "회피", "아레나"],
+    manual: videoGameManuals.party,
+    featured: false,
+  },
+  {
+    title: "Snake Rush",
+    description: "(1~8인) Good_ETC 스네이크 / 성장과 충돌 회피가 핵심인 파티 게임입니다.",
+    to: "/app/games/video/snake",
+    tone: "from-emerald-500 via-lime-500 to-slate-900",
+    players: "1~8인",
+    minPlayers: 1,
+    maxPlayers: 8,
+    mode: "파티",
+    preview: "snake",
+    highlights: ["성장", "회피", "점수"],
+    manual: videoGameManuals.party,
+    featured: false,
+  },
+  {
+    title: "Coin Collector",
+    description: "(1~8인) Good_ETC 코인 수집 / 제한 시간 동안 코인을 모아 경쟁합니다.",
+    to: "/app/games/video/coin",
+    tone: "from-yellow-400 via-orange-500 to-sky-700",
+    players: "1~8인",
+    minPlayers: 1,
+    maxPlayers: 8,
+    mode: "파티",
+    preview: "coin",
+    highlights: ["수집", "경쟁", "점수"],
+    manual: videoGameManuals.party,
+    featured: false,
+  },
+  {
+    title: "Good_ETC RPG",
+    description: "(1인) Good_ETC 솔로 RPG / 진행 저장은 localStorage를 우선 사용합니다.",
+    to: "/app/games/video/rpg",
+    tone: "from-violet-700 via-slate-950 to-emerald-700",
+    players: "1인",
+    minPlayers: 1,
+    maxPlayers: 1,
+    mode: "RPG",
+    preview: "rpg",
+    highlights: ["솔로", "저장", "탐험"],
+    manual: videoGameManuals.rpg,
+    featured: true,
+  },
+];
+
 const gameRoutePreloads = {
   "/app/poker": () => import("./TabletopGame.jsx"),
   "/app/games/las-vegas": () => import("./LasVegasGame.jsx"),
@@ -559,6 +754,14 @@ const gameRoutePreloads = {
   "/app/games/telestrations": () => import("./TabletopGame.jsx"),
   "/app/games/mafia": () => import("./TabletopGame.jsx"),
   "/app/games/citadels": () => import("./CitadelsGame.jsx"),
+  "/app/games/video/arena": () => import("./GoodEtcVideoGame.jsx"),
+  "/app/games/video/fortress": () => import("./GoodEtcVideoGame.jsx"),
+  "/app/games/video/defense": () => import("./GoodEtcVideoGame.jsx"),
+  "/app/games/video/kart": () => import("./GoodEtcVideoGame.jsx"),
+  "/app/games/video/bomb": () => import("./GoodEtcVideoGame.jsx"),
+  "/app/games/video/snake": () => import("./GoodEtcVideoGame.jsx"),
+  "/app/games/video/coin": () => import("./GoodEtcVideoGame.jsx"),
+  "/app/games/video/rpg": () => import("./GoodEtcVideoGame.jsx"),
 };
 
 const preloadedRoutes = new Set();
@@ -570,18 +773,32 @@ const preloadGameRoute = (to) => {
   preload().catch(() => preloadedRoutes.delete(to));
 };
 
-const gamesByPlayerCount = [...games].sort((left, right) => (
+const boardGamesByPlayerCount = [...boardGames].sort((left, right) => (
   left.minPlayers - right.minPlayers ||
   left.maxPlayers - right.maxPlayers
 ));
 
-const gameSections = [
-  {
-    title: "게임 목록",
-    description: "혼자부터 함께 즐길 수 있는 다양한 게임들이 있습니다.",
-    games: gamesByPlayerCount,
-  },
-];
+const videoGamesByPlayerCount = [...videoGames].sort((left, right) => (
+  left.minPlayers - right.minPlayers ||
+  left.maxPlayers - right.maxPlayers
+));
+
+const gameSectionsByTab = {
+  board: [
+    {
+      title: "보드게임 목록",
+      description: "기존 보드게임은 같은 방 만들기, 코드 입장, 준비하기 흐름으로 플레이합니다.",
+      games: boardGamesByPlayerCount,
+    },
+  ],
+  video: [
+    {
+      title: "비디오게임 목록",
+      description: "Good_ETC 게임을 홈페이지 방 입장 흐름으로 이식합니다.",
+      games: videoGamesByPlayerCount,
+    },
+  ],
+};
 
 const GameCard = ({ game, onOpenManual }) => {
   const titleId = `game-card-${game.preview}-title`;
@@ -656,6 +873,10 @@ const GameCard = ({ game, onOpenManual }) => {
 };
 
 const GamePreview = ({ type }) => {
+  if (videoGameArtProfiles[type]) {
+    return <VideoGameArtwork type={type} />;
+  }
+
   if (type === "catan") {
     const tiles = [
       { x: 76, y: 24, fill: "#2f8f5b", token: "8", mark: "tree" },
@@ -1086,21 +1307,48 @@ const GameManualModal = ({ game, onClose }) => {
 };
 
 export const GamesHub = () => {
+  const [activeTab, setActiveTab] = useState("board");
   const [manualGame, setManualGame] = useState(null);
   const closeManual = useCallback(() => setManualGame(null), []);
+  const gameSections = gameSectionsByTab[activeTab] || gameSectionsByTab.board;
 
   return (
     <div className="animate-fade-in space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60 sm:p-8">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
-            <Sparkles className="h-3.5 w-3.5 text-primary-500" />
-            게임 허브
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
+              <Sparkles className="h-3.5 w-3.5 text-primary-500" />
+              게임 허브
+            </div>
+            <h1 className="mt-4 text-2xl font-black text-slate-900 sm:text-4xl">게임을 선택하세요</h1>
+            <p className="mt-3 text-sm font-medium text-slate-500 sm:text-base">
+              방 만들기, 방 코드 입장, 준비하기 흐름은 게임마다 동일하게 유지됩니다.
+            </p>
           </div>
-          <h1 className="mt-4 text-2xl font-black text-slate-900 sm:text-4xl">게임을 선택하세요</h1>
-          <p className="mt-3 text-sm font-medium text-slate-500 sm:text-base">
-            방 만들기, 방 코드 입장, 준비하기 흐름은 게임마다 동일하게 유지됩니다.
-          </p>
+          <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1" role="tablist" aria-label="게임 종류">
+            {[
+              { key: "board", label: "보드게임", count: boardGames.length },
+              { key: "video", label: "비디오게임", count: videoGames.length },
+            ].map((tab) => {
+              const selected = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  className={`min-h-11 rounded-xl px-4 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 ${
+                    selected ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                  }`}
+                  onClick={() => setActiveTab(tab.key)}
+                >
+                  {tab.label}
+                  <span className="ml-1 text-[11px] text-slate-400">{tab.count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 

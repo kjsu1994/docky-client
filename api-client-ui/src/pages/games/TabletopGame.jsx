@@ -6979,9 +6979,12 @@ const sixNimmtPhaseLabels = {
 const sixNimmtEventLabels = {
   ROUND_STARTED: "라운드 시작",
   SELECT_CARD: "카드 선택",
-  CARD_PLACED: "카드 배치",
+  PLACE_CARD: "카드 배치",
+  REVEAL: "카드 공개",
+  ROW_CHOICE_REQUIRED: "행 선택 필요",
   TAKE_ROW: "행 회수",
   ROW_TAKEN: "행 회수",
+  NEXT_TURN: "다음 턴",
   ROUND_FINISHED: "라운드 종료",
   GAME_FINISHED: "게임 종료",
 };
@@ -7009,13 +7012,21 @@ const mergeSixNimmtRealtimeState = (previousState, realtimeState, mySeatNo) => {
       const realtimeHand = listOf(get(player, "hand", "hand", []));
       const hasRealtimeSelectedCard = Object.prototype.hasOwnProperty.call(player, "selectedCard")
         || Object.prototype.hasOwnProperty.call(player, "selected_card");
+      const nextSelectedCard = hasRealtimeSelectedCard
+        ? get(player, "selected_card", "selectedCard", null)
+        : get(previousPlayer, "selected_card", "selectedCard", null);
+      const nextSelectedCardId = sixNimmtCardId(nextSelectedCard);
+      const previousHand = listOf(get(previousPlayer, "hand", "hand", []));
+      const nextHand = realtimeHand.length
+        ? realtimeHand
+        : nextSelectedCardId
+          ? previousHand.filter((card) => sixNimmtCardId(card) !== nextSelectedCardId)
+          : previousHand;
       return {
         ...previousPlayer,
         ...player,
-        hand: realtimeHand.length ? realtimeHand : listOf(get(previousPlayer, "hand", "hand", [])),
-        selectedCard: hasRealtimeSelectedCard
-          ? get(player, "selected_card", "selectedCard", null)
-          : get(previousPlayer, "selected_card", "selectedCard", null),
+        hand: nextHand,
+        selectedCard: nextSelectedCard,
       };
     }),
   };
@@ -7078,6 +7089,13 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
     }
   }, [myHandKey, selectedCardId]);
 
+  useEffect(() => {
+    if (mySelected || phase !== "SELECTING") {
+      setSelectedCardId("");
+      setSelectedRowIndex(null);
+    }
+  }, [mySelected, phase]);
+
   const rowTail = (row) => {
     const cards = sixNimmtRowCards(row);
     return cards[cards.length - 1] || null;
@@ -7113,7 +7131,6 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
 
   const selectCard = async () => {
     if (!selectedCardId || !waitingSelection) return;
-    if (selectedPreview?.possibleRows?.length > 1 && selectedAnchorX === null) return;
     await onAction({ actionType: "SELECT_CARD", cardIds: [selectedCardId], anchorX: selectedAnchorX });
   };
   const chooseRow = async (rowIndex) => {
@@ -7123,7 +7140,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
 
   const selectedPreview = selectedCard ? previewForCard(selectedCard, selectedRowIndex) : null;
   const selectedAnchorX = selectedPreview?.possibleRows?.some((item) => item.index === selectedRowIndex) ? selectedRowIndex : null;
-  const selectedNeedsRowTap = waitingSelection && selectedPreview?.possibleRows?.length > 1 && selectedAnchorX === null;
+  const selectedHasOptionalRows = waitingSelection && selectedPreview?.possibleRows?.length > 1 && selectedAnchorX === null;
   const phaseLabel = sixNimmtPhaseLabels[phase] || phase || "-";
 
   return (
@@ -7150,9 +7167,9 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             </div>
           )}
 
-          {selectedNeedsRowTap && (
+          {selectedHasOptionalRows && (
             <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50 px-2 py-1.5 text-[11px] font-black leading-relaxed text-sky-700 sm:mt-3 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs">
-              이 카드는 여러 행에 놓을 수 있습니다. 아래 행 중 하나를 터치해 배치 행을 고른 뒤 제출하세요.
+              이 카드는 여러 행에 놓을 수 있습니다. 행을 직접 고르지 않으면 규칙상 가장 가까운 행에 자동 배치됩니다.
             </div>
           )}
 
@@ -7236,8 +7253,8 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           </div>
           <div id="six-nimmt-action-strip" className="tabletop-mobile-action-strip sticky bottom-3 z-20 mt-2 scroll-mt-24 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur sm:mt-4 sm:p-3 xl:static xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none">
             {waitingSelection ? (
-              <button type="button" disabled={!selectedCardId || selectedNeedsRowTap} onClick={selectCard} className="min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
-                {selectedNeedsRowTap ? "배치 행을 먼저 선택" : "선택한 카드 제출"}
+              <button type="button" disabled={!selectedCardId} onClick={selectCard} className="min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+                선택한 카드 제출
               </button>
             ) : needsRowChoice ? (
               <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-black leading-relaxed text-amber-800">가져갈 행을 위에서 선택하세요.</div>
@@ -8262,6 +8279,14 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
   const myCardKey = myCards.map(pokerCardId).join("|");
   const advice = roughPokerAdvice(myCards, communityCards, callAmount, pot, { isFiveCardDraw });
   const winnerName = pokerPlayerName(roomPlayers, pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === winnerSeatNo) || {});
+  const resultTitle = get(gameState, "result_title", "resultTitle", "");
+  const resultDetail = get(gameState, "result_detail", "resultDetail", "");
+  const resultEvent = events
+    .slice()
+    .reverse()
+    .find((event) => ["SHOWDOWN", "POT_AWARDED", "GAME_FINISHED"].includes(get(event, "event_type", "eventType", "")));
+  const resultMessage = resultDetail || get(resultEvent, "message", "message", "");
+  const resultHeading = resultTitle || (phase === "FINISHED" ? `${winnerName} 최종 승리` : phase === "HAND_FINISHED" ? "핸드 결과" : "");
   const canUse = (action) => myTurn && (!availableActions.length || availableActions.includes(action));
   const send = (actionType, extra = {}) => onAction({ actionType, ...extra });
   const tableLabel = isFiveCardDraw ? "Five-card Draw" : "Limit Texas Hold'em";
@@ -8385,7 +8410,7 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
             <div>
               <div className="text-sm font-black text-slate-900">{phase === "FINISHED" ? "최종 결과" : phase === "HAND_FINISHED" ? "핸드 결과" : myTurn ? "내 차례" : "대기 중"}</div>
               <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
-                {phase === "FINISHED" ? `${winnerName} 최종 승리` : phase === "HAND_FINISHED" ? `팟 ${lastPot}칩 정산 완료` : phase === "DRAW" && myTurn ? `교체 카드 ${drawSelection.length}/${maxDrawCards}장 선택` : myTurn ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : `${activeSeatNo || "-"}번 차례를 기다리는 중`}
+                {phase === "FINISHED" || phase === "HAND_FINISHED" ? (resultHeading || `팟 ${lastPot}칩 정산 완료`) : phase === "DRAW" && myTurn ? `교체 카드 ${drawSelection.length}/${maxDrawCards}장 선택` : myTurn ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : `${activeSeatNo || "-"}번 차례를 기다리는 중`}
               </div>
             </div>
             <div className="grid min-w-[220px] flex-1 gap-2 sm:grid-cols-2">
@@ -8399,6 +8424,13 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
               </div>
             </div>
           </div>
+
+          {(phase === "HAND_FINISHED" || phase === "FINISHED") && resultMessage && (
+            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold leading-relaxed text-amber-800">
+              <div className="text-xs font-black text-amber-600">승리 사유</div>
+              <div className="mt-1">{resultMessage}</div>
+            </div>
+          )}
 
           {phase === "HAND_FINISHED" ? (
             <button type="button" onClick={() => send("NEXT_HAND")} className="mt-3 min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white">

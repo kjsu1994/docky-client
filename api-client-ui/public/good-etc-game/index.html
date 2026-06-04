@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LAN Arena</title>
+    <link rel="stylesheet" href="./style.css?v=20260601storage" />
+  </head>
+  <body>
+    <main class="arena-shell">
+      <canvas id="gameCanvas" aria-label="LAN Arena game field"></canvas>
+
+      <section
+        class="hud hud-left"
+        id="connectionPanel"
+        aria-label="connection controls"
+      >
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div>
+            <h1>LAN Arena</h1>
+            <p id="connectionState">연결 대기</p>
+          </div>
+          <button
+            id="hudToggle"
+            class="hud-toggle"
+            type="button"
+            aria-label="Toggle connection panel"
+            aria-expanded="true"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+        <form id="connectForm" class="connect-form">
+          <label>
+            이름
+            <input
+              id="playerName"
+              name="playerName"
+              maxlength="18"
+              autocomplete="nickname"
+              placeholder="플레이어"
+            />
+          </label>
+          <label>
+            서버 주소
+            <input
+              id="serverUrl"
+              name="serverUrl"
+              placeholder="ws://host:7000/ws"
+            />
+          </label>
+          <div class="button-row">
+            <button id="connectButton" type="submit">연결</button>
+            <button id="disconnectButton" type="button">해제</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="hud hud-right" aria-label="scoreboard">
+        <h2>점수</h2>
+        <ol id="scoreboard"></ol>
+      </section>
+
+      <section class="hud hud-bottom" aria-label="controls">
+        <span>WASD / 방향키: 이동</span>
+        <span>마우스: 조준</span>
+        <span>Shift: 회피 대시</span>
+        <span>클릭 / Space: 발사</span>
+      </section>
+
+      <section
+        class="hud net-info collapsed"
+        id="netInfoPanel"
+        aria-label="network connection info"
+      >
+        <button
+          id="netInfoToggle"
+          class="net-info-toggle"
+          type="button"
+          aria-label="접속 정보 열기"
+          aria-expanded="false"
+          title="접속 정보"
+        >
+          i
+        </button>
+        <div class="net-info-body">
+          <h2>접속 정보</h2>
+          <dl>
+            <dt>게임</dt>
+            <dd id="netInfoGame">-</dd>
+            <dt>현재 화면</dt>
+            <dd id="netInfoPage">-</dd>
+            <dt>서버 연결</dt>
+            <dd id="netInfoServer">-</dd>
+            <dt>초대 링크</dt>
+            <dd id="netInfoShare">-</dd>
+          </dl>
+          <p id="netInfoWarning"></p>
+          <button id="netInfoCopy" type="button">초대 링크 복사</button>
+        </div>
+      </section>
+
+      <div id="centerMessage" class="center-message">
+        연결하면 LAN 아레나가 시작됩니다.
+      </div>
+    </main>
+
+    <script src="./storage.js?v=20260601storage"></script>
+    <script src="./site-bridge.js?v=20260604site"></script>
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        const version = encodeURIComponent(
+          params.get("v") || "20260601storage",
+        );
+        const game = params.get("game");
+        const partyGames = ["kart", "bomb", "snake", "coin"];
+        const script = document.createElement("script");
+        script.src =
+          game === "rpg"
+            ? `./rpg.js?v=${version}`
+            : game === "fortress"
+              ? `./fortress.js?v=${version}`
+              : game === "defense"
+                ? `./defense.js?v=${version}`
+                : partyGames.includes(game)
+                  ? `./party.js?v=${version}`
+                  : `./game.js?v=${version}`;
+        document.body.appendChild(script);
+      })();
+    </script>
+  </body>
+</html>

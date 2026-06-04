@@ -200,12 +200,12 @@ export const Login = () => {
 
         setReleaseLoading(true);
         const toast = await loadToast().catch(() => null);
-        const toastId = toast?.loading("해제 요청을 제출하는 중...");
+        const toastId = toast?.loading("해제 요청을 제출하는 중...", { duration: 20000 });
         try {
             const { authAdapter, extractAuthErrorMessage } = await loadAuthAdapter();
             await authAdapter.requestSanctionRelease({ email: lockInfo.email, reason: releaseReason });
             if (toast && toastId) {
-                toast.success("해제 요청이 제출되었습니다.", { id: toastId });
+                toast.success("해제 요청이 제출되었습니다.", { id: toastId, duration: 3200 });
             } else {
                 notifySuccess("해제 요청이 제출되었습니다.");
             }
@@ -214,7 +214,7 @@ export const Login = () => {
             const { extractAuthErrorMessage } = await loadAuthAdapter();
             const message = extractAuthErrorMessage(error, "해제 요청 제출에 실패했습니다.");
             if (toast && toastId) {
-                toast.error(message, { id: toastId });
+                toast.error(message, { id: toastId, duration: 4200 });
             } else {
                 notifyError(message);
             }

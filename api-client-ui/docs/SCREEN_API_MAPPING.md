@@ -234,6 +234,7 @@
   - Game manual modal accessibility contract: labelled `aria-modal` dialog, title/description linkage, initial focus on the close button, Escape/backdrop close, and focus return to the launcher after close.
   - 게임 허브. 게임 설명서 모달은 클라이언트 로컬 데이터만 사용합니다.
   - 보드게임 입장 방식은 공통 흐름을 유지합니다: 방 제목 입력, 방 코드 입장, 준비, 방장 시작.
+  - 허브는 `보드게임`과 `비디오게임` 탭을 렌더링하고 기본 탭은 보드게임입니다.
   - 전용 `npm run smoke:hub-ui`는 게임 허브 문구, 카탄 설명서 모달 열기/닫기, 게임 입장 링크, 데스크톱/모바일 가로 overflow를 확인합니다.
 - `/app/plinko`
   - `POST /game/dice/roll`
@@ -268,6 +269,20 @@
   - 액션: `POST /game/citadels/rooms/{roomId}/actions` (`CHOOSE_CHARACTER`, `DISCARD_CHARACTER`, `TAKE_GOLD`, `DRAW_DISTRICTS`, `KEEP_DISTRICT_CARDS`, `COLLECT_COLOR_INCOME`, `ASSASSIN_TARGET`, `THIEF_TARGET`, `MAGICIAN_REDRAW`, `MAGICIAN_EXCHANGE`, `LABORATORY_DISCARD`, `SMITHY_DRAW`, `BUILD_DISTRICT`, `WARLORD_DESTROY`, `GRAVEYARD_KEEP`, `GRAVEYARD_DECLINE`, `END_TURN`)
   - 화면은 현재 턴의 비용/이득 보조 정보를 클라이언트에서 계산하지만, 최종 가능 여부는 서버 판정 결과를 그대로 따릅니다. 모바일에서는 `지금 할 일`과 핵심 수치 위주로 줄이고, 캐릭터/점수 세부 도움은 데스크톱 사이드 패널에 둡니다.
 - 카탄/블로커스/마헤/달무티/Citadels 화면은 `src/adapters/tabletopGameAdapter.js`를 통해 variants/rooms/state 응답 shape, join-by-code/settings/action REST payload, STOMP state payload를 정규화합니다. 서버는 게임별 대기방 목록을 최신 50개로 제한합니다.
+- `/app/games/video/:videoGameCode`
+  - `GET /game/video/games`
+  - `GET /game/video/{game-code}/rooms`
+  - `GET /game/video/{game-code}/rooms/me`
+  - `POST /game/video/{game-code}/rooms`
+  - `POST /game/video/{game-code}/rooms/join-by-code`
+  - `POST /game/video/{game-code}/rooms/{roomId}/join`
+  - `POST /game/video/{game-code}/rooms/{roomId}/ready`
+  - `POST /game/video/{game-code}/rooms/{roomId}/start`
+  - `POST /game/video/{game-code}/rooms/{roomId}/force-finish`
+  - `POST /game/video/{game-code}/rooms/{roomId}/leave`
+  - `GET /game/video/{game-code}/rooms/{roomId}/state`
+  - STOMP: subscribe `/sub/game/video/{gameCode}/room/{roomId}` and `/sub/game/video/{gameCode}/room/{roomId}/signal`; publish transient input/snapshot payloads to `/pub/game/video/{gameCode}/room/{roomId}/signal`.
+  - `src/adapters/videoGameAdapter.js` 정규화 경계를 사용합니다. `public/good-etc-game/site-bridge.js`는 iframe 내부 Good_ETC WebSocket 호출과 부모 React STOMP relay를 연결합니다. DB는 방/참가자 lifecycle만 저장하고 프레임 상태는 transient STOMP로만 전달합니다.
 - `/app/games/las-vegas`
   - `GET /game/las-vegas/rooms`
   - 서버는 기존 배열 응답 shape을 유지하면서 최신 대기방 50개만 반환합니다.

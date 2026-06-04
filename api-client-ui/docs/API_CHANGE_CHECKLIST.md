@@ -25,6 +25,7 @@
 - [ ] docs update 완료
 
 ## 2026-06-01 Applied Notes
+- [x] `/app/games/video/:videoGameCode` uses `src/adapters/videoGameAdapter.js` for `/game/video/**` room APIs and subscribes to `/sub/game/video/{gameCode}/room/{roomId}` plus `/signal` only after the user is a room member. The iframe bridge sends transient Good_ETC input/snapshot payloads over `/pub/game/video/{gameCode}/room/{roomId}/signal`; trusted actor metadata is supplied by the backend STOMP relay. `npm run build` and static Good_ETC JS syntax checks passed.
 - [x] `/app/optimizer` invalid address-count / valid-geocode shortage errors use the standard server error schema (`status`, `code`, `message`).
 - [x] `src/adapters/optimizerAdapter.js` keeps the page component behind the adapter boundary and displays `ErrorResponse.message` through `getApiErrorMessage`.
 - [x] Optimizer browser requests use `/api/optimizer/**` while the adapter calls backend `/optimizer/**`; legacy direct backend `/api/optimizer/**` remains compatible.

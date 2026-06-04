@@ -220,6 +220,64 @@ function assertActionToastSingleton() {
   }
 }
 
+function assertSixNimmtActionSource() {
+  const source = readFileSync("src/pages/games/TabletopGame.jsx", "utf8");
+  const requiredSnippets = [
+    "selectedHasOptionalRows",
+    "행을 직접 고르지 않으면 규칙상 가장 가까운 행에 자동 배치됩니다.",
+    'disabled={!selectedCardId} onClick={selectCard}',
+    'phase !== "SELECTING"',
+    "previousHand.filter((card) => sixNimmtCardId(card) !== nextSelectedCardId)",
+  ];
+  const missing = requiredSnippets.filter((snippet) => !source.includes(snippet));
+  if (missing.length) {
+    throw new Error(`tabletop-ui-smoke: Six Nimmt optional row/realtime guards missing: ${missing.join(", ")}`);
+  }
+  if (source.includes("selectedNeedsRowTap") || source.includes("disabled={!selectedCardId ||")) {
+    throw new Error("tabletop-ui-smoke: Six Nimmt must not block card submit only because multiple compatible rows exist.");
+  }
+}
+
+function simulateSixNimmtRealtimeMerge(previousState, realtimeState, mySeatNo) {
+  const players = realtimeState.players.map((player) => {
+    if (player.seatNo !== mySeatNo) return player;
+    const previousPlayer = previousState.players.find((item) => item.seatNo === mySeatNo);
+    const selectedCard = Object.prototype.hasOwnProperty.call(player, "selectedCard")
+      ? player.selectedCard
+      : previousPlayer.selectedCard;
+    const nextHand = player.hand?.length
+      ? player.hand
+      : selectedCard
+        ? previousPlayer.hand.filter((card) => card.id !== selectedCard.id)
+        : previousPlayer.hand;
+    return { ...previousPlayer, ...player, hand: nextHand, selectedCard };
+  });
+  return { ...previousState, ...realtimeState, players };
+}
+
+function assertSixNimmtRealtimeSimulation() {
+  const previousState = {
+    phase: "SELECTING",
+    players: [
+      { seatNo: 1, hand: [sixNimmtCard(24), sixNimmtCard(37)], selected: false, selectedCard: null },
+      { seatNo: 2, hand: [], selected: false, selectedCard: null },
+    ],
+  };
+  const realtimeState = {
+    phase: "SELECTING",
+    selectedSeatNos: [1],
+    players: [
+      { seatNo: 1, hand: [], handCount: 1, selected: true, selectedCard: sixNimmtCard(24) },
+      { seatNo: 2, hand: [], handCount: 2, selected: false },
+    ],
+  };
+  const merged = simulateSixNimmtRealtimeMerge(previousState, realtimeState, 1);
+  const mine = merged.players.find((player) => player.seatNo === 1);
+  if (!mine.selected || mine.hand.length !== 1 || mine.hand[0].id !== "C37" || mine.selectedCard.id !== "C24") {
+    throw new Error(`tabletop-ui-smoke: Six Nimmt realtime merge simulation failed ${JSON.stringify(mine)}`);
+  }
+}
+
 class PipeCdp {
   constructor(chrome) {
     this.chrome = chrome;
@@ -1590,6 +1648,8 @@ async function inspectPage(ws, testCase, viewport) {
 async function main() {
   assertTabletopRealtimeSource();
   assertActionToastSingleton();
+  assertSixNimmtActionSource();
+  assertSixNimmtRealtimeSimulation();
   const chrome = spawn(chromePath, [
     "--headless=new",
     "--remote-debugging-pipe",

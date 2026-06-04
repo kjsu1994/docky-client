@@ -2,6 +2,15 @@
 
 React + Vite 기반의 커뮤니티/게임/운영 도구 프론트엔드입니다. 운영 배포는 Docker Compose 환경에서 `C:\compose\minio-data\client\dist`를 nginx가 정적 파일로 서빙하는 구조를 기준으로 합니다.
 
+## 2026-06-04 Good_ETC Video Game Port
+
+- 게임 허브는 `보드게임`/`비디오게임` 탭으로 분리되며 기본 진입은 보드게임 목록입니다. Good_ETC 8개 게임은 `/app/games/video/:videoGameCode`로 진입합니다.
+- `src/adapters/videoGameAdapter.js`가 `/game/video/**` 방 API 응답과 snake_case/camelCase 호환을 정규화합니다.
+- `public/good-etc-game`에는 Good_ETC 원본 정적 게임 복사본과 `site-bridge.js`가 있으며, 사이트 모드에서는 iframe WebSocket 호출을 부모 React 화면의 STOMP 릴레이로 연결합니다.
+- 실시간 멀티는 방장 iframe이 원본 로컬 시뮬레이션을 권위 상태로 사용하고, 참가자 입력/스냅샷은 `/pub`/`/sub` STOMP signal 채널로 중계합니다. RPG는 싱글 플레이 localStorage 저장을 유지합니다.
+- 포커 결과 패널은 서버가 내려주는 승리 제목/사유를 표시하고, 토스트는 로딩 지속 시간을 제한하며 주요 게임 메시지를 한글화합니다.
+- 검증: `npm.cmd run build`, `npm.cmd run smoke:text-quality`, 정적 Good_ETC JS `new Function` 문법 확인 통과.
+
 ## 2026-06-03 Profile Avatars / Naver Login
 
 - 공통 `UserAvatar` 컴포넌트를 추가하고 헤더, 일반 채팅, 플로팅 채팅, Tabletop/Citadels/Poker/Las Vegas/No Thanks 게임방의 유저 이름 옆에 프로필 사진을 표시합니다.
@@ -558,3 +567,7 @@ npm run build
 - 2026-06-03 invest risk-adjusted return: v3 `risk_adjusted_return_snapshot` is rendered as a Sharpe/Sortino/Calmar card and included in the decision checklist and matrix.
 - 2026-06-04 invest references: `/app/invest` exposes SEC, FINRA, and Fidelity methodology links beside the top safety warning, and the invest UI smoke checks the reference labels.
 - 2026-06-03 verify: `node --check scripts\invest-ui-smoke.mjs`, JSX transform for `src/pages/facility/InvestAssistant.jsx`, `npm.cmd run build`, `npm.cmd run smoke:invest-ui`, and `npm.cmd run smoke:text-quality` passed after the invest price-risk UX pass.
+- 2026-06-04 game UX: `/app/games` video-game cards and `/app/games/video/:gameCode` rooms now use per-game graphic artwork, lobby/room visual context, Korean room labels, and responsive mobile direction/action controls for the Good_ETC video games.
+- 2026-06-04 game UX: `6 nimmt!` now treats row choice as optional when several compatible rows exist, relies on the rules engine for the closest-row placement, clears stale selected-card UI during realtime updates, and keeps already selected cards out of the viewer hand before reveal.
+- 2026-06-04 toast UX: `src/utils/toast.js` now gives loading toasts their own default id, Koreanizes shared toast feedback, and schedules dismiss/remove cleanup so progress toasts do not remain stuck at the bottom.
+- 2026-06-04 verify: JSX transform for `GoodEtcVideoGame.jsx`, `GamesHub.jsx`, `TabletopGame.jsx`, and `VideoGameArtwork.jsx`; `node --check` for `scripts\hub-ui-smoke.mjs`, `scripts\tabletop-ui-smoke.mjs`, and `src\utils\toast.js`; `npm.cmd run build`; `npm.cmd run smoke:hub-ui`; `npm.cmd run smoke:text-quality`; and `npm.cmd run smoke:tabletop-ui` passed after the video-game artwork, 6 nimmt realtime, and toast cleanup pass.

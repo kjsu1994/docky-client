@@ -32,6 +32,7 @@ const TelestrationsGame = lazy(() => import("../pages/games/TabletopGame.jsx").t
 const MafiaGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.MafiaGame })));
 const PokerGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.PokerGame })));
 const CitadelsGame = lazy(() => import("../pages/games/CitadelsGame.jsx").then((module) => ({ default: module.CitadelsGame })));
+const GoodEtcVideoGame = lazy(() => import("../pages/games/GoodEtcVideoGame.jsx").then((module) => ({ default: module.GoodEtcVideoGame })));
 const MeetingOptimizer = lazy(() => import("../pages/facility/MeetingOptimizer.jsx").then((module) => ({ default: module.MeetingOptimizer })));
 const FacilityFinder = lazy(() => import("../pages/facility/FacilityFinder.jsx").then((module) => ({ default: module.FacilityFinder })));
 const AdminCommandCenter = lazy(() => import("../pages/admin/AdminCommandCenter.jsx").then((module) => ({ default: module.AdminCommandCenter })));
@@ -84,6 +85,7 @@ export const ProtectedRoutes = () => (
                         <Route path="games/telestrations" element={<TelestrationsGame />} />
                         <Route path="games/mafia" element={<MafiaGame />} />
                         <Route path="games/citadels" element={<CitadelsGame />} />
+                        <Route path="games/video/:videoGameCode" element={<GoodEtcVideoGame />} />
                         <Route path="optimizer" element={<MeetingOptimizer />} />
                         <Route path="facility" element={<FacilityFinder />} />
                         <Route path="parking" element={<Navigate to="/app/facility" replace />} />

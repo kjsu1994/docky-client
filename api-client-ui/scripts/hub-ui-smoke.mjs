@@ -105,6 +105,31 @@ function assertStaticGamesHubManualAccessibility() {
     }
 }
 
+function assertStaticVideoGameRoomDesign() {
+    const roomSource = readFileSync("src/pages/games/GoodEtcVideoGame.jsx", "utf8");
+    const artworkSource = readFileSync("src/pages/games/VideoGameArtwork.jsx", "utf8");
+    const requiredRoomSnippets = [
+        "VideoGameArtwork type={videoGameCode}",
+        "artProfile?.roomNote",
+        "directionControls",
+        "aria-label=\"방 제목\"",
+        "aria-label=\"방 코드\"",
+        "transportLabel",
+    ];
+    const missingRoomSnippets = requiredRoomSnippets.filter((snippet) => !roomSource.includes(snippet));
+    if (missingRoomSnippets.length) {
+        throw new Error(`video game room design guard missing: ${missingRoomSnippets.join(", ")}`);
+    }
+    for (const code of ["arena", "fortress", "defense", "kart", "bomb", "snake", "coin", "rpg"]) {
+        if (!artworkSource.includes(`${code}: {`)) {
+            throw new Error(`video game artwork profile missing: ${code}`);
+        }
+    }
+    if (!artworkSource.includes('data-smoke="video-game-artwork"')) {
+        throw new Error("video game artwork smoke marker missing");
+    }
+}
+
 function send(ws, method, params = {}) {
     const id = nextMessageId++;
     ws.send(JSON.stringify({ id, method, params }));
@@ -307,12 +332,48 @@ async function inspectGamesHub(ws, viewport) {
         throw new Error(`games-hub ${viewport.name}: grouped game labels must not be visible`);
     }
 
-    const value = await inspectPageFrame(ws, `games-hub ${viewport.name}`, gamesHubTexts);
-    return `games-hub ${viewport.name}: ok ${value.clientWidth}/${value.scrollWidth} ${value.url}`;
+    const boardValue = await inspectPageFrame(ws, `games-hub ${viewport.name}`, gamesHubTexts);
+
+    const videoTabClicked = await evaluate(ws, `(() => {
+        const tab = Array.from(document.querySelectorAll('button[role="tab"]')).find((node) => node.innerText.includes("비디오게임"));
+        if (!tab) return false;
+        tab.click();
+        return true;
+    })()`);
+    if (!videoTabClicked) {
+        throw new Error(`games-hub ${viewport.name}: video game tab missing`);
+    }
+    for (const text of ["비디오게임 목록", "LAN Arena", "Fortress", "Defense", "Kart Dash", "Bomb Battle", "Snake Rush", "Coin Collector", "Good_ETC RPG"]) {
+        await waitForText(ws, text);
+    }
+    const videoArtworkCount = await evaluate(ws, `document.querySelectorAll('[data-smoke="video-game-artwork"]').length`);
+    if (videoArtworkCount < 8) {
+        throw new Error(`games-hub ${viewport.name}: video game artwork count too low ${videoArtworkCount}`);
+    }
+    const videoOrder = await evaluate(ws, `Array.from(document.querySelectorAll('[data-smoke="game-card"]')).map((node) => node.getAttribute("data-game-title"))`);
+    const expectedVideoOrder = ["Good_ETC RPG", "Fortress", "Defense", "LAN Arena", "Kart Dash", "Bomb Battle", "Snake Rush", "Coin Collector"];
+    if (JSON.stringify(videoOrder) !== JSON.stringify(expectedVideoOrder)) {
+        throw new Error(`games-hub ${viewport.name}: video player-count order mismatch ${JSON.stringify(videoOrder)}`);
+    }
+
+    await inspectPageFrame(ws, `games-hub video ${viewport.name}`, [
+        "게임 허브",
+        "비디오게임 목록",
+        "LAN Arena",
+        "Fortress",
+        "Defense",
+        "Kart Dash",
+        "Bomb Battle",
+        "Snake Rush",
+        "Coin Collector",
+        "Good_ETC RPG",
+    ]);
+    return `games-hub ${viewport.name}: ok ${boardValue.clientWidth}/${boardValue.scrollWidth} ${boardValue.url}`;
 }
 
 async function main() {
     assertStaticGamesHubManualAccessibility();
+    assertStaticVideoGameRoomDesign();
 
     const chrome = spawn(chromePath, [
         "--headless=new",
