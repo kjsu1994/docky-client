@@ -14507,12 +14507,59 @@ const sixNimmtRowPenalty = (row) => sixNimmtRowCards(row).reduce((sum, card) => 
 const sixNimmtPlacementEventTypes = new Set(["PLACE_CARD", "ROW_TAKEN"]);
 const sixNimmtEventNo = (event) => Number(get(event, "event_no", "eventNo", 0));
 const sixNimmtEventType = (event) => String(get(event, "event_type", "eventType", "") || "").toUpperCase();
+const SIX_NIMMT_REPLAY_STEP_MS = 650;
+const SIX_NIMMT_FINAL_FALLBACK_MS = 1200;
 const sixNimmtRowsSignature = (rows = []) => rows
   .map((row) => sixNimmtRowCards(row).map((card) => sixNimmtCardId(card) || sixNimmtCardValue(card)).join(","))
   .join("|");
 const sixNimmtEventsSignature = (events = []) => events
   .map((event) => `${sixNimmtEventNo(event)}:${sixNimmtEventType(event)}`)
   .join("|");
+const sixNimmtLatestEventNo = (state) => listOf(get(state, "events", "events", []))
+  .reduce((latest, event) => Math.max(latest, sixNimmtEventNo(event)), 0);
+const sixNimmtHasNewPlacementEvents = (previousState, nextState) => {
+  const previousEventNo = sixNimmtLatestEventNo(previousState);
+  return listOf(get(nextState, "events", "events", []))
+    .some((event) => sixNimmtEventNo(event) > previousEventNo && sixNimmtPlacementEventTypes.has(sixNimmtEventType(event)));
+};
+const sixNimmtPlayerForSeat = (state, seatNo) => {
+  const normalizedSeatNo = Number(seatNo);
+  if (!state || !normalizedSeatNo) return null;
+  return listOf(get(state, "players", "players", []))
+    .find((player) => Number(get(player, "seat_no", "seatNo", 0)) === normalizedSeatNo) || null;
+};
+const sixNimmtHandCount = (player) => Number(get(player, "hand_count", "handCount", 0)) || 0;
+const sixNimmtHandLength = (player) => listOf(get(player, "hand", "hand", [])).length;
+const sixNimmtNeedsViewerHandRefresh = (previousState, realtimeState, mySeatNo) => {
+  const realtimePlayer = sixNimmtPlayerForSeat(realtimeState, mySeatNo);
+  if (!realtimePlayer) return false;
+  const expectedHandCount = sixNimmtHandCount(realtimePlayer);
+  if (expectedHandCount <= 0 || sixNimmtHandLength(realtimePlayer) > 0) return false;
+  const previousPlayer = sixNimmtPlayerForSeat(previousState, mySeatNo);
+  return sixNimmtHandLength(previousPlayer) !== expectedHandCount;
+};
+const buildSixNimmtReplayStepsFromFinal = (previousState, finalState) => {
+  const previousRows = cloneSixNimmtRows(get(previousState, "rows", "rows", []));
+  if (!previousRows.length || !finalState) return [];
+  const previousEventNo = sixNimmtLatestEventNo(previousState);
+  const finalEvents = listOf(get(finalState, "events", "events", []));
+  const placementEvents = finalEvents
+    .filter((event) => sixNimmtEventNo(event) > previousEventNo && sixNimmtPlacementEventTypes.has(sixNimmtEventType(event)))
+    .sort((a, b) => sixNimmtEventNo(a) - sixNimmtEventNo(b));
+  if (!placementEvents.length) return [];
+
+  let nextRows = previousRows;
+  return placementEvents.map((event) => {
+    const eventNo = sixNimmtEventNo(event);
+    nextRows = applySixNimmtPlacementEventToRows(nextRows, event);
+    return {
+      ...finalState,
+      phase: "RESOLVING",
+      rows: cloneSixNimmtRows(nextRows),
+      events: finalEvents.filter((candidate) => sixNimmtEventNo(candidate) <= eventNo),
+    };
+  });
+};
 const sixNimmtBullsForValue = (value) => {
   const safeValue = Number(value) || 0;
   if (safeValue === 55) return 7;
@@ -15310,7 +15357,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
       .filter((item) => item.tail < value);
   };
 
-  const previewForCard = (card, rowOverride = null) => {
+  const previewForCard = (card) => {
     const value = sixNimmtCardValue(card);
     let bestIndex = -1;
     let bestTail = -1;
@@ -15323,26 +15370,25 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
     });
     const possibleRows = possibleRowsForCard(card);
     if (bestIndex < 0) return { label: "행 선택 필요", tone: "text-amber-700", rowIndex: -1, penalty: 0, possibleRows };
-    const chosenIndex = rowOverride !== null && possibleRows.some((item) => item.index === rowOverride) ? rowOverride : bestIndex;
-    const row = rows[chosenIndex];
+    const officialRows = possibleRows.filter((item) => item.index === bestIndex);
+    const row = rows[bestIndex];
     if (sixNimmtRowCards(row).length >= 5) {
-      return { label: `${chosenIndex + 1}행 회수`, tone: "text-rose-700", rowIndex: chosenIndex, penalty: sixNimmtRowPenalty(row), possibleRows };
+      return { label: `${bestIndex + 1}행 회수`, tone: "text-rose-700", rowIndex: bestIndex, penalty: sixNimmtRowPenalty(row), possibleRows: officialRows };
     }
-    return { label: `${chosenIndex + 1}행 배치`, tone: "text-emerald-700", rowIndex: chosenIndex, penalty: 0, possibleRows };
+    return { label: `${bestIndex + 1}행 배치`, tone: "text-emerald-700", rowIndex: bestIndex, penalty: 0, possibleRows: officialRows };
   };
 
   const selectCard = async () => {
     if (!selectedCardId || !waitingSelection) return;
-    await onAction({ actionType: "SELECT_CARD", cardIds: [selectedCardId], anchorX: selectedAnchorX });
+    await onAction({ actionType: "SELECT_CARD", cardIds: [selectedCardId] });
   };
   const chooseRow = async (rowIndex) => {
     if (!needsRowChoice) return;
     await onAction({ actionType: "CHOOSE_ROW", anchorX: rowIndex });
   };
 
-  const selectedPreview = selectedCard ? previewForCard(selectedCard, selectedRowIndex) : null;
-  const selectedAnchorX = selectedPreview?.possibleRows?.some((item) => item.index === selectedRowIndex) ? selectedRowIndex : null;
-  const selectedHasOptionalRows = waitingSelection && selectedPreview?.possibleRows?.length > 1 && selectedAnchorX === null;
+  const selectedPreview = selectedCard ? previewForCard(selectedCard) : null;
+  const selectedAnchorX = null;
   const boardRows = displayRows.length === rows.length ? displayRows : rows;
   const phaseLabel = sixNimmtPhaseLabels[phase] || phase || "-";
   const mostDangerousRow = rows.reduce((best, row, index) => {
@@ -15465,45 +15511,32 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             </div>
           )}
 
-          {selectedHasOptionalRows && (
-            <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50 px-2 py-1.5 text-[11px] font-black leading-relaxed text-sky-700 sm:mt-3 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs">
-              이 카드는 여러 행에 놓을 수 있습니다. 행을 직접 고르지 않으면 규칙상 가장 가까운 행에 자동 배치됩니다.
-            </div>
-          )}
-
           <div className="mt-2 grid gap-1.5 sm:mt-4 sm:gap-3">
             {boardRows.map((row, index) => {
               const cards = sixNimmtRowCards(row);
               const penalty = sixNimmtRowPenalty(row);
               const selectedRow = selectedPreview?.rowIndex === index;
-              const manualRowCandidate = waitingSelection && selectedPreview?.possibleRows?.some((item) => item.index === index);
-              const manuallySelected = selectedRowIndex === index;
+              const automaticRowCandidate = waitingSelection && selectedRow;
               const recommended = needsRowChoice && recommendedRowIndex === index;
               return (
-                <div key={index} className={`rounded-lg border p-1.5 transition sm:rounded-2xl sm:p-3 ${selectedRow ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"} ${manuallySelected ? "ring-4 ring-sky-200" : ""}`}>
+                <div key={index} className={`rounded-lg border p-1.5 transition sm:rounded-2xl sm:p-3 ${selectedRow ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
                   <div className="mb-1 flex flex-wrap items-center justify-between gap-1 sm:mb-2 sm:gap-2">
                     <div className="text-xs font-black text-slate-900 sm:text-sm">{index + 1}행</div>
                     <div className="flex flex-wrap items-center gap-1 text-[9px] font-black sm:gap-1.5 sm:text-[11px]">
                       <span className="rounded-full bg-white px-1.5 py-0.5 text-slate-600 sm:px-2 sm:py-1">{cards.length}/5장</span>
                       <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-rose-700 sm:px-2 sm:py-1">{penalty}벌점</span>
-                      {manualRowCandidate && <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-sky-700 sm:px-2 sm:py-1">배치 가능</span>}
+                      {automaticRowCandidate && <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-sky-700 sm:px-2 sm:py-1">자동 배치</span>}
                       {recommended && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-emerald-700 sm:px-2 sm:py-1">추천</span>}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!manualRowCandidate}
-                    onClick={() => setSelectedRowIndex(index)}
-                    className="block w-full rounded-lg text-left disabled:cursor-default"
-                    aria-label={`${index + 1}행 배치 선택`}
-                  >
+                  <div className="block w-full rounded-lg text-left">
                     <div className="grid grid-cols-5 gap-1 sm:gap-2">
                     {cards.map((card) => <SixNimmtCard key={sixNimmtCardId(card)} card={card} compact />)}
                     {Array.from({ length: Math.max(0, 5 - cards.length) }).map((_, emptyIndex) => (
                       <div key={`empty-${emptyIndex}`} className="min-h-[46px] rounded-md border border-dashed border-slate-200 bg-white/70 sm:min-h-[76px] sm:rounded-xl" />
                     ))}
                     </div>
-                  </button>
+                  </div>
                   {needsRowChoice && (
                     <button type="button" onClick={() => chooseRow(index)} className="mt-2 min-h-9 w-full rounded-xl bg-slate-900 px-3 text-xs font-black text-white sm:mt-3 sm:min-h-10">
                       이 행 가져가기 · {penalty}벌점
@@ -15530,8 +15563,8 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           <div className="grid grid-cols-5 gap-1 sm:gap-2 lg:grid-cols-5">
             {myHand.map((card) => {
               const preview = previewForCard(card);
-              const possibleRowLabel = preview.possibleRows.length
-                ? `${preview.possibleRows.map((item) => item.index + 1).join(",")}행 가능`
+              const possibleRowLabel = preview.rowIndex >= 0
+                ? `${preview.rowIndex + 1}행 자동`
                 : "행 회수 선택";
               return (
                 <SixNimmtCard
@@ -15541,7 +15574,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
                   disabled={!waitingSelection}
                   onClick={() => {
                     setSelectedCardId(sixNimmtCardId(card));
-                    setSelectedRowIndex(preview.possibleRows.length === 1 ? preview.possibleRows[0].index : null);
+                    setSelectedRowIndex(null);
                   }}
                   note={`${possibleRowLabel} · ${preview.label}${preview.penalty ? ` · ${preview.penalty}벌점` : ""}`}
                   compact
@@ -20199,6 +20232,14 @@ export const TabletopGame = ({ game }) => {
   const lobbyLoadSeqRef = useRef(0);
   const roomOpenSeqRef = useRef(0);
   const mountedRef = useRef(false);
+  const gameStateRef = useRef(null);
+  const sixNimmtReplayQueueRef = useRef([]);
+  const sixNimmtQueuedEventNosRef = useRef(new Set());
+  const sixNimmtReplayTimerRef = useRef(null);
+  const sixNimmtFinalFallbackTimerRef = useRef(null);
+  const sixNimmtReplayRunningRef = useRef(false);
+  const sixNimmtPendingFinalStateRef = useRef(null);
+  const sixNimmtHandRefreshInFlightRef = useRef(null);
 
   const myMemberId = Number(user?.member_id || user?.memberId || user?.id || 0);
   const players = playersOf(selectedRoom);
@@ -20280,6 +20321,112 @@ export const TabletopGame = ({ game }) => {
   const isLatestRoomOpen = (seq) => mountedRef.current && seq === roomOpenSeqRef.current;
   const realtimeRoomRef = useRef(null);
 
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  const clearSixNimmtReplayTimers = () => {
+    if (sixNimmtReplayTimerRef.current) {
+      window.clearTimeout(sixNimmtReplayTimerRef.current);
+      sixNimmtReplayTimerRef.current = null;
+    }
+    if (sixNimmtFinalFallbackTimerRef.current) {
+      window.clearTimeout(sixNimmtFinalFallbackTimerRef.current);
+      sixNimmtFinalFallbackTimerRef.current = null;
+    }
+  };
+
+  const clearSixNimmtReplay = () => {
+    clearSixNimmtReplayTimers();
+    sixNimmtReplayQueueRef.current = [];
+    sixNimmtQueuedEventNosRef.current = new Set();
+    sixNimmtReplayRunningRef.current = false;
+    sixNimmtPendingFinalStateRef.current = null;
+  };
+
+  const applySixNimmtState = (nextState) => {
+    setGameState((prev) => {
+      const merged = mergeSixNimmtRealtimeState(prev, nextState, mySeatNo);
+      gameStateRef.current = merged;
+      return merged;
+    });
+  };
+
+  const flushSixNimmtPendingFinal = () => {
+    const pendingFinal = sixNimmtPendingFinalStateRef.current;
+    sixNimmtPendingFinalStateRef.current = null;
+    if (sixNimmtFinalFallbackTimerRef.current) {
+      window.clearTimeout(sixNimmtFinalFallbackTimerRef.current);
+      sixNimmtFinalFallbackTimerRef.current = null;
+    }
+    if (pendingFinal) {
+      applySixNimmtState(pendingFinal);
+    }
+  };
+
+  const playNextSixNimmtReplayStep = () => {
+    const nextStep = sixNimmtReplayQueueRef.current.shift();
+    if (!nextStep) {
+      sixNimmtReplayRunningRef.current = false;
+      flushSixNimmtPendingFinal();
+      return;
+    }
+    sixNimmtReplayRunningRef.current = true;
+    applySixNimmtState(nextStep);
+    sixNimmtReplayTimerRef.current = window.setTimeout(() => {
+      sixNimmtReplayTimerRef.current = null;
+      playNextSixNimmtReplayStep();
+    }, SIX_NIMMT_REPLAY_STEP_MS);
+  };
+
+  const enqueueSixNimmtReplayStep = (stepState) => {
+    if (!stepState) return;
+    const stepEventNo = sixNimmtLatestEventNo(stepState);
+    if (stepEventNo && sixNimmtQueuedEventNosRef.current.has(stepEventNo)) return;
+    const currentEventNo = sixNimmtLatestEventNo(gameStateRef.current);
+    if (!sixNimmtPendingFinalStateRef.current
+      && !sixNimmtReplayRunningRef.current
+      && sixNimmtReplayQueueRef.current.length === 0
+      && stepEventNo <= currentEventNo) {
+      return;
+    }
+    if (sixNimmtFinalFallbackTimerRef.current) {
+      window.clearTimeout(sixNimmtFinalFallbackTimerRef.current);
+      sixNimmtFinalFallbackTimerRef.current = null;
+    }
+    if (stepEventNo) sixNimmtQueuedEventNosRef.current.add(stepEventNo);
+    sixNimmtReplayQueueRef.current.push(stepState);
+    if (!sixNimmtReplayRunningRef.current && !sixNimmtReplayTimerRef.current) {
+      playNextSixNimmtReplayStep();
+    }
+  };
+
+  const deferSixNimmtFinalState = (finalState) => {
+    if (!finalState) return;
+    const replaySteps = buildSixNimmtReplayStepsFromFinal(gameStateRef.current, finalState);
+    sixNimmtPendingFinalStateRef.current = finalState;
+    if (replaySteps.length) {
+      if (sixNimmtFinalFallbackTimerRef.current) {
+        window.clearTimeout(sixNimmtFinalFallbackTimerRef.current);
+        sixNimmtFinalFallbackTimerRef.current = null;
+      }
+      replaySteps.forEach(enqueueSixNimmtReplayStep);
+      return;
+    }
+    if (sixNimmtReplayRunningRef.current || sixNimmtReplayQueueRef.current.length > 0 || sixNimmtReplayTimerRef.current) {
+      return;
+    }
+    if (sixNimmtFinalFallbackTimerRef.current) {
+      window.clearTimeout(sixNimmtFinalFallbackTimerRef.current);
+    }
+    sixNimmtFinalFallbackTimerRef.current = window.setTimeout(() => {
+      sixNimmtFinalFallbackTimerRef.current = null;
+      if (!sixNimmtReplayRunningRef.current && sixNimmtReplayQueueRef.current.length === 0) {
+        flushSixNimmtPendingFinal();
+      }
+    }, SIX_NIMMT_FINAL_FALLBACK_MS);
+  };
+
   const fetchVariants = async (seq = lobbyLoadSeqRef.current) => {
     const nextVariants = visibleTabletopVariants(game, await tabletopGameAdapter.fetchVariants(game));
     if (!isLatestLobbyLoad(seq)) return;
@@ -20340,8 +20487,11 @@ export const TabletopGame = ({ game }) => {
 
   const clearRoomSelection = (roomId) => {
     roomOpenSeqRef.current += 1;
+    clearSixNimmtReplay();
+    sixNimmtHandRefreshInFlightRef.current = null;
     realtimeRoomRef.current = null;
     setSelectedRoom(null);
+    gameStateRef.current = null;
     setGameState(null);
     const storedId = localStorage.getItem(config.storageKey);
     if (!roomId || storedId === String(roomId)) {
@@ -20369,8 +20519,24 @@ export const TabletopGame = ({ game }) => {
     if (roomSeq !== null && !isLatestRoomOpen(roomSeq)) return null;
     const room = payload?.room || null;
     if (room) setSelectedRoom(room);
-    setGameState(payload?.gameState || null);
+    const nextGameState = payload?.gameState || null;
+    gameStateRef.current = nextGameState;
+    setGameState(nextGameState);
     return room;
+  };
+
+  const refreshSixNimmtViewerHand = (roomId, roomSeq) => {
+    if (sixNimmtHandRefreshInFlightRef.current === roomSeq) return;
+    sixNimmtHandRefreshInFlightRef.current = roomSeq;
+    fetchState(roomId, roomSeq)
+      .catch((error) => {
+        if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 손패 정보를 갱신하지 못했습니다.");
+      })
+      .finally(() => {
+        if (sixNimmtHandRefreshInFlightRef.current === roomSeq) {
+          sixNimmtHandRefreshInFlightRef.current = null;
+        }
+      });
   };
 
   const bindRealtimeRoom = async (client, roomId, roomSeq) => {
@@ -20389,13 +20555,29 @@ export const TabletopGame = ({ game }) => {
       }
       if (payload.room) setSelectedRoom(payload.room);
       if (game === "six-nimmt" && payload.gameState) {
-        setGameState((prev) => mergeSixNimmtRealtimeState(prev, payload.gameState, mySeatNo));
+        const eventType = String(get(payload, "event_type", "eventType", "") || "").toLowerCase();
+        const needsViewerHandRefresh = sixNimmtNeedsViewerHandRefresh(gameStateRef.current, payload.gameState, mySeatNo);
+        if (eventType === "six_nimmt_resolution_step") {
+          enqueueSixNimmtReplayStep(payload.gameState);
+        } else if (sixNimmtHasNewPlacementEvents(gameStateRef.current, payload.gameState)
+          || sixNimmtReplayRunningRef.current
+          || sixNimmtReplayQueueRef.current.length > 0
+          || sixNimmtReplayTimerRef.current) {
+          deferSixNimmtFinalState(payload.gameState);
+        } else {
+          applySixNimmtState(payload.gameState);
+        }
+        if (needsViewerHandRefresh) {
+          refreshSixNimmtViewerHand(roomId, roomSeq);
+        }
       } else if ((game === "dalmuti" || game === "catan" || game === "poker" || game === "telestrations") && payload.gameState) {
         fetchState(roomId, roomSeq).catch((error) => {
           if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 정보를 갱신하지 못했습니다.");
         });
       } else {
-        setGameState(payload.gameState || null);
+        const nextGameState = payload.gameState || null;
+        gameStateRef.current = nextGameState;
+        setGameState(nextGameState);
       }
       if (payload.message) notify(payload.message);
     });
@@ -20521,11 +20703,13 @@ export const TabletopGame = ({ game }) => {
       } catch {
         if (!active) return;
         setSelectedRoom(null);
+        gameStateRef.current = null;
         setGameState(null);
       }
     })();
     return () => {
       active = false;
+      clearSixNimmtReplay();
       if (gameSubRef.current) gameSubRef.current.unsubscribe();
       if (stompRef.current) stompRef.current.deactivate();
       realtimeRoomRef.current = null;
@@ -20625,6 +20809,7 @@ export const TabletopGame = ({ game }) => {
         turnTimeSeconds: Number(settingsForm.turnTimeSeconds || 30),
       });
       setSelectedRoom(room);
+      gameStateRef.current = null;
       setGameState(null);
       await fetchRooms();
       notifySuccess("방 설정 저장 완료");
@@ -20693,9 +20878,15 @@ export const TabletopGame = ({ game }) => {
       const result = await tabletopGameAdapter.sendAction(game, idOf(selectedRoom), payload);
       if (result?.room) setSelectedRoom(result.room);
       if (game === "six-nimmt" && result?.gameState) {
-        setGameState((prev) => mergeSixNimmtRealtimeState(prev, result.gameState, mySeatNo));
+        if (sixNimmtHasNewPlacementEvents(gameStateRef.current, result.gameState)) {
+          deferSixNimmtFinalState(result.gameState);
+        } else {
+          applySixNimmtState(result.gameState);
+        }
       } else {
-        setGameState(result?.gameState || null);
+        const nextGameState = result?.gameState || null;
+        gameStateRef.current = nextGameState;
+        setGameState(nextGameState);
       }
       return result;
     } catch (error) {
@@ -20723,6 +20914,7 @@ export const TabletopGame = ({ game }) => {
       setBusy(true);
       const room = await tabletopGameAdapter.forceFinish(game, idOf(selectedRoom));
       setSelectedRoom(room);
+      gameStateRef.current = null;
       setGameState(null);
       notifySuccess("대기방으로 돌아왔습니다.");
     } catch {
@@ -20744,6 +20936,7 @@ export const TabletopGame = ({ game }) => {
       setBusy(true);
       const room = await tabletopGameAdapter.rematch(game, idOf(selectedRoom));
       setSelectedRoom(room);
+      gameStateRef.current = null;
       setGameState(null);
       notifySuccess("다시 준비합니다.");
     } catch {
@@ -20958,7 +21151,10 @@ export const TabletopGame = ({ game }) => {
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-black">
                           <span className="rounded-full bg-white px-2 py-1 text-slate-600">{listedVariantGroupLabel}</span>
-                          <span className={`rounded-full px-2 py-1 ${listedRoomFull ? "bg-rose-50 text-rose-700" : "bg-white text-slate-600"}`}>
+                          <span
+                            className={`rounded-full px-2 py-1 ${listedRoomFull ? "bg-rose-50 text-rose-700" : "bg-white text-slate-600"}`}
+                            data-smoke="tabletop-lobby-room-slot"
+                          >
                             {listedPlayers.length}/{listedMaxPlayers || "-"}명{listedRoomFull ? " · 가득 참" : ""}
                           </span>
                           <span className="rounded-full bg-white px-2 py-1 text-slate-600">최소 {listedMinPlayers || "-"}명</span>
@@ -20967,7 +21163,8 @@ export const TabletopGame = ({ game }) => {
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-500">
                           <span>방장 {hostPlayer?.nickname || "-"}</span>
                           <span>턴 {turnSecondsOf(room)}초</span>
-                          <span>{readiness.value}</span>
+                          <span data-smoke="tabletop-lobby-room-readiness">{readiness.value}</span>
+                          <span className="sr-only" data-smoke="tabletop-lobby-room-action-signal">{actionSignal.value}</span>
                         </div>
                       </div>
                       <button
