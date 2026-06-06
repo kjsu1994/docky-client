@@ -1513,6 +1513,105 @@ const LasVegasTurnRailPanel = ({ players, selectedRoom, state, myMemberId, ready
     );
 };
 
+const LasVegasPlayerRosterPanel = ({
+    players = [],
+    selectedRoom = null,
+    roomStatus = "WAITING",
+    myMemberId = null,
+    winnerMemberId = null,
+}) => {
+    const safePlayers = Array.isArray(players) ? players : [];
+    const normalizedStatus = String(roomStatus || selectedRoom?.roomStatus || "WAITING").toUpperCase();
+    const waiting = normalizedStatus === "WAITING";
+    const hostMemberId = Number(selectedRoom?.hostMemberId || 0);
+    const maxPlayers = toPlainInt(selectedRoom?.maxPlayers, 6);
+    const sortedBySeat = [...safePlayers].sort((left, right) => {
+        const leftSeat = toPlainInt(left?.seatNo || left?.seat_no, 999);
+        const rightSeat = toPlainInt(right?.seatNo || right?.seat_no, 999);
+        return leftSeat - rightSeat;
+    });
+    const guests = sortedBySeat.filter((player) => Number(getLasVegasPlayerId(player) || 0) !== hostMemberId);
+    const readyGuestCount = guests.filter(isReadyPlayer).length;
+    const rosterSummary = waiting
+        ? (guests.length ? `게스트 준비 ${readyGuestCount}/${guests.length}` : "방장 대기")
+        : `${sortedBySeat.length}/${maxPlayers || "-"}명`;
+
+    const badgeTone = (key) => {
+        if (key === "host") return "bg-amber-100 text-amber-700";
+        if (key === "ready") return "bg-emerald-100 text-emerald-700";
+        if (key === "waiting") return "bg-slate-100 text-slate-600";
+        if (key === "me") return "bg-sky-100 text-sky-700";
+        if (key === "winner") return "bg-amber-500 text-white";
+        return "bg-primary-100 text-primary-700";
+    };
+
+    return (
+        <section className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg" data-smoke="las-vegas-player-roster" data-room-status={normalizedStatus}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+                    <Crown className="h-4 w-4 text-amber-500" />
+                    플레이어
+                </div>
+                <div className="flex flex-wrap gap-1.5 text-[11px] font-black">
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{sortedBySeat.length}/{maxPlayers || "-"}명</span>
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">{rosterSummary}</span>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {sortedBySeat.map((player, index) => {
+                    const memberId = Number(getLasVegasPlayerId(player) || 0);
+                    const seatNo = toPlainInt(player?.seatNo || player?.seat_no, index + 1);
+                    const isHostPlayer = memberId > 0 && memberId === hostMemberId;
+                    const isMe = memberId > 0 && Number(memberId) === Number(myMemberId || 0);
+                    const isWinner = memberId > 0 && Number(memberId) === Number(winnerMemberId || 0);
+                    const ready = isReadyPlayer(player);
+                    const cardTone = isWinner
+                        ? "border-amber-200 bg-amber-50"
+                        : isMe
+                            ? "border-sky-200 bg-sky-50"
+                            : ready && waiting
+                                ? "border-emerald-200 bg-emerald-50"
+                                : "border-slate-100 bg-slate-50";
+                    const detail = waiting
+                        ? `좌석 ${seatNo}${isHostPlayer ? " · 방장" : ""}`
+                        : `좌석 ${seatNo} · 보유금 ${formatWon(player.totalMoney || 0)} · 주사위 ${player.remainingDice || 8}`;
+
+                    return (
+                        <div key={`player-${memberId || seatNo}`} className={`rounded-xl border p-3 ${cardTone}`} data-smoke="las-vegas-player-roster-item" data-ready={ready ? "true" : "false"} data-host={isHostPlayer ? "true" : "false"}>
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <UserAvatar name={player.nickname || `좌석 ${seatNo}`} profileUrl={player.profileUrl} size="sm" />
+                                    <div className="min-w-0">
+                                        <div className="truncate text-sm font-black text-slate-900">{player.nickname || `좌석 ${seatNo}`}</div>
+                                        <div className="mt-1 truncate text-xs font-bold text-slate-600">{detail}</div>
+                                    </div>
+                                </div>
+                                <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                                    {isWinner && <span className={`rounded-full px-2 py-1 text-[10px] font-black ${badgeTone("winner")}`}>우승</span>}
+                                    {isHostPlayer && <span className={`rounded-full px-2 py-1 text-[10px] font-black ${badgeTone("host")}`}>방장</span>}
+                                    {waiting && !isHostPlayer && (
+                                        <span className={`rounded-full px-2 py-1 text-[10px] font-black ${badgeTone(ready ? "ready" : "waiting")}`}>
+                                            {ready ? "준비 완료" : "준비 대기"}
+                                        </span>
+                                    )}
+                                    {isMe && <span className={`rounded-full px-2 py-1 text-[10px] font-black ${badgeTone("me")}`}>내 좌석</span>}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {!sortedBySeat.length && (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs font-bold text-slate-500">
+                    참가자 정보가 도착하면 프로필과 준비 상태가 표시됩니다.
+                </div>
+            )}
+        </section>
+    );
+};
+
 const LasVegasDecisionPanel = ({ state, players, myMemberId, currentRollCountByFace, canRoll, canBet, isFinished, lastPlacedText, winnerMemberId }) => {
     if (!state) return null;
     const decisionRows = buildLasVegasDecisionRows({ state, currentRollCountByFace, myMemberId });
@@ -2901,11 +3000,6 @@ export const LasVegasGame = () => {
     const livePlayers = Array.isArray(state?.players) ? state.players : [];
     const roomPlayers = Array.isArray(selectedRoom?.players) ? selectedRoom.players : [];
     const players = livePlayers.length > 0 ? livePlayers : roomPlayers;
-    const sortedPlayers = [...players].sort((a, b) => {
-        const aMoney = a.totalMoney || 0;
-        const bMoney = b.totalMoney || 0;
-        return bMoney - aMoney;
-    });
     const winnerMemberId = state?.winnerMemberId || null;
     const winnerNickname = winnerMemberId
         ? players.find((player) => Number(player.memberId) === Number(winnerMemberId))?.nickname || `플레이어 ${winnerMemberId}`
@@ -3808,55 +3902,13 @@ export const LasVegasGame = () => {
                                 </div>
                             )}
 
-                            <div className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">
-                                <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
-                                    <Crown className="h-4 w-4 text-amber-500" />
-                                    플레이어
-                                </div>
-                                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                                    {sortedPlayers.map((player, index) => {
-                                        const memberId = player.memberId;
-                                        const isCurrent = Number(memberId) === Number(state?.turnMemberId);
-                                        const isMe = Number(memberId) === Number(myMemberId);
-                                        const isWinner = Number(memberId) === Number(winnerMemberId || 0);
-                                        const seatNo = player.seatNo || player.seat_no || index + 1;
-                                        return (
-                                            <div key={`player-${memberId}`} className={`rounded-xl border p-3 ${isWinner ? "border-amber-200 bg-amber-50" : isCurrent ? "border-primary-400 bg-primary-50" : isMe ? "border-sky-200 bg-sky-50" : "border-slate-100 bg-slate-50"}`}>
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <div className="flex min-w-0 items-center gap-2">
-                                                        <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
-                                                        <div className="min-w-0">
-                                                            <div className="truncate text-sm font-black text-slate-900">{player.nickname}</div>
-                                                            <div className="mt-1 truncate text-xs font-bold text-slate-600">
-                                                                좌석 {seatNo} · 보유금 {formatWon(player.totalMoney || 0)} · 주사위 {player.remainingDice || 8}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                                                        {isWinner && <span className="rounded-full bg-amber-500 px-2 py-1 text-[10px] font-black text-white">우승</span>}
-                                                        {isCurrent && !isWinner && <span className="rounded-full bg-primary-100 px-2 py-1 text-[10px] font-black text-primary-700">현재 차례</span>}
-                                                        {isMe && !isWinner && <span className="rounded-full bg-sky-100 px-2 py-1 text-[10px] font-black text-sky-700">내 좌석</span>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                {winnerMemberId && (
-                                    <div className="relative mt-3 overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-700">
-                                        <div>우승자: {winnerNickname}</div>
-                                        <div className="pointer-events-none absolute inset-0">
-                                            <span className="chip-burst left-[10%] bottom-2 bg-yellow-400" style={{ animationDelay: "0ms" }} />
-                                            <span className="chip-burst left-[22%] bottom-1 bg-emerald-400" style={{ animationDelay: "120ms" }} />
-                                            <span className="chip-burst left-[34%] bottom-2 bg-cyan-400" style={{ animationDelay: "210ms" }} />
-                                            <span className="chip-burst left-[48%] bottom-1 bg-rose-400" style={{ animationDelay: "300ms" }} />
-                                            <span className="chip-burst left-[60%] bottom-2 bg-fuchsia-400" style={{ animationDelay: "420ms" }} />
-                                            <span className="chip-burst left-[74%] bottom-1 bg-amber-400" style={{ animationDelay: "520ms" }} />
-                                            <span className="chip-burst left-[86%] bottom-2 bg-indigo-400" style={{ animationDelay: "640ms" }} />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <LasVegasPlayerRosterPanel
+                                players={players}
+                                selectedRoom={selectedRoom}
+                                roomStatus={roomStatus}
+                                myMemberId={myMemberId}
+                                winnerMemberId={winnerMemberId}
+                            />
                         </div>
 
                         <aside className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">

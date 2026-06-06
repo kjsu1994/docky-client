@@ -26,6 +26,7 @@ import {
   videoGameErrorMessage,
 } from "../../adapters/videoGameAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
+import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
@@ -4782,6 +4783,22 @@ export const GoodEtcVideoGame = () => {
               </div>
               </div>
             </section>
+
+            {status === "WAITING" && (
+              <GameRoomPlayersPanel
+                players={players}
+                selectedRoom={selectedRoom}
+                roomStatus={status}
+                myMemberId={myMemberId}
+                hostMemberId={selectedRoom?.hostMemberId}
+                maxPlayers={selectedRoom?.maxPlayers || profile.maxPlayers}
+                getMemberId={getVideoGameMemberId}
+                getSeatNo={getVideoGameSeatNo}
+                getReady={isVideoGameReadyPlayer}
+                getDetail={(player, { seatNo, isHost }) => `좌석 ${seatNo || "-"}${isHost ? " · 방장" : ""}`}
+                dataSmoke="video-game-waiting-player-roster"
+              />
+            )}
 
             {status === "FINISHED" && (
               <>

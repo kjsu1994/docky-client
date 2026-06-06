@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
-import { CheckCircle2, Crown, MessageSquare, Play, TimerReset } from "lucide-react";
+import { MessageSquare, Play, TimerReset } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
@@ -18,6 +18,7 @@ import {
   normalizeNoThanksState,
 } from "../../adapters/noThanksGameAdapter.js";
 import { useGameSound } from "../../hooks/useGameSound.js";
+import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { NoThanksCardFace, NoThanksChipToken } from "../../common/NoThanksVisuals.jsx";
 import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
@@ -1410,106 +1411,6 @@ const NoThanksCardStandbyPanel = ({ roomStatus, isMyTurn, turnName, potChips, de
         </div>
       </div>
     </section>
-  );
-};
-
-const NoThanksPlayerStateArt = ({ cards, chips, finalScore, isCurrent, isMe, isWinner, statusLabel }) => {
-  const safeCards = Array.isArray(cards) ? cards.map(Number).filter(Number.isFinite).sort((a, b) => a - b) : [];
-  const runs = summarizeNoThanksRuns(safeCards);
-  const cardCount = safeCards.length;
-  const chipCount = Math.max(0, Number(chips || 0));
-  const scoreNumber = Number(finalScore);
-  const scoreText = Number.isFinite(scoreNumber) ? `${scoreNumber}` : "-";
-  const cardWidth = Math.max(18, Math.min(88, cardCount * 14));
-  const chipWidth = Math.max(18, Math.min(88, chipCount * 10));
-  const scoreWidth = Number.isFinite(scoreNumber) ? Math.max(18, Math.min(88, Math.abs(scoreNumber) * 4)) : 18;
-  const accent = isWinner ? "#f59e0b" : isCurrent ? "#38bdf8" : isMe ? "#8b5cf6" : "#64748b";
-  const soft = isWinner ? "#fffbeb" : isCurrent ? "#ecfeff" : isMe ? "#f5f3ff" : "#f8fafc";
-
-  return (
-    <svg
-      viewBox="0 0 252 128"
-      className="h-full min-h-[106px] w-full"
-      role="img"
-      aria-label={`노땡스 플레이어 상태 ${statusLabel || ""}`}
-      data-smoke="no-thanks-player-state-art"
-    >
-      <rect x="8" y="8" width="236" height="112" rx="18" fill={soft} stroke={accent} strokeWidth="3" />
-      <path d="M34 92 C78 42, 174 42, 218 92" fill="none" stroke={accent} strokeWidth="8" strokeLinecap="round" opacity="0.18" />
-      <path d="M38 92 C84 58, 168 58, 214 92" fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round" opacity="0.72" />
-      <g data-smoke="no-thanks-player-state-node" data-player-state-key="cards">
-        <rect x="30" y="30" width="54" height="66" rx="11" fill="#ffffff" stroke="#fb923c" strokeWidth="3" />
-        <rect x="38" y="38" width="38" height="28" rx="7" fill="#fff7ed" />
-        <text x="57" y="57" textAnchor="middle" fill="#9a3412" fontSize="13" fontWeight="900">{cardCount}</text>
-        <rect x="33" y="76" width={cardWidth} height="8" rx="4" fill="#fb923c" opacity="0.82" />
-        <text x="57" y="108" textAnchor="middle" fill="#334155" fontSize="9" fontWeight="900">{runs.longestRun ? `${runs.longestRun}연속` : "카드 없음"}</text>
-      </g>
-      <g data-smoke="no-thanks-player-state-node" data-player-state-key="chips">
-        <circle cx="126" cy="58" r="28" fill="#fef3c7" stroke="#f59e0b" strokeWidth="4" />
-        <circle cx="126" cy="58" r="17" fill="#fbbf24" stroke="#fde68a" strokeWidth="3" />
-        <text x="126" y="63" textAnchor="middle" fill="#78350f" fontSize="17" fontWeight="900">{chipCount}</text>
-        <rect x="82" y="92" width={chipWidth} height="9" rx="4.5" fill="#eab308" opacity="0.9" />
-        <text x="126" y="108" textAnchor="middle" fill="#334155" fontSize="9" fontWeight="900">칩 압력</text>
-      </g>
-      <g data-smoke="no-thanks-player-state-node" data-player-state-key="score">
-        <rect x="172" y="34" width="50" height="58" rx="12" fill="#0f172a" stroke={accent} strokeWidth="3" />
-        <text x="197" y="55" textAnchor="middle" fill="#cbd5e1" fontSize="9" fontWeight="900">점수</text>
-        <text x="197" y="79" textAnchor="middle" fill="#ffffff" fontSize="19" fontWeight="900">{scoreText}</text>
-        <rect x="134" y="22" width={scoreWidth} height="8" rx="4" fill={accent} opacity="0.78" />
-        <text x="197" y="108" textAnchor="middle" fill="#334155" fontSize="9" fontWeight="900">점수 압력</text>
-      </g>
-      <g data-smoke="no-thanks-player-state-node" data-player-state-key="status">
-        <circle cx="28" cy="24" r="9" fill={accent} stroke="#ffffff" strokeWidth="2" />
-        <text x="46" y="27" fill="#334155" fontSize="9" fontWeight="900">{statusLabel || "참가"}</text>
-      </g>
-    </svg>
-  );
-};
-
-const NoThanksPlayerStateCard = ({ player, index, roomStatus, turnMemberId, myMemberId, winnerMemberId, readyMemberIds, hostMemberId }) => {
-  const id = playerIdOf(player);
-  const cards = Array.isArray(player?.cards) ? player.cards : [];
-  const chips = parseIntSafe(player?.chips, 0);
-  const cardScore = scoreNoThanksCards(cards);
-  const serverScore = Number(player?.score);
-  const finalScore = Number.isFinite(serverScore) ? serverScore : cardScore - chips;
-  const isCurrent = id > 0 && id === Number(turnMemberId || 0);
-  const isMe = id > 0 && id === Number(myMemberId || 0);
-  const isWinner = id > 0 && id === Number(winnerMemberId || 0);
-  const isHost = id > 0 && id === Number(hostMemberId || 0);
-  const toneClass = isWinner
-    ? "border-amber-300 bg-amber-50"
-    : isCurrent
-      ? "border-primary-400 bg-primary-50"
-      : isMe
-        ? "border-violet-200 bg-violet-50"
-        : "border-slate-100 bg-slate-50";
-
-  return (
-    <div
-      className={`rounded-xl border p-3 ${toneClass}`}
-      data-smoke="no-thanks-player-state-card"
-      data-player-current={isCurrent ? "true" : "false"}
-      data-player-winner={isWinner ? "true" : "false"}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-black text-slate-900">{player.nickname || `플레이어 ${index + 1}`}</div>
-            <div className="truncate text-[11px] font-bold text-slate-500">
-              좌석 {index + 1}{isHost ? " · 방장" : ""} · 점수 {Number.isFinite(finalScore) ? finalScore : "-"} · 칩 {chips} · 카드 {cards.length}
-            </div>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1">
-          {isWinner && <span className="rounded-full bg-amber-500 px-2 py-1 text-[10px] font-black text-white">우승</span>}
-          {isCurrent && !isWinner && <span className="rounded-full bg-primary-100 px-2 py-1 text-[10px] font-black text-primary-700">현재 차례</span>}
-          {isMe && !isWinner && <span className="rounded-full bg-violet-100 px-2 py-1 text-[10px] font-black text-violet-700">내 좌석</span>}
-          {!isWinner && !isCurrent && !isMe && isHost && <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">방장</span>}
-        </div>
-      </div>
-    </div>
   );
 };
 
@@ -3651,7 +3552,11 @@ export const NoThanksGame = () => {
                   게임 목록
                 </Link>
                 {isHost && roomStatus === "PLAYING" && <button className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700" onClick={forceFinishGame}>강제 종료</button>}
-                <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>준비 토글</button>
+                {roomStatus === "WAITING" && !isHost && (
+                  <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>
+                    {readyMemberIds.has(myMemberId) ? "준비 취소" : "준비하기"}
+                  </button>
+                )}
                 {isHost && roomStatus === "WAITING" && <button className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white" onClick={startGame}>시작</button>}
                 <button className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" onClick={leaveRoom}>퇴장</button>
               </div>
@@ -3761,25 +3666,26 @@ export const NoThanksGame = () => {
                 </div>
               </div>
 
-              <div className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">
-                <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900"><Crown className="h-4 w-4 text-amber-500" />플레이어</div>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {sortedPlayers.map((player, index) => (
-                    <NoThanksPlayerStateCard
-                      key={playerIdOf(player) || `no-thanks-player-${index}`}
-                      player={player}
-                      index={index}
-                      roomStatus={roomStatus}
-                      turnMemberId={turnMemberId}
-                      myMemberId={myMemberId}
-                      winnerMemberId={winnerMemberId}
-                      readyMemberIds={readyMemberIds}
-                      hostMemberId={hostMemberId}
-                    />
-                  ))}
-                </div>
-                {winnerMemberId > 0 && <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-700">우승자: {winnerNickname}</div>}
-              </div>
+              <GameRoomPlayersPanel
+                players={players}
+                selectedRoom={selectedRoom}
+                roomStatus={roomStatus}
+                myMemberId={myMemberId}
+                hostMemberId={hostMemberId}
+                maxPlayers={parseIntSafe(selectedRoom.maxPlayers, 6)}
+                getMemberId={playerIdOf}
+                getReady={(player) => readyMemberIds.has(playerIdOf(player)) || isReadyPlayer(player)}
+                currentMemberId={turnMemberId}
+                winnerMemberId={winnerMemberId}
+                getDetail={(player, { seatNo, isHost, waiting }) => {
+                  if (waiting) return `좌석 ${seatNo || "-"}${isHost ? " · 방장" : ""}`;
+                  const cards = Array.isArray(player?.cards) ? player.cards : [];
+                  const chips = parseIntSafe(player?.chips, 0);
+                  const score = Number.isFinite(Number(player?.score)) ? Number(player.score) : scoreNoThanksCards(cards) - chips;
+                  return `좌석 ${seatNo || "-"}${isHost ? " · 방장" : ""} · 점수 ${Number.isFinite(score) ? score : "-"} · 칩 ${chips} · 카드 ${cards.length}`;
+                }}
+                dataSmoke="no-thanks-player-roster"
+              />
             </div>
 
             <aside className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">

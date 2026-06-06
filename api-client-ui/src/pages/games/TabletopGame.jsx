@@ -37,6 +37,7 @@ import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameUxGlyph, PlayingCardArt, playingCardSuitLabel } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
@@ -21118,6 +21119,22 @@ export const TabletopGame = ({ game }) => {
               </div>
             )}
           </div>
+
+          {status === "WAITING" && (
+            <GameRoomPlayersPanel
+              players={players}
+              selectedRoom={selectedRoom}
+              roomStatus={status}
+              myMemberId={myMemberId}
+              hostMemberId={hostMemberIdOf(selectedRoom)}
+              maxPlayers={maxPlayersOf(selectedRoom)}
+              getMemberId={memberIdOf}
+              getSeatNo={seatNoOf}
+              getReady={isReady}
+              getDetail={(player, { seatNo, isHost }) => `좌석 ${seatNo || "-"}${isHost ? " · 방장" : ""}`}
+              dataSmoke={`${game}-waiting-player-roster`}
+            />
+          )}
 
           {gameState && (
             <>

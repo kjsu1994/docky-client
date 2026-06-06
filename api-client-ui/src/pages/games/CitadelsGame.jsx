@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, CheckCircle2, Coins, Crown, Hammer, RefreshCw, Shield, Sparkles, Target, Users } from "lucide-react";
+import { BookOpen, Coins, Crown, Hammer, RefreshCw, Shield, Sparkles, Target, Users } from "lucide-react";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import {
@@ -16,7 +16,7 @@ import {
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
-import UserAvatar from "../../common/UserAvatar.jsx";
+import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 
@@ -5061,41 +5061,19 @@ export const CitadelsGame = () => {
           </div>
 
           {status === "WAITING" && (
-            <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-black text-slate-900">참가자 준비 현황</div>
-                    <div className="mt-1 text-xs font-bold text-slate-500">{startBlockedText}</div>
-                  </div>
-                  {isHost ? (
-                    <button type="button" disabled={!canStart || busy} onClick={startGame} className="min-h-10 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white disabled:opacity-50">
-                      시작하기
-                    </button>
-                  ) : (
-                    <span className="inline-flex min-h-10 items-center rounded-xl bg-amber-50 px-4 text-xs font-black text-amber-700">
-                      방장 시작 대기
-                    </span>
-                  )}
-                </div>
-                <div className="mt-4 text-xs font-black text-slate-500">참가자</div>
-                <div className="mt-2 grid gap-2">
-                  {players.map((player) => {
-                    const host = memberIdOf(player) === hostMemberId;
-                    return (
-                      <div key={memberIdOf(player)} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                        <div className="flex items-center justify-between gap-2 text-sm font-black text-slate-800">
-                          <span className="flex min-w-0 items-center gap-2">
-                            <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="xs" />
-                            <span className="min-w-0 truncate">{player.nickname}</span>
-                          </span>
-                          {host ? <Crown className="h-4 w-4 shrink-0 text-amber-500" /> : <CheckCircle2 className={`h-4 w-4 shrink-0 ${isReady(player) ? "text-emerald-500" : "text-slate-300"}`} />}
-                        </div>
-                        <div className="mt-1 text-[11px] font-bold text-slate-500">{host ? "방장" : isReady(player) ? "준비 완료" : "준비 대기"}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
+            <GameRoomPlayersPanel
+              players={players}
+              selectedRoom={selectedRoom}
+              roomStatus={status}
+              myMemberId={myMemberId}
+              hostMemberId={hostMemberId}
+              maxPlayers={maxPlayers}
+              getMemberId={memberIdOf}
+              getSeatNo={seatNoOf}
+              getReady={isReady}
+              getDetail={(player, { seatNo, isHost }) => `좌석 ${seatNo || "-"}${isHost ? " · 방장" : ""}`}
+              dataSmoke="citadels-waiting-player-roster"
+            />
           )}
 
           {gameState && (
