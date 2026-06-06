@@ -14480,6 +14480,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
 
 const sixNimmtPhaseLabels = {
   SELECTING: "카드 선택",
+  RESOLVING: "카드 배치",
   ROW_CHOICE: "행 선택",
   FINISHED: "게임 종료",
 };
@@ -14502,6 +14503,58 @@ const sixNimmtCardBulls = (card) => Number(get(card, "bulls", "bulls", 0));
 const sixNimmtCardId = (card) => get(card, "id", "id", "");
 const sixNimmtRowCards = (row) => listOf(get(row, "cards", "cards", []));
 const sixNimmtRowPenalty = (row) => sixNimmtRowCards(row).reduce((sum, card) => sum + sixNimmtCardBulls(card), 0);
+const sixNimmtPlacementEventTypes = new Set(["PLACE_CARD", "ROW_TAKEN"]);
+const sixNimmtEventNo = (event) => Number(get(event, "event_no", "eventNo", 0));
+const sixNimmtEventType = (event) => String(get(event, "event_type", "eventType", "") || "").toUpperCase();
+const sixNimmtRowsSignature = (rows = []) => rows
+  .map((row) => sixNimmtRowCards(row).map((card) => sixNimmtCardId(card) || sixNimmtCardValue(card)).join(","))
+  .join("|");
+const sixNimmtEventsSignature = (events = []) => events
+  .map((event) => `${sixNimmtEventNo(event)}:${sixNimmtEventType(event)}`)
+  .join("|");
+const sixNimmtBullsForValue = (value) => {
+  const safeValue = Number(value) || 0;
+  if (safeValue === 55) return 7;
+  if (safeValue % 11 === 0) return 5;
+  if (safeValue % 10 === 0) return 3;
+  if (safeValue % 5 === 0) return 2;
+  return 1;
+};
+const sixNimmtCardFromEvent = (event) => {
+  const value = Number(get(event, "card_value", "cardValue", 0));
+  if (!value) return null;
+  return {
+    id: `C${value}`,
+    value,
+    bulls: Number(get(event, "card_bulls", "cardBulls", 0)) || sixNimmtBullsForValue(value),
+    seatNo: Number(get(event, "seat_no", "seatNo", 0)),
+  };
+};
+const sixNimmtEventRowIndex = (event) => {
+  const indexes = listOf(get(event, "row_indexes", "rowIndexes", []));
+  const index = Number(indexes[0]);
+  return Number.isInteger(index) && index >= 0 ? index : null;
+};
+const cloneSixNimmtRows = (rows = []) => listOf(rows).map((row) => ({
+  ...row,
+  cards: sixNimmtRowCards(row).map((card) => ({ ...card })),
+}));
+const applySixNimmtPlacementEventToRows = (sourceRows, event) => {
+  const eventType = sixNimmtEventType(event);
+  if (!sixNimmtPlacementEventTypes.has(eventType)) return cloneSixNimmtRows(sourceRows);
+  const rowIndex = sixNimmtEventRowIndex(event);
+  const card = sixNimmtCardFromEvent(event);
+  const rows = cloneSixNimmtRows(sourceRows);
+  if (rowIndex === null || !card || !rows[rowIndex]) return rows;
+  if (eventType === "ROW_TAKEN") {
+    rows[rowIndex] = { ...rows[rowIndex], cards: [card] };
+    return rows;
+  }
+  const cards = sixNimmtRowCards(rows[rowIndex]);
+  const alreadyPlaced = cards.some((existingCard) => sixNimmtCardValue(existingCard) === card.value);
+  rows[rowIndex] = { ...rows[rowIndex], cards: alreadyPlaced ? cards : [...cards, card] };
+  return rows;
+};
 
 const sixNimmtCardPalettes = {
   low: { paper: "#fefce8", rim: "#a16207", wash: "#fde68a", ink: "#1f2937", accent: "#84cc16", badge: "#713f12" },
@@ -15157,6 +15210,9 @@ const SixNimmtRiskPanel = ({
 const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }) => {
   const [selectedCardId, setSelectedCardId] = useState("");
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
+  const [displayRows, setDisplayRows] = useState([]);
+  const replayEventNoRef = useRef(0);
+  const replayTimersRef = useRef([]);
   const phase = get(gameState, "phase", "phase", "");
   const rows = listOf(get(gameState, "rows", "rows", []));
   const statePlayers = listOf(get(gameState, "players", "players", []));
@@ -15164,6 +15220,8 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
   const activeSeatNo = Number(get(gameState, "active_seat_no", "activeSeatNo", 0));
   const pendingCard = get(gameState, "pending_card", "pendingCard", null);
   const events = listOf(get(gameState, "events", "events", []));
+  const rowsSignature = sixNimmtRowsSignature(rows);
+  const eventsSignature = sixNimmtEventsSignature(events);
   const roundNo = Number(get(gameState, "round_no", "roundNo", 0));
   const turnNo = Number(get(gameState, "turn_no", "turnNo", 0));
   const myPlayer = statePlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(mySeatNo)) || null;
@@ -15192,6 +15250,52 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
       setSelectedRowIndex(null);
     }
   }, [mySelected, phase]);
+
+  useEffect(() => {
+    const clearReplayTimers = () => {
+      replayTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      replayTimersRef.current = [];
+    };
+    clearReplayTimers();
+
+    const latestEventNo = events.reduce((latest, event) => Math.max(latest, sixNimmtEventNo(event)), 0);
+    const previousEventNo = replayEventNoRef.current;
+    const newEvents = events.filter((event) => sixNimmtEventNo(event) > previousEventNo);
+    const placementEvents = newEvents.filter((event) => sixNimmtPlacementEventTypes.has(sixNimmtEventType(event)));
+    const roundReset = newEvents.some((event) => sixNimmtEventType(event) === "ROUND_STARTED");
+    const canReplayPlacements = previousEventNo > 0
+      && placementEvents.length > 0
+      && !roundReset
+      && displayRows.length === rows.length;
+
+    replayEventNoRef.current = latestEventNo;
+    if (!canReplayPlacements) {
+      setDisplayRows(cloneSixNimmtRows(rows));
+      return clearReplayTimers;
+    }
+
+    let nextRows = cloneSixNimmtRows(displayRows);
+    placementEvents.forEach((event, index) => {
+      const applyPlacement = () => {
+        nextRows = applySixNimmtPlacementEventToRows(nextRows, event);
+        setDisplayRows(nextRows);
+      };
+      if (index === 0) {
+        applyPlacement();
+        return;
+      }
+      const timer = window.setTimeout(applyPlacement, index * 140);
+      replayTimersRef.current.push(timer);
+    });
+
+    const finishTimer = window.setTimeout(() => {
+      setDisplayRows(cloneSixNimmtRows(rows));
+      replayTimersRef.current = [];
+    }, placementEvents.length * 140 + 80);
+    replayTimersRef.current.push(finishTimer);
+
+    return clearReplayTimers;
+  }, [eventsSignature, rowsSignature]);
 
   const rowTail = (row) => {
     const cards = sixNimmtRowCards(row);
@@ -15238,6 +15342,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
   const selectedPreview = selectedCard ? previewForCard(selectedCard, selectedRowIndex) : null;
   const selectedAnchorX = selectedPreview?.possibleRows?.some((item) => item.index === selectedRowIndex) ? selectedRowIndex : null;
   const selectedHasOptionalRows = waitingSelection && selectedPreview?.possibleRows?.length > 1 && selectedAnchorX === null;
+  const boardRows = displayRows.length === rows.length ? displayRows : rows;
   const phaseLabel = sixNimmtPhaseLabels[phase] || phase || "-";
   const mostDangerousRow = rows.reduce((best, row, index) => {
     const penalty = sixNimmtRowPenalty(row);
@@ -15366,7 +15471,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           )}
 
           <div className="mt-2 grid gap-1.5 sm:mt-4 sm:gap-3">
-            {rows.map((row, index) => {
+            {boardRows.map((row, index) => {
               const cards = sixNimmtRowCards(row);
               const penalty = sixNimmtRowPenalty(row);
               const selectedRow = selectedPreview?.rowIndex === index;
