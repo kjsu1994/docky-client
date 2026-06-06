@@ -5,6 +5,7 @@ const includeRuntimeChecks = process.env.SMOKE_RUNTIME === "1";
 const checks = [
     ["run", "smoke:text-quality"],
     ["run", "smoke:api-errors"],
+    ["run", "smoke:toast-runtime"],
     ["run", "smoke:page-guides"],
     ["run", "smoke:navigation-routes"],
     ["run", "smoke:auth-ui"],

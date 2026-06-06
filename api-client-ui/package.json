@@ -39,6 +39,7 @@
     "smoke:navigation-routes": "node scripts/navigation-route-smoke.mjs",
     "smoke:text-quality": "node scripts/text-quality-smoke.mjs",
     "smoke:api-errors": "node scripts/api-error-message-smoke.mjs",
+    "smoke:toast-runtime": "node scripts/toast-runtime-smoke.mjs",
     "smoke:all": "node scripts/smoke-all.mjs"
   },
   "dependencies": {

@@ -173,7 +173,8 @@ function assertStaticAuthRuntimeBoundaries() {
         !loginSource.includes("const loadAuthAdapter = () => import(\"../../adapters/authAdapter.js\")") ||
         !registerSource.includes("const loadAuthAdapter = () => import(\"../../adapters/authAdapter.js\")") ||
         !queueSource.includes("const loadQueueAdapter = () => import(\"../../adapters/queueAdapter.js\")") ||
-        !loginSource.includes("import { loadToast, notifyError, notifySuccess } from \"../../utils/toast.js\"") ||
+        !loginSource.includes("import { notifyError, notifyLoading, notifySuccess } from \"../../utils/toast.js\"") ||
+        !loginSource.includes("notifyLoading(\"해제 요청을 제출하는 중입니다...\"") ||
         !registerSource.includes("import { notifyError, notifySuccess } from \"../../utils/toast.js\"") ||
         !queueSource.includes("import { notifySuccess } from \"../../utils/toast.js\"")
     ) {

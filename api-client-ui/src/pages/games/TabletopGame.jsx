@@ -7,13 +7,12 @@ import {
   Bot,
   CheckCircle2,
   CircleDollarSign,
+  CircleHelp,
   Copy,
   Crown,
   Dices,
-  Eye,
   FlipHorizontal,
   Gavel,
-  HeartPulse,
   Moon,
   RefreshCw,
   RotateCw,
@@ -40,6 +39,8 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
+import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameUxGlyph, PlayingCardArt, playingCardSuitLabel } from "./GameUxAssets.jsx";
+import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 
 const gameConfigs = {
   catan: {
@@ -312,6 +313,13 @@ const blokusColorLabels = {
   GREEN: "초록",
 };
 
+const blokusPiecePalette = {
+  BLUE: { fill: "#3b82f6", stroke: "#1d4ed8", shine: "#bfdbfe" },
+  YELLOW: { fill: "#fde047", stroke: "#ca8a04", shine: "#fef9c3" },
+  RED: { fill: "#f43f5e", stroke: "#be123c", shine: "#fecdd3" },
+  GREEN: { fill: "#10b981", stroke: "#047857", shine: "#bbf7d0" },
+};
+
 const seatTokenClasses = [
   "bg-blue-500 text-white border-blue-700",
   "bg-rose-500 text-white border-rose-700",
@@ -482,9 +490,737 @@ const catanResourceLabels = {
   WOOL_GRAIN: "양털/곡물",
 };
 
+const catanTerrainResourceType = {
+  FOREST: "LUMBER",
+  PASTURE: "WOOL",
+  FIELD: "GRAIN",
+  HILL: "BRICK",
+  MOUNTAIN: "ORE",
+  GOLD: "GOLD",
+};
+
 const catanResourceKeys = ["BRICK", "LUMBER", "WOOL", "GRAIN", "ORE"];
 const catanResourceEntries = catanResourceKeys.map((key) => [key, catanResourceLabels[key]]);
 const emptyCatanResourceCounts = () => Object.fromEntries(catanResourceKeys.map((key) => [key, 0]));
+
+const catanResourceArtProfiles = {
+  BRICK: { fill: "#dc2626", stroke: "#7f1d1d", wash: "#fecaca", ink: "#fff7ed" },
+  LUMBER: { fill: "#92400e", stroke: "#451a03", wash: "#fde68a", ink: "#fff7ed" },
+  WOOL: { fill: "#f8fafc", stroke: "#64748b", wash: "#e0f2fe", ink: "#0f172a" },
+  GRAIN: { fill: "#facc15", stroke: "#a16207", wash: "#fef9c3", ink: "#451a03" },
+  ORE: { fill: "#64748b", stroke: "#1e293b", wash: "#e2e8f0", ink: "#f8fafc" },
+};
+
+const CatanResourceTokenArt = ({ type, count = 0, bankCount = null, className = "" }) => {
+  const profile = catanResourceArtProfiles[type] || catanResourceArtProfiles.BRICK;
+  const label = catanResourceLabels[type] || type;
+  const safeCount = Math.max(0, Number(count || 0));
+  const bankLabel = bankCount == null ? "은행 -" : `은행 ${bankCount}`;
+  const countScale = Math.min(1, safeCount / 6);
+
+  return (
+    <svg
+      viewBox="0 0 96 112"
+      className={className}
+      data-smoke="catan-resource-token-art"
+      role="img"
+      aria-label={`${label} 보유 ${safeCount}장, ${bankLabel}`}
+    >
+      <rect x="7" y="7" width="82" height="98" rx="16" fill={profile.wash} stroke={profile.stroke} strokeWidth="3" />
+      <rect x="15" y="15" width="66" height="82" rx="12" fill="#ffffff" opacity=".72" />
+      <g transform="translate(48 44)">
+        {type === "BRICK" && (
+          <>
+            <rect x="-25" y="-18" width="22" height="13" rx="3" fill={profile.fill} stroke={profile.stroke} strokeWidth="2" />
+            <rect x="-1" y="-18" width="26" height="13" rx="3" fill={profile.fill} stroke={profile.stroke} strokeWidth="2" />
+            <rect x="-18" y="-3" width="36" height="13" rx="3" fill="#ef4444" stroke={profile.stroke} strokeWidth="2" />
+            <rect x="-26" y="12" width="24" height="13" rx="3" fill={profile.fill} stroke={profile.stroke} strokeWidth="2" />
+            <rect x="4" y="12" width="22" height="13" rx="3" fill="#ef4444" stroke={profile.stroke} strokeWidth="2" />
+          </>
+        )}
+        {type === "LUMBER" && (
+          <>
+            {[-14, 0, 14].map((offset) => (
+              <g key={offset} transform={`translate(${offset} ${offset === 0 ? 4 : 0}) rotate(${offset / 2})`}>
+                <rect x="-6" y="-25" width="12" height="50" rx="6" fill={profile.fill} stroke={profile.stroke} strokeWidth="2" />
+                <path d="M-2-18c5 8-4 16 2 25" fill="none" stroke={profile.wash} strokeWidth="2" strokeLinecap="round" opacity=".65" />
+              </g>
+            ))}
+          </>
+        )}
+        {type === "WOOL" && (
+          <>
+            {[
+              [-16, -4, 14], [0, -14, 16], [16, -4, 14], [-9, 11, 14], [11, 10, 15],
+            ].map(([x, y, r]) => (
+              <circle key={`${x}-${y}`} cx={x} cy={y} r={r} fill={profile.fill} stroke={profile.stroke} strokeWidth="2" />
+            ))}
+            <circle cx="5" cy="0" r="8" fill={profile.stroke} opacity=".8" />
+          </>
+        )}
+        {type === "GRAIN" && (
+          <>
+            <path d="M0 28V-27" stroke={profile.stroke} strokeWidth="4" strokeLinecap="round" />
+            {[-19, -10, -1, 8, 17].map((y, index) => (
+              <g key={y}>
+                <ellipse cx="-10" cy={y} rx="7" ry="11" fill={profile.fill} stroke={profile.stroke} strokeWidth="1.7" transform={`rotate(${-35 - index * 3} -10 ${y})`} />
+                <ellipse cx="10" cy={y + 3} rx="7" ry="11" fill={profile.fill} stroke={profile.stroke} strokeWidth="1.7" transform={`rotate(${35 + index * 3} 10 ${y + 3})`} />
+              </g>
+            ))}
+          </>
+        )}
+        {type === "ORE" && (
+          <>
+            <polygon points="-22,12 -14,-18 6,-26 26,-8 20,22 -6,28" fill={profile.fill} stroke={profile.stroke} strokeWidth="2.4" />
+            <polygon points="-6,-10 8,-18 17,-5 8,5" fill="#94a3b8" opacity=".72" />
+            <polygon points="-18,12 -7,5 5,25 -8,26" fill="#334155" opacity=".55" />
+          </>
+        )}
+      </g>
+      <rect x="18" y="78" width="58" height="16" rx="8" fill={profile.stroke} opacity=".9" />
+      <rect x="18" y="78" width={Math.max(8, 58 * countScale)} height="16" rx="8" fill={profile.fill} />
+      <text x="48" y="72" textAnchor="middle" fill="#0f172a" fontSize="13" fontWeight="900">{label}</text>
+      <text x="48" y="91" textAnchor="middle" fill={profile.ink} fontSize="12" fontWeight="900">{safeCount}장</text>
+    </svg>
+  );
+};
+
+const CatanResourceStrategyArt = ({
+  resources = {},
+  buildSignals = [],
+  tradeSummary = "",
+  scoreRace = [],
+  myCardCount = 0,
+  phase = "",
+  myTurn = false,
+}) => {
+  const resourceTotal = catanResourceKeys.reduce((sum, key) => sum + Math.max(0, Number(resources?.[key] || 0)), 0);
+  const readyBuilds = buildSignals.filter((item) => item.ready).length;
+  const affordableBuilds = buildSignals.filter((item) => item.affordable || item.ready).length;
+  const leader = scoreRace[0];
+  const tradeReady = /가능|교환|항구|은행/.test(tradeSummary || "");
+  const nodes = [
+    {
+      key: "resource",
+      x: 58,
+      y: 83,
+      label: "자원",
+      value: `${resourceTotal}장`,
+      active: resourceTotal > 0,
+      fill: "#f59e0b",
+    },
+    {
+      key: "build",
+      x: 150,
+      y: 52,
+      label: "건설",
+      value: readyBuilds ? `${readyBuilds}개` : affordableBuilds ? "차례" : "부족",
+      active: readyBuilds > 0,
+      fill: "#10b981",
+    },
+    {
+      key: "trade",
+      x: 242,
+      y: 92,
+      label: "교환",
+      value: tradeReady ? "검토" : "대기",
+      active: tradeReady,
+      fill: "#0ea5e9",
+    },
+    {
+      key: "score",
+      x: 334,
+      y: 62,
+      label: "승점",
+      value: leader ? `${leader.points}/${leader.target}` : "-",
+      active: Boolean(leader),
+      fill: "#8b5cf6",
+    },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 390 150"
+      className="h-auto w-full"
+      data-smoke="catan-resource-strategy-art"
+      role="img"
+      aria-label="카탄 자원에서 건설, 교환, 승점 압박으로 이어지는 전략 흐름"
+      focusable="false"
+    >
+      <rect x="8" y="8" width="374" height="134" rx="24" fill="#0f172a" stroke="#334155" strokeWidth="3" />
+      <path d="M58 83C96 40 118 35 150 52s55 68 92 40 59-68 92-30" fill="none" stroke="#334155" strokeWidth="13" strokeLinecap="round" />
+      <path d="M58 83C96 40 118 35 150 52s55 68 92 40 59-68 92-30" fill="none" stroke={myTurn ? "#fbbf24" : "#64748b"} strokeWidth="4" strokeLinecap="round" />
+      <text x="24" y="32" fontSize="11" fontWeight="900" fill="#fde68a">자원 전략 지도</text>
+      <text x="24" y="51" fontSize="17" fontWeight="900" fill="#ffffff">자원 → 건설 → 교환 → 승점</text>
+      <text x="24" y="126" fontSize="10" fontWeight="900" fill="#cbd5e1">{`${myTurn ? "내 차례" : "관찰"} · 손패 ${myCardCount} · ${phase || "상태 확인"}`}</text>
+      {nodes.map((node) => (
+        <g key={node.key} data-smoke="catan-resource-strategy-node" data-strategy-key={node.key} data-active={node.active ? "true" : "false"}>
+          <circle cx={node.x} cy={node.y} r="23" fill={node.active ? "#ffffff" : "#f8fafc"} stroke={node.active ? node.fill : "#cbd5e1"} strokeWidth="4" />
+          <circle cx={node.x} cy={node.y} r="7" fill={node.active ? node.fill : "#94a3b8"} />
+          <text x={node.x} y={node.y - 31} textAnchor="middle" fontSize="10" fontWeight="900" fill="#f8fafc">{node.label}</text>
+          <text x={node.x} y={node.y + 39} textAnchor="middle" fontSize="10" fontWeight="900" fill="#e2e8f0">{node.value}</text>
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+const CatanResourceStrategyPanel = ({
+  resources = {},
+  resourceBank = {},
+  buildSignals = [],
+  scoreRace = [],
+  myCardCount = 0,
+  tradeSummary = "",
+  phase = "",
+  myTurn = false,
+  className = "",
+}) => {
+  const resourceTotal = catanResourceKeys.reduce((sum, key) => sum + Math.max(0, Number(resources?.[key] || 0)), 0);
+  const readyBuildCount = buildSignals.filter((item) => item.ready).length;
+
+  return (
+    <section
+      className={`rounded-[1.5rem] border border-slate-200 bg-slate-950 p-4 text-white shadow-lg ${className}`}
+      data-smoke="catan-resource-strategy-panel"
+      data-phase={phase || ""}
+      data-my-turn={myTurn ? "true" : "false"}
+      data-resource-total={resourceTotal}
+      data-ready-builds={readyBuildCount}
+      data-card-count={myCardCount}
+      aria-label="카탄 자원과 건설 판단"
+    >
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="text-[11px] font-black uppercase tracking-wide text-amber-200">Resource Board</div>
+        <div className="mt-1 text-base font-black">자원과 다음 건설 판단</div>
+        <div className="mt-1 text-xs font-bold leading-relaxed text-slate-300">
+          {myTurn ? "내 보유 자원으로 가능한 건설·교환 신호를 즉시 확인합니다." : "자원은 충분해도 실제 실행은 내 차례에만 가능합니다."}
+        </div>
+      </div>
+      <div className="rounded-xl bg-white/10 px-3 py-2 text-right ring-1 ring-white/10">
+        <div className="text-[10px] font-black text-slate-400">손패 압박</div>
+        <div className="text-xl font-black text-amber-100">{myCardCount}</div>
+        <div className="text-[10px] font-bold text-slate-400">{phase === "DISCARD" ? "버리기 단계" : "자원+상품"}</div>
+      </div>
+    </div>
+    <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+      <CatanResourceStrategyArt
+        resources={resources}
+        buildSignals={buildSignals}
+        tradeSummary={tradeSummary}
+        scoreRace={scoreRace}
+        myCardCount={myCardCount}
+        phase={phase}
+        myTurn={myTurn}
+      />
+    </div>
+    <div className="mt-4 grid grid-cols-5 gap-1.5">
+      {catanResourceEntries.map(([key]) => (
+        <CatanResourceTokenArt
+          key={key}
+          type={key}
+          count={resources?.[key] ?? 0}
+          bankCount={resourceBank?.[key] ?? null}
+          className="h-24 w-full"
+        />
+      ))}
+    </div>
+    <div className="mt-4 grid gap-2 sm:grid-cols-2" data-smoke="catan-build-readiness-list">
+      {buildSignals.map((item) => (
+        <div
+          key={item.key}
+          className={`min-h-[92px] rounded-xl border px-3 py-2 ${item.ready ? "border-emerald-300/40 bg-emerald-400/15" : item.affordable ? "border-amber-300/40 bg-amber-400/15" : "border-white/10 bg-white/10"}`}
+          data-smoke="catan-build-readiness-card"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-black">{item.label}</div>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-black ${item.ready ? "bg-emerald-300 text-emerald-950" : item.affordable ? "bg-amber-200 text-amber-950" : "bg-white/10 text-slate-300"}`}>
+              {item.ready ? "가능" : item.affordable ? "차례 대기" : "재료 부족"}
+            </span>
+          </div>
+          <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-300">{item.cost}</div>
+          <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-400">{item.detail}</div>
+        </div>
+      ))}
+    </div>
+    <div className="mt-4 rounded-xl bg-white/10 p-3 ring-1 ring-white/10">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-black text-slate-200">승점 레이스</div>
+        <div className="text-[10px] font-bold text-slate-400">{tradeSummary}</div>
+      </div>
+      <div className="mt-2 space-y-2">
+        {scoreRace.map((player) => (
+          <div key={player.seatNo} data-smoke="catan-score-race-item">
+            <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-bold">
+              <span className={player.isMe ? "text-amber-100" : "text-slate-300"}>{player.name}</span>
+              <span className="text-slate-400">{player.points}/{player.target}점</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-white/10">
+              <div
+                className={`h-full rounded-full ${player.isMe ? "bg-amber-300" : "bg-sky-300"}`}
+                style={{ width: `${player.progress}%` }}
+              />
+            </div>
+          </div>
+        ))}
+        {!scoreRace.length && <div className="text-xs font-bold text-slate-500">플레이어 승점 정보가 아직 없습니다.</div>}
+      </div>
+    </div>
+    </section>
+  );
+};
+
+const CatanVictoryTrackArt = ({ rows = [], target = 10, leaderSeatNo = 0, mySeatNo = 0 }) => {
+  const visibleRows = rows.slice(0, 4);
+  const safeTarget = Math.max(1, Number(target || 10));
+
+  return (
+    <svg
+      data-smoke="catan-victory-track-art"
+      viewBox="0 0 420 230"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`카탄 승리 트랙 목표 ${safeTarget}점`}
+      focusable="false"
+    >
+      <rect x="12" y="12" width="396" height="206" rx="28" fill="#f8fafc" stroke="#fde68a" strokeWidth="3" />
+      <path d="M36 184c44-42 78-50 116-24 31 22 62 19 100-11 46-36 90-25 132 35v32H36Z" fill="#fef3c7" opacity=".7" />
+      <rect x="54" y="46" width="300" height="16" rx="8" fill="#e2e8f0" />
+      <path d="M354 36v44" stroke="#92400e" strokeWidth="4" strokeLinecap="round" />
+      <path d="M340 43h34l-9 10 9 10h-34Z" fill="#f59e0b" stroke="#92400e" strokeWidth="2" />
+      <text x="354" y="30" textAnchor="middle" fontSize="13" fontWeight="900" fill="#92400e">목표 {safeTarget}</text>
+      {visibleRows.map((row, index) => {
+        const y = 86 + index * 35;
+        const progress = Math.max(0, Math.min(1, Number(row.visiblePoints || 0) / safeTarget));
+        const x = 54 + progress * 300;
+        const isLeader = row.seatNo === leaderSeatNo;
+        const isMe = row.seatNo === mySeatNo;
+        const fill = isLeader ? "#f59e0b" : isMe ? "#06b6d4" : "#94a3b8";
+        return (
+          <g key={row.seatNo || index} data-smoke="catan-victory-track-node">
+            <rect x="54" y={y - 7} width="300" height="14" rx="7" fill="#e2e8f0" />
+            <rect x="54" y={y - 7} width={Math.max(10, x - 54)} height="14" rx="7" fill={fill} opacity=".9" />
+            <circle cx={x} cy={y} r={isLeader ? 16 : 13} fill="#ffffff" stroke={fill} strokeWidth={isLeader ? 5 : 4} />
+            <text x={x} y={y + 4} textAnchor="middle" fontSize="11" fontWeight="900" fill="#0f172a">{row.visiblePoints}</text>
+            <text x="32" y={y + 4} textAnchor="middle" fontSize="11" fontWeight="900" fill="#334155">{index + 1}</text>
+            <text x="368" y={y + 4} fontSize="11" fontWeight="900" fill={isLeader ? "#92400e" : isMe ? "#0e7490" : "#475569"}>
+              {isLeader ? "선두" : isMe ? "나" : `${row.remaining}점 남음`}
+            </text>
+          </g>
+        );
+      })}
+      <rect x="38" y="188" width="154" height="28" rx="14" fill="#ffffff" stroke="#fde68a" />
+      <text x="115" y="207" textAnchor="middle" fontSize="12" fontWeight="900" fill="#92400e">공개 승점 기준</text>
+      <rect x="218" y="188" width="150" height="28" rx="14" fill="#ffffff" stroke="#bae6fd" />
+      <text x="293" y="207" textAnchor="middle" fontSize="12" fontWeight="900" fill="#075985">내 숨은 점수 포함</text>
+    </svg>
+  );
+};
+
+const CatanVictoryTrackPanel = ({ rows = [], target = 10, phase = "", mySeatNo = 0 }) => {
+  if (!rows.length) return null;
+  const leader = rows[0];
+  const mine = rows.find((row) => row.seatNo === mySeatNo) || null;
+  const safeTarget = Math.max(1, Number(target || 10));
+  const leaderRemaining = Math.max(0, safeTarget - Number(leader?.visiblePoints || 0));
+  const myRemaining = mine ? Math.max(0, safeTarget - Number(mine.visiblePoints || 0)) : null;
+  const gap = mine ? Math.max(0, Number(leader?.visiblePoints || 0) - Number(mine.visiblePoints || 0)) : 0;
+  const finished = phase === "FINISHED";
+  const items = [
+    {
+      label: finished ? "승자" : "선두",
+      value: leader ? `${leader.name} ${leader.visiblePoints}점` : "-",
+      detail: leaderRemaining <= 0 ? "목표 점수에 도달한 상태입니다." : `목표까지 ${leaderRemaining}점 남았습니다.`,
+      tone: "border-amber-100 bg-amber-50 text-amber-900",
+    },
+    {
+      label: "내 격차",
+      value: mine ? (gap > 0 ? `${gap}점 차이` : "동률/선두권") : "참가 대기",
+      detail: mine ? `내 목표까지 ${myRemaining}점 남았습니다.` : "내 좌석 점수 정보가 아직 없습니다.",
+      tone: "border-sky-100 bg-sky-50 text-sky-900",
+    },
+    {
+      label: "보너스 압력",
+      value: `${rows.reduce((sum, row) => sum + row.bonusCount, 0)}개 신호`,
+      detail: "최장 교역로, 최대 기사력, 특별/임무/방어자 점수 같은 공개 보너스 신호입니다.",
+      tone: "border-violet-100 bg-violet-50 text-violet-900",
+    },
+    {
+      label: "판단 기준",
+      value: finished ? "결과 확인" : "점수 레이스",
+      detail: "상대는 공개 승점 중심, 내 점수는 서버가 내려준 내 승점 정보를 함께 읽습니다.",
+      tone: "border-slate-200 bg-white text-slate-700",
+    },
+  ];
+
+  return (
+    <section data-smoke="catan-victory-track-panel" className="mb-3 overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-sky-50 p-3 shadow-sm sm:rounded-[1.5rem]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_1.05fr]">
+        <CatanVictoryTrackArt rows={rows} target={safeTarget} leaderSeatNo={leader?.seatNo || 0} mySeatNo={mySeatNo} />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-amber-700">승리 트랙</div>
+              <div className="mt-1 text-base font-black text-slate-950">누가 목표에 가장 가까운지 확인</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+                목표 {safeTarget}점까지 남은 거리와 공개 보너스 압력을 보드 조작 전에 읽습니다.
+              </div>
+            </div>
+            <span className="rounded-full border border-amber-100 bg-white px-3 py-1 text-[11px] font-black text-amber-700">
+              목표까지 {leaderRemaining}점
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2">
+            {items.map((item) => (
+              <div key={item.label} data-smoke="catan-victory-track-item" className={`rounded-xl border px-3 py-2 ${item.tone}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-black opacity-60">{item.label}</div>
+                    <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                  </div>
+                </div>
+                <div className="mt-1 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const CatanActionAtlasArt = ({ activeKey = "build", items = [] }) => {
+  const profiles = {
+    build: { x: 74, label: "건설", color: "#059669", wash: "#d1fae5" },
+    target: { x: 190, label: "대상", color: "#0284c7", wash: "#e0f2fe" },
+    trade: { x: 306, label: "교환", color: "#d97706", wash: "#fef3c7" },
+  };
+  const activeProfile = profiles[activeKey] || profiles.build;
+  const activeIndex = Math.max(0, ["build", "target", "trade"].indexOf(activeKey));
+  const progressWidth = 116 * activeIndex;
+
+  return (
+    <svg
+      data-smoke="catan-action-atlas-art"
+      viewBox="0 0 380 210"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`카탄 액션 아틀라스 ${activeProfile.label}`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="360" height="190" rx="28" fill="#f8fafc" stroke="#bbf7d0" strokeWidth="3" />
+      <path d="M38 152c46-31 86-39 120-22 40 20 77 18 112-6 31-21 55-12 78 26v40H38Z" fill={activeProfile.wash} opacity="0.72" />
+      <path d="M74 102h232" fill="none" stroke="#d1d5db" strokeWidth="10" strokeLinecap="round" />
+      <path d={`M74 102h${progressWidth}`} fill="none" stroke="#0f172a" strokeWidth="10" strokeLinecap="round" />
+      {Object.entries(profiles).map(([key, profile]) => {
+        const active = key === activeKey;
+        return (
+          <g key={key} data-smoke="catan-action-atlas-node">
+            <circle cx={profile.x} cy="102" r={active ? 34 : 27} fill={active ? profile.color : "#ffffff"} stroke={active ? "#0f172a" : "#cbd5e1"} strokeWidth={active ? 5 : 3} />
+            {key === "build" && (
+              <g>
+                <path d={`M${profile.x - 18} 111l18-20 18 20v18h-36Z`} fill={active ? "#ffffff" : profile.wash} stroke={active ? "#ffffff" : profile.color} strokeWidth="2" />
+                <path d={`M${profile.x - 10} 129v-14h20v14`} fill="none" stroke={active ? profile.color : "#064e3b"} strokeWidth="4" strokeLinecap="round" />
+              </g>
+            )}
+            {key === "target" && (
+              <g>
+                <circle cx={profile.x} cy="102" r="14" fill={active ? "#ffffff" : profile.wash} stroke={active ? "#ffffff" : profile.color} strokeWidth="3" />
+                <path d={`M${profile.x - 22} 102h44M${profile.x} 80v44`} stroke={active ? profile.color : "#075985"} strokeWidth="4" strokeLinecap="round" />
+              </g>
+            )}
+            {key === "trade" && (
+              <g>
+                <path d={`M${profile.x - 20} 95h36l-8-8M${profile.x + 20} 112h-36l8 8`} fill="none" stroke={active ? "#ffffff" : profile.color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx={profile.x - 21} cy="115" r="5" fill={active ? "#ffffff" : profile.wash} />
+                <circle cx={profile.x + 21} cy="92" r="5" fill={active ? "#ffffff" : profile.wash} />
+              </g>
+            )}
+            <text x={profile.x} y="60" textAnchor="middle" fontSize="13" fontWeight="900" fill={active ? "#0f172a" : "#64748b"}>{profile.label}</text>
+          </g>
+        );
+      })}
+      <rect x="44" y="24" width="116" height="28" rx="14" fill="#ffffff" stroke="#bbf7d0" />
+      <text x="102" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill="#047857">{activeProfile.label} 판단</text>
+      <rect x="206" y="24" width="110" height="28" rx="14" fill="#ffffff" stroke="#dbeafe" />
+      <text x="261" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill="#1e3a8a">근거 {items.length}개</text>
+      <rect x="60" y="166" width="260" height="24" rx="12" fill="#ffffff" stroke="#e2e8f0" />
+      <text x="190" y="182" textAnchor="middle" fontSize="11" fontWeight="900" fill="#334155">선택값과 버튼 잠금 이유를 먼저 확인</text>
+    </svg>
+  );
+};
+
+const CatanActionAtlasPanel = ({ title = "", detail = "", activeKey = "build", items = [] }) => (
+  <section data-smoke="catan-action-atlas-panel" className="mb-3 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-3 shadow-sm sm:rounded-[1.5rem]">
+    <div className="grid gap-3">
+      <CatanActionAtlasArt activeKey={activeKey} items={items} />
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-xs font-black text-emerald-600">액션 아틀라스</div>
+            <div className="mt-1 text-base font-black text-slate-950">{title}</div>
+            <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{detail}</div>
+          </div>
+          <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[11px] font-black text-emerald-700">
+            {items.filter((item) => item.ready).length}/{items.length} 준비
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {items.map((item) => (
+            <div key={item.key} data-smoke="catan-action-atlas-item" className={`rounded-xl border px-3 py-2 ${item.ready ? "border-emerald-100 bg-white" : "border-slate-100 bg-slate-50"}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                  <div className="mt-0.5 text-sm font-black leading-snug text-slate-900">{item.value}</div>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${item.ready ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
+                  {item.ready ? "준비" : "잠금"}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+const buildCatanActionRouteItems = ({
+  phase = "SETUP",
+  phaseLabel = "",
+  myTurn = false,
+  activeName = "",
+  lastRoll = null,
+  mustDiscard = false,
+  discardTotal = 0,
+  discardRequired = 0,
+  myGoldChoice = null,
+  goldRequired = 0,
+  myAqueductChoice = null,
+  catanBuildTargetReady = false,
+  catanRobberTargetReady = false,
+  hasSelectedTarget = false,
+  buildMode = "",
+  catanBuildTargetKind = "",
+  selectedBuildActionDisabled = false,
+  canMaritimeTrade = false,
+  canBuyDevelopmentCard = false,
+  actionProgressCount = 0,
+  pendingDomesticTrade = false,
+  catanTradeSummary = "",
+  catanTurnGuidance = "",
+  winnerSeatNo = 0,
+  winnerVictoryPoints = 0,
+  winningPoints = 10,
+}) => {
+  const normalizedPhase = String(phase || "SETUP");
+  const activePlayerLabel = activeName || "상대";
+  const specialTurnReady = Boolean(mustDiscard || myGoldChoice || myAqueductChoice);
+  const actionSupportReady = Boolean(canMaritimeTrade || canBuyDevelopmentCard || actionProgressCount > 0 || pendingDomesticTrade);
+  const targetReady = normalizedPhase === "ROBBER" ? catanRobberTargetReady : catanBuildTargetReady || hasSelectedTarget;
+  const mainReady = (() => {
+    if (normalizedPhase === "FINISHED") return Boolean(winnerSeatNo);
+    if (normalizedPhase === "ROLL") return myTurn;
+    if (normalizedPhase === "DISCARD") return mustDiscard && Number(discardRequired) > 0 && Number(discardTotal) === Number(discardRequired);
+    if (normalizedPhase === "GOLD_CHOICE") return Boolean(myGoldChoice);
+    if (normalizedPhase === "AQUEDUCT_CHOICE") return Boolean(myAqueductChoice);
+    if (normalizedPhase === "ROBBER") return myTurn && catanRobberTargetReady;
+    if (normalizedPhase === "SETUP") return myTurn && catanBuildTargetReady;
+    if (normalizedPhase === "ACTION") return myTurn && (actionSupportReady || (catanBuildTargetReady && !selectedBuildActionDisabled));
+    return myTurn || specialTurnReady;
+  })();
+
+  const stateValue = (() => {
+    if (normalizedPhase === "FINISHED") return winnerSeatNo ? `승자 확정 ${winnerVictoryPoints}/${winningPoints}점` : "결과 확정";
+    if (normalizedPhase === "ROLL") return lastRoll ? `최근 주사위 ${lastRoll}` : "주사위 대기";
+    if (normalizedPhase === "DISCARD") return mustDiscard ? `${discardTotal}/${discardRequired}장 버리기` : "버리기 대기";
+    if (normalizedPhase === "GOLD_CHOICE") return myGoldChoice ? `${goldRequired}장 선택` : "금광 보상 대기";
+    if (normalizedPhase === "AQUEDUCT_CHOICE") return myAqueductChoice ? "수로 보상 선택" : "수로 보상 대기";
+    if (normalizedPhase === "ROBBER") return "도적/해적 이동";
+    if (normalizedPhase === "ACTION") return myTurn ? "내 행동 단계" : `${activePlayerLabel} 행동`;
+    if (normalizedPhase === "SETUP") return "초기 배치";
+    return phaseLabel || normalizedPhase;
+  })();
+
+  const targetValue = (() => {
+    if (normalizedPhase === "FINISHED") return "결과 확인";
+    if (normalizedPhase === "DISCARD") return mustDiscard ? "버릴 카드 수 입력" : "다른 플레이어 대기";
+    if (normalizedPhase === "GOLD_CHOICE") return myGoldChoice ? "받을 자원 입력" : "선택 순서 대기";
+    if (normalizedPhase === "AQUEDUCT_CHOICE") return myAqueductChoice ? "수로 자원 선택" : "선택 순서 대기";
+    if (normalizedPhase === "ROBBER") return catanRobberTargetReady ? "대상 타일 선택 완료" : "타일 선택 필요";
+    if (normalizedPhase === "SETUP") return catanBuildTargetReady ? "정점+간선 선택 완료" : "정점과 간선 선택";
+    if (normalizedPhase === "ACTION") {
+      if (catanBuildTargetReady) return `${catanBuildTargetKind || "대상"} 선택 완료`;
+      if (hasSelectedTarget) return "선택값 확인";
+      return `${catanBuildTargetKind || catanBuildModeLabels[buildMode] || "건설 대상"} 선택`;
+    }
+    return hasSelectedTarget ? "선택 완료" : "선택 대기";
+  })();
+
+  const mainValue = (() => {
+    if (normalizedPhase === "FINISHED") return "승리 근거 검토";
+    if (normalizedPhase === "ROLL") return "주사위 굴리기";
+    if (normalizedPhase === "DISCARD") return mustDiscard ? "버리기 제출" : "대기";
+    if (normalizedPhase === "GOLD_CHOICE") return "자원 받기";
+    if (normalizedPhase === "AQUEDUCT_CHOICE") return "자원 받기";
+    if (normalizedPhase === "ROBBER") return catanRobberTargetReady ? "이동 실행" : "대상 필요";
+    if (normalizedPhase === "SETUP") return catanBuildTargetReady ? "초기 배치 실행" : "배치 대상 필요";
+    if (normalizedPhase === "ACTION") {
+      if (pendingDomesticTrade) return "거래 응답";
+      if (catanBuildTargetReady) return selectedBuildActionDisabled ? "조건 확인" : `${catanBuildModeLabels[buildMode] || "건설"} 실행`;
+      if (canMaritimeTrade) return "해상 교환";
+      if (canBuyDevelopmentCard) return "개발 카드 구매";
+      if (actionProgressCount > 0) return `진행 카드 ${actionProgressCount}장`;
+      if (selectedBuildActionDisabled) return "조건 확인";
+      return "건설/교환 선택";
+    }
+    return phaseLabel || "단계 처리";
+  })();
+
+  const finishValue = (() => {
+    if (normalizedPhase === "FINISHED") return "게임 종료";
+    if (normalizedPhase === "ACTION") {
+      if (pendingDomesticTrade) return "거래 처리 후 종료";
+      return myTurn ? "행동 후 종료" : "상대 턴 대기";
+    }
+    if (normalizedPhase === "ROLL") return "행동 단계로 이동";
+    if (normalizedPhase === "SETUP") return "다음 배치 순서";
+    if (["DISCARD", "GOLD_CHOICE", "AQUEDUCT_CHOICE", "ROBBER"].includes(normalizedPhase)) return "처리 후 계속";
+    return "다음 단계";
+  })();
+
+  return [
+    {
+      key: "state",
+      label: "상태 확인",
+      value: stateValue,
+      ready: myTurn || specialTurnReady || normalizedPhase === "FINISHED",
+      detail: catanTurnGuidance || "현재 단계와 차례 권한을 확인한 뒤 다음 버튼으로 이동합니다.",
+    },
+    {
+      key: "target",
+      label: "보드 대상",
+      value: targetValue,
+      ready: targetReady || ["DISCARD", "GOLD_CHOICE", "AQUEDUCT_CHOICE", "FINISHED"].includes(normalizedPhase),
+      detail: normalizedPhase === "ROBBER"
+        ? "선택한 타일과 약탈 후보가 도적/해적 이동 버튼의 근거가 됩니다."
+        : "보드 클릭이나 입력값이 실제 실행 버튼의 근거가 됩니다.",
+    },
+    {
+      key: "main",
+      label: "실행 버튼",
+      value: mainValue,
+      ready: mainReady,
+      detail: normalizedPhase === "ACTION"
+        ? "건설, 교환, 카드 버튼은 기존 조건을 그대로 읽어 가능한 행동만 강조합니다."
+        : "필요한 선택값이 채워지면 현재 단계의 제출 버튼으로 이어집니다.",
+    },
+    {
+      key: "finish",
+      label: "턴 종료",
+      value: finishValue,
+      ready: normalizedPhase === "FINISHED" || (normalizedPhase === "ACTION" && myTurn),
+      detail: normalizedPhase === "ACTION"
+        ? (actionSupportReady ? `${catanTradeSummary || "교환/카드 선택"}도 확인한 뒤 턴 종료로 넘깁니다.` : "할 일을 마치면 턴 종료 버튼으로 다음 차례를 넘깁니다.")
+        : "현재 특수 처리가 끝나면 서버의 다음 단계 흐름을 그대로 따릅니다.",
+    },
+  ];
+};
+
+const CatanActionRouteArt = ({ items = [] }) => {
+  const routeItems = items.length ? items : [
+    { key: "state", label: "상태", ready: false },
+    { key: "target", label: "대상", ready: false },
+    { key: "main", label: "실행", ready: false },
+    { key: "finish", label: "종료", ready: false },
+  ];
+  const activeIndex = Math.max(0, routeItems.findIndex((item) => !item.ready));
+  const nodes = routeItems.map((item, index) => ({
+    ...item,
+    x: 54 + index * 92,
+    active: index === activeIndex,
+  }));
+
+  return (
+    <svg data-smoke="catan-action-route-art" viewBox="0 0 380 170" role="img" aria-label="카탄 액션 루트" className="h-auto w-full">
+      <rect x="8" y="10" width="364" height="150" rx="18" fill="#f8fafc" stroke="#bae6fd" strokeWidth="2" />
+      <path d="M48 112C92 58 132 58 168 112S248 164 324 74" fill="none" stroke="#7dd3fc" strokeWidth="9" strokeLinecap="round" />
+      <path d="M48 112C92 58 132 58 168 112S248 164 324 74" fill="none" stroke="#0f766e" strokeWidth="3" strokeLinecap="round" />
+      {nodes.map((item, index) => (
+        <g key={item.key} data-smoke="catan-action-route-node" data-route-key={item.key}>
+          {index < nodes.length - 1 && (
+            <path d={`M${item.x + 32} 82H${nodes[index + 1].x - 32}`} stroke={item.ready ? "#0f766e" : "#cbd5e1"} strokeWidth="4" strokeLinecap="round" />
+          )}
+          <rect x={item.x - 34} y={item.active ? 48 : 54} width="68" height="58" rx="14" fill={item.ready ? "#ccfbf1" : "#ffffff"} stroke={item.active ? "#0f766e" : item.ready ? "#14b8a6" : "#cbd5e1"} strokeWidth={item.active ? "3" : "2"} />
+          <circle cx={item.x} cy={item.active ? 66 : 72} r="13" fill={item.ready ? "#0f766e" : "#e2e8f0"} />
+          <text x={item.x} y={item.active ? 70 : 76} textAnchor="middle" fontSize="12" fontWeight="900" fill={item.ready ? "#ffffff" : "#475569"}>{index + 1}</text>
+          <text x={item.x} y={item.active ? 98 : 104} textAnchor="middle" fontSize="11" fontWeight="900" fill="#0f172a">{item.label}</text>
+        </g>
+      ))}
+      <rect x="28" y="20" width="124" height="26" rx="13" fill="#ffffff" stroke="#bae6fd" />
+      <text x="90" y="37" textAnchor="middle" fontSize="12" fontWeight="900" fill="#0369a1">카탄 액션 루트</text>
+      <rect x="208" y="130" width="126" height="24" rx="12" fill="#ffffff" stroke="#99f6e4" />
+      <text x="271" y="146" textAnchor="middle" fontSize="11" fontWeight="900" fill="#0f766e">버튼 조건은 그대로 유지</text>
+    </svg>
+  );
+};
+
+const CatanActionRoutePanel = ({
+  phase = "SETUP",
+  myTurn = false,
+  buildMode = "",
+  targetReady = false,
+  canMaritimeTrade = false,
+  canBuyDevelopmentCard = false,
+  actionProgressCount = 0,
+  items = [],
+}) => (
+  <section
+    data-smoke="catan-action-route-panel"
+    data-phase={phase}
+    data-my-turn={myTurn ? "true" : "false"}
+    data-build-mode={buildMode || "none"}
+    data-target-ready={targetReady ? "true" : "false"}
+    data-can-trade={canMaritimeTrade ? "true" : "false"}
+    data-can-development={canBuyDevelopmentCard ? "true" : "false"}
+    data-action-count={String(actionProgressCount)}
+    className="mb-3 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-teal-50 p-3 shadow-sm sm:rounded-[1.5rem]"
+  >
+    <div className="grid gap-3">
+      <CatanActionRouteArt items={items} />
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-xs font-black text-sky-700">카탄 액션 루트</div>
+            <div className="mt-1 text-base font-black text-slate-950">상태 확인 → 보드 대상 → 실행 버튼 → 턴 종료</div>
+            <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">현재 단계에서 실제 버튼까지 이어지는 순서만 보여주는 읽기 전용 안내입니다.</div>
+          </div>
+          <span className="rounded-full border border-sky-100 bg-white px-3 py-1 text-[11px] font-black text-sky-700">
+            {items.filter((item) => item.ready).length}/{items.length} 준비
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {items.map((item) => (
+            <div key={item.key} data-smoke="catan-action-route-item" data-route-key={item.key} className={`rounded-xl border px-3 py-2 ${item.ready ? "border-teal-100 bg-white" : "border-slate-100 bg-slate-50"}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                  <div className="mt-0.5 text-sm font-black leading-snug text-slate-900">{item.value}</div>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${item.ready ? "bg-teal-100 text-teal-700" : "bg-slate-200 text-slate-600"}`}>
+                  {item.ready ? "준비" : "확인"}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+);
 
 const catanResourceByTerrain = {
   HILL: "BRICK",
@@ -554,6 +1290,18 @@ const catanRouteLabels = {
   ROAD: "도로",
   SHIP: "배",
   BRIDGE: "다리",
+};
+
+const catanBuildModeLabels = {
+  ROAD: "도로",
+  BRIDGE: "다리",
+  SHIP: "배",
+  MOVE_SHIP: "배 이동",
+  KNIGHT: "기사",
+  CITY_WALL: "성벽",
+  SETTLEMENT: "마을",
+  CITY: "도시",
+  HARBOR_SETTLEMENT: "항구 정착지",
 };
 
 const catanProgressLabels = {
@@ -632,6 +1380,618 @@ const catanProgressTimingClass = (cardType) => {
   if (cardType === "ALCHEMIST") return "bg-emerald-50 text-emerald-700";
   if (playableProgressTypes.has(cardType)) return "bg-white text-slate-700";
   return "bg-slate-100 text-slate-500";
+};
+
+const catanProgressDiscardTone = (status = "waiting") => {
+  if (status === "ready") return "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-950";
+  if (status === "protected") return "border-amber-100 bg-amber-50 text-amber-950";
+  if (status === "active") return "border-violet-100 bg-violet-50 text-violet-950";
+  return "border-slate-100 bg-slate-50 text-slate-900";
+};
+
+const buildCatanProgressDiscardPlannerItems = ({
+  nonVictoryCards = [],
+  progressCards = [],
+  selectedCardId = "",
+  discardRequired = 0,
+  mustDiscardProgress = false,
+  pendingNames = [],
+} = {}) => {
+  const safeNonVictoryCards = listOf(nonVictoryCards);
+  const safeProgressCards = listOf(progressCards);
+  const required = Math.max(0, Number(discardRequired) || 0);
+  const victoryCards = safeProgressCards.filter((card) => catanProgressVictoryTypes.has(get(card, "type", "type", "")));
+  const selectedCard = safeNonVictoryCards.find((card) => String(card.id) === String(selectedCardId)) || safeNonVictoryCards[0] || null;
+  const selectedType = get(selectedCard, "type", "type", "");
+  const waitText = pendingNames.length ? pendingNames.join(" · ") : "대기 없음";
+
+  return [
+    {
+      key: "limit",
+      label: "보유 한도",
+      value: `비승점 ${safeNonVictoryCards.length}/4장`,
+      detail: required > 0 ? `${required}장을 버리면 진행 카드 한도 안으로 돌아갑니다.` : "현재 진행 카드 한도 안에 있습니다.",
+      status: required > 0 ? "active" : "ready",
+    },
+    {
+      key: "selection",
+      label: "버릴 카드",
+      value: selectedCard ? (catanProgressLabels[selectedType] || selectedType || "선택 카드") : "선택 필요",
+      detail: mustDiscardProgress ? "아래 선택 상자의 카드가 그대로 제출됩니다." : `${waitText} 플레이어의 선택을 기다립니다.`,
+      status: mustDiscardProgress && selectedCard ? "ready" : "waiting",
+    },
+    {
+      key: "excluded",
+      label: "제외 카드",
+      value: `자동 승점 ${victoryCards.length}장`,
+      detail: "인쇄술과 헌법 같은 승점 진행 카드는 버리기 후보에서 제외됩니다.",
+      status: victoryCards.length ? "protected" : "waiting",
+    },
+    {
+      key: "next",
+      label: "다음 처리",
+      value: mustDiscardProgress ? "카드 제출" : "대기",
+      detail: "대상자가 초과 카드를 버리면 서버가 다음 카탄 단계로 진행합니다.",
+      status: mustDiscardProgress ? "active" : "waiting",
+    },
+  ];
+};
+
+const CatanProgressDiscardPlannerArt = ({ items = [], selectedCardId = "", discardRequired = 0, nonVictoryCount = 0, mustDiscardProgress = false }) => {
+  const required = Math.max(0, Number(discardRequired) || 0);
+  const accent = mustDiscardProgress ? "#a21caf" : "#64748b";
+  const progress = Math.max(0.08, Math.min(1, Number(nonVictoryCount || 0) / Math.max(4, Number(nonVictoryCount || 0))));
+  const nodes = [
+    { key: "limit", x: 72, y: 124 },
+    { key: "selection", x: 204, y: 72 },
+    { key: "excluded", x: 344, y: 124 },
+    { key: "next", x: 486, y: 72 },
+  ];
+
+  return (
+    <svg
+      data-smoke="catan-progress-discard-planner-art"
+      viewBox="0 0 560 210"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`카탄 진행 카드 버리기 ${required}장`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="540" height="190" rx="24" fill="#fdf4ff" stroke={accent} strokeWidth="3" />
+      <path d="M70 124C139 42 214 45 282 104c73 64 143 58 204-32" fill="none" stroke="#f5d0fe" strokeWidth="18" strokeLinecap="round" />
+      <path d="M70 124C139 42 214 45 282 104c73 64 143 58 204-32" fill="none" stroke={accent} strokeWidth="5" strokeLinecap="round" />
+      <text x="32" y="42" fontSize="13" fontWeight="900" fill="#701a75">진행 카드 한도 정리</text>
+      <rect x="32" y="160" width="496" height="18" rx="9" fill="#fae8ff" stroke="#e879f9" strokeWidth="2" />
+      <rect x="32" y="160" width={496 * progress} height="18" rx="9" fill={accent} opacity=".82" />
+      <text x="280" y="174" textAnchor="middle" fontSize="11" fontWeight="900" fill="#ffffff">비승점 {nonVictoryCount}장 · 버리기 {required}장</text>
+      {nodes.map((node, index) => {
+        const item = items.find((candidate) => candidate.key === node.key) || {};
+        const nodeFill = item.status === "ready" ? "#f0fdf4" : item.status === "protected" ? "#fef3c7" : item.status === "active" ? "#fae8ff" : "#f8fafc";
+        const nodeStroke = item.status === "ready" ? "#16a34a" : item.status === "protected" ? "#d97706" : item.status === "active" ? "#a21caf" : "#94a3b8";
+        return (
+          <g key={node.key} data-smoke="catan-progress-discard-planner-node" data-progress-key={node.key}>
+            <circle cx={node.x} cy={node.y} r="28" fill={nodeFill} stroke={nodeStroke} strokeWidth="5" />
+            <text x={node.x} y={node.y + 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="#0f172a">{index + 1}</text>
+            <text x={node.x} y={node.y + 45} textAnchor="middle" fontSize="10" fontWeight="900" fill="#581c87">{item.label || node.key}</text>
+          </g>
+        );
+      })}
+      {selectedCardId && (
+        <text x="528" y="42" textAnchor="end" fontSize="10" fontWeight="900" fill="#86198f">선택 {selectedCardId}</text>
+      )}
+    </svg>
+  );
+};
+
+const CatanProgressDiscardPlannerPanel = ({
+  progressCards = [],
+  nonVictoryCards = [],
+  selectedCardId = "",
+  discardRequired = 0,
+  mustDiscardProgress = false,
+  pendingNames = [],
+}) => {
+  const safeNonVictoryCards = listOf(nonVictoryCards);
+  const items = buildCatanProgressDiscardPlannerItems({
+    nonVictoryCards: safeNonVictoryCards,
+    progressCards,
+    selectedCardId,
+    discardRequired,
+    mustDiscardProgress,
+    pendingNames,
+  });
+
+  return (
+    <section
+      data-smoke="catan-progress-discard-planner-panel"
+      data-must-discard-progress={mustDiscardProgress ? "true" : "false"}
+      data-progress-discard-required={Math.max(0, Number(discardRequired) || 0)}
+      data-non-victory-count={safeNonVictoryCards.length}
+      data-selected-card-id={selectedCardId || ""}
+      className="rounded-2xl border border-fuchsia-200 bg-white p-3 shadow-lg"
+    >
+      <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <CatanProgressDiscardPlannerArt
+          items={items}
+          selectedCardId={selectedCardId}
+          discardRequired={discardRequired}
+          nonVictoryCount={safeNonVictoryCards.length}
+          mustDiscardProgress={mustDiscardProgress}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-fuchsia-700">진행 카드 버리기 플래너</div>
+              <div className="mt-1 text-lg font-black text-slate-950">4장 한도 안으로 정리</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+                승점 진행 카드는 제외하고, 실제 버릴 후보와 선택된 카드를 제출 전에 다시 보여줍니다.
+              </div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${mustDiscardProgress ? "bg-fuchsia-100 text-fuchsia-800" : "bg-slate-100 text-slate-600"}`}>
+              {mustDiscardProgress ? "내가 버릴 차례" : "다른 플레이어 대기"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div
+                key={item.key}
+                data-smoke="catan-progress-discard-planner-item"
+                data-progress-key={item.key}
+                className={`min-h-[92px] rounded-xl border px-3 py-2 ${catanProgressDiscardTone(item.status)}`}
+              >
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {safeNonVictoryCards.slice(0, 8).map((card) => {
+              const cardType = get(card, "type", "type", "");
+              const selected = String(card.id) === String(selectedCardId);
+              return (
+                <span
+                  key={card.id}
+                  data-smoke="catan-progress-discard-planner-chip"
+                  data-card-id={card.id}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-black ${selected ? "bg-fuchsia-100 text-fuchsia-800" : "bg-slate-100 text-slate-500"}`}
+                >
+                  {catanProgressLabels[cardType] || cardType}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const catanDomesticTradeReviewTone = (status = "waiting") => {
+  if (status === "ready") return "border-emerald-100 bg-emerald-50 text-emerald-950";
+  if (status === "warning") return "border-amber-100 bg-amber-50 text-amber-950";
+  if (status === "mine") return "border-sky-100 bg-sky-50 text-sky-950";
+  return "border-slate-100 bg-slate-50 text-slate-900";
+};
+
+const catanTradeBundleRows = (values = {}) => catanResourceKeys
+  .map((key) => ({
+    key,
+    label: catanResourceLabels[key] || key,
+    count: Math.max(0, Number(values?.[key] || 0)),
+  }))
+  .filter((row) => row.count > 0);
+
+const catanTradeBundleText = (values = {}) => {
+  const rows = catanTradeBundleRows(values);
+  return rows.length ? rows.map((row) => `${row.label} ${row.count}`).join(" · ") : "없음";
+};
+
+const buildCatanDomesticTradeReviewItems = ({
+  offer = {},
+  request = {},
+  proposerName = "",
+  targetName = "",
+  proposerSeatNo = 0,
+  targetSeatNo = 0,
+  mySeatNo = 0,
+  resources = {},
+} = {}) => {
+  const offerRows = catanTradeBundleRows(offer);
+  const requestRows = catanTradeBundleRows(request);
+  const offerTotal = offerRows.reduce((sum, row) => sum + row.count, 0);
+  const requestTotal = requestRows.reduce((sum, row) => sum + row.count, 0);
+  const isTarget = Number(targetSeatNo) === Number(mySeatNo);
+  const isProposer = Number(proposerSeatNo) === Number(mySeatNo);
+  const canPayRequest = requestRows.every((row) => Number(resources?.[row.key] || 0) >= row.count);
+  const roleValue = isTarget ? "응답자" : isProposer ? "제안자" : "관전";
+  const decisionValue = isTarget ? "수락 또는 거절" : isProposer ? "제안 취소 가능" : "결과 대기";
+
+  return [
+    {
+      key: "route",
+      label: "거래 주체",
+      value: `${proposerName || "제안자"} → ${targetName || "응답자"}`,
+      detail: `내 위치: ${roleValue}`,
+      status: isTarget ? "ready" : isProposer ? "mine" : "waiting",
+    },
+    {
+      key: "offer",
+      label: "상대가 주는 것",
+      value: catanTradeBundleText(offer),
+      detail: `제공 묶음 ${offerTotal}장`,
+      status: offerTotal > 0 ? "ready" : "waiting",
+    },
+    {
+      key: "request",
+      label: isTarget ? "내가 주는 것" : "요청 묶음",
+      value: catanTradeBundleText(request),
+      detail: isTarget
+        ? canPayRequest ? "보유 자원으로 수락할 수 있는 요청입니다." : "요청 자원이 부족하면 수락이 실패할 수 있습니다."
+        : `요청 묶음 ${requestTotal}장`,
+      status: isTarget && !canPayRequest ? "warning" : requestTotal > 0 ? "ready" : "waiting",
+    },
+    {
+      key: "decision",
+      label: "응답 선택",
+      value: decisionValue,
+      detail: isTarget ? "수락하면 제공/요청 묶음이 서버에서 교환됩니다." : isProposer ? "상대 응답 전까지 제안을 취소할 수 있습니다." : "해당 플레이어의 응답을 기다립니다.",
+      status: isTarget ? "ready" : isProposer ? "mine" : "waiting",
+    },
+  ];
+};
+
+const CatanDomesticTradeReviewArt = ({ items = [], offer = {}, request = {}, myRole = "waiting" }) => {
+  const offerTotal = catanTradeBundleRows(offer).reduce((sum, row) => sum + row.count, 0);
+  const requestTotal = catanTradeBundleRows(request).reduce((sum, row) => sum + row.count, 0);
+  const accent = myRole === "target" ? "#059669" : myRole === "proposer" ? "#0284c7" : "#64748b";
+  const nodes = [
+    { key: "route", x: 74, y: 122 },
+    { key: "offer", x: 206, y: 74 },
+    { key: "request", x: 346, y: 122 },
+    { key: "decision", x: 486, y: 74 },
+  ];
+
+  return (
+    <svg
+      data-smoke="catan-domestic-trade-review-art"
+      viewBox="0 0 560 210"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`카탄 거래 제안 제공 ${offerTotal}장 요청 ${requestTotal}장`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="540" height="190" rx="24" fill="#ecfdf5" stroke={accent} strokeWidth="3" />
+      <path d="M72 122C124 58 184 44 252 86c76 47 135 54 226-22" fill="none" stroke="#bbf7d0" strokeWidth="18" strokeLinecap="round" />
+      <path d="M72 122C124 58 184 44 252 86c76 47 135 54 226-22" fill="none" stroke={accent} strokeWidth="5" strokeLinecap="round" />
+      <text x="32" y="42" fontSize="13" fontWeight="900" fill="#064e3b">거래 제안 해석</text>
+      <rect x="54" y="160" width="210" height="18" rx="9" fill="#d1fae5" stroke="#34d399" strokeWidth="2" />
+      <rect x="318" y="160" width="176" height="18" rx="9" fill="#dbeafe" stroke="#38bdf8" strokeWidth="2" />
+      <text x="159" y="174" textAnchor="middle" fontSize="11" fontWeight="900" fill="#065f46">제공 {offerTotal}장</text>
+      <text x="406" y="174" textAnchor="middle" fontSize="11" fontWeight="900" fill="#075985">요청 {requestTotal}장</text>
+      {nodes.map((node, index) => {
+        const item = items.find((candidate) => candidate.key === node.key) || {};
+        const nodeFill = item.status === "ready" ? "#dcfce7" : item.status === "warning" ? "#fef3c7" : item.status === "mine" ? "#e0f2fe" : "#f8fafc";
+        const nodeStroke = item.status === "ready" ? "#16a34a" : item.status === "warning" ? "#d97706" : item.status === "mine" ? "#0284c7" : "#94a3b8";
+        return (
+          <g key={node.key} data-smoke="catan-domestic-trade-review-node" data-trade-key={node.key}>
+            <circle cx={node.x} cy={node.y} r="28" fill={nodeFill} stroke={nodeStroke} strokeWidth="5" />
+            <text x={node.x} y={node.y + 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="#0f172a">{index + 1}</text>
+            <text x={node.x} y={node.y + 45} textAnchor="middle" fontSize="10" fontWeight="900" fill="#064e3b">{item.label || node.key}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+const CatanDomesticTradeReviewPanel = ({
+  offer = {},
+  request = {},
+  proposerName = "",
+  targetName = "",
+  proposerSeatNo = 0,
+  targetSeatNo = 0,
+  mySeatNo = 0,
+  resources = {},
+}) => {
+  const myRole = Number(targetSeatNo) === Number(mySeatNo)
+    ? "target"
+    : Number(proposerSeatNo) === Number(mySeatNo)
+      ? "proposer"
+      : "waiting";
+  const items = buildCatanDomesticTradeReviewItems({
+    offer,
+    request,
+    proposerName,
+    targetName,
+    proposerSeatNo,
+    targetSeatNo,
+    mySeatNo,
+    resources,
+  });
+
+  return (
+    <section
+      data-smoke="catan-domestic-trade-review-panel"
+      data-trade-role={myRole}
+      data-offer-total={catanTradeBundleRows(offer).reduce((sum, row) => sum + row.count, 0)}
+      data-request-total={catanTradeBundleRows(request).reduce((sum, row) => sum + row.count, 0)}
+      className="rounded-2xl border border-emerald-200 bg-white p-3 shadow-lg"
+    >
+      <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <CatanDomesticTradeReviewArt items={items} offer={offer} request={request} myRole={myRole} />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-emerald-700">거래 제안 해석</div>
+              <div className="mt-1 text-lg font-black text-slate-950">무엇을 주고 무엇을 받는지</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+                현재 제안의 제공/요청 묶음과 내가 눌러야 할 실제 버튼을 응답 전에 정리합니다.
+              </div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${myRole === "target" ? "bg-emerald-100 text-emerald-800" : myRole === "proposer" ? "bg-sky-100 text-sky-800" : "bg-slate-100 text-slate-600"}`}>
+              {myRole === "target" ? "응답 필요" : myRole === "proposer" ? "내 제안" : "응답 대기"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div
+                key={item.key}
+                data-smoke="catan-domestic-trade-review-item"
+                data-trade-key={item.key}
+                className={`min-h-[92px] rounded-xl border px-3 py-2 ${catanDomesticTradeReviewTone(item.status)}`}
+              >
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const catanWeddingResponseTone = (status = "waiting") => {
+  if (status === "ready") return "border-emerald-100 bg-emerald-50 text-emerald-950";
+  if (status === "over") return "border-amber-100 bg-amber-50 text-amber-950";
+  if (status === "active") return "border-pink-100 bg-pink-50 text-pink-950";
+  return "border-slate-100 bg-slate-50 text-slate-900";
+};
+
+const catanWeddingSelectedRows = (resources = {}, commodities = {}) => [
+  ...catanResourceKeys.map((key) => ({
+    key,
+    label: catanResourceLabels[key] || key,
+    count: Math.max(0, Number(resources?.[key] || 0)),
+    type: "resource",
+  })),
+  ...Object.entries(catanCommodityLabels).map(([key, label]) => ({
+    key,
+    label,
+    count: Math.max(0, Number(commodities?.[key] || 0)),
+    type: "commodity",
+  })),
+].filter((row) => row.count > 0);
+
+const catanWeddingBundleRows = ({
+  resources = {},
+  commodities = {},
+  resourceSelection = {},
+  commoditySelection = {},
+} = {}) => [
+  ...catanResourceKeys.map((key) => ({
+    key,
+    label: catanResourceLabels[key] || key,
+    held: Math.max(0, Number(resources?.[key] || 0)),
+    selected: Math.max(0, Number(resourceSelection?.[key] || 0)),
+    type: "resource",
+  })),
+  ...Object.entries(catanCommodityLabels).map(([key, label]) => ({
+    key,
+    label,
+    held: Math.max(0, Number(commodities?.[key] || 0)),
+    selected: Math.max(0, Number(commoditySelection?.[key] || 0)),
+    type: "commodity",
+  })),
+].filter((row) => row.held > 0 || row.selected > 0);
+
+const catanWeddingBundleText = (resources = {}, commodities = {}) => {
+  const rows = catanWeddingSelectedRows(resources, commodities);
+  return rows.length ? rows.map((row) => `${row.label} ${row.count}`).join(" · ") : "아직 선택 없음";
+};
+
+const buildCatanWeddingResponseItems = ({
+  attackerName = "",
+  mustRespondWedding = false,
+  weddingRequired = 0,
+  weddingTotal = 0,
+  weddingResources = {},
+  weddingCommodities = {},
+  resources = {},
+  commodities = {},
+  pendingNames = [],
+} = {}) => {
+  const required = Math.max(0, Number(weddingRequired) || 0);
+  const total = Math.max(0, Number(weddingTotal) || 0);
+  const selectedRows = catanWeddingSelectedRows(weddingResources, weddingCommodities);
+  const availableTotal = catanWeddingBundleRows({ resources, commodities }).reduce((sum, row) => sum + row.held, 0);
+  const selectionStatus = !mustRespondWedding ? "waiting" : total === required ? "ready" : total > required ? "over" : "active";
+  const pendingText = pendingNames.length ? pendingNames.join(" · ") : "대상 없음";
+
+  return [
+    {
+      key: "trigger",
+      label: "혼례 대상",
+      value: attackerName ? `${attackerName}의 혼례` : "혼례 응답",
+      detail: mustRespondWedding ? "내가 줄 카드 선택 대상입니다." : `응답 대기: ${pendingText}`,
+      status: mustRespondWedding ? "active" : "waiting",
+    },
+    {
+      key: "requirement",
+      label: "필요 장수",
+      value: mustRespondWedding ? `${required}장 정확히` : "다른 플레이어 대기",
+      detail: mustRespondWedding ? `보유 ${availableTotal}장 기준으로 제출 장수를 맞춥니다.` : "대상 플레이어의 선택이 끝나면 다음 단계로 진행됩니다.",
+      status: mustRespondWedding ? "active" : "waiting",
+    },
+    {
+      key: "selection",
+      label: "선택한 카드",
+      value: `${total}/${required}장`,
+      detail: !mustRespondWedding
+        ? "현재는 내가 제출할 차례가 아닙니다."
+        : total === required
+          ? "제출 버튼을 누르기 전 구성만 마지막으로 확인하면 됩니다."
+          : total > required
+            ? "필요 장수보다 많이 골랐습니다."
+            : "아직 필요한 장수보다 적게 골랐습니다.",
+      status: selectionStatus,
+    },
+    {
+      key: "composition",
+      label: "선택 구성",
+      value: catanWeddingBundleText(weddingResources, weddingCommodities),
+      detail: selectedRows.length ? `자원/상품 합계 ${total}장` : "아래 입력에서 줄 자원이나 상품을 고릅니다.",
+      status: selectedRows.length ? selectionStatus : "waiting",
+    },
+  ];
+};
+
+const CatanWeddingResponseArt = ({ items = [], weddingRequired = 0, weddingTotal = 0, mustRespondWedding = false }) => {
+  const required = Math.max(0, Number(weddingRequired) || 0);
+  const total = Math.max(0, Number(weddingTotal) || 0);
+  const progress = required > 0 ? Math.min(1, total / required) : 0;
+  const accent = !mustRespondWedding ? "#64748b" : total === required ? "#db2777" : total > required ? "#d97706" : "#ec4899";
+  const nodes = [
+    { key: "trigger", x: 72, y: 122 },
+    { key: "requirement", x: 206, y: 74 },
+    { key: "selection", x: 346, y: 122 },
+    { key: "composition", x: 486, y: 74 },
+  ];
+
+  return (
+    <svg
+      data-smoke="catan-wedding-response-art"
+      viewBox="0 0 560 210"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`카탄 혼례 응답 선택 ${total}장 필요 ${required}장`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="540" height="190" rx="24" fill="#fdf2f8" stroke={accent} strokeWidth="3" />
+      <path d="M70 122C128 46 190 48 250 92c70 52 140 58 232-24" fill="none" stroke="#fbcfe8" strokeWidth="18" strokeLinecap="round" />
+      <path d="M70 122C128 46 190 48 250 92c70 52 140 58 232-24" fill="none" stroke={accent} strokeWidth="5" strokeLinecap="round" />
+      <text x="32" y="42" fontSize="13" fontWeight="900" fill="#831843">혼례 응답 경로</text>
+      <rect x="34" y="160" width="492" height="18" rx="9" fill="#fce7f3" stroke="#f472b6" strokeWidth="2" />
+      <rect x="34" y="160" width={492 * progress} height="18" rx="9" fill={accent} opacity=".84" />
+      <text x="280" y="174" textAnchor="middle" fontSize="11" fontWeight="900" fill={progress > 0.38 ? "#ffffff" : "#831843"}>선택 {total}장 · 필요 {required}장</text>
+      {nodes.map((node, index) => {
+        const item = items.find((candidate) => candidate.key === node.key) || {};
+        const nodeFill = item.status === "ready" ? "#dcfce7" : item.status === "over" ? "#fef3c7" : item.status === "active" ? "#fce7f3" : "#f8fafc";
+        const nodeStroke = item.status === "ready" ? "#16a34a" : item.status === "over" ? "#d97706" : item.status === "active" ? "#db2777" : "#94a3b8";
+        return (
+          <g key={node.key} data-smoke="catan-wedding-response-node" data-wedding-key={node.key}>
+            <circle cx={node.x} cy={node.y} r="28" fill={nodeFill} stroke={nodeStroke} strokeWidth="5" />
+            <text x={node.x} y={node.y + 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="#0f172a">{index + 1}</text>
+            <text x={node.x} y={node.y + 45} textAnchor="middle" fontSize="10" fontWeight="900" fill="#831843">{item.label || node.key}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+const CatanWeddingResponsePanel = ({
+  attackerName = "",
+  mustRespondWedding = false,
+  weddingRequired = 0,
+  weddingTotal = 0,
+  weddingResources = {},
+  weddingCommodities = {},
+  resources = {},
+  commodities = {},
+  pendingNames = [],
+}) => {
+  const items = buildCatanWeddingResponseItems({
+    attackerName,
+    mustRespondWedding,
+    weddingRequired,
+    weddingTotal,
+    weddingResources,
+    weddingCommodities,
+    resources,
+    commodities,
+    pendingNames,
+  });
+  const bundleRows = catanWeddingBundleRows({
+    resources,
+    commodities,
+    resourceSelection: weddingResources,
+    commoditySelection: weddingCommodities,
+  });
+
+  return (
+    <section
+      data-smoke="catan-wedding-response-panel"
+      data-must-wedding={mustRespondWedding ? "true" : "false"}
+      data-wedding-required={Math.max(0, Number(weddingRequired) || 0)}
+      data-wedding-total={Math.max(0, Number(weddingTotal) || 0)}
+      data-pending-count={pendingNames.length}
+      className="rounded-2xl border border-pink-200 bg-white p-3 shadow-lg"
+    >
+      <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <CatanWeddingResponseArt
+          items={items}
+          weddingRequired={weddingRequired}
+          weddingTotal={weddingTotal}
+          mustRespondWedding={mustRespondWedding}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-pink-700">혼례 응답 플래너</div>
+              <div className="mt-1 text-lg font-black text-slate-950">정확히 몇 장을 줄지</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+                제출 버튼을 누르기 전에 필요 장수, 현재 선택 수, 자원/상품 구성을 한 번에 확인합니다.
+              </div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${mustRespondWedding ? "bg-pink-100 text-pink-800" : "bg-slate-100 text-slate-600"}`}>
+              {mustRespondWedding ? "응답 필요" : "응답 대기"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div
+                key={item.key}
+                data-smoke="catan-wedding-response-item"
+                data-wedding-key={item.key}
+                className={`min-h-[92px] rounded-xl border px-3 py-2 ${catanWeddingResponseTone(item.status)}`}
+              >
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {bundleRows.slice(0, 8).map((row) => (
+              <span
+                key={row.key}
+                data-smoke="catan-wedding-response-chip"
+                data-card-key={row.key}
+                data-selected={row.selected > 0 ? "true" : "false"}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-black ${row.selected > 0 ? "bg-pink-100 text-pink-800" : "bg-slate-100 text-slate-500"}`}
+              >
+                {row.label} 보유 {row.held} · 선택 {row.selected}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 };
 
 const catanEventLabels = {
@@ -747,8 +2107,457 @@ const catanColorFill = {
   BROWN: "#92400e",
 };
 
+const catanDiceDotPositions = {
+  1: [[24, 24]],
+  2: [[15, 15], [33, 33]],
+  3: [[15, 15], [24, 24], [33, 33]],
+  4: [[15, 15], [33, 15], [15, 33], [33, 33]],
+  5: [[15, 15], [33, 15], [24, 24], [15, 33], [33, 33]],
+  6: [[15, 13], [33, 13], [15, 24], [33, 24], [15, 35], [33, 35]],
+};
+
+const CatanDiceFaceArt = ({ value = 0, red = false, muted = false, className = "" }) => {
+  const safeValue = Number(value || 0);
+  const dots = catanDiceDotPositions[safeValue] || [];
+  const shellFill = red ? "#dc2626" : muted ? "#e2e8f0" : "#ffffff";
+  const stroke = red ? "#7f1d1d" : "#0f172a";
+  const ink = red ? "#fff7ed" : muted ? "#64748b" : "#0f172a";
+
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      className={className}
+      data-smoke="catan-dice-face-art"
+      role="img"
+      aria-label={safeValue > 0 ? `${red ? "적색 " : ""}주사위 ${safeValue}` : "주사위 대기"}
+    >
+      <rect x="4" y="4" width="40" height="40" rx="11" fill={shellFill} stroke={stroke} strokeWidth="3" opacity={muted ? ".86" : "1"} />
+      <rect x="9" y="9" width="30" height="30" rx="8" fill="rgba(255,255,255,.22)" />
+      {dots.length ? dots.map(([x, y]) => (
+        <circle key={`${x}-${y}`} cx={x} cy={y} r="3.4" fill={ink} />
+      )) : (
+        <path d="M17 24h14" stroke={ink} strokeWidth="4" strokeLinecap="round" opacity=".75" />
+      )}
+    </svg>
+  );
+};
+
+const CatanDiceOutcomePanel = ({
+  diceFaces = [],
+  lastRoll = 0,
+  redDie = 0,
+  eventDie = "",
+  phase = "",
+  myTurn = false,
+  pendingDiscardCount = 0,
+  productionSummary = [],
+  resourceBank = {},
+  robberLocked = false,
+  explorersPiratesRule = false,
+  citiesKnightsRule = false,
+}) => {
+  const normalizedFaces = Array.isArray(diceFaces) ? diceFaces.map(Number).filter((value) => value > 0) : [];
+  const inferredWhiteDie = redDie > 0 && lastRoll > redDie && lastRoll - redDie <= 6 ? lastRoll - redDie : 0;
+  const faces = normalizedFaces.length
+    ? normalizedFaces.slice(0, 3)
+    : redDie > 0
+      ? [redDie, inferredWhiteDie || 0]
+      : [0, 0];
+  const isSeven = Number(lastRoll || 0) === 7;
+  const hasRoll = Number(lastRoll || 0) > 0;
+  const eventLabel = eventDie ? catanEventDieLabels[eventDie] || eventDie : "이벤트 없음";
+  const productionText = productionSummary.length
+    ? productionSummary.map((item) => `${item.label} ${item.count}`).join(" · ")
+    : hasRoll && !isSeven
+      ? "생산 후보 없음"
+      : "굴림 후 표시";
+  const primaryTitle = !hasRoll
+    ? phase === "ROLL" ? "주사위 굴림 대기" : "최근 굴림 없음"
+    : isSeven
+      ? explorersPiratesRule ? "7 처리 · 해적 이동" : robberLocked ? "7 처리 · 도적 잠금" : "7 처리 · 도둑 압박"
+      : `생산 숫자 ${lastRoll}`;
+  const primaryDetail = !hasRoll
+    ? myTurn ? "굴림 전 개발 카드나 진행 카드 타이밍을 먼저 확인하고, 주사위를 굴리면 생산 근거가 여기로 이동합니다." : "현재 플레이어의 주사위 굴림을 기다리는 중입니다."
+    : isSeven
+      ? pendingDiscardCount > 0
+        ? `${pendingDiscardCount}명이 손패를 줄인 뒤 ${explorersPiratesRule ? "해적" : "도둑"} 이동 단계로 이어집니다.`
+        : robberLocked
+          ? "첫 야만인 침공 전이라 도적 이동 없이 손패 처리만 확인합니다."
+          : `${explorersPiratesRule ? "해적" : "도둑"}을 옮길 타일과 훔칠 대상을 확인해야 합니다.`
+      : `${productionText} · 도둑이 막은 타일과 은행 잔량은 실제 지급 결과에 영향을 줍니다.`;
+  const signalItems = [
+    {
+      key: "roll",
+      label: "굴림 결과",
+      value: hasRoll ? String(lastRoll) : "대기",
+      detail: hasRoll ? primaryTitle : phase === "ROLL" ? "주사위 버튼 대기" : "최근 기록 없음",
+      tone: hasRoll ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-600",
+    },
+    {
+      key: "event",
+      label: citiesKnightsRule ? "이벤트 주사위" : "이벤트",
+      value: eventLabel,
+      detail: citiesKnightsRule ? "야만인선/진행 카드 계열 신호를 확인합니다." : "기본판은 이벤트 주사위가 없을 수 있습니다.",
+      tone: eventDie ? "bg-rose-50 text-rose-800" : "bg-slate-50 text-slate-600",
+    },
+    {
+      key: "discard",
+      label: "손패 압박",
+      value: isSeven ? `${pendingDiscardCount}명 확인` : "없음",
+      detail: isSeven ? "8장 이상 보유자는 절반을 버립니다." : "7이 아닐 때는 생산/행동 단계가 중심입니다.",
+      tone: isSeven ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-700",
+    },
+    {
+      key: "bank",
+      label: "은행 신호",
+      value: `${catanResourceKeys.reduce((sum, key) => sum + Math.max(0, Number(resourceBank?.[key] || 0)), 0)}장`,
+      detail: "자원 공급 부족 이벤트가 있으면 지급량이 달라질 수 있습니다.",
+      tone: "bg-sky-50 text-sky-800",
+    },
+  ];
+
+  return (
+    <section className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg" data-smoke="catan-dice-outcome-panel">
+      <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="bg-slate-950 p-4 text-white">
+          <div className="text-[11px] font-black uppercase tracking-wide text-amber-200">Dice Readout</div>
+          <div className="mt-2 flex items-center gap-2">
+            {faces.map((face, index) => (
+              <CatanDiceFaceArt key={`${face}-${index}`} value={face} red={redDie > 0 && index === 0} muted={!face} className="h-16 w-16" />
+            ))}
+          </div>
+          <div className="mt-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+            <div className="text-[11px] font-black text-slate-300">결과 해석</div>
+            <div className="mt-1 text-sm font-black leading-snug text-white">{primaryTitle}</div>
+            <div className="mt-1 text-xs font-bold leading-relaxed text-slate-300">{primaryDetail}</div>
+          </div>
+        </div>
+        <div className="p-3">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {signalItems.map((item) => (
+              <div key={item.key} className={`min-h-[96px] rounded-xl border border-slate-100 px-3 py-2 ${item.tone}`} data-smoke="catan-dice-signal-item">
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-1 truncate text-sm font-black">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-5">
+            {catanResourceKeys.map((key) => {
+              const produced = productionSummary.find((item) => item.key === key);
+              return (
+                <div key={key} className="rounded-xl border border-slate-100 bg-slate-50 px-2 py-2" data-smoke="catan-dice-production-item">
+                  <div className="text-[10px] font-black text-slate-500">{catanResourceLabels[key]}</div>
+                  <div className="mt-1 text-sm font-black text-slate-950">{produced?.count || 0}개 후보</div>
+                  <div className="mt-1 text-[10px] font-bold text-slate-500">은행 {resourceBank?.[key] ?? "-"}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
+
+const catanDiscardPlannerTone = (status = "waiting") => {
+  if (status === "ready") return "border-emerald-100 bg-emerald-50 text-emerald-950";
+  if (status === "over") return "border-rose-100 bg-rose-50 text-rose-950";
+  if (status === "under") return "border-amber-100 bg-amber-50 text-amber-950";
+  return "border-slate-100 bg-slate-50 text-slate-900";
+};
+
+const buildCatanDiscardPlannerItems = ({
+  mustDiscard = false,
+  discardRequired = 0,
+  discardTotal = 0,
+  resourceRows = [],
+  commodityRows = [],
+  pendingNames = [],
+  explorersPiratesRule = false,
+  robberLocked = false,
+} = {}) => {
+  const required = Math.max(0, Number(discardRequired) || 0);
+  const total = Math.max(0, Number(discardTotal) || 0);
+  const remaining = Math.max(0, required - total);
+  const over = Math.max(0, total - required);
+  const selectedRows = [...resourceRows, ...commodityRows].filter((row) => Number(row.selected || 0) > 0);
+  const selectionText = selectedRows.length
+    ? selectedRows.map((row) => `${row.label} ${row.selected}`).join(" · ")
+    : "아직 선택 없음";
+  const waitText = pendingNames.length ? pendingNames.join(" · ") : "대기 없음";
+  const status = !mustDiscard ? "waiting" : total === required ? "ready" : total > required ? "over" : "under";
+  const nextValue = explorersPiratesRule ? "해적 이동" : robberLocked ? "도적 잠금 유지" : "도둑 이동";
+
+  return [
+    {
+      key: "requirement",
+      label: "필요 장수",
+      value: mustDiscard ? `${required}장 정확히` : "내 차례 아님",
+      detail: mustDiscard ? "보유 카드 절반을 정확히 선택해야 다음 단계로 넘어갑니다." : `${waitText} 플레이어의 선택을 기다립니다.`,
+      status: mustDiscard ? "under" : "waiting",
+    },
+    {
+      key: "selection",
+      label: "선택한 카드",
+      value: `${total}/${required}장`,
+      detail: status === "ready"
+        ? "필요 장수와 일치합니다. 제출 버튼으로 확정할 수 있습니다."
+        : status === "over"
+          ? `${over}장 초과 선택했습니다. 숫자를 줄여야 합니다.`
+          : mustDiscard
+            ? `${remaining}장을 더 골라야 합니다.`
+            : "현재 내가 버릴 대상이 아닙니다.",
+      status,
+    },
+    {
+      key: "composition",
+      label: "선택 구성",
+      value: selectionText,
+      detail: selectedRows.length ? "입력칸에서 고른 자원/상품 구성을 그대로 요약합니다." : "아래 입력칸에서 버릴 자원을 고르면 여기에 바로 요약됩니다.",
+      status: selectedRows.length ? "ready" : "waiting",
+    },
+    {
+      key: "next",
+      label: "다음 처리",
+      value: nextValue,
+      detail: "모든 대상자가 정확히 버리면 서버가 7 처리의 다음 단계를 진행합니다.",
+      status: status === "ready" ? "ready" : "waiting",
+    },
+  ];
+};
+
+const CatanDiscardPlannerArt = ({ items = [], discardTotal = 0, discardRequired = 0, mustDiscard = false }) => {
+  const required = Math.max(0, Number(discardRequired) || 0);
+  const total = Math.max(0, Number(discardTotal) || 0);
+  const safeRequired = Math.max(1, required);
+  const progress = Math.max(0, Math.min(1.15, total / safeRequired));
+  const ready = mustDiscard && required > 0 && total === required;
+  const over = mustDiscard && total > required;
+  const accent = ready ? "#059669" : over ? "#e11d48" : mustDiscard ? "#d97706" : "#64748b";
+  const nodes = [
+    { key: "requirement", x: 74, y: 126 },
+    { key: "selection", x: 206, y: 76 },
+    { key: "composition", x: 346, y: 126 },
+    { key: "next", x: 486, y: 76 },
+  ];
+
+  return (
+    <svg
+      data-smoke="catan-discard-planner-art"
+      viewBox="0 0 560 210"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`카탄 버리기 ${total}/${required}장 선택`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="540" height="190" rx="24" fill="#fff7ed" stroke={accent} strokeWidth="3" />
+      <path d="M74 126C132 50 206 46 278 102c76 59 141 55 208-26" fill="none" stroke="#fed7aa" strokeWidth="18" strokeLinecap="round" />
+      <path d="M74 126C132 50 206 46 278 102c76 59 141 55 208-26" fill="none" stroke={accent} strokeWidth="5" strokeLinecap="round" />
+      <text x="32" y="42" fontSize="13" fontWeight="900" fill="#7c2d12">7 처리 · 버리기 플래너</text>
+      <rect x="32" y="160" width="496" height="18" rx="9" fill="#ffedd5" stroke="#fdba74" strokeWidth="2" />
+      <rect x="32" y="160" width={Math.min(496, 496 * progress)} height="18" rx="9" fill={accent} opacity=".86" />
+      <text x="280" y="174" textAnchor="middle" fontSize="11" fontWeight="900" fill={ready || over ? "#ffffff" : "#7c2d12"}>{total}/{required}장</text>
+      {nodes.map((node, index) => {
+        const item = items.find((candidate) => candidate.key === node.key) || {};
+        const nodeFill = item.status === "ready" ? "#dcfce7" : item.status === "over" ? "#ffe4e6" : item.status === "under" ? "#fef3c7" : "#f8fafc";
+        const nodeStroke = item.status === "ready" ? "#16a34a" : item.status === "over" ? "#e11d48" : item.status === "under" ? "#d97706" : "#94a3b8";
+        return (
+          <g key={node.key} data-smoke="catan-discard-planner-node" data-discard-key={node.key}>
+            <circle cx={node.x} cy={node.y} r="28" fill={nodeFill} stroke={nodeStroke} strokeWidth="5" />
+            <text x={node.x} y={node.y + 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="#0f172a">{index + 1}</text>
+            <text x={node.x} y={node.y + 45} textAnchor="middle" fontSize="10" fontWeight="900" fill="#431407">{item.label || node.key}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+const CatanDiscardPlannerPanel = ({
+  resources = {},
+  commodities = {},
+  discardForm = {},
+  discardCommodityForm = {},
+  discardRequired = 0,
+  discardTotal = 0,
+  mustDiscard = false,
+  pendingNames = [],
+  citiesKnightsRule = false,
+  explorersPiratesRule = false,
+  robberLocked = false,
+}) => {
+  const resourceRows = catanResourceEntries.map(([key, label]) => ({
+    key,
+    label,
+    owned: Math.max(0, Number(resources?.[key] || 0)),
+    selected: Math.max(0, Number(discardForm?.[key] || 0)),
+  }));
+  const commodityRows = citiesKnightsRule
+    ? Object.entries(catanCommodityLabels).map(([key, label]) => ({
+      key,
+      label,
+      owned: Math.max(0, Number(commodities?.[key] || 0)),
+      selected: Math.max(0, Number(discardCommodityForm?.[key] || 0)),
+    }))
+    : [];
+  const items = buildCatanDiscardPlannerItems({
+    mustDiscard,
+    discardRequired,
+    discardTotal,
+    resourceRows,
+    commodityRows,
+    pendingNames,
+    explorersPiratesRule,
+    robberLocked,
+  });
+  const selectedRows = [...resourceRows, ...commodityRows].filter((row) => row.selected > 0);
+
+  return (
+    <section
+      data-smoke="catan-discard-planner-panel"
+      data-must-discard={mustDiscard ? "true" : "false"}
+      data-discard-required={Math.max(0, Number(discardRequired) || 0)}
+      data-discard-total={Math.max(0, Number(discardTotal) || 0)}
+      data-pending-count={pendingNames.length}
+      className="rounded-2xl border border-orange-200 bg-white p-3 shadow-lg"
+    >
+      <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <CatanDiscardPlannerArt
+          items={items}
+          discardTotal={discardTotal}
+          discardRequired={discardRequired}
+          mustDiscard={mustDiscard}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-orange-700">버리기 플래너</div>
+              <div className="mt-1 text-lg font-black text-slate-950">정확히 몇 장을 버려야 하는지</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+                아래 숫자 입력으로 선택한 자원과 상품을 읽어, 제출 전에 부족/초과 상태를 한 번 더 보여줍니다.
+              </div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${mustDiscard ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-600"}`}>
+              {mustDiscard ? "내가 버릴 차례" : "다른 플레이어 대기"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div
+                key={item.key}
+                data-smoke="catan-discard-planner-item"
+                data-discard-key={item.key}
+                className={`min-h-[92px] rounded-xl border px-3 py-2 ${catanDiscardPlannerTone(item.status)}`}
+              >
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {(selectedRows.length ? selectedRows : resourceRows.slice(0, 5)).map((row) => (
+              <span
+                key={row.key}
+                data-smoke="catan-discard-planner-chip"
+                data-discard-key={row.key}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-black ${row.selected ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-500"}`}
+              >
+                {row.label} {row.selected}/{row.owned}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const TabletopHistoryEmptyArt = ({ tone = "slate", gameLabel = "기록", nextLabel = "첫 행동" }) => {
+  const palette = {
+    slate: { bg: "#0f172a", node: "#38bdf8", accent: "#f59e0b", line: "#e2e8f0", soft: "#dbeafe" },
+    blokus: { bg: "#111827", node: "#06b6d4", accent: "#a855f7", line: "#e0f2fe", soft: "#cffafe" },
+    mahe: { bg: "#064e3b", node: "#22c55e", accent: "#facc15", line: "#dcfce7", soft: "#bbf7d0" },
+    catan: { bg: "#451a03", node: "#f59e0b", accent: "#0ea5e9", line: "#fef3c7", soft: "#fde68a" },
+    "six-nimmt": { bg: "#7f1d1d", node: "#f97316", accent: "#84cc16", line: "#fff7ed", soft: "#fed7aa" },
+  }[tone] || {
+    bg: "#0f172a",
+    node: "#38bdf8",
+    accent: "#f59e0b",
+    line: "#e2e8f0",
+    soft: "#dbeafe",
+  };
+  const nodes = [
+    { key: "start", x: 48, y: 66, label: "시작", fill: palette.node },
+    { key: "action", x: 128, y: 38, label: nextLabel, fill: palette.accent },
+    { key: "log", x: 208, y: 70, label: "기록", fill: "#64748b" },
+  ];
+  return (
+    <svg
+      viewBox="0 0 260 116"
+      role="img"
+      aria-label={`${gameLabel} 첫 기록 대기 안내`}
+      className="h-auto w-full"
+      data-smoke="tabletop-history-empty-art"
+    >
+      <rect x="8" y="8" width="244" height="100" rx="18" fill={palette.bg} />
+      <path d="M48 66C78 20 112 28 140 48s55 44 88 6" fill="none" stroke={palette.line} strokeWidth="5" strokeLinecap="round" opacity=".82" />
+      <rect x="28" y="84" width="204" height="12" rx="6" fill={palette.soft} opacity=".22" />
+      {nodes.map((node) => (
+        <g key={node.key} data-smoke="tabletop-history-empty-node" data-history-node={node.key}>
+          <circle cx={node.x} cy={node.y} r="17" fill={node.fill} stroke="#ffffff" strokeWidth="4" />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="8" fontWeight="900" fill="#ffffff">{node.label}</text>
+        </g>
+      ))}
+      <text x="22" y="26" fontSize="9" fontWeight="900" fill="#bfdbfe">최근 행동</text>
+      <text x="238" y="26" textAnchor="end" fontSize="9" fontWeight="900" fill="#e2e8f0">{gameLabel}</text>
+    </svg>
+  );
+};
+
+const TabletopHistoryEmptyState = ({
+  game = "tabletop",
+  title = "아직 기록이 없습니다",
+  detail = "첫 행동이 끝나면 이 영역에 최근 기록이 쌓입니다.",
+  nextAction = "첫 행동",
+}) => {
+  const config = gameConfigs[game] || {};
+  const gameLabel = config.title || title;
+  const items = [
+    { label: "현재 상태", value: "기록 대기", detail: "아직 서버가 전달한 행동 로그가 없습니다." },
+    { label: "다음 변화", value: nextAction, detail: "첫 행동이 처리되면 최근 기록, 주체, 결과가 같은 위치에 표시됩니다." },
+  ];
+  return (
+    <div
+      className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50 p-2"
+      data-smoke="tabletop-history-empty-state"
+      data-history-game={game}
+    >
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,190px)_1fr]">
+        <div className="overflow-hidden rounded-lg bg-slate-950">
+          <TabletopHistoryEmptyArt tone={game} gameLabel={gameLabel} nextLabel={nextAction} />
+        </div>
+        <div className="min-w-0 p-1">
+          <div className="text-xs font-black text-slate-900">{title}</div>
+          <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">{detail}</div>
+          <div className="mt-2 grid gap-1.5">
+            {items.map((item) => (
+              <div key={item.label} className="rounded-lg bg-white px-2 py-1.5" data-smoke="tabletop-history-empty-item">
+                <div className="text-[9px] font-black text-slate-400">{item.label}</div>
+                <div className="text-[11px] font-black text-slate-900">{item.value}</div>
+                <div className="text-[10px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 const idOf = getTabletopRoomId;
 const codeOf = getTabletopRoomCode;
 const statusOf = getTabletopRoomStatus;
@@ -797,6 +2606,3285 @@ const tabletopActionSignalForSound = (game, gameState) => {
     get(last, "event_type", "eventType", get(last, "action_type", "actionType", "")),
     get(last, "seat_no", "seatNo", get(last, "active_seat_no", "activeSeatNo", "")),
   ].join(":");
+};
+
+const tabletopPlayerName = (players, seatNo) => {
+  const normalizedSeatNo = Number(seatNo || 0);
+  if (!normalizedSeatNo) return "-";
+  return players.find((player) => seatNoOf(player) === normalizedSeatNo)?.nickname || `${normalizedSeatNo}번`;
+};
+
+const tabletopPhaseLabel = (game, gameState, status) => {
+  const phase = String(get(gameState, "phase", "phase", "") || "").toUpperCase();
+  if (!phase) return statusLabels[status] || status || "대기";
+  if (game === "dalmuti") return dalmutiPhaseLabels[phase] || phase;
+  if (game === "six-nimmt") return sixNimmtPhaseLabels[phase] || phase;
+  if (game === "telestrations") return telestrationsPhaseLabels[phase] || phase;
+  if (game === "mafia") return mafiaPhaseLabels[phase] || phase;
+  if (game === "poker") return pokerPhaseLabels[phase] || phase;
+  if (game === "mahe") {
+    if (phase === "ROLLING") return "주사위 굴림";
+    if (phase === "CHOOSE_DICE_COUNT") return "주사위 개수 선택";
+    if (phase === "FINISHED") return "게임 종료";
+  }
+  if (game === "blokus") return phase === "FINISHED" ? "게임 종료" : "조각 배치";
+  if (game === "catan") {
+    const catanLabels = {
+      INITIAL_PLACEMENT: "초기 배치",
+      ROLL_DICE: "주사위 굴림",
+      ROBBER: "도둑 처리",
+      ACTION: "건설·교역",
+      DISCARD: "자원 버리기",
+      FINISHED: "게임 종료",
+    };
+    return catanLabels[phase] || phase;
+  }
+  return phase;
+};
+
+const tabletopLatestActionText = (game, gameState, players) => {
+  if (!gameState) return "아직 게임 로그가 없습니다.";
+  const eventSource = game === "blokus" || game === "mahe"
+    ? listOf(get(gameState, "move_history", "moveHistory", []))
+    : listOf(get(gameState, "events", "events", []));
+  const last = eventSource[eventSource.length - 1];
+  if (!last) return "아직 게임 로그가 없습니다.";
+  const message = get(last, "message", "message", "");
+  if (message) return message;
+  const eventType = String(get(last, "event_type", "eventType", get(last, "action_type", "actionType", "")) || "");
+  const seatNo = Number(get(last, "seat_no", "seatNo", get(last, "active_seat_no", "activeSeatNo", 0)));
+  const actor = tabletopPlayerName(players, seatNo);
+  if (game === "blokus") {
+    const turn = get(last, "turn_number", "turnNumber", "");
+    return `${turn ? `${turn}수 · ` : ""}${actor} ${last.pass ? "패스" : `${get(last, "piece_code", "pieceCode", "조각")} 배치`}`;
+  }
+  if (game === "mahe") return `${actor} · ${maheEventLabels[eventType] || eventType || "최근 행동"}`;
+  if (game === "dalmuti") return `${actor} · ${dalmutiEventLabels[eventType] || eventType || "최근 행동"}`;
+  if (game === "catan") return `${actor} · ${catanEventLabels[eventType] || eventType || "최근 행동"}`;
+  if (game === "six-nimmt") return `${actor} · ${sixNimmtEventLabels[eventType] || eventType || "최근 행동"}`;
+  if (game === "poker") return `${actor} · ${eventType || "최근 행동"}`;
+  return `${actor} · ${eventType || "최근 행동"}`;
+};
+
+const tabletopRecentEventSource = (game, gameState) => {
+  if (!gameState) return [];
+  return game === "blokus" || game === "mahe"
+    ? listOf(get(gameState, "move_history", "moveHistory", []))
+    : listOf(get(gameState, "events", "events", []));
+};
+
+const tabletopEventTypeLabel = (game, eventType) => {
+  if (game === "catan") return catanEventLabels[eventType] || eventType;
+  if (game === "mahe") return maheEventLabels[eventType] || eventType;
+  if (game === "dalmuti") return dalmutiEventLabels[eventType] || eventType;
+  if (game === "six-nimmt") return sixNimmtEventLabels[eventType] || eventType;
+  if (game === "mafia") return mafiaPhaseLabels[eventType] || eventType;
+  return eventType || "진행 기록";
+};
+
+const buildTabletopProgressDigest = (game, gameState, players, status) => {
+  const events = tabletopRecentEventSource(game, gameState);
+  const recentEvents = events.slice(-3).reverse();
+  const latest = events[events.length - 1] || null;
+  const latestType = String(get(latest, "event_type", "eventType", get(latest, "action_type", "actionType", "")) || "");
+  const latestSeatNo = Number(get(latest, "seat_no", "seatNo", get(latest, "active_seat_no", "activeSeatNo", 0)));
+  const actor = latestSeatNo ? tabletopPlayerName(players, latestSeatNo) : latest ? "시스템" : "대기";
+  const latestSummary = tabletopLatestActionText(game, gameState, players);
+  const phaseLabel = tabletopPhaseLabel(game, gameState, status);
+  const eventNo = get(latest, "event_no", "eventNo", get(latest, "turn_number", "turnNumber", ""));
+  const eventLabel = tabletopEventTypeLabel(game, latestType);
+  const isFinished = String(get(gameState, "phase", "phase", "") || "").toUpperCase() === "FINISHED" || status === "FINISHED";
+
+  const items = [
+    {
+      key: "latest",
+      icon: "recent",
+      label: "최근 진행",
+      value: latestSummary,
+      detail: latest ? "가장 마지막 서버 기록을 플레이어 문장으로 요약했습니다." : "첫 기록이 생기면 이 영역이 갱신됩니다.",
+    },
+    {
+      key: "actor",
+      icon: "player",
+      label: "행동 주체",
+      value: actor,
+      detail: latest ? `${eventLabel || "진행"} 기록의 기준 좌석입니다.` : "아직 행동 주체가 없습니다.",
+    },
+    {
+      key: "count",
+      icon: "signal",
+      label: "기록 밀도",
+      value: `${events.length}개`,
+      detail: recentEvents.length ? `최근 ${recentEvents.length}개 기록을 흐름으로 묶었습니다.` : "아직 표시할 최근 기록이 없습니다.",
+    },
+    {
+      key: "phase",
+      icon: isFinished ? "win" : "stage",
+      label: isFinished ? "결과 상태" : "현재 단계",
+      value: phaseLabel,
+      detail: eventNo ? `기록 번호 ${eventNo} 이후의 보드 상태입니다.` : "현재 단계와 최신 기록을 함께 봅니다.",
+    },
+  ];
+
+  return { events, recentEvents, latestType, items, eventLabel };
+};
+
+const TabletopProgressDigestArt = ({ digest }) => {
+  const nodes = digest.items.map((item, index) => ({
+    ...item,
+    x: 52 + index * 92,
+    y: index % 2 === 0 ? 76 : 118,
+    fill: ["#0ea5e9", "#10b981", "#f59e0b", "#f43f5e"][index] || "#64748b",
+  }));
+
+  return (
+    <svg
+      viewBox="0 0 360 188"
+      role="img"
+      aria-label="보드게임 최근 진행 요약"
+      className="h-full min-h-[188px] w-full"
+      data-smoke="tabletop-progress-digest-art"
+    >
+      <rect x="10" y="10" width="340" height="168" rx="22" fill="#0f172a" />
+      <rect x="24" y="30" width="312" height="132" rx="18" fill="#f8fafc" />
+      <path d="M52 76 C86 38 122 132 144 118 S214 76 236 76 S294 136 328 118" fill="none" stroke="#cbd5e1" strokeWidth="13" strokeLinecap="round" />
+      <path d="M52 76 C86 38 122 132 144 118 S214 76 236 76 S294 136 328 118" fill="none" stroke="#334155" strokeWidth="3" strokeLinecap="round" />
+      <text x="34" y="25" fontSize="10" fontWeight="900" fill="#bfdbfe">최근 진행</text>
+      <text x="326" y="25" textAnchor="end" fontSize="10" fontWeight="900" fill="#e2e8f0">{digest.events.length}개 기록</text>
+      {nodes.map((node, index) => (
+        <g key={node.key} data-smoke="tabletop-progress-digest-node">
+          <circle cx={node.x} cy={node.y} r="22" fill={node.fill} stroke="#ffffff" strokeWidth="5" />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="10" fontWeight="900" fill="#ffffff">{index + 1}</text>
+          <text x={node.x} y={node.y + (index % 2 === 0 ? 38 : -32)} textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#0f172a">{node.label}</text>
+        </g>
+      ))}
+      <rect x="64" y="148" width="232" height="13" rx="7" fill="#e2e8f0" />
+      <text x="180" y="158" textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#0f172a">최근 기록 → 행동 주체 → 기록 밀도 → 현재 단계</text>
+    </svg>
+  );
+};
+
+const TabletopProgressDigestPanel = ({ game, gameState, players, status }) => {
+  if (!gameState) return null;
+  const digest = buildTabletopProgressDigest(game, gameState, players, status);
+
+  return (
+    <section
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      data-smoke="tabletop-progress-digest-panel"
+      data-event-count={digest.events.length}
+      data-recent-count={digest.recentEvents.length}
+      data-latest-type={digest.latestType}
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,340px)_1fr]">
+        <div className="bg-slate-950 p-3">
+          <TabletopProgressDigestArt digest={digest} />
+        </div>
+        <div className="p-3 sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-500">
+                <GameUxGlyph type="recent" className="h-3.5 w-3.5 text-primary-600" />
+                최근 진행 요약
+              </div>
+              <h3 className="mt-2 text-base font-black text-slate-950 sm:text-lg">방금 무엇이 바뀌었는가</h3>
+            </div>
+            <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-black text-white">
+              {digest.eventLabel || "진행 기록"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {digest.items.map((item) => (
+              <div key={item.key} className="min-h-[108px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-progress-digest-item" data-digest-key={item.key}>
+                <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400">
+                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 text-primary-600" />
+                  {item.label}
+                </div>
+                <div className="mt-1 line-clamp-2 text-sm font-black leading-snug text-slate-950">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-slate-600">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const tabletopNumber = (value, fallback = 0) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const tabletopStateSeatNo = (item) => tabletopNumber(get(item, "seat_no", "seatNo", 0));
+
+const tabletopStateName = (players, item) => {
+  const directName = get(item, "name", "name", "") || get(item, "nickname", "nickname", "") || get(item, "label", "label", "");
+  if (directName) return directName;
+  return tabletopPlayerName(players, tabletopStateSeatNo(item));
+};
+
+const tabletopScoreRows = (rows, players, scoreReader, order = "desc") => {
+  const mapped = rows
+    .map((row) => ({
+      row,
+      seatNo: tabletopStateSeatNo(row),
+      name: tabletopStateName(players, row),
+      score: scoreReader(row),
+      winner: Boolean(get(row, "winner", "winner", false)),
+    }))
+    .filter((row) => Number.isFinite(row.score));
+  return mapped.sort((left, right) => order === "asc" ? left.score - right.score : right.score - left.score);
+};
+
+const tabletopWinnerNames = (winners) => winners.map((row) => `${row.name}님`).join(", ");
+
+const tabletopRunnerUp = (scoreRows, winners) => scoreRows.find((row) => !winners.includes(row));
+
+const tabletopResultGapText = (winner, runnerUp, { lowerIsBetter = false, unit = "점" } = {}) => {
+  if (!winner || !runnerUp) return "";
+  const gap = lowerIsBetter ? runnerUp.score - winner.score : winner.score - runnerUp.score;
+  if (!Number.isFinite(gap) || gap <= 0) return "";
+  return `2위 ${runnerUp.name}님과 ${gap}${unit} 차이입니다.`;
+};
+
+const buildTabletopScoreSignal = (game, gameState, players) => {
+  const phase = String(get(gameState, "phase", "phase", "") || "").toUpperCase();
+  const statePlayers = listOf(get(gameState, "players", "players", []));
+
+  if (game === "catan") {
+    const winningPoints = tabletopNumber(get(gameState, "winning_points", "winningPoints", 10), 10) || 10;
+    const winnerSeatNo = tabletopNumber(get(gameState, "winner_seat_no", "winnerSeatNo", 0));
+    const scoreRows = tabletopScoreRows(
+      statePlayers,
+      players,
+      (player) => tabletopNumber(get(player, "public_victory_points", "publicVictoryPoints", get(player, "victory_points", "victoryPoints", 0)))
+    );
+    const winner = winnerSeatNo
+      ? scoreRows.find((row) => row.seatNo === winnerSeatNo) || { name: tabletopPlayerName(players, winnerSeatNo), score: 0 }
+      : null;
+    const leader = scoreRows[0];
+    if (phase === "FINISHED" && winner) {
+      return {
+        value: `${winner.name} 승리`,
+        detail: `목표 ${winningPoints}점에 도달해 최종 승자가 확정되었습니다.`,
+      };
+    }
+    if (leader) {
+      return {
+        value: `${leader.name} ${leader.score}/${winningPoints}점`,
+        detail: `공개 승점 기준 선두입니다. 목표까지 ${Math.max(0, winningPoints - leader.score)}점 남았습니다.`,
+      };
+    }
+  }
+
+  if (game === "blokus") {
+    const scoreRows = tabletopScoreRows(
+      listOf(get(gameState, "scores", "scores", [])),
+      players,
+      (score) => tabletopNumber(get(score, "score", "score", 0))
+    );
+    const winners = scoreRows.filter((row) => row.winner);
+    if (phase === "FINISHED" && winners.length) {
+      const runnerUp = tabletopRunnerUp(scoreRows, winners);
+      const gapText = tabletopResultGapText(winners[0], runnerUp);
+      const winnerLead = winners.length > 1
+        ? `${tabletopWinnerNames(winners)}이 공동 ${winners[0].score}점으로 승리했습니다.`
+        : `${tabletopWinnerNames(winners)}이 최종 ${winners[0].score}점으로 승리했습니다.`;
+      return {
+        value: `${winners.map((row) => row.name).join(", ")} 승리`,
+        detail: `${winnerLead}${gapText ? ` ${gapText}` : ""} 블로커스 점수는 남은 조각 손실, 모든 조각 사용 보너스, 마지막 한 칸 조각 보너스를 서버가 합산한 결과입니다.`,
+      };
+    }
+    if (scoreRows[0]) {
+      return {
+        value: `${scoreRows[0].name} ${scoreRows[0].score}점`,
+        detail: "현재 표시 점수 기준 선두입니다. 둘 수 있는 조각과 막힌 경로를 함께 보세요.",
+      };
+    }
+  }
+
+  if (game === "mahe") {
+    const scoreRows = tabletopScoreRows(
+      listOf(get(gameState, "scores", "scores", [])),
+      players,
+      (score) => tabletopNumber(get(score, "score", "score", 0))
+    );
+    const winners = scoreRows.filter((row) => row.winner);
+    if (phase === "FINISHED" && winners.length) {
+      const runnerUp = tabletopRunnerUp(scoreRows, winners);
+      const gapText = tabletopResultGapText(winners[0], runnerUp);
+      const winningEggCount = listOf(get(winners[0].row, "cards", "cards", [])).length;
+      const eggCountText = winningEggCount ? ` 획득한 알 카드는 ${winningEggCount}장입니다.` : "";
+      const winnerLead = winners.length > 1
+        ? `${tabletopWinnerNames(winners)}이 알 카드 총점 ${winners[0].score}점으로 공동 승리했습니다.`
+        : `${tabletopWinnerNames(winners)}이 알 카드 총점 ${winners[0].score}점으로 승리했습니다.`;
+      return {
+        value: `${winners.map((row) => row.name).join(", ")} 승리`,
+        detail: `${winnerLead}${gapText ? ` ${gapText}` : ""}${eggCountText} 최종 알 카드 합계가 승리 기준이며 동점이면 알 카드 수와 서버 판정 순서가 함께 반영됩니다.`,
+      };
+    }
+    if (scoreRows[0]) {
+      const currentEgg = tabletopNumber(get(gameState, "current_egg", "currentEgg", 0));
+      return {
+        value: `${scoreRows[0].name} ${scoreRows[0].score}점`,
+        detail: currentEgg ? `현재 알 ${currentEgg}점이 다음 위험 보상입니다.` : "알 카드 점수 기준 선두입니다.",
+      };
+    }
+  }
+
+  if (game === "dalmuti") {
+    const nextOrder = listOf(get(gameState, "next_turn_order_seat_nos", "nextTurnOrderSeatNos", [])).map(Number).filter(Boolean);
+    const outSeatNos = listOf(get(gameState, "out_seat_nos", "outSeatNos", [])).map(Number).filter(Boolean);
+    if (phase === "FINISHED" && nextOrder.length) {
+      const firstSeatNo = nextOrder[0];
+      const firstName = tabletopPlayerName(players, firstSeatNo);
+      const escapedNames = outSeatNos.slice(0, 3).map((seatNo) => `${tabletopPlayerName(players, seatNo)}님`);
+      const escapedText = escapedNames.length ? ` 탈출 순서: ${escapedNames.join(" → ")}${outSeatNos.length > escapedNames.length ? " ..." : ""}.` : "";
+      return {
+        value: `${firstName} 다음 대달무티`,
+        detail: `${firstName}님이 가장 먼저 손패를 비워 이번 판 1순위가 되었고, 다음 라운드의 대달무티 자리를 받습니다. ${nextOrder.length}명 순위가 다음 계급과 세금 교환 흐름을 정합니다.${escapedText}`,
+      };
+    }
+    return {
+      value: outSeatNos.length ? `${outSeatNos.length}명 탈출` : `라운드 ${tabletopNumber(get(gameState, "round_no", "roundNo", 1), 1)}`,
+      detail: "손패를 먼저 비운 순서가 다음 계급과 자리 이점을 만듭니다.",
+    };
+  }
+
+  if (game === "six-nimmt") {
+    const scoreRows = tabletopScoreRows(
+      statePlayers,
+      players,
+      (player) => tabletopNumber(get(player, "total_penalty", "totalPenalty", 0)),
+      "asc"
+    );
+    const winners = scoreRows.filter((row) => row.winner);
+    if (phase === "FINISHED" && winners.length) {
+      const runnerUp = tabletopRunnerUp(scoreRows, winners);
+      const gapText = tabletopResultGapText(winners[0], runnerUp, { lowerIsBetter: true });
+      const winnerLead = winners.length > 1
+        ? `${tabletopWinnerNames(winners)}이 누적 벌점 ${winners[0].score}점으로 공동 승리했습니다.`
+        : `${tabletopWinnerNames(winners)}이 누적 벌점 ${winners[0].score}점으로 승리했습니다.`;
+      return {
+        value: `${winners.map((row) => row.name).join(", ")} 승리`,
+        detail: `${winnerLead}${gapText ? ` ${gapText}` : ""} 6 nimmt!는 벌점이 낮을수록 유리하므로 가져간 카드의 황소머리 합계가 최종 근거입니다.`,
+      };
+    }
+    if (scoreRows[0]) {
+      const selectedCount = listOf(get(gameState, "selected_seat_nos", "selectedSeatNos", [])).length;
+      return {
+        value: `${scoreRows[0].name} 벌점 ${scoreRows[0].score}`,
+        detail: `카드 선택 ${selectedCount}/${statePlayers.length || "-"}명 완료. 낮은 벌점이 유리합니다.`,
+      };
+    }
+  }
+
+  if (game === "telestrations") {
+    const currentStep = tabletopNumber(get(gameState, "current_step", "currentStep", 0));
+    const totalSteps = tabletopNumber(get(gameState, "total_steps", "totalSteps", 0));
+    const completedCount = listOf(get(gameState, "completed_seat_nos", "completedSeatNos", [])).length;
+    if (phase === "FINISHED") {
+      return {
+        value: "릴레이 완료",
+        detail: "텔레스트레이션은 승패보다 책자별 원문, 그림, 추측이 어떻게 바뀌었는지가 결과입니다. 공개 리플레이에서 원문과 마지막 추측의 차이를 비교하세요.",
+      };
+    }
+    return {
+      value: phase === "REVEAL" ? "공개 단계" : `${Math.min(currentStep + 1, totalSteps || currentStep + 1)}/${totalSteps || "-"}단계`,
+      detail: `${completedCount}명 제출 완료. 책자별로 제한된 정보만 이어받는 흐름입니다.`,
+    };
+  }
+
+  if (game === "mafia") {
+    const winnerTeam = String(get(gameState, "winner_team", "winnerTeam", "") || "");
+    const outcomeMessage = get(gameState, "outcome_message", "outcomeMessage", "") || "";
+    if (phase === "FINISHED" && winnerTeam) {
+      return {
+        value: winnerTeam === "MAFIA" ? "마피아팀 승리" : "시민팀 승리",
+        detail: outcomeMessage || "생존 균형과 투표 결과로 승패가 확정되었습니다.",
+      };
+    }
+    const aliveMafia = tabletopNumber(get(gameState, "alive_mafia_count", "aliveMafiaCount", 0));
+    const aliveTown = tabletopNumber(get(gameState, "alive_town_count", "aliveTownCount", 0));
+    return {
+      value: `마피아 ${aliveMafia} · 시민 ${aliveTown}`,
+      detail: "남은 인원 균형이 투표 압박과 밤 행동의 위험도를 결정합니다.",
+    };
+  }
+
+  if (game === "poker") {
+    const winnerSeatNo = tabletopNumber(get(gameState, "winner_seat_no", "winnerSeatNo", 0));
+    const resultTitle = get(gameState, "result_title", "resultTitle", "");
+    const resultDetail = get(gameState, "result_detail", "resultDetail", "");
+    if ((phase === "HAND_FINISHED" || phase === "FINISHED") && winnerSeatNo) {
+      return {
+        value: resultTitle || `${tabletopPlayerName(players, winnerSeatNo)} 승리`,
+        detail: resultDetail || `직전 팟 ${tabletopNumber(get(gameState, "last_pot", "lastPot", 0))}칩이 정산되었습니다.`,
+      };
+    }
+    return {
+      value: `팟 ${tabletopNumber(get(gameState, "pot", "pot", 0))}칩`,
+      detail: `콜 ${tabletopNumber(get(gameState, "call_amount", "callAmount", 0))}칩 · ${tabletopNumber(get(gameState, "hand_no", "handNo", 0))}/${tabletopNumber(get(gameState, "max_hands", "maxHands", 0)) || "-"}핸드`,
+    };
+  }
+
+  return {
+    value: tabletopPhaseLabel(game, gameState, "PLAYING"),
+    detail: "현재 서버 상태를 기준으로 판세를 확인하세요.",
+  };
+};
+
+const buildTabletopDecisionSignal = (game, gameState, players, status, mySeatNo, startStatusText) => {
+  const phase = String(get(gameState, "phase", "phase", "") || "").toUpperCase();
+  const activeSeatNo = tabletopTurnSeatForSound(game, gameState);
+  const activeName = activeSeatNo ? tabletopPlayerName(players, activeSeatNo) : "";
+  const brief = tabletopRoomBriefs[game] || {};
+  const myTurn = Boolean(status === "PLAYING" && activeSeatNo && Number(mySeatNo) === activeSeatNo);
+  if (status === "WAITING") {
+    return {
+      value: "시작 조건 확인",
+      detail: startStatusText || "참가자 준비와 인원 조건을 먼저 맞추세요.",
+    };
+  }
+  if (phase === "FINISHED" || status === "FINISHED") {
+    return {
+      value: "결과 확인",
+      detail: brief.winSignal || "승자와 점수 흐름을 확인한 뒤 다시하기를 선택하세요.",
+    };
+  }
+  if (game === "six-nimmt" && phase === "SELECTING") {
+    const myState = statePlayersForDecision(gameState).find((player) => tabletopStateSeatNo(player) === Number(mySeatNo));
+    return {
+      value: Boolean(get(myState, "selected", "selected", false)) ? "카드 제출 완료" : "카드 선택 필요",
+      detail: "모두 선택하면 카드가 공개되고 위험 행 선택 여부가 결정됩니다.",
+    };
+  }
+  if (game === "telestrations") {
+    const mySubmitted = Boolean(get(gameState, "my_submitted", "mySubmitted", false));
+    return {
+      value: mySubmitted ? "제출 완료" : "내 입력 제출",
+      detail: get(gameState, "current_task", "currentTask", "") || brief.firstDecision || "현재 단계 입력을 완료하세요.",
+    };
+  }
+  if (game === "mafia") {
+    const mySubmitted = Boolean(get(gameState, "my_submitted", "mySubmitted", false));
+    return {
+      value: mySubmitted ? "행동 제출 완료" : "역할 행동 확인",
+      detail: get(gameState, "my_task", "myTask", "") || brief.firstDecision || "현재 단계에서 가능한 대상과 투표 흐름을 확인하세요.",
+    };
+  }
+  if (myTurn) {
+    return {
+      value: "내 행동 선택",
+      detail: brief.firstDecision || "강조된 액션 패널에서 가능한 행동을 선택하세요.",
+    };
+  }
+  return {
+    value: activeName ? `${activeName} 대기` : "동시 진행 확인",
+    detail: brief.winSignal || "상대 행동 이후 바뀌는 점수, 카드, 말 위치를 확인하세요.",
+  };
+};
+
+const statePlayersForDecision = (gameState) => listOf(get(gameState, "players", "players", []));
+
+const TabletopBoardFocusPanel = ({ game, gameState, players, status, mySeatNo, startStatusText }) => {
+  if (!gameState) return null;
+  const phaseLabel = tabletopPhaseLabel(game, gameState, status);
+  const activeSeatNo = tabletopTurnSeatForSound(game, gameState);
+  const activeName = activeSeatNo ? tabletopPlayerName(players, activeSeatNo) : "동시 진행";
+  const scoreSignal = buildTabletopScoreSignal(game, gameState, players);
+  const decisionSignal = buildTabletopDecisionSignal(game, gameState, players, status, mySeatNo, startStatusText);
+  const latestAction = tabletopLatestActionText(game, gameState, players);
+  const hasRecentEvents = tabletopRecentEventSource(game, gameState).length > 0;
+  const normalizedPhase = String(get(gameState, "phase", "phase", "") || "").toUpperCase();
+  const isFinished = normalizedPhase === "FINISHED" || normalizedPhase === "HAND_FINISHED" || status === "FINISHED";
+  const myTurn = Boolean(status === "PLAYING" && activeSeatNo && Number(mySeatNo) === activeSeatNo);
+  const cueTone = isFinished ? "done" : myTurn ? "active" : status === "WAITING" ? "waiting" : "neutral";
+  const cueTitle = isFinished ? "결과 확인" : myTurn ? "내 행동 차례" : activeSeatNo ? `${activeName} 차례 관찰` : "동시 진행 확인";
+  const cueItems = [
+    { label: "단계", value: phaseLabel, icon: "stage", tone: isFinished ? "done" : "neutral" },
+    { label: "행동", value: decisionSignal.value, icon: "decision", tone: myTurn ? "active" : "neutral" },
+    { label: "판세", value: scoreSignal.value, icon: isFinished ? "win" : "score", tone: isFinished ? "done" : "neutral" },
+    { label: "근거", value: latestAction, icon: "recent" },
+  ];
+  const tiles = [
+    {
+      key: "phase",
+      icon: "stage",
+      label: "현재 단계",
+      value: phaseLabel,
+      detail: activeSeatNo ? `${activeName} 차례 기준으로 보드를 읽으세요.` : "동시 선택 또는 공개 단계입니다.",
+    },
+    {
+      key: "score",
+      icon: isFinished ? "win" : "score",
+      label: isFinished ? "결과" : "판세",
+      value: scoreSignal.value,
+      detail: scoreSignal.detail,
+    },
+    {
+      key: "decision",
+      icon: "decision",
+      label: "다음 판단",
+      value: decisionSignal.value,
+      detail: decisionSignal.detail,
+    },
+    {
+      key: "recent",
+      icon: "recent",
+      label: "최근 근거",
+      value: latestAction,
+      detail: "방금 바뀐 정보가 이번 판단의 기준입니다.",
+    },
+  ];
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-lg" data-smoke="tabletop-board-focus-panel">
+      {isFinished && (
+        <GameResultSpotlight
+          title={scoreSignal.value}
+          subtitle="게임 결과"
+          detail={scoreSignal.detail}
+          metric={latestAction}
+          smoke="tabletop-result-spotlight"
+          className="mb-3"
+        />
+      )}
+      <GameActionCueBar
+        title={cueTitle}
+        detail={decisionSignal.detail}
+        items={cueItems}
+        tone={cueTone}
+        smoke="tabletop-action-cue-bar"
+        className="mb-3"
+      />
+      {game === "catan" && !hasRecentEvents && !isFinished && (
+        <div className="mb-3" data-smoke="tabletop-focus-history-empty">
+          <TabletopHistoryEmptyState
+            game="catan"
+            title="아직 카탄 기록이 없습니다"
+            detail="주사위, 생산, 건설, 거래가 처리되면 좌석과 자원 근거가 이 기록 영역에 쌓입니다."
+            nextAction="첫 생산"
+          />
+        </div>
+      )}
+      <div className="grid gap-2 md:grid-cols-4">
+        {tiles.map((tile) => (
+          <div key={tile.key} className="min-h-[112px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-board-focus-tile">
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500">
+              <GameUxGlyph type={tile.icon} className="h-3.5 w-3.5" />
+              {tile.label}
+            </div>
+            <div className="mt-1 line-clamp-2 text-sm font-black leading-snug text-slate-950">{tile.value}</div>
+            <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-slate-600">{tile.detail}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const tabletopOutcomeBriefs = {
+  catan: {
+    condition: "목표 승점 도달",
+    basis: "공개 승점, 보너스 표식, 비공개 승점이 서버 최종 점수로 합산됩니다.",
+    review: "승점 트랙과 보너스 표식을 다시 확인하면 왜 끝났는지 가장 빨리 이해할 수 있습니다.",
+    tone: "amber",
+  },
+  blokus: {
+    condition: "남은 조각 손실 최소화",
+    basis: "남은 조각 점수, 모든 조각 사용 보너스, 마지막 한 칸 조각 보너스가 최종 점수입니다.",
+    review: "영토 압박과 남은 조각을 보면 승자와 격차의 이유가 드러납니다.",
+    tone: "sky",
+  },
+  mahe: {
+    condition: "알 카드 총점 우위",
+    basis: "트랙 보상으로 얻은 알 카드 합계가 승리 기준이며 동점이면 카드 수와 서버 판정 순서가 반영됩니다.",
+    review: "마지막 보상 압력과 누적 알 카드 수를 보면 추격 실패 지점이 보입니다.",
+    tone: "emerald",
+  },
+  dalmuti: {
+    condition: "가장 먼저 손패 비우기",
+    basis: "손패를 비운 순서가 다음 계급과 세금 흐름을 정합니다.",
+    review: "손패 레이스와 패스 압력을 보면 다음 대달무티가 왜 결정됐는지 알 수 있습니다.",
+    tone: "violet",
+  },
+  "six-nimmt": {
+    condition: "누적 벌점 최소화",
+    basis: "가져간 카드의 황소머리 합계가 낮을수록 유리합니다.",
+    review: "행 위험과 선택 잠금을 보면 어느 선택이 벌점 격차를 만들었는지 보입니다.",
+    tone: "rose",
+  },
+  telestrations: {
+    condition: "릴레이 공개 완료",
+    basis: "텔레스트레이션은 승패보다 원문, 그림, 추측이 어떻게 변했는지 보는 공개 경험이 핵심입니다.",
+    review: "공개 해석 패널에서 문구 변화와 현재 항목을 따라가면 라운드 흐름이 이해됩니다.",
+    tone: "cyan",
+  },
+  mafia: {
+    condition: "팀 승리 조건 충족",
+    basis: "마피아와 시민 생존 수, 처형/밤 결과, 서버 승리 팀 판정이 결과 근거입니다.",
+    review: "투표 압박과 목표 인텔을 다시 보면 어느 밤/낮 선택이 승패를 갈랐는지 보입니다.",
+    tone: "zinc",
+  },
+  poker: {
+    condition: "핸드 또는 최종 팟 승리",
+    basis: "서버 결과 설명을 우선하고, 없으면 공개 카드와 족보 비교로 승리 근거를 해석합니다.",
+    review: "쇼다운 해설과 비교 카드를 보면 누가 어떤 족보로 팟을 가져갔는지 확인할 수 있습니다.",
+    tone: "slate",
+  },
+};
+
+const tabletopOutcomeToneClasses = {
+  amber: "border-amber-200 bg-amber-50 text-amber-900",
+  sky: "border-sky-200 bg-sky-50 text-sky-900",
+  emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  violet: "border-violet-200 bg-violet-50 text-violet-900",
+  rose: "border-rose-200 bg-rose-50 text-rose-900",
+  cyan: "border-cyan-200 bg-cyan-50 text-cyan-900",
+  zinc: "border-zinc-200 bg-zinc-50 text-zinc-900",
+  slate: "border-slate-200 bg-slate-50 text-slate-900",
+};
+
+const tabletopOutcomeIsVisible = (gameState, status) => {
+  const phase = String(get(gameState, "phase", "phase", "") || "").toUpperCase();
+  return status === "FINISHED" || phase === "FINISHED" || phase === "HAND_FINISHED";
+};
+
+const buildTabletopOutcomeInsightItems = ({ game, config, selectedRoom, gameState, players, status }) => {
+  const brief = tabletopOutcomeBriefs[game] || {
+    condition: "종료 조건 충족",
+    basis: "서버가 계산한 최종 점수와 승자 표식을 기준으로 결과를 표시합니다.",
+    review: "결과 스포트라이트와 최근 행동을 함께 보면 판정 근거를 확인할 수 있습니다.",
+    tone: "slate",
+  };
+  const scoreSignal = gameState
+    ? buildTabletopScoreSignal(game, gameState, players)
+    : {
+        value: statusLabels[status] || `${config.title} 종료`,
+        detail: `${config.title} 방이 종료 상태입니다. 상태 새로고침으로 최신 정산을 다시 확인할 수 있습니다.`,
+      };
+  const latestAction = gameState ? tabletopLatestActionText(game, gameState, players) : "방이 종료 상태로 전환되었습니다.";
+  const roomCode = codeOf(selectedRoom);
+  const playerCount = players.length || playersOf(selectedRoom).length || 0;
+  const phase = String(get(gameState, "phase", "phase", status || "") || status || "FINISHED").toUpperCase();
+  return [
+    {
+      key: "condition",
+      icon: "stage",
+      label: "승리 조건",
+      value: brief.condition,
+      detail: brief.basis,
+      tone: tabletopOutcomeToneClasses[brief.tone] || tabletopOutcomeToneClasses.slate,
+    },
+    {
+      key: "basis",
+      icon: "win",
+      label: "판정 근거",
+      value: scoreSignal.value,
+      detail: scoreSignal.detail,
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    },
+    {
+      key: "review",
+      icon: "decision",
+      label: "다시 볼 지점",
+      value: "결과 해석",
+      detail: brief.review,
+      tone: "border-cyan-200 bg-cyan-50 text-cyan-900",
+    },
+    {
+      key: "session",
+      icon: "recent",
+      label: "세션 기록",
+      value: roomCode ? `방 ${roomCode}` : `${playerCount || "-"}명 참여`,
+      detail: `${phase} 상태입니다. 최근 기준: ${latestAction}`,
+      tone: "border-slate-200 bg-slate-50 text-slate-800",
+    },
+  ];
+};
+
+const TabletopOutcomeInsightArt = ({ game, title, items = [] }) => {
+  const brief = tabletopOutcomeBriefs[game] || tabletopOutcomeBriefs.poker;
+  const colorByTone = {
+    amber: "#f59e0b",
+    sky: "#0ea5e9",
+    emerald: "#10b981",
+    violet: "#8b5cf6",
+    rose: "#f43f5e",
+    cyan: "#06b6d4",
+    zinc: "#3f3f46",
+    slate: "#475569",
+  };
+  const accent = colorByTone[brief.tone] || "#475569";
+  const nodes = [
+    { x: 58, y: 86, label: "조건" },
+    { x: 142, y: 50, label: "근거" },
+    { x: 238, y: 92, label: "해석" },
+    { x: 322, y: 58, label: "다음" },
+  ];
+  return (
+    <svg
+      viewBox="0 0 380 150"
+      role="img"
+      aria-label={`${title} 종료 결과 해석 흐름`}
+      className="h-36 w-full"
+      data-smoke="tabletop-outcome-insight-art"
+    >
+      <rect x="12" y="14" width="356" height="122" rx="22" fill="#0f172a" />
+      <path d="M42 104 C92 38 150 42 206 92 S302 94 342 42" fill="none" stroke="#334155" strokeWidth="11" strokeLinecap="round" />
+      <path d="M42 104 C92 38 150 42 206 92 S302 94 342 42" fill="none" stroke={accent} strokeWidth="4" strokeLinecap="round" />
+      <text x="28" y="36" fill="#cbd5e1" fontSize="11" fontWeight="900">OUTCOME</text>
+      <text x="190" y="36" textAnchor="middle" fill="#ffffff" fontSize="14" fontWeight="900">{title}</text>
+      {nodes.map((node, index) => (
+        <g key={node.label} data-smoke="tabletop-outcome-insight-node">
+          <circle cx={node.x} cy={node.y} r="21" fill={index === 1 ? "#fef3c7" : "#e0f2fe"} />
+          <circle cx={node.x} cy={node.y} r="13" fill={index === 1 ? accent : "#0f172a"} />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="900">{index + 1}</text>
+          <text x={node.x} y={node.y + 34} textAnchor="middle" fill="#dbeafe" fontSize="10" fontWeight="900">{node.label}</text>
+        </g>
+      ))}
+      <rect x="82" y="112" width="216" height="20" rx="10" fill="#ffffff" opacity="0.12" />
+      <text x="190" y="126" textAnchor="middle" fill="#f8fafc" fontSize="10" fontWeight="900">{items[0]?.value || "종료 조건"} · {items[1]?.value || "결과 확인"}</text>
+    </svg>
+  );
+};
+
+const TabletopOutcomeInsightPanel = ({ game, config, selectedRoom, gameState, players, status }) => {
+  if (!tabletopOutcomeIsVisible(gameState, status)) return null;
+  const items = buildTabletopOutcomeInsightItems({ game, config, selectedRoom, gameState, players, status });
+  const phase = String(get(gameState, "phase", "phase", status || "") || status || "FINISHED").toUpperCase();
+  return (
+    <section
+      className="rounded-2xl border border-slate-200 bg-white p-3 shadow-lg"
+      data-smoke="tabletop-outcome-insight-panel"
+      data-outcome-game={game}
+      data-outcome-status={status || ""}
+      data-outcome-phase={phase}
+    >
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,360px)_1fr] xl:items-center">
+        <TabletopOutcomeInsightArt game={game} title={config.title} items={items} />
+        <div className="min-w-0">
+          <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-700">결과 인사이트 · 4단계</div>
+          <h2 className="mt-2 text-lg font-black text-slate-950">왜 끝났는지 먼저 읽기</h2>
+          <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">
+            게임별 종료 조건과 판정 근거를 분리해 보여줍니다. 점수판을 다시 훑기 전에 승리 기준, 격차, 다시 볼 지점을 빠르게 확인하세요.
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.key} className={`min-h-[104px] rounded-xl border px-3 py-2 ${item.tone}`} data-smoke="tabletop-outcome-insight-item" data-outcome-key={item.key}>
+                <div className="flex items-center gap-1.5 text-[10px] font-black opacity-70">
+                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
+                  {item.label}
+                </div>
+                <div className="mt-1 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const TabletopSessionActionArt = ({ title, roomCode, playerCount, isHost }) => {
+  const nodes = [
+    { x: 54, y: 92, label: "결과", fill: "#10b981" },
+    { x: 128, y: 54, label: "동기화", fill: "#38bdf8" },
+    { x: 210, y: 104, label: "허브", fill: "#f59e0b" },
+    { x: 286, y: 70, label: isHost ? "재시작" : "퇴장", fill: isHost ? "#8b5cf6" : "#f43f5e" },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 340 180"
+      role="img"
+      aria-label={`${title} 종료 후 행동 흐름`}
+      className="h-40 w-full"
+      data-smoke="tabletop-session-action-art"
+    >
+      <rect x="8" y="10" width="324" height="160" rx="22" fill="#f8fafc" />
+      <path d="M56 92 C96 40 158 42 206 102 S272 92 286 70" fill="none" stroke="#cbd5e1" strokeWidth="9" strokeLinecap="round" />
+      <path d="M56 92 C96 40 158 42 206 102 S272 92 286 70" fill="none" stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
+      <rect x="34" y="132" width="268" height="32" rx="16" fill="#ffffff" stroke="#e2e8f0" strokeWidth="2" />
+      <text x="52" y="153" fontSize="12" fontWeight="900" fill="#0f172a">{roomCode ? `방 ${roomCode}` : "종료된 방"}</text>
+      <text x="264" y="153" textAnchor="end" fontSize="12" fontWeight="900" fill="#475569">{playerCount}명</text>
+      <text x="26" y="34" fontSize="11" fontWeight="900" fill="#64748b">보드게임 세션</text>
+      <text x="170" y="34" textAnchor="middle" fontSize="14" fontWeight="900" fill="#0f172a">{title}</text>
+      {nodes.map((node) => (
+        <g key={node.label} data-smoke="tabletop-session-action-node">
+          <circle cx={node.x} cy={node.y} r="22" fill={node.fill} stroke="#ffffff" strokeWidth="5" />
+          <circle cx={node.x} cy={node.y} r="27" fill="none" stroke="#e2e8f0" strokeWidth="2" />
+          <text x={node.x} y={node.y + 5} textAnchor="middle" fontSize="10" fontWeight="900" fill="#ffffff">{node.label}</text>
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+const TabletopSessionActionPanel = ({
+  game,
+  config,
+  selectedRoom,
+  gameState,
+  players,
+  status,
+  isHost,
+  busy,
+  onRefresh,
+  onRematch,
+  onLeave,
+}) => {
+  const phase = String(get(gameState, "phase", "phase", "") || "").toUpperCase();
+  if (status !== "FINISHED" && phase !== "FINISHED") return null;
+
+  const scoreSignal = gameState
+    ? buildTabletopScoreSignal(game, gameState, players)
+    : {
+        value: statusLabels[status] || "게임 종료",
+        detail: `${config.title} 방이 종료되었습니다. 결과 정보가 비어 있으면 상태 새로고침으로 최신 정산을 확인하세요.`,
+      };
+  const latestAction = gameState ? tabletopLatestActionText(game, gameState, players) : "방이 종료 상태로 전환되었습니다.";
+  const roomCode = codeOf(selectedRoom);
+  const playerCount = players.length || playersOf(selectedRoom).length || 0;
+  const actionItems = [
+    {
+      key: "result",
+      icon: "win",
+      label: "결과 확인",
+      value: scoreSignal.value,
+      detail: scoreSignal.detail,
+    },
+    {
+      key: "sync",
+      icon: "signal",
+      label: "상태 동기화",
+      value: "최신 방 상태",
+      detail: "결과 직후 비어 있는 정산 정보가 있으면 방 상태를 다시 읽어 확인합니다.",
+    },
+    {
+      key: "next",
+      icon: "stage",
+      label: isHost ? "다음 판 준비" : "다음 선택",
+      value: isHost ? "다시 하기" : "게임 허브",
+      detail: isHost ? "같은 방 멤버를 대기 상태로 돌려 재도전 흐름을 열 수 있습니다." : "허브에서 같은 게임이나 다른 보드게임을 고를 수 있습니다.",
+    },
+    {
+      key: "leave",
+      icon: "recent",
+      label: "세션 정리",
+      value: "방 나가기",
+      detail: latestAction,
+    },
+  ];
+
+  return (
+    <section
+      className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-lg"
+      data-smoke="tabletop-session-action-panel"
+      data-session-status={status || phase}
+    >
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,340px)_1fr]">
+        <TabletopSessionActionArt title={config.title} roomCode={roomCode} playerCount={playerCount} isHost={Boolean(isHost)} />
+        <div className="min-w-0">
+          <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700">세션 정리</div>
+          <h2 className="mt-2 text-lg font-black text-slate-950">결과 이후 다음 행동</h2>
+          <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">
+            승리 근거를 확인한 뒤 상태를 새로고침하거나, 허브로 돌아가거나, 방을 나가 세션을 정리할 수 있습니다.
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {actionItems.map((item) => (
+              <div key={item.key} className="min-h-[104px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-session-action-item">
+                <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500">
+                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 text-emerald-600" />
+                  {item.label}
+                </div>
+                <div className="mt-1 line-clamp-2 text-sm font-black leading-snug text-slate-950">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-slate-600">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white disabled:opacity-40"
+              disabled={busy}
+              onClick={onRefresh}
+              data-smoke="tabletop-session-action-refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
+              상태 새로고침
+            </button>
+            {isHost && (
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white disabled:opacity-40"
+                disabled={busy}
+                onClick={onRematch}
+                data-smoke="tabletop-session-action-rematch"
+              >
+                다시 하기
+              </button>
+            )}
+            <Link
+              to="/app/games"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white"
+              data-smoke="tabletop-session-action-hub"
+            >
+              게임 허브
+            </Link>
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-sm font-black text-rose-600 disabled:opacity-40"
+              disabled={busy}
+              onClick={onLeave}
+              data-smoke="tabletop-session-action-leave"
+            >
+              방 나가기
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const buildTabletopActionReadinessItems = ({ game, gameState, players, status, mySeatNo, startStatusText, actionBusy }) => {
+  const phase = String(get(gameState, "phase", "phase", "") || "").toUpperCase();
+  const activeSeatNo = tabletopTurnSeatForSound(game, gameState);
+  const activeName = activeSeatNo ? tabletopPlayerName(players, activeSeatNo) : "동시 진행";
+  const myTurn = Boolean(status === "PLAYING" && activeSeatNo && Number(mySeatNo) === activeSeatNo);
+  const phaseLabel = tabletopPhaseLabel(game, gameState, status);
+  const scoreSignal = buildTabletopScoreSignal(game, gameState, players);
+  const decisionSignal = buildTabletopDecisionSignal(game, gameState, players, status, mySeatNo, startStatusText);
+  const latestAction = tabletopLatestActionText(game, gameState, players);
+  const myState = statePlayersForDecision(gameState).find((player) => tabletopStateSeatNo(player) === Number(mySeatNo));
+  const genericLock = actionBusy
+    ? "서버 판정 중이라 새 행동은 잠시 잠깁니다."
+    : myTurn
+      ? "강조된 버튼, 선택한 대상, 보드 위 합법 위치를 확인하세요."
+      : `${activeName} 차례가 끝나면 내 선택 가능성이 다시 갱신됩니다.`;
+  const profile = (() => {
+    if (status === "WAITING") {
+      return {
+        input: "준비 상태",
+        inputDetail: startStatusText || "인원과 준비 상태를 맞추면 방장이 시작할 수 있습니다.",
+        lock: "시작 조건",
+        lockDetail: startStatusText || "아직 게임 시작 전입니다.",
+        next: "게임 시작",
+        nextDetail: "시작 후 이 영역이 실제 행동 조건으로 바뀝니다.",
+        icon: "player",
+      };
+    }
+    if (phase === "FINISHED" || status === "FINISHED") {
+      return {
+        input: "결과 확인",
+        inputDetail: scoreSignal.detail,
+        lock: "행동 종료",
+        lockDetail: "이번 판의 행동 입력은 닫혔습니다. 결과와 다시하기 흐름을 확인하세요.",
+        next: scoreSignal.value,
+        nextDetail: latestAction,
+        icon: "win",
+      };
+    }
+    if (game === "catan") {
+      const catanInputByPhase = {
+        INITIAL_PLACEMENT: ["초기 배치", "정착지와 도로 후보를 보고 다음 생산 자원 조합을 만듭니다."],
+        ROLL_DICE: ["주사위 굴림", "굴림 후 생산, 도둑, 건설·교역 단계가 열립니다."],
+        ROBBER: ["도둑 처리", "도둑 위치와 약탈 대상을 골라 자원 흐름을 흔듭니다."],
+        ACTION: ["건설·교역", "자원, 비용, 교역 조건을 보고 건설하거나 턴을 넘깁니다."],
+        DISCARD: ["자원 버리기", "초과 자원 수량에 맞춰 버릴 카드를 선택합니다."],
+      };
+      const [input, inputDetail] = catanInputByPhase[phase] || ["카탄 행동", "현재 단계의 강조 버튼과 보드 후보를 확인하세요."];
+      return {
+        input,
+        inputDetail,
+        lock: "조건 확인",
+        lockDetail: myTurn ? "자원 보유량, 도둑 처리, 선택 대상이 맞아야 버튼이 열립니다." : `${activeName}님의 단계가 끝날 때까지 대기합니다.`,
+        next: "승점 흐름",
+        nextDetail: scoreSignal.detail,
+        icon: "build",
+      };
+    }
+    if (game === "blokus") {
+      const remainingPieces = listOf(get(myState, "remaining_pieces", "remainingPieces", [])).length || tabletopNumber(get(myState, "remaining_piece_count", "remainingPieceCount", 0));
+      return {
+        input: myTurn ? "조각+칸 선택" : "배치 대기",
+        inputDetail: myTurn ? "조각을 고른 뒤 보드 칸을 찍으면 합법 배치 여부가 표시됩니다." : `${activeName}님의 조각 배치를 관찰하세요.`,
+        lock: "잠김 이유",
+        lockDetail: myTurn ? "내 색 차례, 남은 조각, 모서리 연결, 겹침 여부가 모두 맞아야 배치됩니다." : genericLock,
+        next: remainingPieces ? `남은 조각 ${remainingPieces}개` : "영역 싸움",
+        nextDetail: scoreSignal.detail,
+        icon: "build",
+      };
+    }
+    if (game === "mahe") {
+      const dice = listOf(get(gameState, "dice", "dice", []));
+      const diceRollsLeft = tabletopNumber(get(gameState, "dice_rolls_left", "diceRollsLeft", 0));
+      return {
+        input: phase === "CHOOSE_DICE_COUNT" ? "주사위 개수" : phase === "ROLLING" ? "굴림/멈춤" : "트랙 확인",
+        inputDetail: phase === "CHOOSE_DICE_COUNT" ? "위험률과 이동 칸 수를 비교해 1~3개 중 선택합니다." : `현재 주사위 ${dice.length}개 · 남은 굴림 ${diceRollsLeft}회`,
+        lock: "실패 조건",
+        lockDetail: "합계가 7을 넘으면 차례가 무너집니다. 다음 굴림 미리보기를 먼저 보세요.",
+        next: "보상 카드",
+        nextDetail: scoreSignal.detail,
+        icon: "coin",
+      };
+    }
+    if (game === "dalmuti") {
+      return {
+        input: phase === "TAX_RETURN" ? "세금 반납" : phase === "REVOLUTION_DECISION" ? "혁명 결정" : "카드 제출",
+        inputDetail: decisionSignal.detail,
+        lock: "제출 기준",
+        lockDetail: phase === "PLAYING" ? "같은 계급, 필요한 장수, 현재 기준보다 높은 조합일 때 제출할 수 있습니다." : "현재 단계의 대상자와 선택 수량 조건을 맞춰야 합니다.",
+        next: "계급 순서",
+        nextDetail: scoreSignal.detail,
+        icon: "input",
+      };
+    }
+    if (game === "six-nimmt") {
+      const mySubmitted = Boolean(get(myState, "selected", "selected", false));
+      return {
+        input: phase === "SELECTING" ? (mySubmitted ? "카드 제출 완료" : "카드 선택") : "행 선택",
+        inputDetail: phase === "SELECTING" ? "손패에서 낼 카드 한 장을 고르면 공개 단계까지 대기합니다." : "가져갈 위험 행을 직접 골라 벌점을 줄입니다.",
+        lock: "진행 조건",
+        lockDetail: mySubmitted ? "다른 플레이어 선택이 끝나면 카드가 공개됩니다." : "선택 카드가 없거나 현재 단계가 아니면 제출할 수 없습니다.",
+        next: "벌점 압박",
+        nextDetail: scoreSignal.detail,
+        icon: "decision",
+      };
+    }
+    if (game === "telestrations") {
+      const mySubmitted = Boolean(get(gameState, "my_submitted", "mySubmitted", false));
+      return {
+        input: mySubmitted ? "제출 완료" : "문장/그림 제출",
+        inputDetail: get(gameState, "current_task", "currentTask", "") || decisionSignal.detail,
+        lock: "입력 조건",
+        lockDetail: mySubmitted ? "다른 플레이어 제출을 기다립니다." : "현재 라운드 입력이 비어 있으면 제출할 수 없습니다.",
+        next: "릴레이 변화",
+        nextDetail: latestAction,
+        icon: "input",
+      };
+    }
+    if (game === "mafia") {
+      const mySubmitted = Boolean(get(gameState, "my_submitted", "mySubmitted", false));
+      return {
+        input: mySubmitted ? "행동 제출 완료" : "대상 선택",
+        inputDetail: get(gameState, "my_task", "myTask", "") || decisionSignal.detail,
+        lock: "역할/단계",
+        lockDetail: mySubmitted ? "밤/투표 결과 공개를 기다립니다." : "내 역할, 생존 상태, 현재 단계에 맞는 대상만 선택할 수 있습니다.",
+        next: "생존 균형",
+        nextDetail: scoreSignal.detail,
+        icon: "player",
+      };
+    }
+    if (game === "poker") {
+      const callAmount = tabletopNumber(get(gameState, "call_amount", "callAmount", 0));
+      const pot = tabletopNumber(get(gameState, "pot", "pot", 0));
+      return {
+        input: myTurn ? "베팅 판단" : "상대 액션 대기",
+        inputDetail: phase === "DRAW" ? "교체할 카드를 고르거나 그대로 진행합니다." : `콜 ${callAmount}칩 · 팟 ${pot}칩`,
+        lock: "베팅 조건",
+        lockDetail: myTurn ? "현재 콜 금액, 보유 칩, 드로우 단계 조건에 맞는 버튼만 열립니다." : genericLock,
+        next: "쇼다운 근거",
+        nextDetail: scoreSignal.detail,
+        icon: "coin",
+      };
+    }
+    return {
+      input: decisionSignal.value,
+      inputDetail: decisionSignal.detail,
+      lock: "선택 조건",
+      lockDetail: genericLock,
+      next: scoreSignal.value,
+      nextDetail: scoreSignal.detail,
+      icon: "decision",
+    };
+  })();
+
+  return [
+    {
+      key: "turn",
+      icon: "turn",
+      label: "내 차례",
+      value: actionBusy ? "판정 중" : myTurn ? "행동 가능" : status === "PLAYING" ? `${activeName} 대기` : phaseLabel,
+      detail: myTurn ? "지금 선택 가능한 버튼과 보드 후보를 확인하세요." : decisionSignal.detail,
+      tone: actionBusy ? "pending" : myTurn ? "active" : "neutral",
+    },
+    {
+      key: "input",
+      icon: profile.icon || "decision",
+      label: "필요 입력",
+      value: profile.input,
+      detail: profile.inputDetail,
+      tone: myTurn ? "active" : "neutral",
+    },
+    {
+      key: "lock",
+      icon: "state",
+      label: profile.lock,
+      value: actionBusy ? "서버 판정" : myTurn ? "조건 확인" : "대기",
+      detail: profile.lockDetail,
+      tone: actionBusy ? "pending" : myTurn ? "waiting" : "neutral",
+    },
+    {
+      key: "next",
+      icon: phase === "FINISHED" ? "win" : "recent",
+      label: "다음 변화",
+      value: profile.next,
+      detail: profile.nextDetail,
+      tone: phase === "FINISHED" ? "done" : "neutral",
+    },
+  ];
+};
+
+const tabletopActionReadinessArtTones = {
+  active: { fill: "#ecfdf5", stroke: "#10b981", text: "#047857", accent: "#34d399" },
+  waiting: { fill: "#fffbeb", stroke: "#f59e0b", text: "#92400e", accent: "#fbbf24" },
+  pending: { fill: "#eff6ff", stroke: "#3b82f6", text: "#1d4ed8", accent: "#60a5fa" },
+  done: { fill: "#f0fdf4", stroke: "#22c55e", text: "#166534", accent: "#86efac" },
+  neutral: { fill: "#f8fafc", stroke: "#94a3b8", text: "#334155", accent: "#cbd5e1" },
+};
+
+const tabletopActionReadinessArtLabels = {
+  turn: "차례",
+  input: "입력",
+  lock: "조건",
+  next: "다음",
+};
+
+const TabletopActionReadinessArt = ({ items = [], myTurn, actionBusy, phaseLabel, className = "" }) => {
+  const nodes = items.slice(0, 4);
+  const routeTone = actionBusy ? "#2563eb" : myTurn ? "#059669" : "#64748b";
+  const statusText = actionBusy ? "서버 조정" : myTurn ? "내 차례" : phaseLabel || "상태 확인";
+  const headline = actionBusy ? "처리 확인" : myTurn ? "행동 가능" : "상황 대기";
+  const points = [
+    { x: 54, y: 118 },
+    { x: 154, y: 84 },
+    { x: 254, y: 118 },
+    { x: 354, y: 84 },
+  ];
+  const routePath = `M ${points[0].x} ${points[0].y} C 94 94, 114 94, ${points[1].x} ${points[1].y} S 214 106, ${points[2].x} ${points[2].y} S 314 94, ${points[3].x} ${points[3].y}`;
+
+  const iconPathFor = (key) => {
+    if (key === "turn") return "M -9 0 h18 M 2 -7 l7 7 -7 7";
+    if (key === "input") return "M -9 -6 h18 v12 h-18 z M -4 0 h8";
+    if (key === "lock") return "M -8 -1 h16 v9 h-16 z M -4 -1 v-4 a4 4 0 0 1 8 0 v4";
+    return "M -8 6 l7 -12 6 8 4 -5";
+  };
+
+  return (
+    <svg
+      viewBox="0 0 420 180"
+      role="img"
+      aria-label="보드게임 행동 준비 흐름"
+      className={className}
+      data-smoke="tabletop-action-readiness-art"
+    >
+      <rect x="10" y="10" width="400" height="160" rx="20" fill="#ffffff" stroke="#e2e8f0" />
+      <rect x="22" y="22" width="152" height="44" rx="14" fill="#f8fafc" stroke="#e2e8f0" />
+      <text x="34" y="40" fill="#0f172a" fontSize="14" fontWeight="900">행동 준비</text>
+      <text x="34" y="56" fill="#64748b" fontSize="11" fontWeight="800">{headline}</text>
+      <rect x="292" y="25" width="88" height="30" rx="15" fill={myTurn ? "#dcfce7" : actionBusy ? "#dbeafe" : "#f1f5f9"} stroke={myTurn ? "#86efac" : actionBusy ? "#93c5fd" : "#cbd5e1"} />
+      <text x="336" y="44" textAnchor="middle" fill={myTurn ? "#166534" : actionBusy ? "#1d4ed8" : "#475569"} fontSize="11" fontWeight="900">{statusText}</text>
+      <path d={routePath} fill="none" stroke={routeTone} strokeWidth="12" strokeLinecap="round" opacity="0.12" />
+      <path d={routePath} fill="none" stroke={routeTone} strokeWidth="3" strokeLinecap="round" />
+      <polygon points="366,84 354,77 355,91" fill={routeTone} />
+      {nodes.map((node, index) => {
+        const point = points[index] || points[points.length - 1];
+        const tone = tabletopActionReadinessArtTones[node.tone] || tabletopActionReadinessArtTones.neutral;
+        const label = tabletopActionReadinessArtLabels[node.key] || node.label || "";
+        return (
+          <g key={node.key || `${label}-${index}`} data-smoke="tabletop-action-readiness-node" data-action-key={node.key || ""}>
+            <circle cx={point.x} cy={point.y} r="28" fill={tone.fill} stroke={tone.stroke} strokeWidth="3" />
+            <circle cx={point.x} cy={point.y} r="18" fill="#ffffff" stroke={tone.accent} strokeWidth="2" />
+            <path d={iconPathFor(node.key)} transform={`translate(${point.x} ${point.y - 2})`} fill="none" stroke={tone.text} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <text x={point.x} y={point.y + 44} textAnchor="middle" fill={tone.text} fontSize="12" fontWeight="900">{label}</text>
+          </g>
+        );
+      })}
+      <text x="210" y="160" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="800">차례 → 입력 → 조건 → 다음 변화</text>
+    </svg>
+  );
+};
+
+const TabletopActionReadinessPanel = ({ game, gameState, players, status, mySeatNo, startStatusText, actionBusy }) => {
+  if (!gameState) return null;
+  const phaseLabel = tabletopPhaseLabel(game, gameState, status);
+  const activeSeatNo = tabletopTurnSeatForSound(game, gameState);
+  const myTurn = Boolean(status === "PLAYING" && activeSeatNo && Number(mySeatNo) === activeSeatNo);
+  const items = buildTabletopActionReadinessItems({ game, gameState, players, status, mySeatNo, startStatusText, actionBusy });
+  const shellTone = actionBusy
+    ? "border-sky-200 bg-sky-50"
+    : myTurn
+      ? "border-emerald-200 bg-emerald-50"
+      : "border-slate-200 bg-white";
+  const pillTone = actionBusy
+    ? "bg-sky-100 text-sky-700"
+    : myTurn
+      ? "bg-emerald-100 text-emerald-800"
+      : "bg-slate-100 text-slate-600";
+  const tileTone = {
+    active: "border-emerald-200 bg-white text-emerald-800",
+    waiting: "border-amber-200 bg-white text-amber-800",
+    pending: "border-sky-200 bg-white text-sky-800",
+    done: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    neutral: "border-slate-100 bg-white text-slate-700",
+  };
+
+  return (
+    <section className={`rounded-2xl border p-3 shadow-sm ${shellTone}`} data-smoke="tabletop-action-readiness-panel" data-my-turn={myTurn ? "true" : "false"} data-action-busy={actionBusy ? "true" : "false"}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+            <GameUxGlyph type="decision" className="h-4 w-4 text-emerald-600" />
+            행동 준비
+          </div>
+          <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600">실제 버튼을 누르기 전에 차례, 필요한 입력, 잠김 조건, 다음 변화를 확인합니다.</p>
+        </div>
+        <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-black ${pillTone}`}>
+          {actionBusy ? "서버 판정" : myTurn ? "내 행동 가능" : phaseLabel}
+        </span>
+      </div>
+      <TabletopActionReadinessArt items={items} myTurn={myTurn} actionBusy={actionBusy} phaseLabel={phaseLabel} className="mt-3 h-44 w-full" />
+      <div className="mt-3 grid gap-2 md:grid-cols-4">
+        {items.map((item) => (
+          <div key={item.key} className={`min-h-[108px] rounded-xl border px-3 py-2 ${tileTone[item.tone] || tileTone.neutral}`} data-smoke="tabletop-action-readiness-item">
+            <div className="flex items-center gap-1.5 text-[10px] font-black">
+              <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
+              {item.label}
+            </div>
+            <div className="mt-1 line-clamp-2 text-sm font-black leading-snug text-slate-950">{item.value}</div>
+            <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed text-slate-600">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const TabletopExperienceRibbon = ({
+  game,
+  gameState,
+  players,
+  status,
+  mySeatNo,
+  isHost,
+  myReady,
+  canStart,
+  startStatusText,
+}) => {
+  const phaseLabel = tabletopPhaseLabel(game, gameState, status);
+  const activeSeatNo = tabletopTurnSeatForSound(game, gameState);
+  const activeName = activeSeatNo ? tabletopPlayerName(players, activeSeatNo) : "-";
+  const myTurn = Boolean(status === "PLAYING" && activeSeatNo && Number(mySeatNo) === activeSeatNo);
+  const latestAction = tabletopLatestActionText(game, gameState, players);
+  const myStateText = status === "WAITING"
+    ? isHost
+      ? canStart ? "방장 · 시작 가능" : `방장 · ${startStatusText}`
+      : myReady ? "준비 완료" : "준비 필요"
+    : myTurn ? "지금 내 차례" : activeSeatNo ? `${activeName} 차례 대기` : "상태 확인";
+  const currentTask = status === "WAITING"
+    ? canStart ? "게임 시작 버튼을 누르면 본게임으로 진입합니다." : startStatusText
+    : myTurn ? "강조된 액션 패널에서 가능한 행동을 선택하세요." : `${activeName}님의 행동을 기다리는 중입니다.`;
+
+  return (
+    <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-950 p-3 text-white shadow-inner" data-smoke="tabletop-experience-ribbon">
+      <div className="grid gap-2 md:grid-cols-4">
+        <div className="rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/10">
+          <div className="flex items-center gap-1.5 text-[10px] font-black text-white/55">
+            <GameUxGlyph type="state" className="h-3.5 w-3.5" />
+            진행 상태
+          </div>
+          <div className="mt-1 text-sm font-black">{statusLabels[status] || status || "대기"}</div>
+          <div className="mt-0.5 truncate text-[11px] font-bold text-white/55">{phaseLabel}</div>
+        </div>
+        <div className={`rounded-xl px-3 py-2 ring-1 ${myTurn ? "bg-emerald-400 text-slate-950 ring-emerald-200" : "bg-white/10 text-white ring-white/10"}`}>
+          <div className={`flex items-center gap-1.5 text-[10px] font-black ${myTurn ? "text-slate-800" : "text-white/55"}`}>
+            <GameUxGlyph type="turn" className="h-3.5 w-3.5" />
+            현재 차례
+          </div>
+          <div className="mt-1 truncate text-sm font-black">{status === "PLAYING" ? activeName : "대기방"}</div>
+          <div className={`mt-0.5 truncate text-[11px] font-bold ${myTurn ? "text-slate-800/75" : "text-white/55"}`}>{myTurn ? "내 행동 필요" : phaseLabel}</div>
+        </div>
+        <div className="rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/10">
+          <div className="flex items-center gap-1.5 text-[10px] font-black text-white/55">
+            <GameUxGlyph type="player" className="h-3.5 w-3.5" />
+            내 상태
+          </div>
+          <div className="mt-1 truncate text-sm font-black">{myStateText}</div>
+          <div className="mt-0.5 truncate text-[11px] font-bold text-white/55">좌석 {mySeatNo || "-"}</div>
+        </div>
+        <div className="rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/10">
+          <div className="flex items-center gap-1.5 text-[10px] font-black text-white/55">
+            <GameUxGlyph type="recent" className="h-3.5 w-3.5" />
+            최근 행동
+          </div>
+          <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-white/80">{latestAction}</div>
+        </div>
+      </div>
+      <div className="mt-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold leading-relaxed text-white/70">
+        {currentTask}
+      </div>
+    </section>
+  );
+};
+
+const tabletopTurnOrderTone = ({ winner, active, mine, ready }) => {
+  if (winner) return { fill: "#10b981", stroke: "#047857", text: "#ecfdf5", label: "승리" };
+  if (active) return { fill: "#f59e0b", stroke: "#92400e", text: "#fffbeb", label: "현재 차례" };
+  if (mine) return { fill: "#38bdf8", stroke: "#0369a1", text: "#f0f9ff", label: "내 좌석" };
+  if (ready) return { fill: "#e0f2fe", stroke: "#0284c7", text: "#0f172a", label: "준비" };
+  return { fill: "#f8fafc", stroke: "#94a3b8", text: "#0f172a", label: "대기" };
+};
+
+const TabletopTurnOrderArt = ({ players, selectedRoom, status, activeSeatNo, winnerSeatNos, mySeatNo }) => {
+  const visiblePlayers = players.slice(0, 8);
+  const count = Math.max(visiblePlayers.length, 1);
+  const pathPoints = visiblePlayers.length
+    ? visiblePlayers.map((_, index) => {
+        const x = 34 + (count === 1 ? 150 : (index * 300) / (count - 1));
+        const y = 66 + (index % 2 === 0 ? -12 : 12);
+        return `${x},${y}`;
+      })
+    : ["34,66", "334,66"];
+  const routePath = `M ${pathPoints.join(" L ")}`;
+
+  return (
+    <svg
+      viewBox="0 0 360 132"
+      className="h-full w-full"
+      role="img"
+      aria-label="보드게임 턴 순서 시각화"
+      data-smoke="tabletop-turn-order-art"
+    >
+      <rect x="8" y="8" width="344" height="116" rx="24" fill="#0f172a" />
+      <path d="M22 105 C82 72 122 112 172 72 S276 38 338 70" fill="none" stroke="#1e293b" strokeWidth="18" strokeLinecap="round" />
+      <path d={routePath} fill="none" stroke="#64748b" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      {visiblePlayers.length ? visiblePlayers.map((player, index) => {
+        const seatNo = seatNoOf(player);
+        const mine = Number(mySeatNo) === seatNo;
+        const active = Number(activeSeatNo) === seatNo && status === "PLAYING";
+        const winner = winnerSeatNos.has(seatNo);
+        const host = memberIdOf(player) === hostMemberIdOf(selectedRoom);
+        const ready = host || isReady(player);
+        const tone = tabletopTurnOrderTone({ winner, active, mine, ready });
+        const x = 34 + (count === 1 ? 150 : (index * 300) / (count - 1));
+        const y = 66 + (index % 2 === 0 ? -12 : 12);
+        return (
+          <g key={memberIdOf(player) || seatNo || index} transform={`translate(${x} ${y})`} data-smoke="tabletop-turn-order-node">
+            <circle r={active ? 18 : 15} fill={tone.fill} stroke={tone.stroke} strokeWidth="4" />
+            <circle r="7" fill={tone.text} opacity=".95" />
+            <text x="0" y="34" textAnchor="middle" fontSize="9" fontWeight="900" fill="#e2e8f0">{seatNo || index + 1}</text>
+          </g>
+        );
+      }) : (
+        <g data-smoke="tabletop-turn-order-node">
+          <circle cx="180" cy="66" r="16" fill="#f8fafc" stroke="#94a3b8" strokeWidth="4" />
+          <text x="180" y="101" textAnchor="middle" fontSize="9" fontWeight="900" fill="#e2e8f0">대기</text>
+        </g>
+      )}
+      <text x="24" y="30" fontSize="10" fontWeight="900" fill="#cbd5e1">턴 순서</text>
+      <text x="336" y="30" textAnchor="end" fontSize="10" fontWeight="900" fill="#cbd5e1">{statusLabels[status] || status || "대기"}</text>
+    </svg>
+  );
+};
+
+const TabletopTurnOrderPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo }) => {
+  const activeSeatNo = tabletopTurnSeatForSound(game, gameState);
+  const winnerSeatNos = tabletopPlayerPanelWinners(gameState);
+  const phaseLabel = tabletopPhaseLabel(game, gameState, status);
+  const latestAction = tabletopLatestActionText(game, gameState, players);
+  const readyCount = players.filter((player) => memberIdOf(player) === hostMemberIdOf(selectedRoom) || isReady(player)).length;
+  const activeName = activeSeatNo ? tabletopPlayerName(players, activeSeatNo) : "";
+  const winnerNames = players
+    .filter((player) => winnerSeatNos.has(seatNoOf(player)))
+    .map((player) => player.nickname)
+    .filter(Boolean);
+  const summaryText = winnerNames.length
+    ? `${winnerNames.join(", ")} 승리`
+    : status === "WAITING"
+      ? `준비 ${readyCount}/${players.length}`
+      : activeName
+        ? `${activeName} 차례`
+        : phaseLabel;
+  const detailText = status === "WAITING"
+    ? "좌석 순서와 준비 상태를 보고 시작 조건을 맞춥니다."
+    : winnerNames.length
+      ? "승자 좌석과 최종 점수 흐름을 확인한 뒤 다시하기를 선택합니다."
+      : "좌석 순서, 내 좌석, 현재 차례를 기준으로 보드를 읽습니다.";
+
+  return (
+    <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg" data-smoke="tabletop-turn-order-panel">
+      <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="min-h-[132px] overflow-hidden rounded-2xl bg-slate-950" data-smoke="tabletop-turn-order-art-wrap">
+          <TabletopTurnOrderArt
+            players={players}
+            selectedRoom={selectedRoom}
+            status={status}
+            activeSeatNo={activeSeatNo}
+            winnerSeatNos={winnerSeatNos}
+            mySeatNo={mySeatNo}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+                <GameUxGlyph type="turn" className="h-4 w-4 text-amber-600" />
+                턴 순서
+              </div>
+              <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{detailText}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600" data-smoke="tabletop-turn-order-summary">
+              {summaryText}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {players.map((player, index) => {
+              const seatNo = seatNoOf(player);
+              const mine = Number(mySeatNo) === seatNo;
+              const active = Number(activeSeatNo) === seatNo && status === "PLAYING";
+              const winner = winnerSeatNos.has(seatNo);
+              const host = memberIdOf(player) === hostMemberIdOf(selectedRoom);
+              const ready = host || isReady(player);
+              const scoreText = tabletopPlayerPanelScore(game, gameState, seatNo);
+              const tone = tabletopTurnOrderTone({ winner, active, mine, ready });
+              return (
+                <div key={memberIdOf(player) || seatNo || index} className="min-h-[94px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-turn-order-player">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-black text-slate-950">{player.nickname || `좌석 ${seatNo || index + 1}`}</span>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black" style={{ backgroundColor: tone.fill, color: tone.text }}>
+                      {tone.label}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">
+                    좌석 {seatNo || "-"}{host ? " · 방장" : ""}{scoreText ? ` · ${scoreText}` : ""}
+                  </div>
+                  <div className="mt-2 h-1.5 rounded-full bg-slate-200">
+                    <div className="h-1.5 rounded-full" style={{ width: active || winner ? "100%" : mine ? "72%" : ready ? "52%" : "28%", backgroundColor: tone.stroke }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-600">
+            최근 근거: {latestAction}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const tabletopRoomBriefs = {
+  catan: {
+    objective: "자원 생산 위치를 선점하고 도로, 마을, 도시로 승점을 먼저 쌓는 전략 게임입니다.",
+    firstDecision: "초기 배치에서 어떤 자원 조합을 가져갈지 정합니다.",
+    winSignal: "목표 승점에 가까운 공개 점수와 항구/개발 카드 흐름을 봅니다.",
+  },
+  blokus: {
+    objective: "내 조각을 최대한 많이 놓고 상대 확장 경로를 막는 공간 장악 게임입니다.",
+    firstDecision: "초반에는 모서리 연결을 유지하면서 중앙 진입로를 열어 둡니다.",
+    winSignal: "남은 조각 칸 수가 적을수록 유리합니다.",
+  },
+  mahe: {
+    objective: "거북이를 전진시켜 알 카드를 얻되, 욕심내다 7을 넘기면 차례가 무너집니다.",
+    firstDecision: "주사위를 몇 개까지 굴릴지 위험도를 보고 정합니다.",
+    winSignal: "알 카드 점수와 업힌 위치가 다음 보상 흐름을 만듭니다.",
+  },
+  dalmuti: {
+    objective: "손패를 먼저 비워 계급을 올리고 다음 판의 유리한 자리로 이동합니다.",
+    firstDecision: "같은 계급 카드를 몇 장씩 낼지, 언제 패스할지 정합니다.",
+    winSignal: "먼저 탈출한 순서가 다음 계급과 세금 흐름을 결정합니다.",
+  },
+  "six-nimmt": {
+    objective: "동시에 카드를 내고 벌점이 적은 행을 피하는 숫자 카드 게임입니다.",
+    firstDecision: "내 카드가 어느 행에 붙을지, 여섯 번째가 될 위험을 봅니다.",
+    winSignal: "누적 벌점 66점에 가까운 플레이어와 위험 행을 확인합니다.",
+  },
+  telestrations: {
+    objective: "문장과 그림이 번갈아 이어지는 파티 릴레이입니다.",
+    firstDecision: "현재 단계가 문장 입력인지 그림 입력인지 확인하고 제한된 정보만 보고 제출합니다.",
+    winSignal: "마지막 공개에서 원래 문장이 어떻게 변했는지가 보상입니다.",
+  },
+  mafia: {
+    objective: "밤에는 비밀 역할, 낮에는 토론과 투표로 진영 승리를 노립니다.",
+    firstDecision: "내 역할과 현재 단계에서 가능한 대상이 누구인지 먼저 봅니다.",
+    winSignal: "생존한 마피아와 시민 수의 균형이 승패 조건입니다.",
+  },
+  poker: {
+    objective: "칩을 지키면서 강한 족보나 좋은 교체/베팅 기회를 노립니다.",
+    firstDecision: "현재 패, 콜 금액, 팟 크기를 비교해 참여할지 정합니다.",
+    winSignal: "쇼다운에서는 족보와 키커, 중도에는 폴드 유도가 승리 이유가 됩니다.",
+  },
+};
+
+const tabletopRoomBriefArtTones = {
+  first: { fill: "#eef2ff", stroke: "#6366f1", text: "#3730a3", accent: "#818cf8" },
+  win: { fill: "#f0fdf4", stroke: "#22c55e", text: "#166534", accent: "#86efac" },
+  ready: { fill: "#fffbeb", stroke: "#f59e0b", text: "#92400e", accent: "#fbbf24" },
+  rule: { fill: "#f8fafc", stroke: "#94a3b8", text: "#334155", accent: "#cbd5e1" },
+};
+
+const tabletopRoomBriefArtLabels = {
+  first: "첫 판단",
+  win: "승리 신호",
+  ready: "시작 준비",
+  rule: "선택 규칙",
+};
+
+const TabletopRoomBriefArt = ({ tiles = [], status, canStart, className = "" }) => {
+  const nodes = tiles.slice(0, 4);
+  const routeTone = status === "WAITING" ? (canStart ? "#059669" : "#d97706") : "#2563eb";
+  const statusText = status === "WAITING" ? (canStart ? "시작 가능" : "대기 확인") : (statusLabels[status] || status || "상태 확인");
+  const points = [
+    { x: 54, y: 112 },
+    { x: 154, y: 82 },
+    { x: 254, y: 112 },
+    { x: 354, y: 82 },
+  ];
+  const routePath = `M ${points[0].x} ${points[0].y} C 94 88, 114 88, ${points[1].x} ${points[1].y} S 214 100, ${points[2].x} ${points[2].y} S 314 88, ${points[3].x} ${points[3].y}`;
+
+  const iconPathFor = (key) => {
+    if (key === "first") return "M -9 0 h18 M 2 -7 l7 7 -7 7";
+    if (key === "win") return "M -8 6 l4 -12 5 8 5 -8 4 12 z";
+    if (key === "ready") return "M -9 1 l5 5 13 -13";
+    return "M -9 -5 h18 v10 h-18 z M -4 0 h8";
+  };
+
+  return (
+    <svg
+      viewBox="0 0 420 174"
+      role="img"
+      aria-label="보드게임 방 입장 브리프 흐름"
+      className={className}
+      data-smoke="tabletop-room-brief-art"
+    >
+      <rect x="10" y="10" width="400" height="154" rx="20" fill="#ffffff" stroke="#e2e8f0" />
+      <rect x="24" y="22" width="158" height="42" rx="14" fill="#f8fafc" stroke="#e2e8f0" />
+      <text x="36" y="40" fill="#0f172a" fontSize="14" fontWeight="900">방 입장 브리프</text>
+      <text x="36" y="56" fill="#64748b" fontSize="11" fontWeight="800">첫 10초 판단</text>
+      <rect x="286" y="24" width="96" height="30" rx="15" fill={status === "WAITING" ? (canStart ? "#dcfce7" : "#fef3c7") : "#dbeafe"} stroke={status === "WAITING" ? (canStart ? "#86efac" : "#fcd34d") : "#93c5fd"} />
+      <text x="334" y="43" textAnchor="middle" fill={status === "WAITING" ? (canStart ? "#166534" : "#92400e") : "#1d4ed8"} fontSize="11" fontWeight="900">{statusText}</text>
+      <path d={routePath} fill="none" stroke={routeTone} strokeWidth="12" strokeLinecap="round" opacity="0.12" />
+      <path d={routePath} fill="none" stroke={routeTone} strokeWidth="3" strokeLinecap="round" />
+      <polygon points="366,82 354,75 355,89" fill={routeTone} />
+      {nodes.map((node, index) => {
+        const point = points[index] || points[points.length - 1];
+        const tone = tabletopRoomBriefArtTones[node.key] || tabletopRoomBriefArtTones.rule;
+        const label = tabletopRoomBriefArtLabels[node.key] || node.label || "";
+        return (
+          <g key={node.key || `${label}-${index}`} data-smoke="tabletop-room-brief-node" data-brief-key={node.key || ""}>
+            <circle cx={point.x} cy={point.y} r="28" fill={tone.fill} stroke={tone.stroke} strokeWidth="3" />
+            <circle cx={point.x} cy={point.y} r="18" fill="#ffffff" stroke={tone.accent} strokeWidth="2" />
+            <path d={iconPathFor(node.key)} transform={`translate(${point.x} ${point.y - 2})`} fill="none" stroke={tone.text} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <text x={point.x} y={point.y + 44} textAnchor="middle" fill={tone.text} fontSize="12" fontWeight="900">{label}</text>
+          </g>
+        );
+      })}
+      <text x="210" y="155" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="800">첫 판단 → 승리 신호 → 시작 준비 → 선택 규칙</text>
+    </svg>
+  );
+};
+
+const TabletopRoomBriefPanel = ({
+  game,
+  config,
+  selectedRoom,
+  selectedRoomVariant,
+  status,
+  players,
+  readyGuestCount,
+  guestPlayers,
+  canStart,
+  startStatusText,
+}) => {
+  const brief = tabletopRoomBriefs[game] || {};
+  const variantName = variantNameOf(selectedRoom) || variantDisplayName(selectedRoomVariant) || "기본 규칙";
+  const variantSummaryText = variantSummaryOf(selectedRoom) || variantSummary(selectedRoomVariant) || brief.objective || "";
+  const maxPlayers = maxPlayersOf(selectedRoom);
+  const playerSummary = `${players.length}/${maxPlayers || "-"}명`;
+  const readySummary = guestPlayers.length ? `게스트 준비 ${readyGuestCount}/${guestPlayers.length}` : "방장만으로 시작 가능";
+  const startSummary = status === "WAITING" ? (canStart ? "시작 가능" : startStatusText) : (statusLabels[status] || status || "진행 중");
+  const tiles = [
+    {
+      key: "first",
+      icon: "decision",
+      label: "첫 판단",
+      value: brief.firstDecision || "현재 단계의 강조된 행동을 먼저 확인합니다.",
+      detail: brief.objective || config.description,
+    },
+    {
+      key: "win",
+      icon: "state",
+      label: "승리 신호",
+      value: brief.winSignal || "점수와 완료 조건을 확인합니다.",
+      detail: variantSummaryText,
+    },
+    {
+      key: "ready",
+      icon: "player",
+      label: "시작 준비",
+      value: startSummary,
+      detail: `${playerSummary} · ${readySummary}`,
+    },
+    {
+      key: "rule",
+      icon: "stage",
+      label: "선택 규칙",
+      value: variantName,
+      detail: variantSummaryText || `${config.title} 방 규칙을 확인하세요.`,
+    },
+  ];
+
+  return (
+    <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-smoke="tabletop-room-brief-panel" data-room-status={status || ""} data-can-start={canStart ? "true" : "false"}>
+      <TabletopRoomBriefArt tiles={tiles} status={status} canStart={canStart} className="mb-3 h-44 w-full" />
+      <div className="grid gap-2 md:grid-cols-4">
+        {tiles.map((tile) => (
+          <div key={tile.key} className="min-h-[104px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-room-brief-tile">
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500">
+              <GameUxGlyph type={tile.icon} className="h-3.5 w-3.5" />
+              {tile.label}
+            </div>
+            <div className="mt-1 line-clamp-2 text-sm font-black leading-snug text-slate-900">{tile.value}</div>
+            <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-slate-500">{tile.detail}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const tabletopSessionRoutePalette = {
+  state: { fill: "#eef2ff", stroke: "#4f46e5", accent: "#818cf8", text: "#3730a3" },
+  ready: { fill: "#ecfdf5", stroke: "#059669", accent: "#34d399", text: "#065f46" },
+  primary: { fill: "#fffbeb", stroke: "#d97706", accent: "#f59e0b", text: "#92400e" },
+  exit: { fill: "#fff1f2", stroke: "#e11d48", accent: "#fb7185", text: "#9f1239" },
+};
+
+const buildTabletopSessionRouteItems = ({
+  status,
+  isHost,
+  canStart,
+  busy,
+  myReady,
+  players,
+  guestPlayers,
+  readyGuestCount,
+  selectedRoomVariantName,
+  selectedRoomPlayerRangeText,
+  startStatusText,
+}) => {
+  const normalizedStatus = status || "WAITING";
+  const totalGuests = guestPlayers.length;
+  const readyText = totalGuests ? `게스트 준비 ${readyGuestCount}/${totalGuests}` : "방장 단독 시작 가능";
+  const primaryValue = busy
+    ? "요청 처리 중"
+    : normalizedStatus === "WAITING" && isHost
+      ? (canStart ? "시작 가능" : "시작 잠김")
+      : normalizedStatus === "WAITING"
+        ? (myReady ? "준비 취소 가능" : "준비하기")
+        : normalizedStatus === "PLAYING" && isHost
+          ? "강제 종료"
+          : normalizedStatus === "PLAYING"
+            ? "게임 진행 중"
+            : normalizedStatus === "FINISHED" && isHost
+              ? "다시 하기"
+              : normalizedStatus === "FINISHED"
+                ? "결과 확인"
+                : "상태 확인";
+  const primaryDetail = busy
+    ? "요청 처리 중에는 같은 버튼을 반복 실행하지 않도록 잠깁니다."
+    : normalizedStatus === "WAITING" && isHost && canStart
+      ? "방장은 시작 버튼으로 현재 규칙의 첫 턴을 열 수 있습니다."
+      : normalizedStatus === "WAITING" && isHost
+        ? startStatusText || "최소 인원과 게스트 준비가 맞아야 시작 버튼이 열립니다."
+        : normalizedStatus === "WAITING"
+          ? "참가자는 준비하기 버튼으로 방장의 시작 조건을 맞춥니다."
+          : normalizedStatus === "PLAYING" && isHost
+            ? "방장은 강제 종료 버튼으로 진행 중인 세션을 정리할 수 있습니다."
+            : normalizedStatus === "PLAYING"
+              ? "플레이 중에는 보드와 행동 패널을 먼저 확인합니다."
+              : normalizedStatus === "FINISHED" && isHost
+                ? "방장은 다시 하기 버튼으로 같은 방에서 다음 판을 준비할 수 있습니다."
+                : "결과 패널과 플레이어 상태를 확인한 뒤 나가기를 선택할 수 있습니다.";
+
+  return [
+    {
+      key: "state",
+      icon: normalizedStatus === "FINISHED" ? "win" : normalizedStatus === "PLAYING" ? "turn" : "state",
+      label: "현재 상태",
+      short: statusLabels[normalizedStatus] || normalizedStatus || "대기",
+      value: statusLabels[normalizedStatus] || normalizedStatus || "대기",
+      detail: normalizedStatus === "WAITING"
+        ? "대기방에서 준비, 규칙, 인원을 맞추는 단계입니다."
+        : normalizedStatus === "PLAYING"
+          ? "보드와 행동 패널에서 지금 가능한 선택을 확인합니다."
+          : normalizedStatus === "FINISHED"
+            ? "승자와 정산 근거를 확인하고 다음 행동을 고릅니다."
+            : "현재 방 상태를 먼저 확인합니다.",
+    },
+    {
+      key: "ready",
+      icon: "player",
+      label: "준비 조건",
+      short: canStart ? "충족" : "확인",
+      value: canStart ? "시작 조건 충족" : readyText,
+      detail: canStart
+        ? `${players.length}명이 ${selectedRoomVariantName || "선택 규칙"} 조건을 만족했습니다.`
+        : `${readyText}입니다. ${selectedRoomPlayerRangeText || "인원 규칙"}도 함께 확인하세요.`,
+    },
+    {
+      key: "primary",
+      icon: "decision",
+      label: "실제 버튼",
+      short: isHost ? "방장" : "참가",
+      value: primaryValue,
+      detail: primaryDetail,
+    },
+    {
+      key: "exit",
+      icon: "recent",
+      label: "정리/나가기",
+      short: normalizedStatus === "FINISHED" ? "결과 후" : "방 관리",
+      value: normalizedStatus === "FINISHED" ? "결과 후 정리" : "방 나가기",
+      detail: normalizedStatus === "PLAYING"
+        ? "플레이 중 퇴장은 방 상태에 영향을 줄 수 있으니 보드 상태를 먼저 확인하세요."
+        : "방 나가기는 현재 방을 닫고 게임 목록 또는 로비 탐색으로 돌아가는 흐름입니다.",
+    },
+  ];
+};
+
+const TabletopSessionRouteArt = ({ items = [], status = "", canStart = false, isHost = false }) => {
+  const statusText = statusLabels[status] || status || "대기";
+  const routeTone = status === "FINISHED" ? "#f59e0b" : canStart || status === "PLAYING" ? "#10b981" : "#38bdf8";
+  const points = [
+    { x: 48, y: 78 },
+    { x: 132, y: 54 },
+    { x: 216, y: 102 },
+    { x: 300, y: 78 },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 360 156"
+      role="img"
+      aria-label="보드게임 세션 버튼 루트"
+      className="h-full min-h-[150px] w-full"
+      data-smoke="tabletop-session-route-art"
+    >
+      <rect x="0" y="0" width="360" height="156" rx="20" fill="#0f172a" />
+      <rect x="18" y="18" width="324" height="120" rx="18" fill="#f8fafc" />
+      <path d="M48 78 C88 34 122 34 160 78 S232 122 292 78" fill="none" stroke="#cbd5e1" strokeWidth="8" strokeLinecap="round" />
+      <path d="M48 78 C88 34 122 34 160 78 S232 122 292 78" fill="none" stroke={routeTone} strokeWidth="4" strokeLinecap="round" />
+      <text x="28" y="38" fill="#334155" fontSize="14" fontWeight="900">세션 버튼 루트</text>
+      <text x="286" y="38" fill="#64748b" fontSize="11" fontWeight="800" textAnchor="end">{isHost ? "방장" : "참가자"}</text>
+      <text x="334" y="38" fill="#64748b" fontSize="11" fontWeight="800" textAnchor="end">{statusText}</text>
+      {items.slice(0, 4).map((item, index) => {
+        const point = points[index] || points[points.length - 1];
+        const palette = tabletopSessionRoutePalette[item.key] || tabletopSessionRoutePalette.state;
+        return (
+          <g key={item.key} data-smoke="tabletop-session-route-node" data-route-key={item.key}>
+            <circle cx={point.x} cy={point.y} r="22" fill={palette.fill} stroke={palette.stroke} strokeWidth="3" />
+            <circle cx={point.x} cy={point.y} r="8" fill={palette.accent} />
+            <text x={point.x} y={point.y + 38} fill={palette.text} fontSize="11" fontWeight="900" textAnchor="middle">{item.label}</text>
+            <text x={point.x} y={point.y + 52} fill="#475569" fontSize="9" fontWeight="800" textAnchor="middle">{item.short}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+const TabletopSessionRoutePanel = ({
+  status,
+  isHost,
+  canStart,
+  busy,
+  myReady,
+  players,
+  guestPlayers,
+  readyGuestCount,
+  selectedRoomVariantName,
+  selectedRoomPlayerRangeText,
+  startStatusText,
+}) => {
+  const routeItems = buildTabletopSessionRouteItems({
+    status,
+    isHost,
+    canStart,
+    busy,
+    myReady,
+    players,
+    guestPlayers,
+    readyGuestCount,
+    selectedRoomVariantName,
+    selectedRoomPlayerRangeText,
+    startStatusText,
+  });
+  const summary = status === "WAITING"
+    ? (canStart ? "시작 가능" : startStatusText || "시작 대기")
+    : statusLabels[status] || status || "상태 확인";
+
+  return (
+    <section
+      className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3"
+      data-smoke="tabletop-session-route-panel"
+      data-session-status={status || ""}
+      data-can-start={canStart ? "true" : "false"}
+      data-host={isHost ? "true" : "false"}
+      data-busy={busy ? "true" : "false"}
+      data-ready={myReady ? "true" : "false"}
+    >
+      <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="min-h-[150px] overflow-hidden rounded-2xl bg-slate-950">
+          <TabletopSessionRouteArt items={routeItems} status={status} canStart={canStart} isHost={isHost} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+                <GameUxGlyph type="decision" className="h-4 w-4 text-primary-600" />
+                세션 버튼 루트
+              </div>
+              <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+                상단의 실제 준비, 시작, 강제 종료, 다시 하기, 나가기 버튼이 어떤 상태에서 쓰이는지 한눈에 정리합니다.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600 ring-1 ring-slate-200">
+              {summary}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {routeItems.map((item) => (
+              <div
+                key={item.key}
+                className="min-h-[98px] rounded-xl border border-slate-200 bg-white px-3 py-2"
+                data-smoke="tabletop-session-route-item"
+                data-route-key={item.key}
+              >
+                <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500">
+                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
+                  {item.label}
+                </div>
+                <div className="mt-1 line-clamp-2 text-sm font-black leading-snug text-slate-950">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-slate-600">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const tabletopStartReadinessToneClasses = {
+  done: {
+    shell: "border-emerald-100 bg-emerald-50 text-emerald-950",
+    icon: "bg-emerald-600 text-white",
+    detail: "text-emerald-800",
+    bar: "bg-emerald-500",
+  },
+  active: {
+    shell: "border-primary-100 bg-primary-50 text-primary-950",
+    icon: "bg-primary-600 text-white",
+    detail: "text-primary-800",
+    bar: "bg-primary-500",
+  },
+  waiting: {
+    shell: "border-amber-100 bg-amber-50 text-amber-950",
+    icon: "bg-amber-500 text-slate-950",
+    detail: "text-amber-800",
+    bar: "bg-amber-500",
+  },
+  neutral: {
+    shell: "border-slate-100 bg-slate-50 text-slate-950",
+    icon: "bg-slate-900 text-white",
+    detail: "text-slate-600",
+    bar: "bg-slate-400",
+  },
+};
+
+const tabletopStartReadinessArtTones = {
+  done: { fill: "#ecfdf5", stroke: "#10b981", text: "#047857", accent: "#34d399" },
+  active: { fill: "#eef2ff", stroke: "#6366f1", text: "#3730a3", accent: "#818cf8" },
+  waiting: { fill: "#fffbeb", stroke: "#f59e0b", text: "#92400e", accent: "#fbbf24" },
+  neutral: { fill: "#f8fafc", stroke: "#94a3b8", text: "#334155", accent: "#cbd5e1" },
+};
+
+const tabletopStartReadinessArtLabels = {
+  players: "인원",
+  ready: "준비",
+  host: "방장",
+  rule: "규칙",
+};
+
+const TabletopStartReadinessArt = ({ items = [], canStart, startStatusText, className = "" }) => {
+  const nodes = items.slice(0, 4);
+  const routeTone = canStart ? "#059669" : "#d97706";
+  const statusText = canStart ? "시작 가능" : startStatusText || "대기";
+  const points = [
+    { x: 54, y: 112 },
+    { x: 154, y: 82 },
+    { x: 254, y: 112 },
+    { x: 354, y: 82 },
+  ];
+  const routePath = `M ${points[0].x} ${points[0].y} C 94 88, 114 88, ${points[1].x} ${points[1].y} S 214 100, ${points[2].x} ${points[2].y} S 314 88, ${points[3].x} ${points[3].y}`;
+
+  const iconPathFor = (key) => {
+    if (key === "players") return "M -9 6 c2 -6 16 -6 18 0 M -5 -2 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0";
+    if (key === "ready") return "M -9 1 l5 5 13 -13";
+    if (key === "host") return "M -10 4 l4 -10 6 8 6 -8 4 10 z";
+    return "M -9 -5 h18 v10 h-18 z M -4 0 h8";
+  };
+
+  return (
+    <svg
+      viewBox="0 0 420 174"
+      role="img"
+      aria-label="보드게임 시작 준비 흐름"
+      className={className}
+      data-smoke="tabletop-start-readiness-art"
+    >
+      <rect x="10" y="10" width="400" height="154" rx="20" fill="#ffffff" stroke="#e2e8f0" />
+      <rect x="24" y="22" width="154" height="42" rx="14" fill="#f8fafc" stroke="#e2e8f0" />
+      <text x="36" y="40" fill="#0f172a" fontSize="14" fontWeight="900">시작 준비</text>
+      <text x="36" y="56" fill="#64748b" fontSize="11" fontWeight="800">대기방 체크</text>
+      <rect x="286" y="24" width="96" height="30" rx="15" fill={canStart ? "#dcfce7" : "#fef3c7"} stroke={canStart ? "#86efac" : "#fcd34d"} />
+      <text x="334" y="43" textAnchor="middle" fill={canStart ? "#166534" : "#92400e"} fontSize="11" fontWeight="900">{statusText}</text>
+      <path d={routePath} fill="none" stroke={routeTone} strokeWidth="12" strokeLinecap="round" opacity="0.12" />
+      <path d={routePath} fill="none" stroke={routeTone} strokeWidth="3" strokeLinecap="round" />
+      <polygon points="366,82 354,75 355,89" fill={routeTone} />
+      {nodes.map((node, index) => {
+        const point = points[index] || points[points.length - 1];
+        const tone = tabletopStartReadinessArtTones[node.tone] || tabletopStartReadinessArtTones.neutral;
+        const label = tabletopStartReadinessArtLabels[node.key] || node.label || "";
+        return (
+          <g key={node.key || `${label}-${index}`} data-smoke="tabletop-start-readiness-node" data-readiness-key={node.key || ""}>
+            <circle cx={point.x} cy={point.y} r="28" fill={tone.fill} stroke={tone.stroke} strokeWidth="3" />
+            <circle cx={point.x} cy={point.y} r="18" fill="#ffffff" stroke={tone.accent} strokeWidth="2" />
+            <path d={iconPathFor(node.key)} transform={`translate(${point.x} ${point.y - 2})`} fill="none" stroke={tone.text} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <text x={point.x} y={point.y + 44} textAnchor="middle" fill={tone.text} fontSize="12" fontWeight="900">{label}</text>
+          </g>
+        );
+      })}
+      <text x="210" y="155" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="800">인원 → 준비 → 권한 → 선택 규칙</text>
+    </svg>
+  );
+};
+
+const TabletopStartReadinessPanel = ({
+  startChecks,
+  startStatusText,
+  canStart,
+  isHost,
+  selectedRoomVariantName,
+  selectedRoomPlayerRangeText,
+  selectedRoomVariantTags,
+  startRuleHint,
+}) => {
+  const iconByKey = {
+    players: "player",
+    ready: "state",
+    host: "decision",
+  };
+  const readinessItems = [
+    ...(Array.isArray(startChecks) ? startChecks : []).map((check) => ({
+      key: check.key,
+      icon: iconByKey[check.key] || "state",
+      label: check.label,
+      value: check.done ? "충족" : "대기",
+      detail: check.detail,
+      tone: check.done ? (check.key === "host" && isHost && canStart ? "active" : "done") : "waiting",
+      progress: check.done ? 100 : check.key === "host" ? 44 : 32,
+    })),
+    {
+      key: "rule",
+      icon: "stage",
+      label: "선택 규칙",
+      value: selectedRoomVariantName || "기본 규칙",
+      detail: `${selectedRoomPlayerRangeText || "인원 규칙 확인"}${selectedRoomVariantTags?.length ? ` · ${selectedRoomVariantTags.slice(0, 2).join(" · ")}` : ""}`,
+      tone: "neutral",
+      progress: 100,
+    },
+  ];
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" data-smoke="tabletop-start-readiness-panel" data-can-start={canStart ? "true" : "false"}>
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+            <GameUxGlyph type="decision" className="h-4 w-4 text-primary-600" />
+            시작 준비
+          </div>
+          <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
+            방장이 무엇을 기다리는지와 선택한 규칙이 시작 조건에 맞는지 확인합니다.
+          </div>
+        </div>
+        <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black ${canStart ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+          {startStatusText}
+        </span>
+      </div>
+      <div className="px-3 pt-3">
+        <TabletopStartReadinessArt items={readinessItems} canStart={canStart} startStatusText={startStatusText} className="h-44 w-full" />
+      </div>
+      <div className="grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-4">
+        {readinessItems.map((item) => {
+          const tone = tabletopStartReadinessToneClasses[item.tone] || tabletopStartReadinessToneClasses.neutral;
+          return (
+            <div key={item.key} className={`min-h-[116px] rounded-xl border px-3 py-2 ${tone.shell}`} data-smoke="tabletop-start-readiness-item">
+              <div className="flex items-start gap-2">
+                <span className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.icon}`}>
+                  <GameUxGlyph type={item.icon} className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] font-black opacity-70">{item.label}</div>
+                    <div className="shrink-0 text-xs font-black">{item.value}</div>
+                  </div>
+                  <div className={`mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed ${tone.detail}`}>{item.detail}</div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/80">
+                    <span className={`block h-full rounded-full ${tone.bar}`} style={{ width: `${item.progress}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="border-t border-slate-100 px-4 py-3 text-[11px] font-bold leading-relaxed text-slate-500">
+        {startRuleHint}
+      </div>
+    </section>
+  );
+};
+
+const TabletopStateSyncArt = ({ status, canStart, playerCount, minPlayers, maxPlayers, className = "" }) => {
+  const waiting = status === "WAITING";
+  const playing = status === "PLAYING";
+  const accent = playing ? "#2563eb" : canStart ? "#059669" : "#d97706";
+  const nodes = [
+    { key: "room", label: "방", x: 54, y: 118, fill: "#f8fafc", stroke: "#94a3b8" },
+    { key: "ready", label: canStart ? "시작" : "준비", x: 154, y: 82, fill: canStart ? "#ecfdf5" : "#fffbeb", stroke: canStart ? "#10b981" : "#f59e0b" },
+    { key: "sync", label: playing ? "수신" : "대기", x: 254, y: 118, fill: playing ? "#dbeafe" : "#f8fafc", stroke: playing ? "#3b82f6" : "#94a3b8" },
+    { key: "board", label: "보드", x: 354, y: 82, fill: playing ? "#eff6ff" : "#f1f5f9", stroke: playing ? "#60a5fa" : "#94a3b8" },
+  ];
+  const playerText = `${playerCount || 0}/${maxPlayers || "-"}명`;
+  const minText = `최소 ${minPlayers || 0}명`;
+
+  return (
+    <svg
+      viewBox="0 0 420 180"
+      role="img"
+      aria-label="보드게임 상태 동기화 흐름"
+      className={className}
+      data-smoke="tabletop-state-sync-art"
+    >
+      <rect x="10" y="10" width="400" height="160" rx="22" fill="#0f172a" stroke="#1e293b" strokeWidth="3" />
+      <rect x="24" y="22" width="170" height="42" rx="14" fill="#ffffff" opacity="0.94" />
+      <text x="38" y="40" fill="#0f172a" fontSize="13" fontWeight="900">보드 상태 수신</text>
+      <text x="38" y="57" fill="#64748b" fontSize="11" fontWeight="800">{playing ? "게임 서버 동기화" : "시작 전 테이블 준비"}</text>
+      <rect x="284" y="24" width="92" height="30" rx="15" fill={canStart ? "#dcfce7" : waiting ? "#fef3c7" : "#dbeafe"} stroke={canStart ? "#86efac" : waiting ? "#fcd34d" : "#93c5fd"} />
+      <text x="330" y="43" textAnchor="middle" fill={canStart ? "#166534" : waiting ? "#92400e" : "#1d4ed8"} fontSize="11" fontWeight="900">
+        {playing ? "수신 중" : canStart ? "시작 가능" : "대기 확인"}
+      </text>
+      <path d="M58 118 C94 80, 122 80, 154 82 S220 120, 254 118 S320 82, 354 82" fill="none" stroke={accent} strokeWidth="12" strokeLinecap="round" opacity="0.2" />
+      <path d="M58 118 C94 80, 122 80, 154 82 S220 120, 254 118 S320 82, 354 82" fill="none" stroke={accent} strokeWidth="4" strokeLinecap="round" />
+      {nodes.map((node) => (
+        <g key={node.key} data-smoke="tabletop-state-sync-node" data-sync-key={node.key}>
+          <circle cx={node.x} cy={node.y} r="30" fill={node.fill} stroke={node.stroke} strokeWidth="3" />
+          <circle cx={node.x} cy={node.y} r="17" fill="#ffffff" stroke={node.stroke} strokeWidth="2" />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#0f172a" fontSize="11" fontWeight="900">{node.label}</text>
+          <text x={node.x} y={node.y + 46} textAnchor="middle" fill="#e2e8f0" fontSize="10" fontWeight="900">
+            {node.key === "room" ? playerText : node.key === "ready" ? minText : node.key === "sync" ? (playing ? "상태" : "준비") : "입장"}
+          </text>
+        </g>
+      ))}
+      <rect x="76" y="148" width="268" height="22" rx="11" fill="#1e293b" stroke="#334155" />
+      <text x="210" y="163" textAnchor="middle" fill="#cbd5e1" fontSize="10" fontWeight="800">
+        방 정보 → 준비 조건 → 서버 상태 → 플레이 보드
+      </text>
+    </svg>
+  );
+};
+
+const TabletopStateSyncPanel = ({
+  game,
+  config,
+  selectedRoom,
+  status,
+  players,
+  canStart,
+  startStatusText,
+  isHost,
+  myReady,
+}) => {
+  const playerCount = Array.isArray(players) ? players.length : 0;
+  const minPlayers = minPlayersOf(selectedRoom);
+  const maxPlayers = maxPlayersOf(selectedRoom);
+  const waiting = status === "WAITING";
+  const playing = status === "PLAYING";
+  const title = playing ? "보드 상태 수신 중" : "시작 전 보드 준비";
+  const detail = playing
+    ? "게임은 시작됐고 서버의 첫 보드 상태를 받아오는 중입니다. 수신되면 실제 보드와 행동 패널로 전환됩니다."
+    : "아직 실제 보드 상태가 없어서 시작 조건, 준비 여부, 규칙 정보를 먼저 확인합니다.";
+  const items = [
+    {
+      key: "status",
+      icon: "state",
+      label: "현재 상태",
+      value: statusLabels[status] || status || "대기",
+      detail: playing ? "상태 응답이 도착하면 보드와 점수 정보가 표시됩니다." : "대기방에서는 준비와 시작 조건이 핵심 정보입니다.",
+      tone: playing ? "active" : "waiting",
+    },
+    {
+      key: "players",
+      icon: "player",
+      label: "좌석",
+      value: `${playerCount}/${maxPlayers || "-"}명`,
+      detail: `이 규칙은 최소 ${minPlayers || 0}명부터 시작할 수 있습니다.`,
+      tone: playerCount >= minPlayers ? "done" : "waiting",
+    },
+    {
+      key: "start",
+      icon: "decision",
+      label: isHost ? "방장 행동" : "내 준비",
+      value: isHost ? (canStart ? "시작 가능" : "조건 대기") : myReady ? "준비 완료" : "준비 필요",
+      detail: isHost ? startStatusText : "준비 버튼으로 방장에게 시작 가능 상태를 전달합니다.",
+      tone: canStart || myReady ? "done" : "waiting",
+    },
+    {
+      key: "rule",
+      icon: "stage",
+      label: "선택 규칙",
+      value: variantNameOf(selectedRoom) || config?.title || game,
+      detail: variantSummaryOf(selectedRoom) || "방 설정과 규칙 요약은 상단에서 계속 확인할 수 있습니다.",
+      tone: "neutral",
+    },
+  ];
+  const toneClass = {
+    active: "border-sky-100 bg-sky-50 text-sky-900",
+    done: "border-emerald-100 bg-emerald-50 text-emerald-900",
+    waiting: "border-amber-100 bg-amber-50 text-amber-900",
+    neutral: "border-slate-100 bg-slate-50 text-slate-900",
+  };
+
+  return (
+    <section
+      className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      data-smoke="tabletop-state-sync-panel"
+      data-room-status={status || ""}
+      data-can-start={canStart ? "true" : "false"}
+    >
+      <div className="grid gap-3 p-3 lg:grid-cols-[minmax(220px,340px)_minmax(0,1fr)]">
+        <div className="rounded-xl bg-slate-950">
+          <TabletopStateSyncArt
+            status={status}
+            canStart={canStart}
+            playerCount={playerCount}
+            minPlayers={minPlayers}
+            maxPlayers={maxPlayers}
+            className="h-44 w-full"
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600">
+                <GameUxGlyph type="stage" className="h-3.5 w-3.5" />
+                상태 동기화
+              </div>
+              <h3 className="mt-3 text-lg font-black text-slate-900">{title}</h3>
+              <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">{detail}</p>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${canStart ? "bg-emerald-100 text-emerald-700" : playing ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"}`}>
+              {playing ? "수신 대기" : canStart ? "시작 가능" : startStatusText}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.key} className={`min-h-[104px] rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="tabletop-state-sync-item" data-sync-key={item.key}>
+                <div className="flex items-center gap-2 text-[11px] font-black opacity-75">
+                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
+                  {item.label}
+                </div>
+                <div className="mt-1 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const TabletopLobbyBriefPanel = ({
+  game,
+  config,
+  selectedVariant,
+  rooms,
+  initialLoading,
+  roomsRefreshing,
+  createForm,
+}) => {
+  const brief = tabletopRoomBriefs[game] || {};
+  const safeRooms = Array.isArray(rooms) ? rooms : [];
+  const waitingRooms = safeRooms.filter((room) => !statusOf(room) || statusOf(room) === "WAITING");
+  const joinableRooms = waitingRooms.filter((room) => {
+    const playerCount = playersOf(room).length;
+    const maxPlayers = maxPlayersOf(room);
+    return maxPlayers <= 0 || playerCount < maxPlayers;
+  });
+  const selectedName = variantDisplayName(selectedVariant) || "기본 규칙";
+  const selectedSummary = variantSummary(selectedVariant) || brief.objective || "";
+  const selectedPlayers = selectedVariant ? variantPlayerLabel(selectedVariant) : "인원 확인 중";
+  const turnTime = String(createForm?.turnTimeSeconds || "30").trim() || "30";
+  const roomSignal = initialLoading
+    ? "방 목록 확인 중"
+    : roomsRefreshing
+      ? "새로고침 중"
+      : joinableRooms.length
+        ? `${joinableRooms.length}/${safeRooms.length}개 입장 가능`
+        : "새 방 만들기 추천";
+  const titleSignal = String(createForm?.title || "").trim() ? "제목 입력됨" : "제목은 비워도 생성 가능";
+  const tiles = [
+    {
+      key: "rule",
+      icon: "state",
+      label: "선택 규칙",
+      value: selectedName,
+      detail: `${selectedPlayers} · ${selectedSummary || `${config.title} 기본 흐름`}`,
+    },
+    {
+      key: "rooms",
+      icon: "player",
+      label: "입장 가능",
+      value: roomSignal,
+      detail: safeRooms.length ? "대기방이 있으면 먼저 입장하고, 가득 찼다면 새 방을 만드세요." : "현재 열린 방이 없으면 왼쪽에서 새 방을 만들면 됩니다.",
+    },
+    {
+      key: "host",
+      icon: "stage",
+      label: "호스트 준비",
+      value: `${turnTime}초 턴`,
+      detail: `${titleSignal} · 생성 후 참가자 준비 상태가 맞으면 시작할 수 있습니다.`,
+    },
+    {
+      key: "decision",
+      icon: "decision",
+      label: "첫 판단",
+      value: brief.firstDecision || "규칙과 인원 확인",
+      detail: brief.objective || "방에 들어가기 전 규칙, 인원, 시작 조건을 먼저 확인하세요.",
+    },
+  ];
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-lg" data-smoke="tabletop-lobby-brief-panel">
+      <div className="grid gap-2 md:grid-cols-4">
+        {tiles.map((tile) => (
+          <div key={tile.key} className="min-h-[104px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-lobby-brief-tile">
+            <div className="flex items-center gap-2 text-[11px] font-black text-slate-500">
+              <GameUxGlyph type={tile.icon} className="h-3.5 w-3.5" />
+              {tile.label}
+            </div>
+            <div className="mt-2 truncate text-sm font-black text-slate-950">{tile.value}</div>
+            <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-slate-600">{tile.detail}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const tabletopSetupPreviewToneClasses = {
+  active: {
+    shell: "border-emerald-100 bg-emerald-50 text-emerald-950",
+    icon: "bg-emerald-600 text-white",
+    detail: "text-emerald-800",
+  },
+  waiting: {
+    shell: "border-amber-100 bg-amber-50 text-amber-950",
+    icon: "bg-amber-500 text-slate-950",
+    detail: "text-amber-800",
+  },
+  neutral: {
+    shell: "border-slate-100 bg-slate-50 text-slate-950",
+    icon: "bg-slate-900 text-white",
+    detail: "text-slate-600",
+  },
+  focus: {
+    shell: "border-sky-100 bg-sky-50 text-sky-950",
+    icon: "bg-sky-600 text-white",
+    detail: "text-sky-800",
+  },
+};
+
+const tabletopSetupTempoLabel = (seconds) => {
+  if (seconds <= 20) return "빠른 압박";
+  if (seconds <= 45) return "표준 리듬";
+  if (seconds <= 90) return "전략 숙고";
+  return "긴 호흡";
+};
+
+const buildTabletopSetupPreviewItems = ({ game, config, selectedVariant, createForm, rooms = [] }) => {
+  const minPlayers = selectedVariant ? variantMinPlayers(selectedVariant) : 0;
+  const maxPlayers = selectedVariant ? variantMaxPlayers(selectedVariant) : 0;
+  const playersLabel = selectedVariant ? variantPlayerLabel(selectedVariant) : "인원 확인 중";
+  const turnSeconds = Math.max(5, Math.min(180, Number(createForm?.turnTimeSeconds || 30) || 30));
+  const tempoLabel = tabletopSetupTempoLabel(turnSeconds);
+  const titleReady = Boolean(String(createForm?.title || "").trim());
+  const waitingRooms = (Array.isArray(rooms) ? rooms : []).filter((room) => !statusOf(room) || statusOf(room) === "WAITING");
+  const featureTags = variantFeatureTags(game, selectedVariant).slice(0, 3);
+  const variantName = variantDisplayName(selectedVariant) || "기본 규칙";
+  const summary = variantSummary(selectedVariant) || config.description || `${config.title} 기본 진행`;
+
+  return [
+    {
+      key: "rule",
+      icon: "state",
+      label: "규칙 체감",
+      value: variantName,
+      detail: `${playersLabel} · ${summary}`,
+      tone: "focus",
+      progress: maxPlayers ? Math.min(100, Math.max(22, (minPlayers / maxPlayers) * 100)) : 46,
+    },
+    {
+      key: "tempo",
+      icon: "turn",
+      label: "턴 템포",
+      value: `${turnSeconds}초 · ${tempoLabel}`,
+      detail: turnSeconds <= 20
+        ? "짧은 턴은 빠른 판단과 실수를 유도합니다. 초보자 방이면 조금 늘리는 편이 읽기 쉽습니다."
+        : turnSeconds <= 45
+          ? "대부분의 보드게임에서 대기감과 판단 시간이 균형 잡히는 기본 템포입니다."
+          : "긴 턴은 협상, 규칙 확인, 복잡한 선택이 많은 판에 어울립니다.",
+      tone: turnSeconds <= 20 ? "waiting" : turnSeconds <= 90 ? "active" : "neutral",
+      progress: Math.min(100, Math.max(18, (turnSeconds / 180) * 100)),
+    },
+    {
+      key: "seats",
+      icon: "player",
+      label: "인원 압력",
+      value: playersLabel,
+      detail: waitingRooms.length
+        ? `현재 대기방 ${waitingRooms.length}개가 있어 새 방은 다른 규칙이나 인원대가 필요할 때 더 의미가 있습니다.`
+        : "대기방이 없으므로 새 방을 만들면 첫 선택지가 됩니다.",
+      tone: waitingRooms.length ? "neutral" : "active",
+      progress: maxPlayers ? Math.min(100, Math.max(20, (maxPlayers / Math.max(1, Math.max(maxPlayers, 8))) * 100)) : 38,
+    },
+    {
+      key: "host",
+      icon: "decision",
+      label: "방장 체크",
+      value: titleReady ? "제목 입력됨" : "제목 없이 생성 가능",
+      detail: featureTags.length
+        ? `표시 규칙: ${featureTags.join(" · ")}. 생성 뒤에는 참가자 준비 상태를 보고 시작하면 됩니다.`
+        : "생성 뒤에는 참가자 준비 상태와 최소 인원 조건을 확인한 다음 시작하면 됩니다.",
+      tone: titleReady ? "active" : "waiting",
+      progress: titleReady ? 100 : 42,
+    },
+  ];
+};
+
+const TabletopSetupPreviewArt = ({ items, game, className = "" }) => {
+  const palette = {
+    catan: ["#f97316", "#22c55e"],
+    blokus: ["#2563eb", "#facc15"],
+    mahe: ["#14b8a6", "#f59e0b"],
+    dalmuti: ["#7c3aed", "#f59e0b"],
+    "six-nimmt": ["#dc2626", "#facc15"],
+    telestrations: ["#0ea5e9", "#a855f7"],
+    mafia: ["#be123c", "#334155"],
+    poker: ["#16a34a", "#f43f5e"],
+  }[game] || ["#2563eb", "#f59e0b"];
+  const nodes = items.map((item, index) => ({
+    ...item,
+    x: 56 + (index * 90),
+    y: index % 2 === 0 ? 116 : 78,
+  }));
+
+  return (
+    <svg
+      viewBox="0 0 380 168"
+      role="img"
+      aria-label="보드게임 방 설정 프리뷰"
+      className={className}
+      data-smoke="tabletop-setup-preview-art"
+    >
+      <rect width="380" height="168" rx="22" fill="#0f172a" />
+      <rect x="18" y="18" width="344" height="132" rx="18" fill="#111827" stroke="#334155" strokeWidth="2" />
+      <path d="M42 120 C88 48 148 138 196 86 S292 40 336 110" fill="none" stroke={palette[0]} strokeWidth="9" strokeLinecap="round" opacity="0.14" />
+      <path d="M42 120 C88 48 148 138 196 86 S292 40 336 110" fill="none" stroke={palette[1]} strokeWidth="3" strokeLinecap="round" opacity="0.72" />
+      <text x="34" y="44" fill="#f8fafc" fontSize="17" fontWeight="900">방 설정 프리뷰</text>
+      <text x="34" y="64" fill="#94a3b8" fontSize="10" fontWeight="800">규칙, 템포, 인원, 방장 체크</text>
+      {nodes.map((node, index) => (
+        <g key={node.key} data-smoke="tabletop-setup-preview-node">
+          <circle cx={node.x} cy={node.y} r="22" fill={index === 0 ? palette[0] : index === 1 ? palette[1] : "#1e293b"} stroke="#e2e8f0" strokeWidth="2" />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#ffffff" fontSize="12" fontWeight="900">{index + 1}</text>
+          <text x={node.x} y="146" textAnchor="middle" fill="#cbd5e1" fontSize="10" fontWeight="900">{node.label}</text>
+        </g>
+      ))}
+      <circle cx="332" cy="38" r="10" fill="#22c55e" />
+      <path d="M327 38 l4 4 8 -9" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+};
+
+const TabletopSetupPreviewPanel = ({ game, config, selectedVariant, createForm, rooms }) => {
+  const items = buildTabletopSetupPreviewItems({ game, config, selectedVariant, createForm, rooms });
+  const turnSeconds = Math.max(5, Math.min(180, Number(createForm?.turnTimeSeconds || 30) || 30));
+
+  return (
+    <section
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      data-smoke="tabletop-setup-preview-panel"
+      data-variant-code={selectedVariant?.code || "BASE"}
+      data-turn-seconds={String(turnSeconds)}
+    >
+      <div className="grid gap-3 p-3 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <TabletopSetupPreviewArt items={items} game={game} className="h-40 w-full" />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+                <GameUxGlyph type="build" className="h-4 w-4 text-primary-600" />
+                설정 도움말
+              </div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
+                방을 만들기 전에 이 규칙과 턴 시간이 어떤 플레이 감각을 만들지 먼저 정리합니다.
+              </div>
+            </div>
+            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">
+              읽기 전용
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => {
+              const tone = tabletopSetupPreviewToneClasses[item.tone] || tabletopSetupPreviewToneClasses.neutral;
+              return (
+                <div key={item.key} className={`min-h-[112px] rounded-xl border px-3 py-2 ${tone.shell}`} data-smoke="tabletop-setup-preview-item">
+                  <div className="flex items-center gap-2 text-[11px] font-black">
+                    <span className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${tone.icon}`}>
+                      <GameUxGlyph type={item.icon} className="h-4 w-4" />
+                    </span>
+                    {item.label}
+                  </div>
+                  <div className="mt-2 truncate text-sm font-black">{item.value}</div>
+                  <div className={`mt-1 line-clamp-3 text-xs font-bold leading-relaxed ${tone.detail}`}>{item.detail}</div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/80">
+                    <span className="block h-full rounded-full bg-current opacity-70" style={{ width: `${Math.max(6, Math.min(100, item.progress))}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const buildTabletopLobbyDirectorPlan = ({ rooms = [], variants = [], game, myMemberId = 0 }) => {
+  const safeRooms = Array.isArray(rooms) ? rooms : [];
+  const waitingRooms = safeRooms.filter((room) => !statusOf(room) || statusOf(room) === "WAITING");
+  const myRooms = safeRooms.filter((room) => playersOf(room).some((player) => memberIdOf(player) === myMemberId));
+  const joinableRooms = waitingRooms.filter((room) => {
+    const maxPlayers = maxPlayersOf(room);
+    return maxPlayers <= 0 || playersOf(room).length < maxPlayers;
+  });
+  const readyJoinableRooms = joinableRooms.filter((room) => playersOf(room).length >= minPlayersOf(room));
+  const roomWithVariantName = (room) => {
+    const variant = variantForRoom(room, variants);
+    return variantDisplayName(variant) || variantNameOf(room) || "기본 규칙";
+  };
+  const readinessScore = (room) => {
+    const players = playersOf(room);
+    const hostMemberId = hostMemberIdOf(room);
+    const guests = players.filter((player) => memberIdOf(player) !== hostMemberId);
+    const readyGuests = guests.filter(isReady).length;
+    const minPlayers = Math.max(1, minPlayersOf(room));
+    const maxPlayers = Math.max(minPlayers, maxPlayersOf(room) || minPlayers);
+    const fillRatio = Math.min(1, players.length / maxPlayers);
+    const startRatio = Math.min(1, players.length / minPlayers);
+    const readyRatio = guests.length ? readyGuests / guests.length : 1;
+    return Math.round((fillRatio * 32) + (startRatio * 34) + (readyRatio * 34));
+  };
+  const candidates = safeRooms
+    .map((room, index) => {
+      const players = playersOf(room);
+      const status = statusOf(room) || "WAITING";
+      const maxPlayers = maxPlayersOf(room);
+      const minPlayers = minPlayersOf(room) || 1;
+      const alreadyInRoom = players.some((player) => memberIdOf(player) === myMemberId);
+      const full = maxPlayers > 0 && players.length >= maxPlayers;
+      const joinable = status === "WAITING" && !full;
+      const readyToStart = status === "WAITING" && players.length >= minPlayers;
+      const action = alreadyInRoom ? "open" : joinable ? "join" : "wait";
+      const priority = [
+        alreadyInRoom ? 400 : 0,
+        joinable ? 220 : 0,
+        readyToStart ? 90 : 0,
+        readinessScore(room),
+        players.length,
+      ].reduce((sum, value) => sum + value, 0);
+      return {
+        key: String(idOf(room) || codeOf(room) || `${room.title || "room"}-${index}`),
+        room,
+        roomId: idOf(room),
+        title: room.title || codeOf(room) || "대기방",
+        variantName: roomWithVariantName(room),
+        status,
+        playerCount: players.length,
+        minPlayers,
+        maxPlayers,
+        alreadyInRoom,
+        joinable,
+        readyToStart,
+        action,
+        score: readinessScore(room),
+        priority,
+        reason: alreadyInRoom
+          ? "이미 참여 중인 방이라 이어 들어가는 흐름이 가장 빠릅니다."
+          : joinable
+            ? readyToStart
+              ? "시작 조건이 맞아 입장 후 바로 준비 흐름으로 갈 수 있습니다."
+              : "입장하면 최소 인원 조건에 가까워지는 방입니다."
+            : status === "PLAYING"
+              ? "이미 진행 중이라 지금은 관전 대신 다른 대기방을 보는 편이 좋습니다."
+              : "완료되었거나 정원이 찬 방입니다.",
+      };
+    })
+    .sort((a, b) => b.priority - a.priority);
+  const recommended = candidates.find((candidate) => candidate.action === "open" || candidate.action === "join") || null;
+  const choices = candidates.filter((candidate) => candidate.action === "open" || candidate.action === "join").slice(0, 3);
+  const items = [
+    {
+      key: "availability",
+      icon: "player",
+      label: "입장 후보",
+      value: joinableRooms.length ? `${joinableRooms.length}개` : "없음",
+      detail: joinableRooms.length ? "지금 누르면 바로 대기방에 합류할 수 있습니다." : "새 방을 만들면 첫 선택이 더 명확합니다.",
+      progress: safeRooms.length ? Math.round((joinableRooms.length / safeRooms.length) * 100) : 0,
+    },
+    {
+      key: "resume",
+      icon: "signal",
+      label: "이어가기",
+      value: myRooms.length ? `${myRooms.length}개` : "없음",
+      detail: myRooms.length ? "이미 앉은 방이 있어 같은 흐름으로 돌아갈 수 있습니다." : "참여 중인 방이 없어서 새 후보를 고르면 됩니다.",
+      progress: myRooms.length ? 100 : 20,
+    },
+    {
+      key: "start",
+      icon: "stage",
+      label: "시작 임박",
+      value: readyJoinableRooms.length ? `${readyJoinableRooms.length}개` : "대기",
+      detail: readyJoinableRooms.length ? "최소 인원을 만족한 방이 있어 준비 신호만 맞추면 됩니다." : "아직 인원이 모이는 중입니다.",
+      progress: joinableRooms.length ? Math.round((readyJoinableRooms.length / joinableRooms.length) * 100) : 0,
+    },
+    {
+      key: "choice",
+      icon: "decision",
+      label: "추천 판단",
+      value: recommended ? recommended.title : "방 만들기",
+      detail: recommended ? `${recommended.variantName} 기준으로 가장 빠른 진입 후보입니다.` : `${game ? "현재 게임" : "보드게임"}은 직접 방을 열면 첫 선택이 분명합니다.`,
+      progress: recommended ? recommended.score : 25,
+    },
+  ];
+  return { items, choices, recommended, roomCount: safeRooms.length };
+};
+
+const TabletopLobbyDirectorArt = ({ plan, className = "" }) => {
+  const nodes = plan.items.map((item, index) => ({
+    ...item,
+    x: 54 + (index * 84),
+    y: index % 2 === 0 ? 50 : 76,
+  }));
+  const recommendedIndex = Math.max(0, nodes.findIndex((node) => node.key === "choice"));
+
+  return (
+    <svg
+      viewBox="0 0 360 136"
+      role="img"
+      aria-label="보드게임 로비 방 선택 디렉터"
+      className={className}
+      data-smoke="tabletop-lobby-director-art"
+    >
+      <rect width="360" height="136" rx="20" fill="#0f172a" />
+      <rect x="18" y="18" width="324" height="100" rx="18" fill="#111827" stroke="#334155" />
+      <path d={`M${nodes[0]?.x || 54} ${nodes[0]?.y || 50} C126 18 190 112 ${nodes[3]?.x || 306} ${nodes[3]?.y || 76}`} fill="none" stroke="#38bdf8" strokeWidth="3" opacity="0.35" />
+      <path d={`M${nodes[1]?.x || 138} ${nodes[1]?.y || 76} C162 104 238 24 ${nodes[2]?.x || 222} ${nodes[2]?.y || 50}`} fill="none" stroke="#facc15" strokeWidth="2" opacity="0.45" />
+      {nodes.map((node, index) => {
+        const active = index === recommendedIndex;
+        return (
+          <g key={node.key} data-smoke="tabletop-lobby-director-node">
+            <circle cx={node.x} cy={node.y} r={active ? 19 : 16} fill={active ? "#facc15" : "#1e293b"} stroke={active ? "#f8fafc" : "#64748b"} strokeWidth="2" />
+            <text x={node.x} y={node.y + 4} textAnchor="middle" fill={active ? "#422006" : "#e2e8f0"} fontSize="11" fontWeight="900">{index + 1}</text>
+            <text x={node.x} y="122" textAnchor="middle" fill="#cbd5e1" fontSize="10" fontWeight="800">{node.label}</text>
+          </g>
+        );
+      })}
+      <rect x="42" y="24" width="104" height="18" rx="9" fill="#0f172a" stroke="#334155" />
+      <text x="94" y="37" textAnchor="middle" fill="#e2e8f0" fontSize="10" fontWeight="900">방 선택 루트</text>
+      <circle cx="316" cy="30" r="10" fill={plan.recommended ? "#22c55e" : "#64748b"} />
+      <path d="M311 30 l4 4 8 -9" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+};
+
+const TabletopLobbyDirectorEmptyArt = ({ game, className = "" }) => {
+  const title = gameConfigs[game]?.title || "보드게임";
+  const safeTitle = String(title).slice(0, 10);
+  const nodes = [
+    { key: "create", x: 78, y: 94, label: "생성", fill: "#38bdf8" },
+    { key: "code", x: 180, y: 52, label: "코드", fill: "#a78bfa" },
+    { key: "refresh", x: 282, y: 94, label: "갱신", fill: "#34d399" },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 360 136"
+      role="img"
+      aria-label={`${title} 로비에 바로 들어갈 방이 없을 때 다음 행동을 안내합니다.`}
+      className={className}
+      data-smoke="tabletop-lobby-director-empty-art"
+    >
+      <rect width="360" height="136" rx="20" fill="#0f172a" />
+      <rect x="18" y="18" width="324" height="100" rx="18" fill="#111827" stroke="#334155" />
+      <path d="M78 94 C116 34, 244 34, 282 94" fill="none" stroke="#334155" strokeWidth="8" strokeLinecap="round" />
+      <path d="M78 94 C116 34, 244 34, 282 94" fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
+      <rect x="119" y="18" width="122" height="26" rx="13" fill="#0f172a" stroke="#334155" />
+      <text x="180" y="35" textAnchor="middle" fill="#e0f2fe" fontSize="11" fontWeight="900">후보 없음</text>
+      <rect x="124" y="84" width="112" height="22" rx="11" fill="#164e63" />
+      <text x="180" y="99" textAnchor="middle" fill="#ecfeff" fontSize="12" fontWeight="900">{safeTitle}</text>
+      {nodes.map((node) => (
+        <g key={node.key} data-smoke="tabletop-lobby-director-empty-node" data-empty-key={node.key}>
+          <circle cx={node.x} cy={node.y} r="20" fill={node.fill} />
+          <circle cx={node.x} cy={node.y} r="9" fill="#020617" opacity="0.72" />
+          <text x={node.x} y={node.y + 34} textAnchor="middle" fill="#cbd5e1" fontSize="10" fontWeight="900">{node.label}</text>
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+const TabletopLobbyDirectorEmptyChoice = ({ game }) => {
+  const title = gameConfigs[game]?.title || "보드게임";
+  const items = [
+    {
+      key: "create",
+      icon: "decision",
+      label: "새 방 만들기",
+      value: "직접 출발",
+      detail: `${title} 방을 만들면 규칙, 턴 시간, 초대 흐름을 바로 통제할 수 있습니다.`,
+    },
+    {
+      key: "code",
+      icon: "input",
+      label: "방코드 입장",
+      value: "초대 합류",
+      detail: "친구가 준 코드는 위 코드 입력 영역에서 기존 합류 흐름 그대로 사용하세요.",
+    },
+    {
+      key: "refresh",
+      icon: "signal",
+      label: "목록 새로고침",
+      value: "후보 재확인",
+      detail: "대기방이 생기면 같은 디렉터 영역에 입장 후보와 시작 임박 신호가 표시됩니다.",
+    },
+  ];
+
+  return (
+    <div
+      className="rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-3"
+      data-smoke="tabletop-lobby-director-choice"
+      data-empty-game={game}
+    >
+      <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center" data-smoke="tabletop-lobby-director-empty-choice">
+        <TabletopLobbyDirectorEmptyArt game={game} className="h-32 w-full" />
+        <div className="min-w-0">
+          <div className="text-sm font-black text-slate-950">추천할 대기방이 없습니다</div>
+          <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+            입장 후보가 비어 있어도 로비 흐름은 이어집니다. 새 방을 만들거나 방코드로 합류하고, 목록 갱신 후 바로 들어갈 방을 다시 확인하세요.
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
+            {items.map((item) => (
+              <div key={item.key} className="rounded-lg border border-white/80 bg-white px-3 py-2" data-smoke="tabletop-lobby-director-empty-item" data-empty-key={item.key}>
+                <div className="flex items-center gap-1.5 text-[10px] font-black text-sky-700">
+                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
+                  {item.label}
+                </div>
+                <div className="mt-1 text-xs font-black text-slate-950">{item.value}</div>
+                <div className="mt-1 text-[10px] font-bold leading-relaxed text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TabletopLobbyDirectorPanel = ({
+  game,
+  rooms,
+  variants,
+  myMemberId,
+  busy,
+  onOpenRoom,
+  onJoinRoom,
+}) => {
+  const plan = buildTabletopLobbyDirectorPlan({ rooms, variants, game, myMemberId });
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" data-smoke="tabletop-lobby-director-panel">
+      <div className="grid gap-3 p-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <TabletopLobbyDirectorArt plan={plan} className="h-36 w-full" />
+        <div className="min-w-0 space-y-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-sm font-black text-slate-900">방 목록 도움말</div>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">{plan.roomCount}개 방 분석</span>
+            </div>
+            <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
+              지금 보이는 방 목록만 보고 이어가기, 바로 입장, 방 만들기 판단을 정리합니다.
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {plan.items.map((item) => (
+              <div key={item.key} className="min-h-[98px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-lobby-director-item">
+                <div className="flex items-center gap-2 text-[11px] font-black text-slate-500">
+                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 text-primary-600" />
+                  {item.label}
+                </div>
+                <div className="mt-1 truncate text-sm font-black text-slate-950">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white">
+                  <span className="block h-full rounded-full bg-primary-500" style={{ width: `${Math.max(6, Math.min(100, item.progress))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2">
+            {plan.choices.length ? plan.choices.map((choice) => (
+              <div key={choice.key} className="grid gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 sm:grid-cols-[minmax(0,1fr)_108px] sm:items-center" data-smoke="tabletop-lobby-director-choice">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-black text-slate-900">{choice.title}</div>
+                  <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-black text-slate-500">
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5">{choice.variantName}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5">{choice.playerCount}/{choice.maxPlayers || "-"}명</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5">{choice.action === "open" ? "이어가기" : "입장 후보"}</span>
+                  </div>
+                  <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-500">{choice.reason}</div>
+                </div>
+                <button
+                  type="button"
+                  className="min-h-10 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => (choice.action === "open" ? onOpenRoom(choice.room) : onJoinRoom(choice.roomId))}
+                  data-smoke="tabletop-lobby-director-primary"
+                >
+                  {choice.action === "open" ? "열기" : "입장"}
+                </button>
+              </div>
+            )) : (
+              <TabletopLobbyDirectorEmptyChoice game={game} />
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const TabletopJoinCodeArt = ({ game, joinCode, className = "" }) => {
+  const codeText = String(joinCode || "").trim().toUpperCase();
+  const visibleCode = codeText ? codeText.slice(0, 8) : "방코드";
+  const palette = {
+    catan: ["#f97316", "#22c55e"],
+    blokus: ["#2563eb", "#facc15"],
+    mahe: ["#14b8a6", "#f59e0b"],
+    dalmuti: ["#7c3aed", "#f59e0b"],
+    "six-nimmt": ["#dc2626", "#facc15"],
+    telestrations: ["#0ea5e9", "#a855f7"],
+    mafia: ["#be123c", "#334155"],
+    poker: ["#16a34a", "#f43f5e"],
+  }[game] || ["#2563eb", "#f59e0b"];
+  const nodes = [
+    { key: "code", label: "코드", x: 58 },
+    { key: "match", label: "방 확인", x: 180 },
+    { key: "seat", label: "좌석", x: 302 },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 360 128"
+      role="img"
+      aria-label="보드게임 방 코드 입장 흐름"
+      className={className}
+      data-smoke="tabletop-join-code-art"
+    >
+      <rect width="360" height="128" rx="20" fill="#0f172a" />
+      <path d="M26 78 C76 34 118 104 166 64 C214 24 266 36 334 82" fill="none" stroke={palette[0]} strokeWidth="2" opacity="0.35" />
+      <rect x="26" y="18" width="308" height="50" rx="16" fill="#111827" stroke="#334155" />
+      <text x="42" y="37" fill="#cbd5e1" fontSize="11" fontWeight="800">공유 방 코드</text>
+      <text x="42" y="58" fill="#ffffff" fontSize="19" fontWeight="900">{visibleCode}</text>
+      <path d="M72 94 H286" fill="none" stroke="#475569" strokeWidth="8" strokeLinecap="round" />
+      <path d="M72 94 H286" fill="none" stroke={codeText ? palette[1] : "#94a3b8"} strokeWidth="3" strokeLinecap="round" />
+      {nodes.map((node, index) => (
+        <g key={node.key} data-smoke="tabletop-join-code-node">
+          <circle cx={node.x} cy="94" r="18" fill={codeText ? palette[0] : "#1f2937"} stroke={codeText ? "#f8fafc" : "#64748b"} strokeWidth="2" />
+          <text x={node.x} y="98" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="900">{index + 1}</text>
+          <text x={node.x} y="122" textAnchor="middle" fill="#e2e8f0" fontSize="10" fontWeight="800">{node.label}</text>
+        </g>
+      ))}
+      <circle cx="318" cy="32" r="10" fill={codeText ? "#facc15" : "#334155"} />
+      <path d="M314 32 h8 M318 28 v8" stroke={codeText ? "#422006" : "#94a3b8"} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+};
+
+const TabletopJoinCodePanel = ({ game, config, joinCode, setJoinCode, busy, initialLoading, joinByCode }) => {
+  const hasCode = String(joinCode || "").trim().length > 0;
+
+  return (
+    <form
+      onSubmit={joinByCode}
+      className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      aria-label={`${config.title} 방 코드 입장`}
+      data-smoke="tabletop-join-code-panel"
+    >
+      <div className="border-b border-slate-100 px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+          <GameUxGlyph type="signal" className="h-4 w-4 text-amber-600" />
+          방 코드 입장
+        </div>
+        <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
+          친구가 공유한 코드를 입력하면 같은 대기방과 좌석 흐름으로 바로 이어집니다.
+        </div>
+      </div>
+      <div className="space-y-3 p-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <input
+            className="min-h-11 min-w-0 rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase"
+            placeholder="방코드"
+            aria-label="방 코드"
+            value={joinCode}
+            maxLength={8}
+            onChange={(event) => setJoinCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+            data-smoke="tabletop-join-code-input"
+          />
+          <button
+            type="submit"
+            className="min-h-11 rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50"
+            disabled={busy || initialLoading || !joinCode.trim()}
+            aria-label={`${joinCode.trim() || "입력한"} 방 코드로 입장`}
+            data-smoke="tabletop-join-code-submit"
+          >
+            입장
+          </button>
+        </div>
+        <div className={`rounded-xl px-3 py-2 text-[11px] font-bold leading-relaxed ${hasCode ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-500"}`} data-smoke="tabletop-join-code-status">
+          {hasCode ? "입력한 코드로 대기방을 찾을 준비가 됐습니다." : "방장이 공유한 코드를 입력하면 공개방 목록을 탐색하지 않아도 됩니다."}
+        </div>
+      </div>
+    </form>
+  );
+};
+
+const tabletopRoomStatusTone = (status) => {
+  if (status === "PLAYING") return "bg-emerald-100 text-emerald-700";
+  if (status === "FINISHED") return "bg-slate-200 text-slate-600";
+  return "bg-amber-100 text-amber-700";
+};
+
+const tabletopLobbyRoomReadiness = (room) => {
+  const status = statusOf(room);
+  const players = playersOf(room);
+  const hostMemberId = hostMemberIdOf(room);
+  const guests = players.filter((player) => memberIdOf(player) !== hostMemberId);
+  const readyGuests = guests.filter(isReady).length;
+  const minPlayers = minPlayersOf(room);
+  const maxPlayers = maxPlayersOf(room);
+  if (status !== "WAITING") {
+    return {
+      done: status === "PLAYING",
+      value: statusLabels[status] || status || "진행 중",
+      detail: status === "PLAYING" ? "이미 시작된 방입니다." : "종료된 방은 새 방을 만드는 편이 좋습니다.",
+    };
+  }
+  if (players.length < minPlayers) {
+    return {
+      done: false,
+      value: `인원 ${players.length}/${minPlayers}`,
+      detail: `${Math.max(0, minPlayers - players.length)}명이 더 들어오면 시작 조건을 맞춥니다.`,
+    };
+  }
+  if (!guests.length) {
+    return {
+      done: true,
+      value: "방장 시작 가능",
+      detail: maxPlayers > 1 ? "추가 인원을 기다리거나 바로 시작할 수 있습니다." : "혼자 진행 가능한 방입니다.",
+    };
+  }
+  return {
+    done: readyGuests === guests.length,
+    value: `게스트 준비 ${readyGuests}/${guests.length}`,
+    detail: readyGuests === guests.length ? "준비 조건을 만족했습니다." : "아직 준비하지 않은 게스트가 있습니다.",
+  };
+};
+
+const tabletopLobbyRoomActionSignal = (room, alreadyInListedRoom) => {
+  const status = statusOf(room);
+  const players = playersOf(room);
+  const maxPlayers = maxPlayersOf(room);
+  const minPlayers = minPlayersOf(room);
+  const full = maxPlayers > 0 && players.length >= maxPlayers;
+  if (alreadyInListedRoom) {
+    return {
+      value: status === "PLAYING" ? "플레이 재입장" : "내 방 열기",
+      detail: status === "PLAYING" ? "진행 중인 판으로 돌아갈 수 있습니다." : "멤버 준비 상태와 시작 조건을 확인하세요.",
+    };
+  }
+  if (status !== "WAITING") {
+    return { value: status === "PLAYING" ? "진행 중" : "종료됨", detail: "입장 대신 다른 대기 방을 고르거나 새 방을 만드세요." };
+  }
+  if (full) {
+    return { value: "정원 마감", detail: "빈 좌석이 생기기 전까지 입장할 수 없습니다." };
+  }
+  if (players.length < minPlayers) {
+    return { value: "합류 추천", detail: "입장하면 시작 조건에 가까워집니다." };
+  }
+  return { value: "입장 가능", detail: "입장 후 준비를 누르면 방장이 시작할 수 있습니다." };
+};
+
+const tabletopLobbyRoomDecisionToneClasses = {
+  access: "border-emerald-100 bg-emerald-50 text-emerald-800",
+  seat: "border-sky-100 bg-sky-50 text-sky-800",
+  ready: "border-amber-100 bg-amber-50 text-amber-800",
+  rule: "border-violet-100 bg-violet-50 text-violet-800",
+  neutral: "border-slate-100 bg-slate-50 text-slate-700",
+};
+
+const buildTabletopLobbyRoomDecisionItems = ({
+  room,
+  game,
+  variantLabel,
+  alreadyInRoom,
+  status,
+  players,
+  minPlayers,
+  maxPlayers,
+  roomFull,
+  canJoin,
+  readiness,
+  actionSignal,
+}) => {
+  const safePlayers = Array.isArray(players) ? players : [];
+  const safeMinPlayers = Math.max(1, Number(minPlayers || 1));
+  const safeMaxPlayers = Math.max(safeMinPlayers, Number(maxPlayers || safePlayers.length || safeMinPlayers));
+  const openSeats = Math.max(0, safeMaxPlayers - safePlayers.length);
+  const statusText = statusLabels[status] || status || "대기 중";
+  const roomCode = codeOf(room) || "-";
+  const accessValue = alreadyInRoom
+    ? "내 참여 방"
+    : canJoin
+      ? "바로 입장"
+      : status === "PLAYING"
+        ? "진행 중"
+        : roomFull
+          ? "정원 마감"
+          : status === "FINISHED"
+            ? "결과 확인"
+            : "상태 확인";
+  const accessDetail = alreadyInRoom
+    ? `${statusText} · 방 코드 ${roomCode}`
+    : actionSignal?.detail || `${statusText} 상태를 먼저 확인하세요.`;
+  const variantName = variantNameOf(room) || variantLabel || gameConfigs[game]?.title || "기본 규칙";
+
+  return [
+    {
+      key: "access",
+      icon: alreadyInRoom || canJoin ? "turn" : "decision",
+      label: "입장 판단",
+      value: accessValue,
+      detail: accessDetail,
+      tone: alreadyInRoom || canJoin ? "access" : "neutral",
+    },
+    {
+      key: "seat",
+      icon: "player",
+      label: "인원",
+      value: `${safePlayers.length}/${safeMaxPlayers}명`,
+      detail: openSeats > 0 ? `빈 좌석 ${openSeats}개 · 최소 ${safeMinPlayers}명` : "빈 좌석이 없습니다.",
+      tone: openSeats > 0 ? "seat" : "neutral",
+    },
+    {
+      key: "ready",
+      icon: readiness?.done ? "win" : "state",
+      label: "준비",
+      value: readiness?.value || "준비 확인",
+      detail: readiness?.detail || "방장의 시작 조건과 참가자 준비 상태를 확인합니다.",
+      tone: readiness?.done ? "access" : "ready",
+    },
+    {
+      key: "rule",
+      icon: "stage",
+      label: "규칙",
+      value: variantLabel || gameConfigs[game]?.title || "보드게임",
+      detail: `${variantName} · 턴 제한 ${turnSecondsOf(room) || "-"}초`,
+      tone: "rule",
+    },
+  ];
+};
+
+const TabletopLobbyRoomDecisionRail = ({ items = [] }) => {
+  const visibleItems = Array.isArray(items) ? items.filter(Boolean).slice(0, 4) : [];
+  if (!visibleItems.length) return null;
+
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" data-smoke="tabletop-lobby-room-decision-rail">
+      {visibleItems.map((item) => {
+        const tone = tabletopLobbyRoomDecisionToneClasses[item.tone] || tabletopLobbyRoomDecisionToneClasses.neutral;
+        return (
+          <div key={item.key} className={`min-h-[94px] rounded-xl border px-3 py-2 ${tone}`} data-smoke="tabletop-lobby-room-decision-item" data-decision-key={item.key}>
+            <div className="flex items-center gap-1.5 text-[10px] font-black opacity-75">
+              <GameUxGlyph type={item.icon || "state"} className="h-3.5 w-3.5" />
+              {item.label}
+            </div>
+            <div className="mt-1 truncate text-sm font-black leading-tight">{item.value}</div>
+            {item.detail && <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-70">{item.detail}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const tabletopLobbyRoomCardPalettes = {
+  catan: { bg: "#fffbeb", primary: "#f59e0b", secondary: "#22c55e", accent: "#0ea5e9", text: "#78350f" },
+  blokus: { bg: "#ecfeff", primary: "#0891b2", secondary: "#6366f1", accent: "#ec4899", text: "#164e63" },
+  mahe: { bg: "#f7fee7", primary: "#65a30d", secondary: "#f59e0b", accent: "#0ea5e9", text: "#365314" },
+  dalmuti: { bg: "#fff7ed", primary: "#ea580c", secondary: "#facc15", accent: "#7c3aed", text: "#7c2d12" },
+  "six-nimmt": { bg: "#fff1f2", primary: "#e11d48", secondary: "#f97316", accent: "#0f766e", text: "#881337" },
+  telestrations: { bg: "#f8fafc", primary: "#2563eb", secondary: "#14b8a6", accent: "#f97316", text: "#1e3a8a" },
+  mafia: { bg: "#f1f5f9", primary: "#475569", secondary: "#dc2626", accent: "#7c3aed", text: "#0f172a" },
+  poker: { bg: "#ecfdf5", primary: "#059669", secondary: "#dc2626", accent: "#0f172a", text: "#064e3b" },
+};
+
+const tabletopLobbyRoomCardStatusTone = {
+  WAITING: { fill: "#fef3c7", stroke: "#d97706", text: "#78350f", label: "대기" },
+  PLAYING: { fill: "#dcfce7", stroke: "#16a34a", text: "#14532d", label: "진행" },
+  FINISHED: { fill: "#e2e8f0", stroke: "#64748b", text: "#334155", label: "결과" },
+};
+
+const TabletopLobbyRoomCardArt = ({
+  game,
+  status,
+  players,
+  minPlayers,
+  maxPlayers,
+  readiness,
+  alreadyInRoom,
+  joinable,
+  full,
+  variantLabel,
+  className = "",
+}) => {
+  const palette = tabletopLobbyRoomCardPalettes[game] || tabletopLobbyRoomCardPalettes.catan;
+  const tone = tabletopLobbyRoomCardStatusTone[status] || tabletopLobbyRoomCardStatusTone.WAITING;
+  const playerCount = Array.isArray(players) ? players.length : 0;
+  const safeMinPlayers = Math.max(1, Number(minPlayers || 1));
+  const safeMaxPlayers = Math.max(safeMinPlayers, Number(maxPlayers || playerCount || safeMinPlayers));
+  const slotCount = Math.max(1, Math.min(safeMaxPlayers, 8));
+  const statusText = statusLabels[status] || status || "대기";
+  const actionText = alreadyInRoom ? "내 방" : joinable ? "입장" : full ? "마감" : status === "PLAYING" ? "진행" : "대기";
+  const nodes = [
+    {
+      key: "rule",
+      label: String(variantLabel || gameConfigs[game]?.title || "규칙").slice(0, 4),
+      fill: "#ffffff",
+      stroke: palette.primary,
+      text: palette.text,
+      active: true,
+    },
+    {
+      key: "seat",
+      label: `${playerCount}/${safeMaxPlayers}`,
+      fill: playerCount >= safeMinPlayers ? "#dcfce7" : "#fef3c7",
+      stroke: playerCount >= safeMinPlayers ? "#16a34a" : "#d97706",
+      text: playerCount >= safeMinPlayers ? "#14532d" : "#78350f",
+      active: playerCount >= safeMinPlayers,
+    },
+    {
+      key: "ready",
+      label: readiness?.done ? "준비" : "확인",
+      fill: readiness?.done ? "#dbeafe" : "#f1f5f9",
+      stroke: readiness?.done ? "#2563eb" : "#64748b",
+      text: readiness?.done ? "#1e3a8a" : "#334155",
+      active: Boolean(readiness?.done),
+    },
+    {
+      key: "action",
+      label: actionText,
+      fill: alreadyInRoom || joinable ? "#ede9fe" : "#f8fafc",
+      stroke: alreadyInRoom || joinable ? "#7c3aed" : "#94a3b8",
+      text: alreadyInRoom || joinable ? "#4c1d95" : "#475569",
+      active: alreadyInRoom || joinable,
+    },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 220 150"
+      className={className}
+      role="img"
+      aria-label={`${gameConfigs[game]?.title || "보드게임"} 방 카드 상태 ${statusText}, ${playerCount}/${safeMaxPlayers}명`}
+      focusable="false"
+      data-smoke="tabletop-lobby-room-card-art"
+      data-room-status={status || ""}
+      data-joinable={joinable ? "true" : "false"}
+    >
+      <rect x="4" y="4" width="212" height="142" rx="22" fill={palette.bg} stroke="#cbd5e1" strokeWidth="2" />
+      <path d="M18 106c30-26 58-29 86-9 31 22 60 13 86-30 10-16 18-20 28-16v48c-58 27-124 30-200 7Z" fill={palette.secondary} opacity="0.18" />
+      <path d="M24 96H196" stroke={palette.primary} strokeWidth="4" strokeLinecap="round" opacity="0.45" />
+      <rect x="16" y="16" width="76" height="26" rx="13" fill="#ffffff" stroke={tone.stroke} strokeWidth="2" />
+      <text x="54" y="33" textAnchor="middle" fontSize="11" fontWeight="900" fill={tone.text}>{tone.label}</text>
+      <rect x="112" y="16" width="88" height="26" rx="13" fill={alreadyInRoom || joinable ? "#dcfce7" : tone.fill} stroke={alreadyInRoom || joinable ? "#16a34a" : tone.stroke} strokeWidth="2" />
+      <text x="156" y="33" textAnchor="middle" fontSize="11" fontWeight="900" fill={alreadyInRoom || joinable ? "#14532d" : tone.text}>{actionText}</text>
+      <g transform="translate(22 58)">
+        {nodes.map((node, index) => {
+          const x = index * 54;
+          return (
+            <g key={node.key} transform={`translate(${x} 0)`} data-smoke="tabletop-lobby-room-card-node" data-room-card-key={node.key}>
+              {index > 0 && <path d="M-36 17H-19" stroke={node.active ? node.stroke : "#94a3b8"} strokeWidth="4" strokeLinecap="round" opacity={node.active ? 0.85 : 0.34} />}
+              <circle cx="17" cy="17" r="17" fill={node.fill} stroke={node.stroke} strokeWidth="3" />
+              <text x="17" y="21" textAnchor="middle" fontSize="9" fontWeight="900" fill={node.text}>{index + 1}</text>
+              <text x="17" y="46" textAnchor="middle" fontSize="9" fontWeight="900" fill={node.text}>{node.label}</text>
+            </g>
+          );
+        })}
+      </g>
+      <g transform="translate(16 128)" aria-hidden="true">
+        {Array.from({ length: slotCount }).map((_, index) => (
+          <rect
+            key={index}
+            x={index * 24}
+            y="0"
+            width="17"
+            height="8"
+            rx="4"
+            fill={index < playerCount ? palette.accent : "#cbd5e1"}
+            opacity={index < playerCount ? 0.95 : 0.7}
+            data-smoke="tabletop-lobby-room-card-seat"
+          />
+        ))}
+      </g>
+    </svg>
+  );
+};
+
+const TabletopLobbyEmptyArt = ({ game, className = "" }) => {
+  const config = gameConfigs[game] || {};
+  const palette = tabletopLobbyRoomCardPalettes[game] || tabletopLobbyRoomCardPalettes.catan;
+  const nodes = [
+    { key: "scan", label: "목록", x: 44, y: 62, active: false },
+    { key: "create", label: "생성", x: 110, y: 40, active: true },
+    { key: "invite", label: "코드", x: 176, y: 62, active: true },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 220 132"
+      className={className}
+      role="img"
+      aria-label={`${config.title || "보드게임"} 대기방이 없을 때 새 방과 초대 코드를 안내합니다.`}
+      focusable="false"
+      data-smoke="tabletop-lobby-empty-art"
+      data-game-code={game || ""}
+    >
+      <rect x="4" y="4" width="212" height="124" rx="22" fill={palette.bg} stroke="#cbd5e1" strokeWidth="2" />
+      <path d="M20 92c33-26 62-30 92-9 34 24 66 11 96-36v60c-62 20-127 23-188-15Z" fill={palette.secondary} opacity="0.16" />
+      <path d="M26 88C60 61 86 64 112 80C144 100 175 76 202 44" fill="none" stroke={palette.primary} strokeWidth="4" strokeLinecap="round" opacity="0.55" />
+      {nodes.map((node, index) => (
+        <g key={node.key} data-smoke="tabletop-lobby-empty-node" data-empty-key={node.key}>
+          {index > 0 && (
+            <path
+              d={`M${nodes[index - 1].x + 18} ${nodes[index - 1].y}C${nodes[index - 1].x + 34} ${nodes[index - 1].y - 28} ${node.x - 34} ${node.y - 28} ${node.x - 18} ${node.y}`}
+              fill="none"
+              stroke={node.active ? palette.accent : "#94a3b8"}
+              strokeWidth="3"
+              strokeLinecap="round"
+              opacity={node.active ? 0.75 : 0.36}
+            />
+          )}
+          <circle cx={node.x} cy={node.y} r="18" fill={node.active ? "#ffffff" : "#f8fafc"} stroke={node.active ? palette.accent : "#94a3b8"} strokeWidth="3" />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="10" fontWeight="900" fill={node.active ? palette.text : "#475569"}>{index + 1}</text>
+          <text x={node.x} y={node.y + 31} textAnchor="middle" fontSize="10" fontWeight="900" fill="#334155">{node.label}</text>
+        </g>
+      ))}
+      <rect x="25" y="16" width="72" height="22" rx="11" fill="#ffffff" stroke="#e2e8f0" />
+      <text x="61" y="31" textAnchor="middle" fontSize="10" fontWeight="900" fill="#475569">방 없음</text>
+      <rect x="122" y="16" width="74" height="22" rx="11" fill={palette.primary} opacity="0.16" />
+      <text x="159" y="31" textAnchor="middle" fontSize="10" fontWeight="900" fill={palette.text}>새 흐름</text>
+    </svg>
+  );
+};
+
+const TabletopLobbyEmptyState = ({ game, config, initialLoading }) => {
+  const title = config?.title || "보드게임";
+  const guideItems = initialLoading
+    ? [
+      { key: "loading", label: "목록 상태", value: "불러오는 중", detail: "대기방 목록을 받는 동안 생성 설정과 초대 코드 경로를 먼저 확인할 수 있습니다." },
+      { key: "create", label: "다음 준비", value: "세팅 확인", detail: "방이 없으면 선택한 규칙과 턴 시간을 기준으로 새 방을 만들게 됩니다." },
+      { key: "invite", label: "초대 경로", value: "코드 대기", detail: "친구가 공유한 방코드가 있다면 목록 수신 후 바로 입장 흐름으로 이어집니다." },
+    ]
+    : [
+      { key: "empty", label: "공개 목록", value: "대기방 없음", detail: "지금 입장할 공개 방이 없으니 새 방을 만들면 첫 선택지가 됩니다." },
+      { key: "create", label: "다음 행동", value: "새 방 만들기", detail: "왼쪽 설정을 확인한 뒤 방을 만들면 다른 플레이어가 바로 합류할 수 있습니다." },
+      { key: "invite", label: "초대 경로", value: "방코드 입장", detail: "이미 받은 코드가 있으면 공개 목록을 기다리지 말고 코드로 합류하세요." },
+    ];
+
+  return (
+    <div
+      className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-3"
+      role={initialLoading ? "status" : undefined}
+      aria-live={initialLoading ? "polite" : undefined}
+      data-smoke="tabletop-lobby-empty-state"
+      data-game-code={game || ""}
+      data-loading={initialLoading ? "true" : "false"}
+    >
+      <div className="grid gap-3 lg:grid-cols-[190px_minmax(0,1fr)] lg:items-center">
+        <TabletopLobbyEmptyArt game={game} className="h-28 w-full" />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-600">{title}</span>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700">{initialLoading ? "목록 수신" : "입장 후보 없음"}</span>
+          </div>
+          <div className="mt-2 text-sm font-black text-slate-900">
+            {initialLoading ? "대기방을 불러오는 중입니다." : "대기 중인 방이 없습니다."}
+          </div>
+          <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
+            빈 로비도 멈춘 화면이 아니라 새 방 만들기, 방코드 입장, 새로고침 중 어느 경로를 선택할지 알려야 합니다.
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
+            {guideItems.map((item) => (
+              <div key={item.key} className="rounded-xl border border-slate-200 bg-white px-3 py-2" data-smoke="tabletop-lobby-empty-item" data-empty-key={item.key}>
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className="mt-0.5 text-xs font-black text-slate-900">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const variantDisplayName = (variant) => variant?.displayName || variant?.code || "";
@@ -1185,165 +6273,35 @@ const transformCells = (piece, rotation, flipped, anchorX = 0, anchorY = 0) => {
   return normalizeCells(transformed).map((cell) => ({ x: cell.x + anchorX, y: cell.y + anchorY }));
 };
 
-const BoardPreview = ({ type, room }) => {
-  if (type === "blokus") {
-    const colors = ["bg-blue-400", "bg-yellow-300", "bg-rose-400", "bg-emerald-400"];
-    return (
-      <div className="grid aspect-square w-full max-w-[520px] grid-cols-10 gap-1 rounded-2xl bg-slate-950 p-3 shadow-2xl">
-        {Array.from({ length: 100 }, (_, index) => (
-          <div
-            key={index}
-            className={`rounded-[4px] ${colors[(index + Math.floor(index / 10)) % colors.length]}`}
-            style={{ opacity: index % 3 === 0 ? 0.9 : 0.3 }}
-          />
-        ))}
-      </div>
-    );
-  }
-  if (type === "mahe") {
-    return (
-      <div className="relative aspect-square w-full max-w-[520px] rounded-full bg-gradient-to-br from-cyan-200 via-emerald-200 to-yellow-100 p-7 shadow-2xl">
-        <div className="absolute inset-[18%] rounded-full bg-gradient-to-br from-yellow-200 to-amber-300 shadow-inner" />
-        {Array.from({ length: 21 }, (_, index) => {
-          const angle = (index / 21) * Math.PI * 2 - Math.PI / 2;
-          const x = 50 + Math.cos(angle) * 42;
-          const y = 50 + Math.sin(angle) * 42;
-          return (
-            <div
-              key={index}
-              className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/80 bg-white/85 text-center text-[10px] font-black text-teal-700 shadow"
-              style={{ left: `${x}%`, top: `${y}%` }}
-            >
-              {index + 1}
-            </div>
-          );
-        })}
-        <div className="absolute left-1/2 top-1/2 w-44 -translate-x-1/2 -translate-y-1/2 text-center text-sm font-black text-teal-900">
-          알 카드<br />{variantNameOf(room) || "본게임"}
-        </div>
-      </div>
-    );
-  }
-  if (type === "dalmuti") {
-    const ranks = ["1", "2", "3", "4", "5", "6", "광"];
-    return (
-      <div className="grid w-full max-w-[560px] grid-cols-3 gap-3 rounded-[2rem] bg-gradient-to-br from-slate-950 to-violet-950 p-5 shadow-2xl sm:grid-cols-7">
-        {ranks.map((rank, index) => (
-          <div key={rank} className="aspect-[2/3] rounded-2xl border border-white/20 bg-white p-3 shadow-xl">
-            <div className="text-xs font-black text-slate-400">계급</div>
-            <div className="mt-6 text-center text-4xl font-black text-slate-900">{rank}</div>
-            <div className="mt-5 text-center text-[10px] font-bold text-slate-500">
-              {index === 0 ? "달무티" : index === 6 ? "광대" : "귀족"}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  if (type === "telestrations") {
-    return (
-      <div className="grid w-full max-w-[560px] gap-3 rounded-2xl bg-slate-950 p-5 shadow-2xl sm:grid-cols-3">
-        {[
-          { label: "문장", body: "달 위의 요리사", tone: "bg-sky-50 text-sky-800" },
-          { label: "그림", body: "✎", tone: "bg-white text-slate-900" },
-          { label: "추측", body: "우주 식당", tone: "bg-amber-50 text-amber-800" },
-        ].map((item) => (
-          <div key={item.label} className={`min-h-36 rounded-lg border border-white/20 p-4 shadow-lg ${item.tone}`}>
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-60">{item.label}</div>
-            <div className="mt-6 text-center text-2xl font-black">{item.body}</div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  if (type === "mafia") {
-    return (
-      <div className="relative aspect-[4/3] w-full max-w-[560px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-zinc-950 via-indigo-950 to-rose-950 p-5 text-white shadow-2xl">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(251,191,36,0.22),transparent_28%),radial-gradient(circle_at_72%_70%,rgba(244,63,94,0.26),transparent_30%)]" />
-        <div className="relative flex h-full flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-200">Narrator TTS</div>
-              <div className="mt-1 text-xl font-black">밤이 되었습니다</div>
-            </div>
-            <Moon className="h-8 w-8 text-indigo-200" />
-          </div>
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { label: "마피아", icon: Skull, tone: "from-rose-600 to-zinc-900" },
-              { label: "경찰", icon: Eye, tone: "from-sky-500 to-indigo-900" },
-              { label: "의사", icon: HeartPulse, tone: "from-emerald-500 to-teal-900" },
-              { label: "시민", icon: Users, tone: "from-slate-400 to-slate-800" },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.label} className={`aspect-[2/3] rounded-xl bg-gradient-to-br ${item.tone} p-2 shadow-xl`}>
-                  <Icon className="h-5 w-5" />
-                  <div className="mt-6 text-center text-xs font-black">{item.label}</div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-black">
-            <span className="rounded-full bg-white/10 px-3 py-2">밤 행동</span>
-            <span className="rounded-full bg-white/10 px-3 py-2">낮 토론</span>
-            <span className="rounded-full bg-white/10 px-3 py-2">투표</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  if (type === "poker") {
-    return (
-      <div className="relative aspect-[4/3] w-full max-w-[560px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-emerald-900 via-emerald-700 to-zinc-950 p-5 shadow-2xl">
-        <div className="absolute inset-5 rounded-[2rem] border border-amber-200/30 bg-emerald-800/80 shadow-inner" />
-        <div className="absolute left-1/2 top-1/2 grid w-40 -translate-x-1/2 -translate-y-1/2 grid-cols-5 gap-1.5">
-          {["A", "K", "Q", "J", "10"].map((rank, index) => (
-            <div key={rank} className={`aspect-[2/3] rounded-lg bg-white px-1 py-1 text-center text-sm font-black shadow ${index % 2 ? "text-slate-900" : "text-rose-600"}`}>
-              {rank}
-            </div>
-          ))}
-        </div>
-        <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
-          {[0, 1, 2].map((index) => (
-            <span key={index} className="h-9 w-9 rounded-full border-4 border-white/70 bg-rose-500 shadow" />
-          ))}
-        </div>
-        <div className="absolute left-6 top-6 rounded-full bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-50">
-          Hold'em / Draw
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="grid w-full max-w-[560px] grid-cols-5 gap-2 rounded-[2rem] bg-slate-900 p-5 shadow-2xl">
-      {Array.from({ length: 19 }, (_, index) => {
-        const terrain = ["bg-amber-300", "bg-emerald-400", "bg-lime-500", "bg-orange-300", "bg-slate-300", "bg-rose-200"][index % 6];
-        return <div key={index} className={`aspect-square rotate-45 rounded-xl ${terrain} shadow-lg`} />;
-      })}
-    </div>
-  );
-};
-
-const MiniPiece = ({ piece, color = "BLUE" }) => {
+const BlokusPieceArt = ({ piece, color = "BLUE", className = "h-8 max-w-full" }) => {
   const cells = normalizeCells((piece?.cells || []).map((cell) => ({ x: Number(cell.x), y: Number(cell.y) })));
+  if (!cells.length) {
+    return (
+      <svg viewBox="0 0 36 36" className={className} data-smoke="blokus-piece-art" role="img" aria-label="빈 블로커스 조각">
+        <rect x="5" y="5" width="26" height="26" rx="7" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="3" />
+      </svg>
+    );
+  }
   const width = Math.max(...cells.map((cell) => cell.x), 0) + 1;
   const height = Math.max(...cells.map((cell) => cell.y), 0) + 1;
-  const occupied = new Set(cells.map((cell) => `${cell.x}:${cell.y}`));
+  const palette = blokusPiecePalette[color] || blokusPiecePalette.BLUE;
+  const cellSize = 18;
+  const padding = 3;
+  const viewWidth = width * cellSize + padding * 2;
+  const viewHeight = height * cellSize + padding * 2;
   return (
-    <div
-      className="grid gap-[2px]"
-      style={{
-        gridTemplateColumns: `repeat(${width}, minmax(0, 0.55rem))`,
-        gridTemplateRows: `repeat(${height}, minmax(0, 0.55rem))`,
-      }}
-    >
-      {Array.from({ length: width * height }, (_, index) => {
-        const x = index % width;
-        const y = Math.floor(index / width);
-        return <div key={`${x}:${y}`} className={`h-2.5 w-2.5 rounded-[2px] ${occupied.has(`${x}:${y}`) ? colorClasses[color] || "bg-slate-400" : "bg-transparent"}`} />;
+    <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} className={className} data-smoke="blokus-piece-art" role="img" aria-label={`${piece?.name || piece?.code || "블로커스 조각"} 미리보기`}>
+      {cells.map((cell) => {
+        const x = padding + cell.x * cellSize;
+        const y = padding + cell.y * cellSize;
+        return (
+          <g key={`${cell.x}:${cell.y}`}>
+            <rect x={x} y={y} width={cellSize - 2} height={cellSize - 2} rx="3" fill={palette.fill} stroke={palette.stroke} strokeWidth="2" />
+            <path d={`M${x + 4} ${y + 5}h${cellSize - 10}`} stroke={palette.shine} strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+          </g>
+        );
       })}
-    </div>
+    </svg>
   );
 };
 
@@ -1428,6 +6386,739 @@ const defaultBlokusBoardCellSize = () => {
   return window.innerWidth < 480 ? 16 : 24;
 };
 
+const blokusPlacementLensProfiles = {
+  legal: { label: "배치 가능", color: "#059669", wash: "#d1fae5", textClass: "text-emerald-700" },
+  warning: { label: "선택 필요", color: "#d97706", wash: "#fef3c7", textClass: "text-amber-700" },
+  blocked: { label: "배치 불가", color: "#e11d48", wash: "#ffe4e6", textClass: "text-rose-700" },
+  idle: { label: "대기", color: "#64748b", wash: "#f1f5f9", textClass: "text-slate-600" },
+};
+
+const BlokusPlacementLensArt = ({ cells = 0, legal = false, blocked = false, firstPiece = false, color = "BLUE", className = "" }) => {
+  const profile = legal
+    ? blokusPlacementLensProfiles.legal
+    : blocked
+      ? blokusPlacementLensProfiles.blocked
+      : blokusPlacementLensProfiles.warning;
+  const safeCells = Math.max(1, Math.min(7, Number(cells) || 1));
+  const palette = blokusPiecePalette[color] || blokusPiecePalette.BLUE;
+
+  return (
+    <svg
+      data-smoke="blokus-placement-lens-art"
+      viewBox="0 0 320 180"
+      className={`h-auto w-full ${className}`}
+      role="img"
+      aria-label={`블로커스 배치 렌즈 ${profile.label}`}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="304" height="164" rx="28" fill="#f8fafc" stroke={profile.color} strokeWidth="3" />
+      <path d="M28 128c42-34 83-39 124-14 42 25 88 22 138-20v48H28Z" fill={profile.wash} opacity="0.92" />
+      <g transform="translate(38 34)">
+        <rect x="0" y="0" width="116" height="116" rx="20" fill="#ffffff" stroke="#cbd5e1" strokeWidth="3" />
+        {Array.from({ length: 5 }).map((_, row) => (
+          Array.from({ length: 5 }).map((__, col) => (
+            <rect key={`${row}-${col}`} x={14 + col * 18} y={14 + row * 18} width="14" height="14" rx="3" fill={col === 0 && row === 0 && firstPiece ? "#fbbf24" : "#e2e8f0"} opacity={col === 0 && row === 0 && firstPiece ? 0.9 : 0.75} />
+          ))
+        ))}
+        {Array.from({ length: safeCells }).map((_, index) => {
+          const coords = [
+            [50, 50],
+            [68, 50],
+            [50, 68],
+            [32, 50],
+            [50, 32],
+            [68, 68],
+            [32, 68],
+          ][index] || [50, 50];
+          return (
+            <rect
+              key={index}
+              x={coords[0]}
+              y={coords[1]}
+              width="16"
+              height="16"
+              rx="4"
+              fill={legal ? palette.fill : blocked ? "#fb7185" : palette.shine}
+              stroke={legal ? palette.stroke : blocked ? "#be123c" : palette.fill}
+              strokeWidth="2"
+            />
+          );
+        })}
+      </g>
+      <g transform="translate(174 38)">
+        <rect x="0" y="0" width="118" height="34" rx="17" fill="#ffffff" stroke={profile.color} strokeWidth="2" />
+        <text x="59" y="22" textAnchor="middle" fontSize="13" fontWeight="900" fill={profile.color}>{profile.label}</text>
+        <path d="M16 62h76" stroke="#cbd5e1" strokeWidth="9" strokeLinecap="round" />
+        <path d="M16 62h46" stroke={profile.color} strokeWidth="9" strokeLinecap="round" />
+        <circle cx="16" cy="62" r="15" fill="#ffffff" stroke={firstPiece ? "#f59e0b" : "#64748b"} strokeWidth="4" />
+        <circle cx="62" cy="62" r="15" fill="#ffffff" stroke={legal ? "#059669" : "#64748b"} strokeWidth="4" />
+        <circle cx="92" cy="62" r="15" fill="#ffffff" stroke={blocked ? "#e11d48" : "#64748b"} strokeWidth="4" />
+        <text x="16" y="90" textAnchor="middle" fontSize="9" fontWeight="900" fill="#64748b">시작</text>
+        <text x="62" y="90" textAnchor="middle" fontSize="9" fontWeight="900" fill="#64748b">모서리</text>
+        <text x="92" y="90" textAnchor="middle" fontSize="9" fontWeight="900" fill="#64748b">차단</text>
+      </g>
+    </svg>
+  );
+};
+
+const BlokusPlacementGuidePanel = ({
+  selectedPiece = null,
+  currentColor = "",
+  myTurn = false,
+  canPass = false,
+  anchorCell = null,
+  placementStatus = { legal: false, reason: "" },
+  selectedPieceLegalCount = 0,
+  totalLegalPlacementCount = 0,
+  remainingSquares = 0,
+  firstPiece = false,
+  placementSignals = {},
+}) => {
+  const selectedPieceSize = Number(selectedPiece?.size || selectedPiece?.cells?.length || 0);
+  const hasAnchor = Boolean(anchorCell);
+  const blocked = hasAnchor && !placementStatus.legal;
+  const profile = placementStatus.legal
+    ? blokusPlacementLensProfiles.legal
+    : blocked || canPass
+      ? blokusPlacementLensProfiles.blocked
+      : selectedPiece
+        ? blokusPlacementLensProfiles.warning
+        : blokusPlacementLensProfiles.idle;
+  const coordinateLabel = anchorCell ? `${anchorCell.x + 1}열 ${anchorCell.y + 1}행` : "위치 미선택";
+  const mainDetail = !myTurn
+    ? "현재 차례가 아니므로 보드 상태와 다음 후보만 확인합니다."
+    : canPass
+      ? "남은 모든 조각이 막혀 패스가 가능한 상태입니다."
+      : !selectedPiece
+        ? "먼저 남은 조각 중 하나를 선택하세요."
+        : hasAnchor
+          ? placementStatus.legal
+            ? "선택 위치는 서버 규칙상 배치 가능한 후보입니다."
+            : `${placementStatus.reason || "규칙 위반"} 때문에 이 위치에는 둘 수 없습니다.`
+          : "보드 칸을 누르면 시작점/모서리/변 접촉 조건을 즉시 판정합니다.";
+  const signalItems = [
+    {
+      label: "선택 조각",
+      value: selectedPiece?.name || "미선택",
+      detail: selectedPiece ? `${selectedPieceSize}칸 · 가능 위치 ${Number(selectedPieceLegalCount).toLocaleString("ko-KR")}곳` : "오른쪽 조각 목록에서 선택",
+      tone: selectedPiece ? "text-slate-900" : "text-amber-700",
+    },
+    {
+      label: "선택 위치",
+      value: coordinateLabel,
+      detail: hasAnchor ? (placementStatus.reason || "배치 후보") : "보드 칸을 선택하면 미리보기가 고정됩니다.",
+      tone: placementStatus.legal ? "text-emerald-700" : blocked ? "text-rose-700" : "text-slate-700",
+    },
+    {
+      label: firstPiece ? "첫 조각 규칙" : "접촉 규칙",
+      value: firstPiece ? (placementSignals.coversStart ? "시작점 충족" : "시작점 필요") : (placementSignals.cornerContact ? "모서리 접촉" : "모서리 필요"),
+      detail: firstPiece ? "첫 조각은 시작점이나 시작 모서리를 덮어야 합니다." : "같은 색과 변은 닿지 않고 모서리만 닿아야 합니다.",
+      tone: firstPiece ? (placementSignals.coversStart ? "text-emerald-700" : "text-amber-700") : placementSignals.cornerContact ? "text-emerald-700" : "text-amber-700",
+    },
+    {
+      label: "차단 원인",
+      value: placementSignals.overlap ? "겹침" : placementSignals.sideContact ? "변 접촉" : placementSignals.outOfBounds ? "보드 밖" : canPass ? "모두 막힘" : "없음",
+      detail: `전체 가능 위치 ${Number(totalLegalPlacementCount).toLocaleString("ko-KR")}곳 · 남은 칸 ${Number(remainingSquares).toLocaleString("ko-KR")}칸`,
+      tone: placementSignals.overlap || placementSignals.sideContact || placementSignals.outOfBounds || canPass ? "text-rose-700" : "text-slate-700",
+    },
+  ];
+
+  return (
+    <section data-smoke="blokus-placement-guide-panel" className="mb-3 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
+      <div className="grid gap-3 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <BlokusPlacementLensArt
+          cells={selectedPieceSize || 1}
+          legal={Boolean(placementStatus.legal)}
+          blocked={blocked || canPass}
+          firstPiece={firstPiece}
+          color={currentColor || "BLUE"}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-emerald-700">배치 판정</div>
+              <div className="mt-1 text-lg font-black text-slate-950">{profile.label}</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{mainDetail}</div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${profile.textClass}`} style={{ backgroundColor: profile.wash }}>
+              {currentColor ? blokusColorLabels[currentColor] || currentColor : "색 대기"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {signalItems.map((item) => (
+              <div key={item.label} data-smoke="blokus-placement-guide-item" className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className={`mt-0.5 text-sm font-black ${item.tone}`}>{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const BlokusTerritoryPressureArt = ({
+  currentColor = "BLUE",
+  remainingSquares = 0,
+  remainingPieceCount = 0,
+  selectedLegalCount = 0,
+  bestLegalCount = 0,
+  blockedPieceCount = 0,
+  canPass = false,
+  className = "",
+}) => {
+  const palette = blokusPiecePalette[currentColor] || blokusPiecePalette.BLUE;
+  const safeRemainingSquares = Math.max(0, Number(remainingSquares) || 0);
+  const safeRemainingPieceCount = Math.max(0, Number(remainingPieceCount) || 0);
+  const safeSelectedLegalCount = Math.max(0, Number(selectedLegalCount) || 0);
+  const safeBestLegalCount = Math.max(0, Number(bestLegalCount) || 0);
+  const safeBlockedPieceCount = Math.max(0, Number(blockedPieceCount) || 0);
+  const remainingRatio = Math.min(1, safeRemainingSquares / 89);
+  const bestRatio = Math.min(1, safeBestLegalCount / 24);
+  const selectedRatio = Math.min(1, safeSelectedLegalCount / Math.max(safeBestLegalCount, 1));
+  const blockedRatio = safeRemainingPieceCount ? Math.min(1, safeBlockedPieceCount / safeRemainingPieceCount) : 0;
+
+  return (
+    <svg
+      data-smoke="blokus-territory-pressure-art"
+      viewBox="0 0 340 210"
+      className={`h-auto w-full ${className}`}
+      role="img"
+      aria-label="블로쿠스 영토 압박 요약"
+      focusable="false"
+    >
+      <rect x="8" y="8" width="324" height="194" rx="28" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="2" />
+      <path d="M24 158c42-30 77-37 114-18 43 22 83 18 152-29v57H24Z" fill={canPass ? "#fef3c7" : "#dcfce7"} opacity="0.88" />
+      <g transform="translate(28 28)">
+        <rect x="0" y="0" width="118" height="118" rx="22" fill="#ffffff" stroke="#dbeafe" strokeWidth="3" />
+        {Array.from({ length: 5 }).map((_, row) => (
+          Array.from({ length: 5 }).map((__, col) => {
+            const index = row * 5 + col;
+            const active = index < Math.ceil(25 * remainingRatio);
+            const blocked = index < Math.ceil(25 * blockedRatio);
+            return (
+              <rect
+                key={`${row}-${col}`}
+                x={14 + col * 18}
+                y={14 + row * 18}
+                width="14"
+                height="14"
+                rx="3"
+                fill={blocked ? "#fb7185" : active ? palette.fill : "#e2e8f0"}
+                stroke={active ? palette.stroke : "#cbd5e1"}
+                strokeWidth="1.5"
+                opacity={active || blocked ? 0.92 : 0.7}
+              />
+            );
+          })
+        ))}
+        <circle cx="94" cy="18" r="13" fill="#ffffff" stroke={canPass ? "#f59e0b" : "#10b981"} strokeWidth="4" />
+      </g>
+      <g transform="translate(164 35)">
+        <rect x="0" y="0" width="144" height="34" rx="17" fill="#ffffff" stroke={canPass ? "#f59e0b" : palette.stroke} strokeWidth="2.5" />
+        <text x="72" y="22" textAnchor="middle" fontSize="13" fontWeight="900" fill={canPass ? "#b45309" : palette.stroke}>
+          {canPass ? "패스 압박" : "배치 압박"}
+        </text>
+        <g transform="translate(8 55)">
+          <path d="M0 0h116" stroke="#e2e8f0" strokeWidth="12" strokeLinecap="round" />
+          <path d={`M0 0h${Math.max(10, 116 * bestRatio)}`} stroke="#10b981" strokeWidth="12" strokeLinecap="round" />
+          <circle cx={Math.max(10, 116 * selectedRatio)} cy="0" r="13" fill="#ffffff" stroke={palette.stroke} strokeWidth="4" />
+          <text x="0" y="29" fontSize="10" fontWeight="900" fill="#64748b">선택</text>
+          <text x="116" y="29" textAnchor="end" fontSize="10" fontWeight="900" fill="#64748b">최고 후보</text>
+        </g>
+        <g transform="translate(8 116)">
+          <path d="M0 0h116" stroke="#e2e8f0" strokeWidth="10" strokeLinecap="round" />
+          <path d={`M0 0h${Math.max(0, 116 * blockedRatio)}`} stroke="#fb7185" strokeWidth="10" strokeLinecap="round" />
+          <text x="0" y="28" fontSize="10" fontWeight="900" fill="#64748b">막힌 조각</text>
+          <text x="116" y="28" textAnchor="end" fontSize="10" fontWeight="900" fill="#64748b">{safeBlockedPieceCount}/{safeRemainingPieceCount}</text>
+        </g>
+      </g>
+    </svg>
+  );
+};
+
+const BlokusTerritoryPressurePanel = ({
+  currentColor = "",
+  selectedPiece = null,
+  selectedPieceLegalCount = 0,
+  totalLegalPlacementCount = 0,
+  remainingSquares = 0,
+  remainingPieceCount = 0,
+  blockedPieceCount = 0,
+  bestPieceEntry = null,
+  currentScoreDetail = null,
+  canPass = false,
+  myTurn = false,
+  phase = "PLAYING",
+}) => {
+  const colorLabel = currentColor ? blokusColorLabels[currentColor] || currentColor : "대기";
+  const selectedPieceName = selectedPiece?.name || "선택 없음";
+  const selectedPieceSize = Number(selectedPiece?.size || selectedPiece?.cells?.length || 0);
+  const bestPieceName = bestPieceEntry?.piece?.name || bestPieceEntry?.pieceCode || "후보 없음";
+  const bestLegalCount = Number(bestPieceEntry?.legalCount || 0);
+  const remainingScore = Number(currentScoreDetail?.score ?? -Number(remainingSquares || 0));
+  const statusLabel = phase === "FINISHED"
+    ? "결과 확정"
+    : canPass
+      ? "패스 가능"
+      : Number(totalLegalPlacementCount) > 0
+        ? "배치 후보 확보"
+        : "후보 없음";
+  const statusDetail = phase === "FINISHED"
+    ? "최종 점수는 남은 칸과 완주 보너스 기준으로 표시됩니다."
+    : canPass
+      ? "남은 모든 조각의 가능 위치가 0곳이라 패스가 가능한 상태입니다."
+      : myTurn
+        ? "선택 조각과 최고 후보를 비교해 지금 놓을 조각을 고르세요."
+        : "상대 턴에도 남은 칸과 막힌 조각을 보며 다음 압박을 예측할 수 있습니다.";
+  const pressureItems = [
+    {
+      label: "남은 칸",
+      value: `${Number(remainingSquares).toLocaleString("ko-KR")}칸`,
+      detail: `남은 조각 ${Number(remainingPieceCount).toLocaleString("ko-KR")}개가 점수 압박의 기준입니다.`,
+      tone: "text-slate-800",
+    },
+    {
+      label: "가능 위치",
+      value: `${Number(totalLegalPlacementCount).toLocaleString("ko-KR")}곳`,
+      detail: `선택 조각은 ${Number(selectedPieceLegalCount).toLocaleString("ko-KR")}곳, 최고 후보는 ${bestLegalCount.toLocaleString("ko-KR")}곳입니다.`,
+      tone: Number(totalLegalPlacementCount) > 0 ? "text-emerald-700" : "text-rose-700",
+    },
+    {
+      label: "최고 후보",
+      value: bestPieceName,
+      detail: bestLegalCount > 0 ? `${bestLegalCount.toLocaleString("ko-KR")}곳에 놓을 수 있어 현재 가장 열려 있습니다.` : "현재 열려 있는 후보 조각이 없습니다.",
+      tone: bestLegalCount > 0 ? "text-emerald-700" : "text-rose-700",
+    },
+    {
+      label: "막힌 조각",
+      value: `${Number(blockedPieceCount).toLocaleString("ko-KR")}개`,
+      detail: `${colorLabel} 현재 점수 기준 ${remainingScore.toLocaleString("ko-KR")}점, 선택 조각 크기 ${selectedPieceSize || 0}칸입니다.`,
+      tone: Number(blockedPieceCount) > 0 ? "text-amber-700" : "text-slate-700",
+    },
+  ];
+
+  return (
+    <section data-smoke="blokus-territory-pressure-panel" className="mb-3 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
+      <div className="grid gap-3 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <BlokusTerritoryPressureArt
+          currentColor={currentColor || "BLUE"}
+          remainingSquares={remainingSquares}
+          remainingPieceCount={remainingPieceCount}
+          selectedLegalCount={selectedPieceLegalCount}
+          bestLegalCount={bestLegalCount}
+          blockedPieceCount={blockedPieceCount}
+          canPass={canPass}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-sky-700">영토 압박</div>
+              <div className="mt-1 text-lg font-black text-slate-950">{statusLabel}</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{statusDetail}</div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${colorText[currentColor] || "text-slate-600"} ${colorBgSoft[currentColor] || "bg-slate-50"}`}>
+              {colorLabel} · {selectedPieceName}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {pressureItems.map((item) => (
+              <div key={item.label} data-smoke="blokus-territory-pressure-item" className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className={`mt-0.5 truncate text-sm font-black ${item.tone}`}>{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const blokusActionRouteTone = {
+  ready: { fill: "#ecfdf5", stroke: "#059669", text: "#047857", soft: "#bbf7d0" },
+  active: { fill: "#eff6ff", stroke: "#2563eb", text: "#1d4ed8", soft: "#bfdbfe" },
+  caution: { fill: "#fffbeb", stroke: "#f59e0b", text: "#b45309", soft: "#fde68a" },
+  blocked: { fill: "#fff1f2", stroke: "#e11d48", text: "#be123c", soft: "#fecdd3" },
+  idle: { fill: "#f8fafc", stroke: "#94a3b8", text: "#475569", soft: "#e2e8f0" },
+};
+
+const buildBlokusActionRouteItems = ({
+  phase = "PLAYING",
+  myTurn = false,
+  canPass = false,
+  selectedPiece = null,
+  selectedPieceCode = "",
+  selectedPieceLegalCount = 0,
+  totalLegalPlacementCount = 0,
+  anchorCell = null,
+  placementStatus = { legal: false, reason: "" },
+  placeButtonEnabled = false,
+  firstPlayablePieceCode = "",
+  bestPieceEntry = null,
+  remainingSquares = 0,
+  remainingPieceCount = 0,
+  rotation = 0,
+  flipped = false,
+  firstPiece = false,
+}) => {
+  const selectedPieceSize = Number(selectedPiece?.size || selectedPiece?.cells?.length || 0);
+  const selectedName = selectedPiece?.name || selectedPieceCode || "미선택";
+  const bestName = bestPieceEntry?.piece?.name || bestPieceEntry?.pieceCode || firstPlayablePieceCode || "";
+  const legalCountText = Number(selectedPieceLegalCount).toLocaleString("ko-KR");
+  const totalLegalText = Number(totalLegalPlacementCount).toLocaleString("ko-KR");
+  const anchorText = anchorCell ? `${anchorCell.x + 1}, ${anchorCell.y + 1}` : "보드 선택";
+  const isFinished = phase === "FINISHED";
+  const routeLockedDetail = isFinished
+    ? "게임이 끝나 배치 버튼은 결과 확인 상태입니다."
+    : !myTurn
+      ? "내 차례가 아니므로 조각과 보드를 관찰하는 단계입니다."
+      : canPass
+        ? "모든 조각의 가능 위치가 0곳이라 패스로 턴을 넘길 수 있습니다."
+        : "선택 조각, 방향, 보드 칸이 모두 맞아야 배치 버튼이 열립니다.";
+
+  return [
+    {
+      key: "piece",
+      label: "조각 선택",
+      value: selectedPiece ? selectedName : canPass ? "모두 막힘" : "미선택",
+      artValue: selectedPiece ? `${selectedPieceSize || "-"}칸` : canPass ? "패스" : "선택",
+      detail: selectedPiece
+        ? `${selectedName}은 현재 ${legalCountText}곳에 둘 수 있습니다.`
+        : bestName
+          ? `먼저 둘 수 있는 후보 ${bestName}을 선택하면 배치 루트가 열립니다.`
+          : routeLockedDetail,
+      toneKey: selectedPieceLegalCount > 0 ? "ready" : canPass ? "caution" : selectedPiece ? "blocked" : "idle",
+      tone: selectedPieceLegalCount > 0 ? "border-emerald-100 bg-emerald-50 text-emerald-800" : canPass ? "border-amber-100 bg-amber-50 text-amber-800" : selectedPiece ? "border-rose-100 bg-rose-50 text-rose-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      key: "shape",
+      label: "방향 조정",
+      value: selectedPiece ? `${rotation}도 · ${flipped ? "뒤집힘" : "기본"}` : "대기",
+      artValue: selectedPiece ? `${rotation}도` : "-",
+      detail: selectedPiece
+        ? "회전과 뒤집기는 같은 조각의 후보 칸을 바꾸며, 서버 배치 규칙은 그대로 유지됩니다."
+        : "조각을 고른 뒤 방향 버튼으로 맞출 수 있습니다.",
+      toneKey: selectedPiece ? "active" : "idle",
+      tone: selectedPiece ? "border-sky-100 bg-sky-50 text-sky-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      key: "anchor",
+      label: "칸 지정",
+      value: anchorText,
+      artValue: anchorCell ? `${anchorCell.x + 1}/${anchorCell.y + 1}` : "칸",
+      detail: anchorCell
+        ? placementStatus.legal
+          ? firstPiece
+            ? "첫 조각 기준 시작점 조건을 만족해 배치할 수 있습니다."
+            : "같은 색 변 접촉 없이 모서리 접촉 조건을 만족했습니다."
+          : `${placementStatus.reason || "규칙 불일치"} 때문에 다른 칸을 골라야 합니다.`
+        : "보드 칸을 누르면 배치 가능 여부와 차단 이유가 고정됩니다.",
+      toneKey: placementStatus.legal ? "ready" : anchorCell ? "blocked" : "idle",
+      tone: placementStatus.legal ? "border-emerald-100 bg-emerald-50 text-emerald-800" : anchorCell ? "border-rose-100 bg-rose-50 text-rose-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      key: "submit",
+      label: "배치/패스",
+      value: placeButtonEnabled ? "배치 가능" : canPass ? "패스 가능" : "잠김",
+      artValue: placeButtonEnabled ? "배치" : canPass ? "패스" : "잠김",
+      detail: placeButtonEnabled
+        ? "같은 칸을 다시 누르거나 배치 버튼으로 기존 PLACE payload를 보냅니다."
+        : canPass
+          ? `남은 ${Number(remainingPieceCount).toLocaleString("ko-KR")}개 조각, ${Number(remainingSquares).toLocaleString("ko-KR")}칸이 모두 막혔습니다.`
+          : `${totalLegalText}곳 중 선택 조각과 칸이 맞아야 배치 버튼이 열립니다.`,
+      toneKey: placeButtonEnabled ? "ready" : canPass ? "caution" : "idle",
+      tone: placeButtonEnabled ? "border-emerald-100 bg-emerald-50 text-emerald-800" : canPass ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-slate-50 text-slate-700",
+    },
+  ];
+};
+
+const BlokusActionRouteArt = ({
+  currentColor = "BLUE",
+  items = [],
+  myTurn = false,
+  canPass = false,
+  placeButtonEnabled = false,
+}) => {
+  const palette = blokusPiecePalette[currentColor] || blokusPiecePalette.BLUE;
+  const routeItems = items.length ? items : [
+    { key: "piece", label: "조각", artValue: "선택", toneKey: "idle" },
+    { key: "shape", label: "방향", artValue: "-", toneKey: "idle" },
+    { key: "anchor", label: "칸", artValue: "-", toneKey: "idle" },
+    { key: "submit", label: "배치", artValue: "-", toneKey: "idle" },
+  ];
+  const activeIndex = placeButtonEnabled || canPass ? 3 : routeItems.findIndex((item) => item.toneKey === "idle" || item.toneKey === "blocked");
+  const safeActiveIndex = activeIndex >= 0 ? activeIndex : myTurn ? 2 : 0;
+
+  return (
+    <svg
+      data-smoke="blokus-action-route-art"
+      viewBox="0 0 400 150"
+      className="h-full min-h-[124px] w-full"
+      role="img"
+      aria-label="블로커스 액션 루트"
+      focusable="false"
+    >
+      <rect x="10" y="10" width="380" height="130" rx="24" fill="#f8fafc" stroke={palette.shine || "#bfdbfe"} strokeWidth="3" />
+      <path d="M58 75h284" stroke={palette.shine || "#bfdbfe"} strokeWidth="14" strokeLinecap="round" />
+      <path d="M58 75h284" stroke={myTurn ? palette.stroke : "#94a3b8"} strokeWidth="4" strokeLinecap="round" opacity="0.72" />
+      {routeItems.map((item, index) => {
+        const x = 58 + index * 94.6;
+        const tone = blokusActionRouteTone[item.toneKey] || blokusActionRouteTone.idle;
+        const active = index === safeActiveIndex;
+        return (
+          <g key={item.key} data-smoke="blokus-action-route-node" data-route-key={item.key}>
+            <circle cx={x} cy="75" r={active ? 34 : 31} fill="#ffffff" stroke={tone.stroke} strokeWidth={active ? "5" : "4"} />
+            <circle cx={x} cy="75" r="22" fill={tone.fill} stroke="#ffffff" strokeWidth="3" />
+            <text x={x} y="70" textAnchor="middle" fontSize="9" fontWeight="900" fill={tone.text}>{item.label}</text>
+            <text x={x} y="89" textAnchor="middle" fontSize="13" fontWeight="900" fill={tone.text}>{item.artValue}</text>
+          </g>
+        );
+      })}
+      <rect x="60" y="116" width="280" height="18" rx="9" fill="#ffffff" stroke={palette.shine || "#bfdbfe"} />
+      <text x="200" y="129" textAnchor="middle" fontSize="10" fontWeight="900" fill={palette.stroke || "#1d4ed8"}>
+        조각 선택 → 방향 조정 → 칸 지정 → 배치/패스
+      </text>
+      <text x="30" y="28" fontSize="10" fontWeight="900" fill={palette.stroke || "#1d4ed8"}>{myTurn ? "내 차례" : "관찰"}</text>
+    </svg>
+  );
+};
+
+const BlokusActionRoutePanel = ({
+  phase = "PLAYING",
+  currentColor = "",
+  currentColorLabel = "",
+  myTurn = false,
+  canPass = false,
+  selectedPiece = null,
+  selectedPieceCode = "",
+  selectedPieceLegalCount = 0,
+  totalLegalPlacementCount = 0,
+  anchorCell = null,
+  placementStatus = { legal: false, reason: "" },
+  placeButtonEnabled = false,
+  firstPlayablePieceCode = "",
+  bestPieceEntry = null,
+  remainingSquares = 0,
+  remainingPieceCount = 0,
+  rotation = 0,
+  flipped = false,
+  firstPiece = false,
+}) => {
+  const items = buildBlokusActionRouteItems({
+    phase,
+    myTurn,
+    canPass,
+    selectedPiece,
+    selectedPieceCode,
+    selectedPieceLegalCount,
+    totalLegalPlacementCount,
+    anchorCell,
+    placementStatus,
+    placeButtonEnabled,
+    firstPlayablePieceCode,
+    bestPieceEntry,
+    remainingSquares,
+    remainingPieceCount,
+    rotation,
+    flipped,
+    firstPiece,
+  });
+
+  return (
+    <section
+      data-smoke="blokus-action-route-panel"
+      data-phase={phase || ""}
+      data-my-turn={myTurn ? "true" : "false"}
+      data-can-pass={canPass ? "true" : "false"}
+      data-selected-piece={selectedPieceCode || ""}
+      data-anchor-cell={anchorCell ? `${anchorCell.x}:${anchorCell.y}` : ""}
+      data-total-legal={Number(totalLegalPlacementCount || 0)}
+      className="mb-3 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
+        <div className="min-h-[132px]">
+          <BlokusActionRouteArt
+            currentColor={currentColor || "BLUE"}
+            items={items}
+            myTurn={myTurn}
+            canPass={canPass}
+            placeButtonEnabled={placeButtonEnabled}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black text-blue-700">블로커스 액션 루트</div>
+              <h3 className="text-base font-black text-slate-900">조각, 방향, 칸, 제출 순서</h3>
+            </div>
+            <div className={`rounded-full border px-3 py-1 text-[11px] font-black ${colorText[currentColor] || "text-slate-600"} ${colorBgSoft[currentColor] || "bg-white"}`}>
+              {currentColorLabel || currentColor || "색상 대기"}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.key} data-smoke="blokus-action-route-item" data-route-key={item.key} className={`min-h-[102px] rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const BlokusRemainingPiecesEmptyArt = ({ currentColor = "BLUE", colorLabel = "", compact = false, canPass = false }) => {
+  const palette = blokusPiecePalette[currentColor] || blokusPiecePalette.BLUE;
+  const nodes = [
+    { key: "empty", x: 62, y: 86, label: "소진" },
+    { key: "board", x: 132, y: 122, label: "보드" },
+    { key: "pass", x: 220, y: 86, label: canPass ? "패스" : "관찰" },
+    { key: "score", x: 298, y: 122, label: "점수" },
+  ];
+
+  return (
+    <svg
+      data-smoke="blokus-remaining-empty-art"
+      viewBox="0 0 360 190"
+      className={compact ? "mx-auto h-auto w-full max-w-[250px]" : "h-auto w-full"}
+      role="img"
+      aria-label={`블로커스 ${colorLabel || currentColor || "현재 색"} 남은 조각 없음`}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="344" height="174" rx="26" fill="#f8fafc" stroke={palette.stroke} strokeWidth="3" opacity="0.96" />
+      <path d="M28 144c40-30 82-35 126-16 50 22 88 14 121-23 22-24 42-28 60-12v50H28Z" fill={palette.soft} opacity="0.78" />
+      <g transform="translate(35 32)">
+        {Array.from({ length: 16 }, (_, index) => {
+          const x = (index % 4) * 18;
+          const y = Math.floor(index / 4) * 18;
+          const filled = [0, 1, 4, 5, 10, 14].includes(index);
+          return <rect key={index} x={x} y={y} width="14" height="14" rx="3" fill={filled ? palette.fill : "#ffffff"} stroke={filled ? palette.stroke : "#cbd5e1"} strokeWidth="1.5" />;
+        })}
+      </g>
+      <path d="M64 108c52-36 96-36 134 0s78 36 132 0" fill="none" stroke="#cbd5e1" strokeWidth="8" strokeLinecap="round" />
+      {nodes.map((node, index) => (
+        <g key={node.key} data-smoke="blokus-remaining-empty-node" data-empty-node={node.key}>
+          <circle cx={node.x} cy={node.y} r={index === 0 ? 24 : 20} fill="#ffffff" stroke={index === 0 ? palette.stroke : "#0f172a"} strokeWidth={index === 0 ? 4 : 3} />
+          {node.key === "empty" && (
+            <g>
+              <rect x={node.x - 12} y={node.y - 12} width="24" height="24" rx="6" fill={palette.soft} />
+              <path d={`M${node.x - 7} ${node.y - 7}h14v14h-14Z`} fill="none" stroke={palette.stroke} strokeWidth="3" />
+              <path d={`M${node.x - 11} ${node.y + 13}h22`} stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
+            </g>
+          )}
+          {node.key === "board" && (
+            <g>
+              <rect x={node.x - 13} y={node.y - 13} width="10" height="10" rx="2" fill={palette.fill} />
+              <rect x={node.x + 3} y={node.y - 13} width="10" height="10" rx="2" fill="#e2e8f0" />
+              <rect x={node.x - 13} y={node.y + 3} width="10" height="10" rx="2" fill="#e2e8f0" />
+              <rect x={node.x + 3} y={node.y + 3} width="10" height="10" rx="2" fill={palette.fill} />
+            </g>
+          )}
+          {node.key === "pass" && (
+            <g>
+              <path d={`M${node.x - 12} ${node.y}h24`} stroke={canPass ? "#f59e0b" : "#64748b"} strokeWidth="5" strokeLinecap="round" />
+              <path d={`M${node.x + 4} ${node.y - 8}l10 8-10 8`} fill="none" stroke={canPass ? "#f59e0b" : "#64748b"} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            </g>
+          )}
+          {node.key === "score" && (
+            <g>
+              <path d={`M${node.x} ${node.y - 14}l5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2Z`} fill="#fef3c7" stroke="#d97706" strokeWidth="2.5" />
+            </g>
+          )}
+          <text x={node.x} y={node.y + 38} textAnchor="middle" fontSize="10" fontWeight="900" fill="#475569">{node.label}</text>
+        </g>
+      ))}
+      <rect x="130" y="24" width="190" height="28" rx="14" fill="#ffffff" stroke={palette.stroke} />
+      <text x="225" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill={palette.stroke}>{colorLabel || currentColor || "현재 색"} 조각 소진</text>
+      <text x="180" y="170" textAnchor="middle" fontSize="11" fontWeight="900" fill="#0f172a">{canPass ? "패스로 다음 색 흐름 확인" : "보드와 점수 압력 관찰"}</text>
+    </svg>
+  );
+};
+
+const BlokusRemainingPiecesEmptyPanel = ({
+  currentColor = "BLUE",
+  colorLabel = "",
+  currentTurnLabel = "",
+  canPass = false,
+  myTurn = false,
+  currentScoreDetail = null,
+  totalLegalPlacementCount = 0,
+  compact = false,
+}) => {
+  const remainingSquares = Number(currentScoreDetail?.remainingSquares || 0);
+  const completed = Boolean(currentScoreDetail?.completed) || remainingSquares === 0;
+  const score = Number(currentScoreDetail?.score || 0);
+  const completionBonus = Number(currentScoreDetail?.completionBonus || 0);
+  const monominoBonus = Number(currentScoreDetail?.monominoBonus || 0);
+  const stateText = completed ? "모든 조각 소진" : "배치 후보 없음";
+  const nextAction = myTurn
+    ? canPass ? "패스로 턴 넘기기" : "서버 가능 위치 확인"
+    : "다른 색 차례 관찰";
+  const emptyItems = [
+    {
+      key: "empty",
+      label: "현재 상태",
+      value: stateText,
+      detail: completed ? "이 색은 남은 조각이 없어 더 이상 조각 선택 목록이 표시되지 않습니다." : "남은 조각 후보를 불러오지 못했거나 현재 색이 배치할 조각이 없습니다.",
+    },
+    {
+      key: "turn",
+      label: "턴 해석",
+      value: myTurn ? "내 조작 흐름" : "관전 흐름",
+      detail: currentTurnLabel || "현재 색과 담당 좌석을 확인하세요.",
+    },
+    {
+      key: "pass",
+      label: "다음 행동",
+      value: nextAction,
+      detail: canPass ? "가능 위치가 0곳이므로 기존 패스 버튼으로 다음 색에 넘길 수 있습니다." : `가능 위치 ${Number(totalLegalPlacementCount).toLocaleString("ko-KR")}곳 기준으로 보드 흐름을 봅니다.`,
+    },
+    {
+      key: "score",
+      label: "점수 근거",
+      value: completionBonus || monominoBonus ? `보너스 +${completionBonus + monominoBonus}` : `${score}점`,
+      detail: completed ? "완주 보너스와 마지막 1칸 보너스 여부는 서버 점수표가 최종 기준입니다." : "남은 칸 수와 남은 조각 손실이 최종 점수 압력입니다.",
+    },
+  ];
+
+  return (
+    <section
+      data-smoke="blokus-remaining-empty-panel"
+      data-empty-color={currentColor || ""}
+      data-can-pass={canPass ? "true" : "false"}
+      data-completed={completed ? "true" : "false"}
+      className={`overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-amber-50 shadow-sm ${compact ? "p-3" : "p-4"}`}
+    >
+      <div className={`grid gap-3 ${compact ? "" : "lg:grid-cols-[240px_minmax(0,1fr)]"}`}>
+        <BlokusRemainingPiecesEmptyArt currentColor={currentColor} colorLabel={colorLabel} compact={compact} canPass={canPass} />
+        <div>
+          <div className="inline-flex rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-black text-sky-700">남은 조각 브리핑</div>
+          <div className="mt-2 text-sm font-black text-slate-950">남은 조각이 없습니다</div>
+          <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+            {completed ? "현재 색은 모든 조각을 사용했습니다. 이제 배치 선택보다 패스 가능 여부, 다음 색 흐름, 최종 점수 보너스 근거를 확인해야 합니다." : "선택 목록이 비어 있어 보드 배치보다 상태 해석이 우선입니다. 서버가 내려준 현재 색과 가능 위치를 기준으로 다음 행동을 판단합니다."}
+          </div>
+          <div className={`mt-3 grid gap-2 ${compact ? "" : "sm:grid-cols-2"}`}>
+            {emptyItems.map((item) => (
+              <div key={item.key} data-smoke="blokus-remaining-empty-item" data-empty-key={item.key} className="rounded-lg border border-white/80 bg-white/85 px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className="mt-0.5 text-xs font-black leading-snug text-slate-900">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
   const [selectedPieceCode, setSelectedPieceCode] = useState("");
   const [rotation, setRotation] = useState(0);
@@ -1498,6 +7189,31 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
     if (!hoverCells.length || !currentColor) return { legal: false, reason: "" };
     return blokusPlacementStatus({ cells: hoverCells, boardSize, occupied, colorByCell, colorsOnBoard, color: currentColor, startPoints });
   }, [hoverCells, boardSize, occupied, colorByCell, colorsOnBoard, currentColor, startPoints]);
+  const currentColorFirstPiece = Boolean(currentColor) && !colorsOnBoard.has(currentColor);
+  const placementSignals = useMemo(() => {
+    if (!hoverCells.length || !currentColor) {
+      return {
+        outOfBounds: false,
+        overlap: false,
+        sideContact: false,
+        cornerContact: false,
+        coversStart: false,
+      };
+    }
+    const orthogonal = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const diagonal = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+    const validStartPoints = (startPoints || []).filter((point) => !get(point, "color", "color", null) || get(point, "color", "color", null) === currentColor);
+    const fallbackCorner = blokusStartCorners[currentColor];
+    return {
+      outOfBounds: hoverCells.some((cell) => cell.x < 0 || cell.y < 0 || cell.x >= boardSize || cell.y >= boardSize),
+      overlap: hoverCells.some((cell) => occupied.has(`${cell.x}:${cell.y}`)),
+      sideContact: hoverCells.some((cell) => orthogonal.some(([dx, dy]) => colorByCell.get(`${cell.x + dx}:${cell.y + dy}`) === currentColor)),
+      cornerContact: hoverCells.some((cell) => diagonal.some(([dx, dy]) => colorByCell.get(`${cell.x + dx}:${cell.y + dy}`) === currentColor)),
+      coversStart: validStartPoints.length
+        ? validStartPoints.some((point) => hoverCells.some((cell) => cell.x === Number(point.x) && cell.y === Number(point.y)))
+        : Boolean(fallbackCorner && hoverCells.some((cell) => cell.x === fallbackCorner.x && cell.y === fallbackCorner.y)),
+    };
+  }, [hoverCells, currentColor, startPoints, boardSize, occupied, colorByCell]);
   const legalPlacementCountsByPieceCode = useMemo(() => {
     const next = new Map();
     remainingPieceCodes.forEach((pieceCode) => {
@@ -1543,6 +7259,23 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
     const piece = pieceByCode.get(pieceCode);
     return sum + Number(piece?.size || piece?.cells?.length || 0);
   }, 0), [remainingPieceCodes, pieceByCode]);
+  const blokusPiecePressureEntries = useMemo(() => remainingPieceCodes.map((pieceCode) => {
+    const piece = pieceByCode.get(pieceCode);
+    const legalCount = Number(legalPlacementCountsByPieceCode.get(pieceCode) || 0);
+    return {
+      pieceCode,
+      piece,
+      legalCount,
+      size: Number(piece?.size || piece?.cells?.length || 0),
+    };
+  }), [remainingPieceCodes, pieceByCode, legalPlacementCountsByPieceCode]);
+  const blokusBlockedPieceCount = blokusPiecePressureEntries.filter((entry) => entry.legalCount <= 0).length;
+  const blokusBestPieceEntry = [...blokusPiecePressureEntries]
+    .filter((entry) => entry.legalCount > 0)
+    .sort((left, right) => {
+      if (right.legalCount !== left.legalCount) return right.legalCount - left.legalCount;
+      return right.size - left.size;
+    })[0] || null;
   const blokusScoreDetailsByColor = useMemo(() => {
     const next = new Map();
     colors.forEach((colorState) => {
@@ -1581,6 +7314,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
     });
     return next;
   }, [colors, pieceByCode]);
+  const currentBlokusScoreDetail = currentColor ? blokusScoreDetailsByColor.get(currentColor) : null;
   const previewCells = useMemo(() => {
     if (!hoverCells.length) return new Set();
     return new Set(hoverCells.map((cell) => `${cell.x}:${cell.y}`));
@@ -1635,6 +7369,36 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
     { label: "조각", value: selectedPiece?.name || "미선택" },
     { label: "가능", value: `${totalLegalPlacementCount.toLocaleString("ko-KR")}곳` },
     { label: "선택", value: anchorCell ? `${anchorCell.x + 1}, ${anchorCell.y + 1}` : "없음" },
+  ];
+  const blokusFlowItems = [
+    {
+      label: "단계",
+      value: phase === "FINISHED" ? "게임 종료" : "조각 배치",
+      detail: currentTurnLabel,
+      icon: "stage",
+      tone: phase === "FINISHED" ? "done" : myTurn ? "active" : "neutral",
+    },
+    {
+      label: "색/차례",
+      value: currentColorState?.label || currentColor || "-",
+      detail: currentColorShared ? `${playerName(currentSeatNo)}님이 공유 색을 조종합니다.` : `${playerName(currentSeatNo)}님의 차례입니다.`,
+      icon: "turn",
+      tone: myTurn ? "active" : "neutral",
+    },
+    {
+      label: "배치 가능",
+      value: `${totalLegalPlacementCount.toLocaleString("ko-KR")}곳`,
+      detail: selectedPiece ? `${selectedPiece.name} 가능 위치 ${selectedPieceLegalCount.toLocaleString("ko-KR")}곳 · 남은 칸 ${remainingSquares}칸` : `남은 조각 ${remainingPieceCodes.length}개`,
+      icon: "decision",
+      tone: canPass ? "danger" : totalLegalPlacementCount > 0 ? "active" : "waiting",
+    },
+    {
+      label: phase === "FINISHED" ? "결과" : "선택 근거",
+      value: phase === "FINISHED" && winnerText ? `${winnerText} 승리` : anchorCell ? `${anchorCell.x + 1}, ${anchorCell.y + 1}` : "보드 선택 대기",
+      detail: blokusTurnGuidance,
+      icon: phase === "FINISHED" ? "win" : "recent",
+      tone: phase === "FINISHED" ? "done" : placementStatus.legal ? "active" : "neutral",
+    },
   ];
   const placeButtonEnabled = myTurn && Boolean(anchorCell) && Boolean(placementStatus.legal);
   const placeButtonHint = !myTurn
@@ -1742,6 +7506,41 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
             </div>
           )}
         </div>
+        <GameFlowMeter
+          title="블로커스 배치 흐름"
+          detail="현재 색, 선택 조각, 합법 배치 수, 확정 근거를 한 줄 흐름으로 확인합니다."
+          items={blokusFlowItems}
+          tone={phase === "FINISHED" ? "amber" : myTurn ? "emerald" : "slate"}
+          className="mb-3"
+          smoke="blokus-flow-meter"
+        />
+        <BlokusPlacementGuidePanel
+          selectedPiece={selectedPiece}
+          currentColor={currentColor}
+          myTurn={myTurn}
+          canPass={canPass}
+          anchorCell={anchorCell}
+          placementStatus={placementStatus}
+          selectedPieceLegalCount={selectedPieceLegalCount}
+          totalLegalPlacementCount={totalLegalPlacementCount}
+          remainingSquares={remainingSquares}
+          firstPiece={currentColorFirstPiece}
+          placementSignals={placementSignals}
+        />
+        <BlokusTerritoryPressurePanel
+          currentColor={currentColor}
+          selectedPiece={selectedPiece}
+          selectedPieceLegalCount={selectedPieceLegalCount}
+          totalLegalPlacementCount={totalLegalPlacementCount}
+          remainingSquares={remainingSquares}
+          remainingPieceCount={remainingPieceCodes.length}
+          blockedPieceCount={blokusBlockedPieceCount}
+          bestPieceEntry={blokusBestPieceEntry}
+          currentScoreDetail={currentBlokusScoreDetail}
+          canPass={canPass}
+          myTurn={myTurn}
+          phase={phase}
+        />
         <div className="mb-3 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 p-3 shadow-sm" role="status" aria-live="polite" aria-atomic="true">
           <div className="flex items-start gap-3">
             <div className={`mt-0.5 rounded-2xl p-2 text-white shadow-sm ${colorClasses[currentColor] || "bg-slate-700"}`}>
@@ -1908,13 +7707,22 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
                     title={`${piece?.name || pieceCode} · 가능 위치 ${legalCount.toLocaleString("ko-KR")}곳`}
                   >
                     <span className="max-w-full truncate">{piece?.name || pieceCode}</span>
-                    <MiniPiece piece={piece} color={currentColor || "BLUE"} />
+                    <BlokusPieceArt piece={piece} color={currentColor || "BLUE"} className="h-7 max-w-full" />
                   </button>
                 );
               })}
               {!quickPieceCodes.length && (
-                <div className="flex h-16 min-w-[120px] items-center justify-center rounded-xl bg-slate-50 px-3 text-[11px] font-bold text-slate-400">
-                  남은 조각 없음
+                <div className="min-w-[220px]">
+                  <BlokusRemainingPiecesEmptyPanel
+                    currentColor={currentColor || "BLUE"}
+                    colorLabel={currentColorState?.label || currentColor || "현재 색"}
+                    currentTurnLabel={currentTurnLabel}
+                    canPass={canPass}
+                    myTurn={myTurn}
+                    currentScoreDetail={currentBlokusScoreDetail}
+                    totalLegalPlacementCount={totalLegalPlacementCount}
+                    compact
+                  />
                 </div>
               )}
             </div>
@@ -1990,7 +7798,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
               <span className="text-[11px] font-bold text-slate-500">{selectedPiece ? `${selectedPieceSize}칸` : "-"}</span>
             </div>
             <div className="flex min-h-[54px] items-center justify-center rounded-lg bg-white">
-              {selectedPiece ? <MiniPiece piece={{ ...selectedPiece, cells: transformCells(selectedPiece, rotation, flipped, 0, 0) }} color={currentColor || "BLUE"} /> : null}
+              {selectedPiece ? <BlokusPieceArt piece={{ ...selectedPiece, cells: transformCells(selectedPiece, rotation, flipped, 0, 0) }} color={currentColor || "BLUE"} className="h-12 max-w-full" /> : null}
             </div>
           </div>
           <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-bold leading-relaxed ${selectedPieceLegalCount > 0 ? "border-emerald-100 bg-emerald-50 text-emerald-700" : "border-rose-100 bg-rose-50 text-rose-700"}`}>
@@ -2050,11 +7858,23 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
                       {legalCount > 0 ? `${legalCount.toLocaleString("ko-KR")}곳` : "막힘"}
                     </span>
                   </span>
-                  <MiniPiece piece={piece} color={currentColor || "BLUE"} />
+                  <BlokusPieceArt piece={piece} color={currentColor || "BLUE"} className="mt-2 h-8 max-w-full" />
                 </button>
               );
             })}
-            {!remainingPieceCodes.length && <div className="col-span-2 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-400">남은 조각 없음</div>}
+            {!remainingPieceCodes.length && (
+              <div className="col-span-2 sm:col-span-3 xl:col-span-2">
+                <BlokusRemainingPiecesEmptyPanel
+                  currentColor={currentColor || "BLUE"}
+                  colorLabel={currentColorState?.label || currentColor || "현재 색"}
+                  currentTurnLabel={currentTurnLabel}
+                  canPass={canPass}
+                  myTurn={myTurn}
+                  currentScoreDetail={currentBlokusScoreDetail}
+                  totalLegalPlacementCount={totalLegalPlacementCount}
+                />
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -2124,7 +7944,14 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
                 {get(move, "turn_number", "turnNumber", 0)}수 · {move.pass ? "패스" : get(move, "piece_code", "pieceCode", "")} · {move.color}
               </div>
             ))}
-            {!moveHistory.length && <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">아직 기록 없음</div>}
+            {!moveHistory.length && (
+              <TabletopHistoryEmptyState
+                game="blokus"
+                title="아직 배치 기록이 없습니다"
+                detail="첫 조각을 놓거나 패스가 처리되면 색상, 조각, 순서가 이 기록 영역에 쌓입니다."
+                nextAction="첫 배치"
+              />
+            )}
           </div>
         </div>
       </aside>
@@ -2132,44 +7959,656 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
   );
 };
 
-const maheTurtlePalettes = [
-  { shell: "bg-emerald-400 border-emerald-700 text-emerald-950", body: "bg-lime-300 border-lime-600" },
-  { shell: "bg-sky-400 border-sky-700 text-sky-950", body: "bg-cyan-200 border-cyan-500" },
-  { shell: "bg-amber-300 border-amber-600 text-amber-950", body: "bg-yellow-200 border-yellow-500" },
-  { shell: "bg-rose-400 border-rose-700 text-rose-950", body: "bg-pink-200 border-pink-500" },
-  { shell: "bg-violet-400 border-violet-700 text-violet-950", body: "bg-fuchsia-200 border-fuchsia-500" },
-  { shell: "bg-teal-400 border-teal-700 text-teal-950", body: "bg-emerald-200 border-emerald-500" },
-  { shell: "bg-orange-300 border-orange-700 text-orange-950", body: "bg-amber-200 border-amber-500" },
-  { shell: "bg-slate-300 border-slate-600 text-slate-950", body: "bg-slate-200 border-slate-400" },
+const maheTurtleSvgPalettes = [
+  { shell: "#34d399", shellStroke: "#047857", body: "#bef264", bodyStroke: "#65a30d", text: "#064e3b" },
+  { shell: "#38bdf8", shellStroke: "#0369a1", body: "#a5f3fc", bodyStroke: "#0891b2", text: "#0c4a6e" },
+  { shell: "#fcd34d", shellStroke: "#b45309", body: "#fde68a", bodyStroke: "#d97706", text: "#78350f" },
+  { shell: "#fb7185", shellStroke: "#be123c", body: "#fbcfe8", bodyStroke: "#db2777", text: "#881337" },
+  { shell: "#a78bfa", shellStroke: "#6d28d9", body: "#f0abfc", bodyStroke: "#c026d3", text: "#4c1d95" },
+  { shell: "#2dd4bf", shellStroke: "#0f766e", body: "#a7f3d0", bodyStroke: "#059669", text: "#134e4a" },
+  { shell: "#fdba74", shellStroke: "#c2410c", body: "#fde68a", bodyStroke: "#d97706", text: "#7c2d12" },
+  { shell: "#cbd5e1", shellStroke: "#475569", body: "#e2e8f0", bodyStroke: "#64748b", text: "#0f172a" },
 ];
 
-const MaheTurtleToken = ({ seatNo, compact = false }) => {
-  const palette = maheTurtlePalettes[(Number(seatNo) - 1) % maheTurtlePalettes.length] || maheTurtlePalettes[0];
+const MaheTurtleArt = ({ seatNo, compact = false, className = "" }) => {
+  const svgPalette = maheTurtleSvgPalettes[(Number(seatNo) - 1) % maheTurtleSvgPalettes.length] || maheTurtleSvgPalettes[0];
+  const label = `${seatNo}번 거북이`;
   return (
-    <span
-      className={`relative inline-flex shrink-0 items-center justify-center ${compact ? "h-5 w-6 text-[8px]" : "h-6 w-8 text-[9px]"} font-black`}
-      title={`${seatNo}번 거북이`}
-      aria-label={`${seatNo}번 거북이`}
+    <svg
+      viewBox="0 0 96 72"
+      className={`${compact ? "h-6 w-8" : "h-8 w-11"} shrink-0 ${className}`}
+      title={label}
+      aria-label={label}
+      role="img"
       data-smoke="mahe-turtle-token"
     >
-      <span className={`absolute right-0 top-1/2 z-0 -translate-y-1/2 rounded-full border ${palette.body} ${compact ? "h-2.5 w-2.5" : "h-3 w-3"}`} />
-      <span className={`absolute left-0 top-1/2 z-0 -translate-y-1/2 rotate-45 rounded-[2px] border ${palette.body} ${compact ? "h-2 w-2" : "h-2.5 w-2.5"}`} />
-      <span className={`absolute left-[20%] top-0 z-0 -rotate-12 rounded-full border ${palette.body} ${compact ? "h-1.5 w-2.5" : "h-2 w-3"}`} />
-      <span className={`absolute bottom-0 left-[20%] z-0 rotate-12 rounded-full border ${palette.body} ${compact ? "h-1.5 w-2.5" : "h-2 w-3"}`} />
-      <span className={`relative z-10 flex items-center justify-center rounded-full border-2 shadow-sm ${palette.shell} ${compact ? "h-4 w-5" : "h-5 w-6"}`}>
-        {seatNo}
-      </span>
-    </span>
+      <g data-smoke="mahe-turtle-art">
+        <ellipse cx="70" cy="38" rx="13" ry="11" fill={svgPalette.body} stroke={svgPalette.bodyStroke} strokeWidth="4" />
+        <path d="M20 36l-11 8 11 8z" fill={svgPalette.body} stroke={svgPalette.bodyStroke} strokeWidth="4" strokeLinejoin="round" />
+        <ellipse cx="33" cy="18" rx="10" ry="7" fill={svgPalette.body} stroke={svgPalette.bodyStroke} strokeWidth="4" transform="rotate(-18 33 18)" />
+        <ellipse cx="33" cy="56" rx="10" ry="7" fill={svgPalette.body} stroke={svgPalette.bodyStroke} strokeWidth="4" transform="rotate(18 33 56)" />
+        <ellipse cx="46" cy="38" rx="28" ry="22" fill={svgPalette.shell} stroke={svgPalette.shellStroke} strokeWidth="5" />
+        <path d="M27 37c10-11 29-13 42-1" fill="none" stroke="rgba(255,255,255,0.58)" strokeWidth="4" strokeLinecap="round" />
+        <path d="M46 17v42M24 38h52" stroke={svgPalette.shellStroke} strokeWidth="2.5" strokeLinecap="round" opacity="0.45" />
+        <circle cx="76" cy="34" r="2.8" fill="#0f172a" />
+        <text x="46" y="45" textAnchor="middle" fontSize="22" fontWeight="900" fill={svgPalette.text}>{seatNo}</text>
+      </g>
+    </svg>
   );
 };
 
 const TurtleStack = ({ seatNos = [], compact = false }) => (
   <div className={`flex items-center ${compact ? "-space-x-2" : "-space-x-1.5"}`}>
     {seatNos.map((seatNo, index) => (
-      <MaheTurtleToken key={`${seatNo}-${index}`} seatNo={seatNo} compact={compact} />
+      <MaheTurtleArt key={`${seatNo}-${index}`} seatNo={seatNo} compact={compact} />
     ))}
   </div>
 );
+
+const maheRiskCompassTone = {
+  ready: { fill: "#e0f2fe", stroke: "#0284c7", accent: "#0f766e", text: "#075985" },
+  safe: { fill: "#dcfce7", stroke: "#16a34a", accent: "#059669", text: "#14532d" },
+  caution: { fill: "#fef3c7", stroke: "#d97706", accent: "#f59e0b", text: "#92400e" },
+  danger: { fill: "#ffe4e6", stroke: "#e11d48", accent: "#f97316", text: "#9f1239" },
+  bust: { fill: "#fecaca", stroke: "#be123c", accent: "#dc2626", text: "#881337" },
+};
+
+const MaheRiskCompassArt = ({
+  diceSum = 0,
+  diceCount = 0,
+  stopSteps = 0,
+  safeFaces = [],
+  bustFaces = [],
+  riskLevel = "ready",
+  stopScores = false,
+}) => {
+  const tone = maheRiskCompassTone[riskLevel] || maheRiskCompassTone.ready;
+  const safeSet = new Set(safeFaces.map(Number));
+  const bustSet = new Set(bustFaces.map(Number));
+  const faces = [1, 2, 3, 4, 5, 6];
+
+  return (
+    <svg
+      viewBox="0 0 360 220"
+      className="h-full min-h-[150px] w-full"
+      role="img"
+      aria-label={`마헤 위험 나침반, 현재 합계 ${diceSum || 0}, 멈추면 ${stopSteps || 0}칸`}
+      data-smoke="mahe-risk-compass-art"
+    >
+      <defs>
+        <linearGradient id="maheRiskCompassGlow" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0" stopColor="#ecfeff" />
+          <stop offset="0.56" stopColor={tone.fill} />
+          <stop offset="1" stopColor="#fff7ed" />
+        </linearGradient>
+      </defs>
+      <rect x="14" y="14" width="332" height="192" rx="28" fill="url(#maheRiskCompassGlow)" stroke="#ffffff" strokeWidth="3" />
+      <path d="M60 154c42-74 116-108 208-82" fill="none" stroke="#ffffff" strokeWidth="16" strokeLinecap="round" opacity="0.72" />
+      <path d="M60 154c42-74 116-108 208-82" fill="none" stroke={tone.stroke} strokeWidth="6" strokeLinecap="round" opacity="0.72" />
+      <circle cx="184" cy="122" r="52" fill="#0f172a" opacity="0.12" />
+      <circle cx="180" cy="116" r="50" fill="#0f172a" opacity="0.08" />
+      <g>
+        <circle cx="178" cy="112" r="52" fill="#ffffff" stroke={tone.stroke} strokeWidth="5" />
+        <circle cx="178" cy="112" r="38" fill={tone.fill} stroke="#ffffff" strokeWidth="3" />
+        <text x="178" y="98" textAnchor="middle" fontSize="12" fontWeight="900" fill={tone.text}>현재 합계</text>
+        <text x="178" y="126" textAnchor="middle" fontSize="32" fontWeight="900" fill={tone.text}>{diceSum || 0}</text>
+        <text x="178" y="146" textAnchor="middle" fontSize="11" fontWeight="900" fill={tone.text}>주사위 {diceCount}/3</text>
+      </g>
+      <g>
+        <rect x="42" y="34" width="82" height="42" rx="16" fill="#ffffff" opacity="0.88" />
+        <text x="83" y="51" textAnchor="middle" fontSize="11" fontWeight="900" fill="#475569">멈추면</text>
+        <text x="83" y="68" textAnchor="middle" fontSize="17" fontWeight="900" fill={stopScores ? "#b45309" : "#0f172a"}>{stopSteps || 0}칸</text>
+      </g>
+      <g>
+        <rect x="238" y="34" width="82" height="42" rx="16" fill="#ffffff" opacity="0.88" />
+        <text x="279" y="51" textAnchor="middle" fontSize="11" fontWeight="900" fill="#475569">위험 눈</text>
+        <text x="279" y="68" textAnchor="middle" fontSize="17" fontWeight="900" fill="#be123c">{bustFaces.length}/6</text>
+      </g>
+      <g>
+        {faces.map((face, index) => {
+          const x = 62 + index * 43;
+          const bust = bustSet.has(face);
+          const safe = safeSet.has(face);
+          const fill = bust ? "#fee2e2" : safe ? "#dcfce7" : "#f8fafc";
+          const stroke = bust ? "#e11d48" : safe ? "#16a34a" : "#cbd5e1";
+          const text = bust ? "#be123c" : safe ? "#166534" : "#475569";
+          return (
+            <g key={face}>
+              <rect x={x} y="166" width="34" height="34" rx="10" fill={fill} stroke={stroke} strokeWidth="3" />
+              <text x={x + 17} y="188" textAnchor="middle" fontSize="16" fontWeight="900" fill={text}>{face}</text>
+              {bust && <path d={`M${x + 8} 194l18-18M${x + 26} 194l-18-18`} stroke="#be123c" strokeWidth="3" strokeLinecap="round" opacity="0.72" />}
+            </g>
+          );
+        })}
+      </g>
+      <path d="M178 112l48-58" stroke={tone.accent} strokeWidth="6" strokeLinecap="round" />
+      <circle cx="178" cy="112" r="7" fill={tone.accent} />
+    </svg>
+  );
+};
+
+const MaheRiskCompassPanel = ({
+  phase,
+  canRoll,
+  canChoose,
+  dice = [],
+  diceSum = 0,
+  diceRollsLeft = 0,
+  safeRemaining = 0,
+  nextSafeRolls = [],
+  nextBustRolls = [],
+  stopSteps = 0,
+  stopScores = false,
+  projectedSteps = 0,
+  projectedDestination = 0,
+  riskLevel = "ready",
+  scoreRecipientText = "",
+  bustReturnText = "",
+  finalEggText = "",
+}) => {
+  const diceCount = dice.length || 0;
+  const hasRolled = diceCount > 0;
+  const decision = phase === "FINISHED"
+    ? "결과 확인"
+    : canChoose
+      ? "주사위 수 선택"
+      : !canRoll
+        ? "차례 대기"
+        : !hasRolled
+          ? "첫 주사위"
+          : diceSum > 7
+            ? "초과 처리"
+            : stopScores
+              ? "멈추면 보상"
+              : nextBustRolls.length >= 4
+                ? "멈춤 우선"
+                : diceRollsLeft <= 0
+                  ? "자동 이동"
+                  : "추가 굴림 검토";
+  const rollRiskText = !hasRolled
+    ? "첫 주사위는 초과 위험 없이 시작합니다."
+    : diceRollsLeft <= 0
+      ? "세 번째 주사위까지 굴렸으므로 서버가 이동을 확정합니다."
+      : `다음 주사위 안전 눈 ${nextSafeRolls.join(", ") || "없음"}, 초과 눈 ${nextBustRolls.join(", ") || "없음"}`;
+  const stopText = stopSteps > 0
+    ? `${stopSteps}칸 이동${stopScores ? " · 알 보상 가능" : ""}`
+    : "아직 멈출 이동값이 없습니다.";
+  const guideItems = [
+    {
+      label: "멈추면",
+      value: stopText,
+      detail: stopScores ? scoreRecipientText : `예상 도착 ${projectedDestination || "출발점"} · 현재 보상은 다음 기회로 남습니다.`,
+      tone: stopScores ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      label: "더 굴리면",
+      value: hasRolled ? `${nextBustRolls.length}/6 초과 위험` : "초과 위험 없음",
+      detail: rollRiskText,
+      tone: nextBustRolls.length >= 4 ? "border-rose-100 bg-rose-50 text-rose-800" : "border-emerald-100 bg-emerald-50 text-emerald-800",
+    },
+    {
+      label: "움직이는 말",
+      value: projectedSteps > 0 ? `${projectedSteps}칸 예상` : "대기",
+      detail: bustReturnText,
+      tone: "border-cyan-100 bg-cyan-50 text-cyan-800",
+    },
+    {
+      label: "판정",
+      value: decision,
+      detail: finalEggText || `합계 7까지 안전 여유 ${Math.max(0, safeRemaining)}입니다.`,
+      tone: riskLevel === "danger" || riskLevel === "bust" ? "border-rose-100 bg-rose-50 text-rose-800" : "border-violet-100 bg-violet-50 text-violet-800",
+    },
+  ];
+
+  return (
+    <section data-smoke="mahe-risk-compass-panel" className="mb-4 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-amber-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1fr)]">
+        <div className="min-h-[170px]">
+          <MaheRiskCompassArt
+            diceSum={diceSum}
+            diceCount={diceCount}
+            stopSteps={stopSteps}
+            safeFaces={nextSafeRolls}
+            bustFaces={nextBustRolls}
+            riskLevel={riskLevel}
+            stopScores={stopScores}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black uppercase text-cyan-700">Mahe Risk Compass</div>
+              <h3 className="text-base font-black text-slate-900">굴릴지 멈출지 판단</h3>
+            </div>
+            <div className={`rounded-full border px-3 py-1 text-[11px] font-black ${maheRiskToneClasses[riskLevel] || maheRiskToneClasses.ready}`}>
+              {decision}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {guideItems.map((item) => (
+              <div key={item.label} data-smoke="mahe-risk-compass-item" className={`rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const MaheRewardPressureArt = ({ rows = [], trackSize = 21, currentEgg = 0, activeSeatNo = 0, mySeatNo = 0 }) => {
+  const safeTrack = Math.max(1, Number(trackSize) || 21);
+  const visibleRows = rows.slice(0, 5);
+  const laneWidth = 258;
+  const laneStart = 86;
+
+  return (
+    <svg
+      viewBox="0 0 420 240"
+      className="h-full min-h-[170px] w-full"
+      role="img"
+      aria-label={`마헤 보상 압력, 현재 알 ${currentEgg ?? "-"}점`}
+      data-smoke="mahe-reward-pressure-art"
+    >
+      <rect x="14" y="14" width="392" height="212" rx="26" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="3" />
+      <path d="M55 186c48-74 126-114 232-104 32 3 57 13 78 31" fill="none" stroke="#d1fae5" strokeWidth="16" strokeLinecap="round" />
+      <path d="M55 186c48-74 126-114 232-104 32 3 57 13 78 31" fill="none" stroke="#0f766e" strokeWidth="5" strokeLinecap="round" opacity="0.65" />
+      <rect x="292" y="28" width="76" height="48" rx="16" fill="#fffbeb" stroke="#f59e0b" strokeWidth="3" />
+      <text x="330" y="47" textAnchor="middle" fontSize="11" fontWeight="900" fill="#92400e">현재 알</text>
+      <text x="330" y="67" textAnchor="middle" fontSize="20" fontWeight="900" fill="#b45309">{currentEgg ?? "-"}</text>
+      <rect x="32" y="28" width="162" height="38" rx="15" fill="#ecfeff" stroke="#0891b2" strokeWidth="2" />
+      <text x="48" y="52" fontSize="13" fontWeight="900" fill="#0e7490">보상 압력</text>
+      <text x="134" y="52" fontSize="10" fontWeight="800" fill="#64748b">결승선까지 {safeTrack}칸</text>
+
+      {visibleRows.map((row, index) => {
+        const y = 94 + index * 29;
+        const progress = Math.max(0, Math.min(1, Number(row.position || 0) / Math.max(1, safeTrack - 1)));
+        const x = laneStart + progress * laneWidth;
+        const active = Number(row.seatNo) === Number(activeSeatNo);
+        const mine = Number(row.seatNo) === Number(mySeatNo);
+        const fill = active ? "#f59e0b" : mine ? "#0284c7" : row.isLeader ? "#16a34a" : "#64748b";
+        return (
+          <g key={row.seatNo || index} data-smoke="mahe-reward-pressure-node">
+            <text x="34" y={y + 5} fontSize="11" fontWeight="900" fill={fill}>{row.name}</text>
+            <rect x={laneStart} y={y - 8} width={laneWidth} height="13" rx="7" fill="#e2e8f0" />
+            <rect x={laneStart} y={y - 8} width={Math.max(8, progress * laneWidth)} height="13" rx="7" fill={fill} opacity="0.76" />
+            <circle cx={x} cy={y - 1.5} r={active ? 9 : 7} fill="#ffffff" stroke={fill} strokeWidth={active ? 4 : 3} />
+            <text x={x} y={y + 3} textAnchor="middle" fontSize="9" fontWeight="900" fill={fill}>{row.seatNo}</text>
+            <text x="370" y={y + 5} textAnchor="end" fontSize="10" fontWeight="900" fill="#475569">
+              {row.score}점
+            </text>
+          </g>
+        );
+      })}
+      <path d="M344 80v132" stroke="#f59e0b" strokeWidth="3" strokeDasharray="5 6" strokeLinecap="round" />
+      <text x="352" y="218" fontSize="10" fontWeight="900" fill="#b45309">결승</text>
+    </svg>
+  );
+};
+
+const MaheRewardPressurePanel = ({
+  rows = [],
+  trackSize = 21,
+  currentEgg = 0,
+  eggDeckCount = 0,
+  finalEggRound = false,
+  activeSeatNo = 0,
+  mySeatNo = 0,
+  activeStackOrderText = "-",
+  activeMovingText = "-",
+  projectedScorerText = "",
+  stopScores = false,
+  projectedScores = false,
+}) => {
+  const sortedRows = rows.slice().sort((left, right) => (
+    Number(right.score || 0) - Number(left.score || 0)
+    || Number(right.cardsCount || 0) - Number(left.cardsCount || 0)
+    || Number(right.position || 0) - Number(left.position || 0)
+  ));
+  const leader = sortedRows[0] || null;
+  const me = rows.find((row) => Number(row.seatNo) === Number(mySeatNo)) || null;
+  const closest = rows.slice().sort((left, right) => Number(right.position || 0) - Number(left.position || 0))[0] || null;
+  const myGap = leader && me ? Math.max(0, Number(leader.score || 0) - Number(me.score || 0)) : 0;
+  const rewardTargetText = stopScores || projectedScores
+    ? projectedScorerText
+    : closest
+      ? `${closest.name}님이 결승선에 가장 가깝습니다.`
+      : "아직 보상 후보가 없습니다.";
+  const items = [
+    {
+      label: "현재 보상",
+      value: finalEggRound ? `${currentEgg ?? "-"}점 마지막 알` : `${currentEgg ?? "-"}점 알`,
+      detail: finalEggRound ? "이번 알을 누군가 가져가면 게임 종료 압력이 생깁니다." : `남은 알 카드 ${eggDeckCount}장입니다.`,
+      tone: finalEggRound ? "border-amber-200 bg-amber-50 text-amber-900" : "border-amber-100 bg-white text-amber-800",
+    },
+    {
+      label: "선두",
+      value: leader ? `${leader.name} ${leader.score}점` : "점수 대기",
+      detail: me ? `내 격차 ${myGap}점 · 알 카드 수 ${me.cardsCount}장` : "점수판이 오면 격차를 계산합니다.",
+      tone: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    },
+    {
+      label: "스택 영향",
+      value: activeStackOrderText,
+      detail: `이번 이동 대상: ${activeMovingText}`,
+      tone: "border-cyan-100 bg-cyan-50 text-cyan-800",
+    },
+    {
+      label: "다음 득점",
+      value: rewardTargetText,
+      detail: "맨 위 거북이가 알을 받는 구조를 보드 위에서 먼저 읽게 합니다.",
+      tone: stopScores || projectedScores ? "border-rose-100 bg-rose-50 text-rose-800" : "border-slate-100 bg-slate-50 text-slate-700",
+    },
+  ];
+
+  return (
+    <section data-smoke="mahe-reward-pressure-panel" className="mb-4 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)]">
+        <div className="min-h-[176px]">
+          <MaheRewardPressureArt
+            rows={rows}
+            trackSize={trackSize}
+            currentEgg={currentEgg}
+            activeSeatNo={activeSeatNo}
+            mySeatNo={mySeatNo}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black text-emerald-700">알 보상 압력</div>
+              <h3 className="text-base font-black text-slate-900">누가 알 보상에 가까운지 확인</h3>
+            </div>
+            <div className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[11px] font-black text-emerald-700">
+              {rows.length}명 트랙
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.label} data-smoke="mahe-reward-pressure-item" className={`rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const maheActionRouteTone = {
+  ready: { fill: "#f8fafc", stroke: "#64748b", text: "#334155", soft: "#e2e8f0" },
+  safe: { fill: "#ecfdf5", stroke: "#059669", text: "#047857", soft: "#bbf7d0" },
+  caution: { fill: "#fffbeb", stroke: "#f59e0b", text: "#b45309", soft: "#fde68a" },
+  danger: { fill: "#fff1f2", stroke: "#e11d48", text: "#be123c", soft: "#fecdd3" },
+  bust: { fill: "#ffe4e6", stroke: "#be123c", text: "#9f1239", soft: "#fecdd3" },
+};
+
+const buildMaheActionRouteItems = ({
+  phase,
+  canRoll,
+  canChoose,
+  diceCount = 0,
+  diceSum = 0,
+  diceRollsLeft = 0,
+  safeRemaining = 0,
+  nextBustRolls = [],
+  stopSteps = 0,
+  stopScores = false,
+  projectedSteps = 0,
+  projectedDestination = 0,
+  scoreRecipientText = "",
+  bustReturnText = "",
+  finalEggText = "",
+  currentEgg = null,
+  riskLevel = "ready",
+}) => {
+  const isFinished = phase === "FINISHED";
+  const isChoosing = phase === "CHOOSE_DICE_COUNT";
+  const actionValue = isFinished
+    ? "결과 확인"
+    : canChoose
+      ? "주사위 개수 선택"
+      : canRoll
+        ? diceCount > 0
+          ? "굴릴지 멈출지 선택"
+          : "첫 주사위 굴림"
+        : "차례 대기";
+  const actionDetail = isFinished
+    ? "알 카드 정산과 최종 점수를 확인합니다."
+    : isChoosing
+      ? "업힌 거북이의 맨 위 플레이어가 이번 굴림 개수를 정합니다."
+      : canRoll
+        ? "현재 합계, 남은 굴림 수, 보상 가능성을 함께 보고 판단합니다."
+        : "현재 차례 플레이어의 선택이 끝나면 루트가 갱신됩니다.";
+  const stopValue = stopSteps > 0
+    ? `${stopSteps}칸 이동`
+    : diceCount > 0
+      ? "이동 없음"
+      : "첫 굴림 전";
+  const stopDetail = stopSteps > 0
+    ? stopScores
+      ? `${currentEgg ?? "-"}점 알 획득 후보입니다. ${scoreRecipientText}`
+      : `멈추면 ${projectedDestination || "출발점"}번 칸 흐름으로 이동합니다.`
+    : diceCount > 0
+      ? "합계가 초과되어 서버 정산을 기다립니다."
+      : "첫 굴림 뒤 멈춤 루트가 열립니다.";
+  const riskValue = diceCount <= 0
+    ? "초과 없음"
+    : diceRollsLeft <= 0
+      ? "자동 이동"
+      : `${nextBustRolls.length}/6 초과`;
+  const riskDetail = diceCount <= 0
+    ? "첫 주사위는 실패 위험 없이 차례를 시작합니다."
+    : diceRollsLeft <= 0
+      ? "세 번째 주사위까지 안전하면 현재 합계로 이동합니다."
+      : nextBustRolls.length
+        ? `초과 눈 ${nextBustRolls.join(", ")} · 안전 여유 ${Math.max(0, safeRemaining)}`
+        : "다음 굴림도 모두 안전한 상태입니다.";
+  const outcomeValue = stopScores
+    ? "보상 가능"
+    : projectedSteps > 0
+      ? `${projectedSteps}칸 후보`
+      : isFinished
+        ? "정산 완료"
+        : "위험 확인";
+  const outcomeDetail = finalEggText
+    || (stopScores ? scoreRecipientText : bustReturnText)
+    || "결승선을 넘는 거북이 스택의 맨 위 플레이어가 알을 받습니다.";
+
+  return [
+    {
+      key: "action",
+      label: "이번 선택",
+      value: actionValue,
+      detail: actionDetail,
+      tone: canRoll || canChoose ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-slate-50 text-slate-700",
+    },
+    {
+      key: "stop",
+      label: "멈춤 루트",
+      value: stopValue,
+      detail: stopDetail,
+      tone: stopScores ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      key: "risk",
+      label: "굴림 위험",
+      value: riskValue,
+      detail: riskDetail,
+      tone: riskLevel === "danger" || riskLevel === "bust" ? "border-rose-100 bg-rose-50 text-rose-800" : "border-cyan-100 bg-cyan-50 text-cyan-800",
+    },
+    {
+      key: "outcome",
+      label: "보상 판단",
+      value: outcomeValue,
+      detail: outcomeDetail,
+      tone: stopScores ? "border-amber-100 bg-amber-50 text-amber-800" : "border-violet-100 bg-violet-50 text-violet-800",
+    },
+  ];
+};
+
+const MaheActionRouteArt = ({
+  phase,
+  canRoll,
+  canChoose,
+  diceCount = 0,
+  diceSum = 0,
+  diceRollsLeft = 0,
+  nextBustRolls = [],
+  stopSteps = 0,
+  stopScores = false,
+  riskLevel = "ready",
+}) => {
+  const tone = maheActionRouteTone[riskLevel] || maheActionRouteTone.ready;
+  const stateLabel = phase === "FINISHED"
+    ? "결과"
+    : canChoose
+      ? "개수"
+      : canRoll
+        ? diceCount > 0
+          ? "선택"
+          : "시작"
+        : "대기";
+  const riskText = diceCount <= 0
+    ? "안전"
+    : diceRollsLeft <= 0
+      ? "이동"
+      : `${nextBustRolls.length}/6`;
+  const nodes = [
+    { key: "turn", label: "차례", value: stateLabel, x: 54, y: 72, fill: canRoll || canChoose ? "#ecfdf5" : "#f8fafc", stroke: canRoll || canChoose ? "#059669" : "#94a3b8", text: canRoll || canChoose ? "#047857" : "#475569" },
+    { key: "dice", label: "합계", value: String(diceSum || 0), x: 142, y: 72, fill: tone.fill, stroke: tone.stroke, text: tone.text },
+    { key: "risk", label: "위험", value: riskText, x: 230, y: 72, fill: diceCount > 0 && nextBustRolls.length >= 4 ? "#fff1f2" : "#ecfeff", stroke: diceCount > 0 && nextBustRolls.length >= 4 ? "#e11d48" : "#0891b2", text: diceCount > 0 && nextBustRolls.length >= 4 ? "#be123c" : "#0e7490" },
+    { key: "stop", label: "멈춤", value: stopSteps > 0 ? `${stopSteps}` : "-", x: 318, y: 72, fill: stopScores ? "#fffbeb" : "#ffffff", stroke: stopScores ? "#f59e0b" : "#cbd5e1", text: stopScores ? "#b45309" : "#475569" },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 372 144"
+      className="h-full min-h-[118px] w-full"
+      role="img"
+      aria-label={`마헤 선택 루트, 현재 합계 ${diceSum || 0}, 멈춤 이동 ${stopSteps || 0}칸`}
+      data-smoke="mahe-action-route-art"
+    >
+      <rect x="10" y="10" width="352" height="124" rx="24" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="3" />
+      <path d="M54 72h264" stroke={tone.soft} strokeWidth="12" strokeLinecap="round" />
+      <path d="M54 72h264" stroke={tone.stroke} strokeWidth="4" strokeLinecap="round" opacity="0.72" />
+      {nodes.map((node) => (
+        <g key={node.key} data-smoke="mahe-action-route-node" data-route-key={node.key}>
+          <circle cx={node.x} cy={node.y} r="30" fill="#ffffff" stroke={node.stroke} strokeWidth="4" />
+          <circle cx={node.x} cy={node.y} r="21" fill={node.fill} stroke="#ffffff" strokeWidth="3" />
+          <text x={node.x} y={node.y - 5} textAnchor="middle" fontSize="9" fontWeight="900" fill={node.text}>{node.label}</text>
+          <text x={node.x} y={node.y + 13} textAnchor="middle" fontSize="16" fontWeight="900" fill={node.text}>{node.value}</text>
+        </g>
+      ))}
+      <rect x="38" y="112" width="284" height="18" rx="9" fill="#ffffff" stroke="#e2e8f0" />
+      <text x="180" y="125" textAnchor="middle" fontSize="10" fontWeight="900" fill="#475569">
+        굴림 · 멈춤 · 보상 판단
+      </text>
+      {stopScores && (
+        <g>
+          <circle cx="338" cy="36" r="16" fill="#fef3c7" stroke="#f59e0b" strokeWidth="3" />
+          <text x="338" y="41" textAnchor="middle" fontSize="12" fontWeight="900" fill="#b45309">알</text>
+        </g>
+      )}
+    </svg>
+  );
+};
+
+const MaheActionRoutePanel = ({
+  phase,
+  canRoll,
+  canChoose,
+  dice = [],
+  diceSum = 0,
+  diceRollsLeft = 0,
+  safeRemaining = 0,
+  nextBustRolls = [],
+  stopSteps = 0,
+  stopScores = false,
+  projectedSteps = 0,
+  projectedDestination = 0,
+  scoreRecipientText = "",
+  bustReturnText = "",
+  finalEggText = "",
+  currentEgg = null,
+  riskLevel = "ready",
+}) => {
+  const diceCount = dice.length || 0;
+  const items = buildMaheActionRouteItems({
+    phase,
+    canRoll,
+    canChoose,
+    diceCount,
+    diceSum,
+    diceRollsLeft,
+    safeRemaining,
+    nextBustRolls,
+    stopSteps,
+    stopScores,
+    projectedSteps,
+    projectedDestination,
+    scoreRecipientText,
+    bustReturnText,
+    finalEggText,
+    currentEgg,
+    riskLevel,
+  });
+
+  return (
+    <section
+      data-smoke="mahe-action-route-panel"
+      data-phase={phase || ""}
+      data-can-roll={canRoll ? "true" : "false"}
+      data-can-choose={canChoose ? "true" : "false"}
+      data-dice-count={diceCount}
+      data-stop-steps={stopSteps}
+      className="mb-4 overflow-hidden rounded-2xl border border-teal-100 bg-gradient-to-br from-white via-teal-50 to-amber-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
+        <div className="min-h-[128px]">
+          <MaheActionRouteArt
+            phase={phase}
+            canRoll={canRoll}
+            canChoose={canChoose}
+            diceCount={diceCount}
+            diceSum={diceSum}
+            diceRollsLeft={diceRollsLeft}
+            nextBustRolls={nextBustRolls}
+            stopSteps={stopSteps}
+            stopScores={stopScores}
+            riskLevel={riskLevel}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black text-teal-700">마헤 선택 루트</div>
+              <h3 className="text-base font-black text-slate-900">굴림, 멈춤, 보상 판단</h3>
+            </div>
+            <div className="rounded-full border border-teal-100 bg-white px-3 py-1 text-[11px] font-black text-teal-700">
+              합계 {diceSum || 0} · 주사위 {diceCount}/3
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.key} data-smoke="mahe-action-route-item" data-route-key={item.key} className={`min-h-[102px] rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }) => {
   const trackSize = Number(get(gameState, "track_size", "trackSize", 21));
@@ -2237,6 +8676,36 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
   const canChoose = phase === "CHOOSE_DICE_COUNT" && decisionSeatNo === mySeatNo;
   const winners = scores.filter((score) => Boolean(get(score, "winner", "winner", false)));
   const playerName = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
+  const scoreBySeatNo = new Map(scores.map((score) => [Number(get(score, "seat_no", "seatNo", 0)), score]));
+  const maheRewardPressureRows = (turtles.length ? turtles : scores.map((score) => ({
+    seatNo: get(score, "seat_no", "seatNo", 0),
+    seat_no: get(score, "seat_no", "seatNo", 0),
+    position: 0,
+  })))
+    .map((turtle) => {
+      const seatNo = Number(get(turtle, "seat_no", "seatNo", 0));
+      const position = Number(get(turtle, "position", "position", 0)) || 0;
+      const stackSeatNos = (stackByPosition.get(position) || [seatNo]).map(Number).filter(Boolean);
+      const stackIndex = stackSeatNos.indexOf(seatNo);
+      const score = scoreBySeatNo.get(seatNo) || {};
+      const cards = listOf(get(score, "cards", "cards", []));
+      return {
+        seatNo,
+        name: playerName(seatNo),
+        position,
+        score: Number(get(score, "score", "score", 0)) || 0,
+        cardsCount: cards.length,
+        stackDepth: stackSeatNos.length,
+        stackIndex: stackIndex >= 0 ? stackIndex : 0,
+        topSeatNo: stackSeatNos.length ? stackSeatNos[stackSeatNos.length - 1] : seatNo,
+        isLeader: false,
+      };
+    })
+    .filter((row) => row.seatNo);
+  const maheRewardLeaderScore = Math.max(0, ...maheRewardPressureRows.map((row) => Number(row.score || 0)));
+  maheRewardPressureRows.forEach((row) => {
+    row.isLeader = Number(row.score || 0) === maheRewardLeaderScore && maheRewardLeaderScore > 0;
+  });
   const activeStackOrderText = activeStackSeatNos.length
     ? activeStackSeatNos.map((seatNo) => playerName(seatNo)).join(" → ")
     : "-";
@@ -2290,6 +8759,36 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
     { label: "차례", value: phase === "FINISHED" ? "종료" : canRoll || canChoose ? "내 차례" : playerName(activeSeatNo || decisionSeatNo) },
     { label: "합계", value: String(diceSum || 0) },
     { label: "알", value: `${currentEgg ?? "-"}점` },
+  ];
+  const maheFlowItems = [
+    {
+      label: "단계",
+      value: mahePhaseLabel,
+      detail: turnMessage,
+      icon: "stage",
+      tone: phase === "FINISHED" ? "done" : canRoll || canChoose ? "active" : "neutral",
+    },
+    {
+      label: "스택",
+      value: activeStackOrderText,
+      detail: activeIsCarried ? `${playerName(activeSeatNo)}님은 업혀 있어 주사위 개수를 선택받습니다.` : `${playerName(activeSeatNo)}님이 직접 이동합니다.`,
+      icon: "player",
+      tone: activeIsCarried ? "waiting" : "neutral",
+    },
+    {
+      label: "위험도",
+      value: riskLabel,
+      detail: diceSum > 7 ? bustReturnText : `멈추면 ${stopSteps || 0}칸 이동 · 다음 위험 눈 ${nextBustRolls.length}/6`,
+      icon: "decision",
+      tone: riskLevel === "bust" || riskLevel === "danger" ? "danger" : riskLevel === "caution" ? "waiting" : "active",
+    },
+    {
+      label: phase === "FINISHED" ? "결과" : "알 카드",
+      value: phase === "FINISHED" && winnerText ? `${winnerText} 승리` : `${currentEgg ?? "-"}점`,
+      detail: phase === "FINISHED" ? `최종 ${winningScore}점입니다.` : `${scoreRecipientText}${finalEggText ? ` · ${finalEggText}` : ""}`,
+      icon: phase === "FINISHED" ? "win" : "score",
+      tone: phase === "FINISHED" ? "done" : stopScores || projectedScores ? "active" : "neutral",
+    },
   ];
   const startActive = activePosition === 0;
   const startProjected = Boolean(projectedSteps) && projectedDestination === 0;
@@ -2437,6 +8936,47 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
             {variantName}
           </div>
         </div>
+        <GameFlowMeter
+          title="마헤 주사위 흐름"
+          detail="차례, 업기 스택, 주사위 위험도, 알 카드 보상 가능성을 같은 흐름으로 확인합니다."
+          items={maheFlowItems}
+          tone={phase === "FINISHED" ? "amber" : canRoll || canChoose ? "emerald" : "slate"}
+          className="mb-4"
+          smoke="mahe-flow-meter"
+        />
+        <MaheRewardPressurePanel
+          rows={maheRewardPressureRows}
+          trackSize={trackSize}
+          currentEgg={currentEgg}
+          eggDeckCount={eggDeck.length}
+          finalEggRound={finalEggRound}
+          activeSeatNo={activeSeatNo}
+          mySeatNo={mySeatNo}
+          activeStackOrderText={activeStackOrderText}
+          activeMovingText={activeMovingText}
+          projectedScorerText={scoreRecipientText}
+          stopScores={stopScores}
+          projectedScores={projectedScores}
+        />
+        <MaheRiskCompassPanel
+          phase={phase}
+          canRoll={canRoll}
+          canChoose={canChoose}
+          dice={dice}
+          diceSum={diceSum}
+          diceRollsLeft={diceRollsLeft}
+          safeRemaining={safeRemaining}
+          nextSafeRolls={nextSafeRolls}
+          nextBustRolls={nextBustRolls}
+          stopSteps={stopSteps}
+          stopScores={stopScores}
+          projectedSteps={projectedSteps}
+          projectedDestination={projectedDestination}
+          riskLevel={riskLevel}
+          scoreRecipientText={scoreRecipientText}
+          bustReturnText={bustReturnText}
+          finalEggText={finalEggText}
+        />
         <div className="mb-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-3 shadow-sm" role="status" aria-live="polite" aria-atomic="true">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 rounded-2xl bg-emerald-600 p-2 text-white shadow-sm">
@@ -2698,11 +9238,129 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
                 {Number(get(move, "value", "value", 0)) > 0 ? ` · ${get(move, "value", "value", 0)}점` : ""}
               </div>
             ))}
-            {!moveHistory.length && <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">아직 기록 없음</div>}
+            {!moveHistory.length && (
+              <TabletopHistoryEmptyState
+                game="mahe"
+                title="아직 이동 기록이 없습니다"
+                detail="첫 주사위 선택이 처리되면 이동 칸, 거북이, 알 카드 흐름이 이 기록 영역에 쌓입니다."
+                nextAction="첫 이동"
+              />
+            )}
           </div>
         </div>
       </aside>
     </div>
+  );
+};
+
+const dalmutiCardPalettes = {
+  high: {
+    paper: "#fff7ed",
+    rim: "#92400e",
+    wash: "#fde68a",
+    ink: "#1f2937",
+    accent: "#dc2626",
+    badge: "#78350f",
+  },
+  mid: {
+    paper: "#f0fdfa",
+    rim: "#0f766e",
+    wash: "#99f6e4",
+    ink: "#134e4a",
+    accent: "#0ea5e9",
+    badge: "#155e75",
+  },
+  low: {
+    paper: "#f8fafc",
+    rim: "#475569",
+    wash: "#e2e8f0",
+    ink: "#334155",
+    accent: "#64748b",
+    badge: "#1e293b",
+  },
+  jester: {
+    paper: "#312e81",
+    rim: "#fbbf24",
+    wash: "#a855f7",
+    ink: "#f8fafc",
+    accent: "#f97316",
+    badge: "#fef3c7",
+  },
+};
+
+const dalmutiMarkPositions = [
+  [80, 92],
+  [58, 78],
+  [102, 78],
+  [58, 112],
+  [102, 112],
+  [80, 130],
+  [42, 96],
+  [118, 96],
+];
+
+const DalmutiCardArt = ({ rank, jester, name, selected }) => {
+  const palette = jester
+    ? dalmutiCardPalettes.jester
+    : rank <= 3
+      ? dalmutiCardPalettes.high
+      : rank <= 7
+        ? dalmutiCardPalettes.mid
+        : dalmutiCardPalettes.low;
+  const displayRank = jester ? "J" : String(rank || "?");
+  const displayName = jester ? "광대" : String(name || dalmutiRankLabel(rank)).slice(0, 7);
+  const caption = jester ? "와일드" : rank <= 3 ? "상위 계급" : rank <= 7 ? "중간 계급" : "하위 계급";
+  const markCount = jester ? 0 : Math.max(1, Math.min(dalmutiMarkPositions.length, rank || 1));
+
+  return (
+    <svg
+      data-smoke="dalmuti-card-art"
+      viewBox="0 0 160 224"
+      className="block w-full"
+      style={{ aspectRatio: "5 / 7" }}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="6" y="6" width="148" height="212" rx="18" fill={palette.paper} stroke={selected ? "#0f172a" : palette.rim} strokeWidth={selected ? 5 : 3} />
+      <path d="M22 26h116v148c-25 18-54 24-86 16-14-4-24-11-30-20Z" fill={palette.wash} opacity={jester ? 0.42 : 0.58} />
+      <path d="M22 32c24 14 48 14 72 0 18-10 34-9 46 2v30c-18-13-36-13-54 0-28 19-55 17-64-5Z" fill="#ffffff" opacity={jester ? 0.14 : 0.55} />
+      <rect x="18" y="18" width="38" height="42" rx="10" fill={jester ? "#1e1b4b" : "#ffffff"} opacity={jester ? 0.72 : 0.82} />
+      <text x="37" y="46" textAnchor="middle" fontSize="25" fontWeight="900" fill={palette.ink}>{displayRank}</text>
+      <rect x="104" y="18" width="38" height="24" rx="12" fill={jester ? palette.badge : "#ffffff"} opacity={jester ? 0.95 : 0.85} />
+      <text x="123" y="34" textAnchor="middle" fontSize="11" fontWeight="900" fill={jester ? "#581c87" : palette.badge}>{jester ? "광대" : `${rank}장`}</text>
+      {jester ? (
+        <g>
+          <path d="M43 133c8-36 19-58 35-66 13 12 21 25 25 40 9-23 20-38 34-45 8 33 3 60-15 82-23 16-49 15-79-11Z" fill="#fbbf24" stroke="#1e1b4b" strokeWidth="6" strokeLinejoin="round" />
+          <path d="M55 132c9-22 17-37 25-45 10 11 16 25 18 42 9-20 19-33 30-39 0 21-8 38-25 51-17 7-33 5-48-9Z" fill="#f97316" opacity="0.78" />
+          <circle cx="78" cy="67" r="9" fill="#fb7185" stroke="#fef3c7" strokeWidth="4" />
+          <circle cx="136" cy="62" r="9" fill="#22c55e" stroke="#fef3c7" strokeWidth="4" />
+          <circle cx="42" cy="133" r="8" fill="#38bdf8" stroke="#fef3c7" strokeWidth="4" />
+        </g>
+      ) : (
+        <g>
+          <path d="M49 142h62l8 24H41Z" fill="#ffffff" opacity="0.72" />
+          <path d="M46 144l14-29 21 22 21-22 14 29Z" fill={palette.accent} opacity="0.86" stroke={palette.rim} strokeWidth="3" strokeLinejoin="round" />
+          {dalmutiMarkPositions.slice(0, markCount).map(([cx, cy], index) => (
+            <g key={`${cx}-${cy}`}>
+              {rank <= 3 ? (
+                <path d={`M${cx} ${cy - 9}l6 7 9 1-6 6 2 9-11-5-10 5 2-9-7-6 10-1Z`} fill="#ffffff" stroke={palette.rim} strokeWidth="2" opacity={index > 5 ? 0.62 : 0.9} />
+              ) : (
+                <circle cx={cx} cy={cy} r={rank <= 7 ? 8 : 7} fill="#ffffff" stroke={palette.accent} strokeWidth="3" opacity={index > 5 ? 0.62 : 0.9} />
+              )}
+            </g>
+          ))}
+        </g>
+      )}
+      <rect x="20" y="176" width="120" height="28" rx="14" fill={jester ? "#1e1b4b" : "#ffffff"} opacity={jester ? 0.68 : 0.82} />
+      <text x="80" y="195" textAnchor="middle" fontSize="14" fontWeight="900" fill={palette.ink}>{displayName}</text>
+      <text x="80" y="213" textAnchor="middle" fontSize="9" fontWeight="800" fill={jester ? "#fde68a" : palette.badge}>{caption}</text>
+      {selected && (
+        <g>
+          <rect x="34" y="65" width="92" height="24" rx="12" fill="#0f172a" opacity="0.9" />
+          <text x="80" y="82" textAnchor="middle" fontSize="12" fontWeight="900" fill="#ffffff">선택됨</text>
+        </g>
+      )}
+    </svg>
   );
 };
 
@@ -2716,13 +9374,6 @@ const DalmutiCard = ({ card, selected, onClick, disabled }) => {
     selected ? "선택됨" : "선택 안 됨",
     disabled ? "현재 선택 불가" : "선택 가능",
   ].join(" · ");
-  const tone = jester
-    ? "from-violet-700 via-fuchsia-600 to-amber-400 text-white"
-    : rank <= 3
-      ? "from-amber-200 via-white to-rose-100 text-slate-900"
-      : rank <= 7
-        ? "from-sky-100 via-white to-emerald-100 text-slate-900"
-        : "from-stone-100 via-white to-slate-100 text-slate-900";
   return (
     <button
       type="button"
@@ -2732,19 +9383,834 @@ const DalmutiCard = ({ card, selected, onClick, disabled }) => {
       aria-pressed={selected}
       title={cardLabel}
       className={[
-        "relative min-h-[106px] rounded-xl border p-2 text-left shadow-sm transition disabled:opacity-70 sm:min-h-[118px]",
-        `bg-gradient-to-br ${tone}`,
+        "relative rounded-xl border bg-white p-1.5 text-left shadow-sm transition disabled:opacity-70",
         selected ? "tabletop-selected-card border-slate-950 ring-2 ring-slate-950" : "border-slate-200 hover:-translate-y-1 hover:border-slate-400",
       ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-xl font-black sm:text-2xl">{jester ? "광" : rank}</div>
-        <div className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-black text-slate-600">{jester ? "와일드" : `${rank}장`}</div>
-      </div>
-      <div className="absolute inset-x-2 bottom-2 break-words rounded-lg border border-black/5 bg-white/70 px-2 py-1 text-center text-[10px] font-black text-slate-700 sm:text-[11px]">
-        {cardName}
-      </div>
+      <DalmutiCardArt rank={rank} jester={jester} name={cardName} selected={selected} />
     </button>
+  );
+};
+
+const DalmutiPlayAdvisorArt = ({
+  selectedRank = 0,
+  selectedCount = 0,
+  requiredRank = 0,
+  requiredCount = 0,
+  legal = false,
+  phase = "PLAYING",
+}) => {
+  const selectedLabel = selectedCount
+    ? selectedRank ? dalmutiRankLabel(selectedRank) : "광대"
+    : "미선택";
+  const requiredLabel = requiredCount
+    ? `${dalmutiRankLabel(requiredRank)} ${requiredCount}장`
+    : "새 기준";
+  const resultFill = legal ? "#dcfce7" : selectedCount ? "#ffe4e6" : "#f8fafc";
+  const resultStroke = legal ? "#16a34a" : selectedCount ? "#e11d48" : "#94a3b8";
+  const resultText = legal ? "제출 가능" : selectedCount ? "조건 불일치" : "선택 대기";
+  const selectedSlots = Array.from({ length: Math.max(1, Math.min(5, selectedCount || requiredCount || 1)) }, (_, index) => index);
+  const requiredSlots = Array.from({ length: Math.max(1, Math.min(5, requiredCount || selectedCount || 1)) }, (_, index) => index);
+
+  return (
+    <svg
+      viewBox="0 0 360 220"
+      className="h-full min-h-[150px] w-full"
+      role="img"
+      aria-label={`달무티 제출 판단, 기준 ${requiredLabel}, 선택 ${selectedLabel} ${selectedCount}장`}
+      data-smoke="dalmuti-play-advisor-art"
+    >
+      <defs>
+        <linearGradient id="dalmutiAdvisorWash" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0" stopColor="#f5f3ff" />
+          <stop offset="0.55" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#ecfeff" />
+        </linearGradient>
+      </defs>
+      <rect x="14" y="14" width="332" height="192" rx="28" fill="url(#dalmutiAdvisorWash)" stroke="#ffffff" strokeWidth="3" />
+      <path d="M72 155c35-56 83-84 144-84 32 0 60 8 84 24" fill="none" stroke="#ddd6fe" strokeWidth="14" strokeLinecap="round" />
+      <path d="M74 155c36-46 83-69 142-69 33 0 61 8 84 24" fill="none" stroke="#7c3aed" strokeWidth="5" strokeLinecap="round" opacity="0.62" />
+      <g>
+        <rect x="42" y="56" width="104" height="76" rx="18" fill="#312e81" opacity="0.12" />
+        <rect x="34" y="48" width="116" height="88" rx="18" fill="#ffffff" stroke="#c4b5fd" strokeWidth="3" />
+        <text x="92" y="72" textAnchor="middle" fontSize="12" fontWeight="900" fill="#6d28d9">현재 기준</text>
+        <text x="92" y="98" textAnchor="middle" fontSize="18" fontWeight="900" fill="#312e81">{requiredLabel}</text>
+        <g>
+          {requiredSlots.map((slot) => (
+            <rect key={slot} x={58 + slot * 13} y="111" width="24" height="32" rx="6" fill="#ede9fe" stroke="#7c3aed" strokeWidth="2" opacity={slot < requiredCount || !requiredCount ? 1 : 0.42} />
+          ))}
+        </g>
+      </g>
+      <g>
+        <rect x="218" y="56" width="104" height="76" rx="18" fill="#312e81" opacity="0.12" />
+        <rect x="210" y="48" width="116" height="88" rx="18" fill="#ffffff" stroke={resultStroke} strokeWidth="3" />
+        <text x="268" y="72" textAnchor="middle" fontSize="12" fontWeight="900" fill="#0f766e">선택 묶음</text>
+        <text x="268" y="98" textAnchor="middle" fontSize="18" fontWeight="900" fill="#0f172a">{selectedLabel}</text>
+        <g>
+          {selectedSlots.map((slot) => (
+            <rect key={slot} x={234 + slot * 13} y="111" width="24" height="32" rx="6" fill={resultFill} stroke={resultStroke} strokeWidth="2" opacity={slot < selectedCount || !selectedCount ? 1 : 0.42} />
+          ))}
+        </g>
+      </g>
+      <g>
+        <circle cx="180" cy="92" r="30" fill={resultFill} stroke={resultStroke} strokeWidth="4" />
+        <path d={legal ? "M166 92l10 10 20-23" : "M168 80l24 24M192 80l-24 24"} fill="none" stroke={legal ? "#16a34a" : selectedCount ? "#e11d48" : "#64748b"} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+      <rect x="92" y="164" width="176" height="34" rx="17" fill={resultFill} stroke={resultStroke} strokeWidth="3" />
+      <text x="180" y="186" textAnchor="middle" fontSize="14" fontWeight="900" fill={legal ? "#166534" : selectedCount ? "#be123c" : "#475569"}>{phase === "FINISHED" ? "결과 확인" : resultText}</text>
+    </svg>
+  );
+};
+
+const DalmutiPlayAdvisorPanel = ({
+  phase,
+  canPlay,
+  canReturnTax,
+  canDecideRevolution,
+  selectedCards = [],
+  selectedPlayStatus,
+  currentTrick,
+  currentTrickCount = 0,
+  currentTrickRank = 0,
+  handRankGroups = [],
+  pendingTaxCount = 0,
+  passCount = 0,
+  requiredPassCount = 0,
+  taxProgressText = "",
+  selectionHint = "",
+  trickClearHint = "",
+}) => {
+  const normalSelectedCards = selectedCards.filter((card) => !card.jester);
+  const selectedRank = normalSelectedCards.length ? Number(normalSelectedCards[0].rank || 0) : 0;
+  const selectedCount = selectedCards.length;
+  const jokerCount = handRankGroups.find((group) => group.jester)?.cards.length || 0;
+  const requiredCount = currentTrick ? currentTrickCount : 0;
+  const requiredRank = currentTrick ? currentTrickRank : 0;
+  const candidateGroups = handRankGroups
+    .filter((group) => !group.jester)
+    .filter((group) => {
+      if (phase !== "PLAYING") return false;
+      if (!currentTrick) return group.cards.length > 0;
+      return group.rank < currentTrickRank && group.cards.length + jokerCount >= currentTrickCount;
+    });
+  const bestCandidate = candidateGroups[0];
+  const legal = Boolean(phase === "PLAYING" && canPlay && selectedPlayStatus?.legal);
+  const advisorMode = phase === "TAX_RETURN"
+    ? "세금 반환"
+    : phase === "REVOLUTION_DECISION"
+      ? "혁명 판단"
+      : phase === "FINISHED"
+        ? "결과 확인"
+        : canPlay
+          ? "제출 판단"
+          : "차례 대기";
+  const selectedLabel = selectedCount
+    ? `${selectedRank ? dalmutiRankLabel(selectedRank) : "광대"} ${selectedCount}장`
+    : "선택 없음";
+  const criteriaText = phase === "TAX_RETURN"
+    ? `${pendingTaxCount}장 반환 필요`
+    : currentTrick
+      ? `${dalmutiRankLabel(currentTrickRank)} ${currentTrickCount}장보다 높은 같은 장수`
+      : "같은 계급 여러 장으로 새 기준 생성";
+  const candidateText = bestCandidate
+    ? `${bestCandidate.label} ${Math.min(bestCandidate.cards.length, currentTrickCount || bestCandidate.cards.length)}장`
+    : phase === "PLAYING" ? "즉시 후보 없음" : advisorMode;
+  const guideItems = [
+    {
+      label: "제출 기준",
+      value: criteriaText,
+      detail: currentTrick ? trickClearHint : "기준이 없으면 같은 계급 묶음으로 새 흐름을 열 수 있습니다.",
+      tone: "border-violet-100 bg-violet-50 text-violet-800",
+    },
+    {
+      label: "선택 묶음",
+      value: selectedLabel,
+      detail: selectionHint || selectedPlayStatus?.reason || "카드를 선택하면 제출 가능 여부가 여기서 분해됩니다.",
+      tone: selectedCount ? (selectedPlayStatus?.legal ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-rose-100 bg-rose-50 text-rose-800") : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      label: "빠른 후보",
+      value: candidateText,
+      detail: jokerCount ? `광대 ${jokerCount}장은 부족한 장수를 보탤 수 있습니다.` : "현재 손패의 계급 묶음을 기준으로 계산했습니다.",
+      tone: bestCandidate ? "border-cyan-100 bg-cyan-50 text-cyan-800" : "border-slate-100 bg-white text-slate-600",
+    },
+    {
+      label: phase === "TAX_RETURN" ? "반환 진행" : "패스 압력",
+      value: phase === "TAX_RETURN" ? taxProgressText : currentTrick ? `${passCount}/${requiredPassCount}` : "새 기준",
+      detail: phase === "REVOLUTION_DECISION" ? "광대 2장을 가진 플레이어의 혁명 선언 단계입니다." : phase === "TAX_RETURN" ? "세금 반환이 끝나야 라운드가 진행됩니다." : "모두 패스하면 현재 기준이 정리되고 다음 기준으로 넘어갑니다.",
+      tone: "border-amber-100 bg-amber-50 text-amber-800",
+    },
+  ];
+
+  return (
+    <section data-smoke="dalmuti-play-advisor-panel" className="mt-4 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-cyan-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.78fr)_minmax(0,1fr)]">
+        <div className="min-h-[170px]">
+          <DalmutiPlayAdvisorArt
+            selectedRank={selectedRank}
+            selectedCount={selectedCount}
+            requiredRank={requiredRank}
+            requiredCount={requiredCount}
+            legal={legal}
+            phase={phase}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black uppercase text-violet-700">Dalmuti Play Advisor</div>
+              <h3 className="text-base font-black text-slate-900">카드 제출 판단</h3>
+            </div>
+            <div className={`rounded-full border px-3 py-1 text-[11px] font-black ${legal || canReturnTax || canDecideRevolution ? "border-emerald-100 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600"}`}>
+              {advisorMode}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {guideItems.map((item) => (
+              <div key={item.label} data-smoke="dalmuti-play-advisor-item" className={`rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const DalmutiRankPressureArt = ({ rows = [], activeSeatNo = 0, leadSeatNo = 0, maxHandCount = 12 }) => {
+  const safeMax = Math.max(1, Number(maxHandCount) || 12);
+  const visibleRows = rows.slice(0, 6);
+  const laneStart = 112;
+  const laneWidth = 228;
+
+  return (
+    <svg
+      viewBox="0 0 420 236"
+      className="h-full min-h-[170px] w-full"
+      role="img"
+      aria-label="달무티 손패 소진과 계급 압력"
+      data-smoke="dalmuti-rank-pressure-art"
+    >
+      <rect x="14" y="14" width="392" height="208" rx="26" fill="#faf5ff" stroke="#ddd6fe" strokeWidth="3" />
+      <path d="M44 190h316" stroke="#c4b5fd" strokeWidth="5" strokeLinecap="round" />
+      <path d="M340 78v118" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" strokeDasharray="5 6" />
+      <text x="337" y="68" textAnchor="middle" fontSize="11" fontWeight="900" fill="#6d28d9">0장</text>
+      <rect x="30" y="28" width="182" height="38" rx="15" fill="#ffffff" stroke="#c4b5fd" strokeWidth="2" />
+      <text x="46" y="52" fontSize="13" fontWeight="900" fill="#6d28d9">손패 레이스</text>
+      <text x="134" y="52" fontSize="10" fontWeight="800" fill="#64748b">먼저 비우면 다음 계급 상승</text>
+
+      {visibleRows.map((row, index) => {
+        const y = 86 + index * 28;
+        const remainingRatio = Math.max(0, Math.min(1, Number(row.handCount || 0) / safeMax));
+        const progress = row.outOrder ? 1 : Math.max(0.08, 1 - remainingRatio);
+        const barWidth = progress * laneWidth;
+        const active = Number(row.seatNo) === Number(activeSeatNo);
+        const lead = Number(row.seatNo) === Number(leadSeatNo);
+        const mine = Boolean(row.isMe);
+        const fill = row.outOrder ? "#16a34a" : active ? "#f59e0b" : mine ? "#0284c7" : lead ? "#7c3aed" : "#64748b";
+        return (
+          <g key={row.seatNo || index} data-smoke="dalmuti-rank-pressure-node">
+            <text x="34" y={y + 5} fontSize="11" fontWeight="900" fill={fill}>{row.name}</text>
+            <rect x={laneStart} y={y - 8} width={laneWidth} height="13" rx="7" fill="#e9d5ff" opacity="0.8" />
+            <rect x={laneStart} y={y - 8} width={barWidth} height="13" rx="7" fill={fill} opacity="0.78" />
+            <circle cx={laneStart + barWidth} cy={y - 1.5} r={active ? 8 : 6} fill="#ffffff" stroke={fill} strokeWidth={active ? 4 : 3} />
+            <text x={laneStart + barWidth} y={y + 3} textAnchor="middle" fontSize="8" fontWeight="900" fill={fill}>{row.seatNo}</text>
+            <text x="382" y={y + 5} textAnchor="end" fontSize="10" fontWeight="900" fill="#475569">
+              {row.outOrder ? `${row.outOrder}등` : `${row.handCount}장`}
+            </text>
+          </g>
+        );
+      })}
+      <rect x="246" y="28" width="110" height="38" rx="15" fill="#ffffff" stroke="#7c3aed" strokeWidth="2" />
+      <text x="301" y="52" textAnchor="middle" fontSize="12" fontWeight="900" fill="#5b21b6">계급 압력</text>
+    </svg>
+  );
+};
+
+const DalmutiRankPressurePanel = ({
+  rows = [],
+  phase = "PLAYING",
+  activeSeatNo = 0,
+  leadSeatNo = 0,
+  passCount = 0,
+  requiredPassCount = 0,
+  currentTrickLabel = "새 기준",
+  nextLeaderName = "",
+}) => {
+  const activeRow = rows.find((row) => Number(row.seatNo) === Number(activeSeatNo));
+  const leadRow = rows.find((row) => Number(row.seatNo) === Number(leadSeatNo));
+  const me = rows.find((row) => row.isMe);
+  const raceLeader = rows
+    .filter((row) => !row.outOrder)
+    .slice()
+    .sort((left, right) => Number(left.handCount || 0) - Number(right.handCount || 0) || Number(left.orderIndex || 0) - Number(right.orderIndex || 0))[0]
+    || rows.find((row) => row.outOrder);
+  const maxHandCount = Math.max(1, ...rows.map((row) => Number(row.handCount || 0)));
+  const finishedCount = rows.filter((row) => row.outOrder).length;
+  const passText = requiredPassCount > 0 ? `${passCount}/${requiredPassCount}` : "새 기준";
+  const items = [
+    {
+      label: "손패 레이스",
+      value: raceLeader ? `${raceLeader.name} ${raceLeader.outOrder ? `${raceLeader.outOrder}등` : `${raceLeader.handCount}장`}` : "대기",
+      detail: me ? `내 손패 ${me.handCount}장 · 먼저 비우면 다음 계급 순서가 올라갑니다.` : "플레이어별 남은 장수를 같은 축으로 비교합니다.",
+      tone: "border-violet-100 bg-violet-50 text-violet-800",
+    },
+    {
+      label: "현재 선",
+      value: leadRow ? leadRow.name : activeRow?.name || "대기",
+      detail: `현재 기준: ${currentTrickLabel}`,
+      tone: "border-cyan-100 bg-cyan-50 text-cyan-800",
+    },
+    {
+      label: "패스 압력",
+      value: passText,
+      detail: requiredPassCount > 0 ? "필요 패스가 채워지면 기준이 정리되고 새 기준으로 넘어갑니다." : "기준이 없으면 차례 플레이어가 새 묶음을 열 수 있습니다.",
+      tone: requiredPassCount > 0 && passCount >= requiredPassCount ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-amber-100 bg-amber-50 text-amber-800",
+    },
+    {
+      label: phase === "FINISHED" ? "다음 계급" : "완료 현황",
+      value: phase === "FINISHED" && nextLeaderName ? `${nextLeaderName} 다음 대달무티` : `${finishedCount}/${rows.length}명 완료`,
+      detail: "라운드 결과가 다음 손의 계급 순서로 이어집니다.",
+      tone: phase === "FINISHED" ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-white text-slate-700",
+    },
+  ];
+
+  return (
+    <section data-smoke="dalmuti-rank-pressure-panel" className="mt-4 overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-slate-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1fr)]">
+        <div className="min-h-[176px]">
+          <DalmutiRankPressureArt rows={rows} activeSeatNo={activeSeatNo} leadSeatNo={leadSeatNo} maxHandCount={maxHandCount} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black text-violet-700">계급 압력</div>
+              <h3 className="text-base font-black text-slate-900">누가 먼저 손패를 비우는지 확인</h3>
+            </div>
+            <div className="rounded-full border border-violet-100 bg-white px-3 py-1 text-[11px] font-black text-violet-700">
+              {rows.length}명 레이스
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.label} data-smoke="dalmuti-rank-pressure-item" className={`rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const DalmutiEmptyHandArt = ({
+  phaseLabel = "",
+  outOrder = 0,
+  activeName = "",
+  nextLeaderName = "",
+  passText = "",
+}) => {
+  const completed = Number(outOrder || 0) > 0;
+  const activeLabel = String(activeName || "대기").slice(0, 5);
+  const leaderLabel = String(nextLeaderName || "대기").slice(0, 5);
+  const statusLabel = completed ? `${outOrder}등` : "대기";
+  const nodes = [
+    { label: "손패", value: "0장", x: 72, y: 90, fill: "#0f766e", bg: "#ccfbf1" },
+    { label: "순위", value: statusLabel, x: 168, y: 140, fill: completed ? "#16a34a" : "#64748b", bg: completed ? "#dcfce7" : "#f8fafc" },
+    { label: "차례", value: activeLabel, x: 270, y: 90, fill: "#7c3aed", bg: "#ede9fe" },
+    { label: "다음", value: leaderLabel, x: 342, y: 144, fill: "#0369a1", bg: "#e0f2fe" },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 420 230"
+      className="h-full min-h-[170px] w-full"
+      role="img"
+      aria-label={`달무티 빈 손패 안내, ${phaseLabel}, ${completed ? `${outOrder}등 완료` : "순위 대기"}`}
+      data-smoke="dalmuti-empty-hand-art"
+    >
+      <rect x="14" y="14" width="392" height="208" rx="26" fill="#f0fdfa" stroke="#99f6e4" strokeWidth="3" />
+      <path d="M68 156c50-62 112-76 188-44 38 16 70 18 100 6" fill="none" stroke="#bae6fd" strokeWidth="16" strokeLinecap="round" />
+      <path d="M70 156c50-51 111-61 184-32 38 15 70 16 99 3" fill="none" stroke="#0f766e" strokeWidth="5" strokeLinecap="round" opacity="0.68" />
+      <rect x="34" y="30" width="184" height="40" rx="16" fill="#ffffff" stroke="#5eead4" strokeWidth="2" />
+      <text x="52" y="55" fontSize="13" fontWeight="900" fill="#0f766e">손패 완료</text>
+      <text x="134" y="55" fontSize="10" fontWeight="800" fill="#64748b">{phaseLabel}</text>
+      <rect x="238" y="30" width="116" height="40" rx="16" fill="#ffffff" stroke="#bfdbfe" strokeWidth="2" />
+      <text x="296" y="55" textAnchor="middle" fontSize="11" fontWeight="900" fill="#0369a1">패스 {passText || "대기"}</text>
+      {nodes.map((node) => (
+        <g key={node.label} data-smoke="dalmuti-empty-hand-node">
+          <circle cx={node.x + 5} cy={node.y + 7} r="30" fill={node.fill} opacity="0.12" />
+          <rect x={node.x - 34} y={node.y - 24} width="78" height="56" rx="18" fill="#ffffff" stroke={node.fill} strokeWidth="3" />
+          <rect x={node.x - 24} y={node.y - 16} width="58" height="18" rx="9" fill={node.bg} />
+          <text x={node.x + 5} y={node.y - 2} textAnchor="middle" fontSize="10" fontWeight="900" fill={node.fill}>{node.label}</text>
+          <text x={node.x + 5} y={node.y + 20} textAnchor="middle" fontSize="13" fontWeight="900" fill="#0f172a">{node.value}</text>
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+const DalmutiEmptyHandPanel = ({
+  phase = "PLAYING",
+  phaseLabel = "",
+  outOrder = 0,
+  activeName = "",
+  nextLeaderName = "",
+  currentTrickLabel = "새 기준",
+  passCount = 0,
+  requiredPassCount = 0,
+  turnNotice = "",
+  trickClearHint = "",
+  nextOrderText = "",
+}) => {
+  const completed = Number(outOrder || 0) > 0;
+  const passText = requiredPassCount > 0 ? `${passCount}/${requiredPassCount}` : "새 기준";
+  const positionValue = completed
+    ? `${outOrder}등으로 손패 완료`
+    : phase === "FINISHED" ? "결과 확정 대기" : "순위 확정 대기";
+  const flowValue = phase === "FINISHED" ? "결과 확인" : activeName ? `${activeName} 차례` : phaseLabel;
+  const nextValue = phase === "FINISHED" && nextLeaderName ? `${nextLeaderName} 다음 대달무티` : "관전 대기";
+  const items = [
+    {
+      label: "손패 상태",
+      value: "모두 제출 완료",
+      detail: "남은 카드가 없어 추가 제출은 없습니다.",
+      tone: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    },
+    {
+      label: "이번 손 위치",
+      value: positionValue,
+      detail: completed ? "손패를 비운 순서가 다음 계급 순서에 반영됩니다." : "서버가 아웃 순서를 확정하면 결과 영역에 반영됩니다.",
+      tone: completed ? "border-teal-100 bg-teal-50 text-teal-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      label: "현재 흐름",
+      value: flowValue,
+      detail: phase === "FINISHED" ? nextOrderText || "다음 손 계급 순서를 확인하세요." : `${currentTrickLabel} · 패스 ${passText}`,
+      tone: "border-violet-100 bg-violet-50 text-violet-800",
+    },
+    {
+      label: "다음 행동",
+      value: nextValue,
+      detail: phase === "FINISHED" ? "결과와 다음 손 계급을 확인하고 새 라운드를 기다리세요." : trickClearHint || turnNotice || "현재 기준과 패스 흐름을 지켜보면 됩니다.",
+      tone: "border-cyan-100 bg-cyan-50 text-cyan-800",
+    },
+  ];
+
+  return (
+    <section
+      data-smoke="dalmuti-empty-hand-panel"
+      data-phase={phase}
+      data-out-order={outOrder || ""}
+      data-pass-progress={passText}
+      className="col-span-full overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-violet-50 p-3 sm:p-4"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(210px,0.74fr)_minmax(0,1fr)]">
+        <div className="min-h-[170px]">
+          <DalmutiEmptyHandArt
+            phaseLabel={phaseLabel}
+            outOrder={outOrder}
+            activeName={activeName}
+            nextLeaderName={nextLeaderName}
+            passText={passText}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black text-emerald-700">손패 0장</div>
+              <h3 className="text-base font-black text-slate-900">손패 완료 상태</h3>
+            </div>
+            <div className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[11px] font-black text-emerald-700">
+              {phaseLabel}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.label} data-smoke="dalmuti-empty-hand-item" className={`rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const DalmutiPlayPileEmptyArt = ({ phase, activeName, leadName, currentTrickLabel, passText }) => {
+  const nodes = [
+    { key: "lead", x: 54, y: 76, label: leadName ? "현재 선" : "새 선", value: String(leadName || activeName || "대기").slice(0, 5), fill: "#7c3aed" },
+    { key: "rule", x: 126, y: 44, label: "기준", value: String(currentTrickLabel || "새 기준").slice(0, 6), fill: "#0ea5e9" },
+    { key: "pass", x: 198, y: 84, label: "패스", value: String(passText || "대기").slice(0, 5), fill: "#f59e0b" },
+    { key: "pile", x: 270, y: 52, label: "더미", value: "0장", fill: "#10b981" },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 320 132"
+      className="h-full min-h-[132px] w-full"
+      role="img"
+      aria-label="달무티 현재 제출 더미 대기 안내"
+      data-smoke="dalmuti-play-pile-empty-art"
+      focusable="false"
+    >
+      <rect x="10" y="12" width="300" height="108" rx="22" fill="#0f172a" />
+      <path d="M42 93C78 50 112 46 154 70s76 28 124-18" fill="none" stroke="#334155" strokeWidth="14" strokeLinecap="round" />
+      <path d="M42 93C78 50 112 46 154 70s76 28 124-18" fill="none" stroke="#a78bfa" strokeWidth="4" strokeLinecap="round" />
+      {nodes.map((node, index) => (
+        <g key={node.key} data-smoke="dalmuti-play-pile-empty-node" data-pile-node={node.key}>
+          <circle cx={node.x} cy={node.y} r="20" fill={node.fill} stroke="#ffffff" strokeWidth="5" />
+          <text x={node.x} y={node.y - 2} textAnchor="middle" fontSize="8" fontWeight="900" fill="#ffffff">{node.label}</text>
+          <text x={node.x} y={node.y + 11} textAnchor="middle" fontSize="8" fontWeight="900" fill="#f8fafc">{node.value}</text>
+          <text x={node.x} y={node.y + 34} textAnchor="middle" fontSize="8" fontWeight="900" fill="#cbd5e1">{index + 1}</text>
+        </g>
+      ))}
+      <rect x="26" y="24" width="92" height="22" rx="11" fill="rgba(255,255,255,.1)" stroke="#475569" strokeWidth="2" />
+      <text x="72" y="39" textAnchor="middle" fontSize="9" fontWeight="900" fill="#f5f3ff">제출 대기</text>
+      <text x="292" y="108" textAnchor="end" fontSize="9" fontWeight="900" fill="#cbd5e1">{dalmutiPhaseLabels[phase] || phase || "대기"}</text>
+    </svg>
+  );
+};
+
+const DalmutiPlayPileEmptyState = ({
+  phase = "PLAYING",
+  activeName = "",
+  leadName = "",
+  currentTrickLabel = "새 기준",
+  passCount = 0,
+  requiredPassCount = 0,
+  turnNotice = "",
+}) => {
+  const passText = requiredPassCount > 0 ? `${passCount}/${requiredPassCount}` : "새 기준";
+  const items = [
+    {
+      key: "pile",
+      label: "현재 더미",
+      value: "아직 제출 없음",
+      detail: "이번 기준에서 실제로 내려온 카드가 생기면 이 영역이 제출 기록으로 바뀝니다.",
+      icon: "recent",
+    },
+    {
+      key: "rule",
+      label: "제출 기준",
+      value: currentTrickLabel || "새 기준",
+      detail: currentTrickLabel === "새 기준" ? "차례 플레이어가 같은 계급 묶음으로 새 기준을 엽니다." : "현재 기준보다 높은 계급을 같은 장수로 내야 합니다.",
+      icon: "decision",
+    },
+    {
+      key: "actor",
+      label: "다음 차례",
+      value: activeName || leadName || "대기",
+      detail: turnNotice || "현재 차례와 패스 흐름을 확인하세요.",
+      icon: "turn",
+    },
+    {
+      key: "pass",
+      label: "패스 흐름",
+      value: passText,
+      detail: requiredPassCount > 0 ? "필요 패스가 채워지면 기준이 정리되고 새 선으로 넘어갑니다." : "아직 기준이 없어서 패스 압력은 열리지 않았습니다.",
+      icon: "state",
+    },
+  ];
+
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border border-violet-100 bg-violet-50/70 p-2"
+      data-smoke="dalmuti-play-pile-empty-state"
+      data-phase={phase}
+      data-pass-progress={passText}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <div className="overflow-hidden rounded-xl bg-slate-950">
+        <DalmutiPlayPileEmptyArt
+          phase={phase}
+          activeName={activeName}
+          leadName={leadName}
+          currentTrickLabel={currentTrickLabel}
+          passText={passText}
+        />
+      </div>
+      <div className="mt-3 space-y-2 px-1">
+        <div className="inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black text-violet-700">제출 더미 브리핑</div>
+        <div className="text-sm font-black text-slate-950">아직 제출된 카드가 없습니다</div>
+        <div className="text-xs font-bold leading-relaxed text-violet-900/75">
+          첫 제출이 열리기 전에는 누가 기준을 만들고, 패스 압력이 언제 생기는지를 먼저 확인해야 합니다.
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {items.map((item) => (
+          <div key={item.key} className="rounded-xl border border-white/80 bg-white/85 px-3 py-2" data-smoke="dalmuti-play-pile-empty-item" data-pile-key={item.key}>
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-violet-700">
+              <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
+              {item.label}
+            </div>
+            <div className="mt-1 line-clamp-1 text-xs font-black text-slate-950">{item.value}</div>
+            <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const dalmutiActionRouteTone = {
+  ready: { fill: "#ecfdf5", stroke: "#059669", text: "#047857", soft: "#bbf7d0" },
+  active: { fill: "#eef2ff", stroke: "#4f46e5", text: "#3730a3", soft: "#c7d2fe" },
+  caution: { fill: "#fffbeb", stroke: "#f59e0b", text: "#b45309", soft: "#fde68a" },
+  blocked: { fill: "#fff1f2", stroke: "#e11d48", text: "#be123c", soft: "#fecdd3" },
+  idle: { fill: "#f8fafc", stroke: "#94a3b8", text: "#475569", soft: "#e2e8f0" },
+};
+
+const buildDalmutiActionRouteItems = ({
+  phase = "PLAYING",
+  phaseLabel = "",
+  canPlay = false,
+  canReturnTax = false,
+  canDecideRevolution = false,
+  selectedCards = [],
+  selectedPlayStatus = { legal: false, reason: "" },
+  currentTrick = null,
+  currentTrickLabel = "새 기준",
+  currentTrickCount = 0,
+  pendingTaxCount = 0,
+  passCount = 0,
+  requiredPassCount = 0,
+  taxProgressText = "",
+  activeName = "",
+  leadName = "",
+  eligibleCount = 0,
+  declinedCount = 0,
+  handCount = 0,
+}) => {
+  const selectedCount = selectedCards.length;
+  const isFinished = phase === "FINISHED";
+  const canSubmitPlay = Boolean(phase === "PLAYING" && canPlay && selectedPlayStatus?.legal);
+  const canSubmitTax = Boolean(phase === "TAX_RETURN" && canReturnTax && selectedCount === Number(pendingTaxCount || 0));
+  const passAvailable = Boolean(phase === "PLAYING" && canPlay && currentTrick);
+  const phaseDetail = phase === "TAX_RETURN"
+    ? "세금 반환 단계에서는 지정된 장수만큼 카드를 골라 반환합니다."
+    : phase === "REVOLUTION_DECISION"
+      ? "혁명 단계에서는 선언과 포기 중 하나만 선택합니다."
+      : phase === "PLAYING"
+        ? "제출 기준을 이기거나, 이미 기준이 있으면 패스할 수 있습니다."
+        : isFinished
+          ? "라운드 결과와 다음 계급 순서를 확인합니다."
+          : "현재 단계의 서버 판정을 기다립니다.";
+
+  return [
+    {
+      key: "phase",
+      label: "단계 확인",
+      value: phaseLabel || phase || "대기",
+      artValue: phase === "TAX_RETURN" ? "세금" : phase === "REVOLUTION_DECISION" ? "혁명" : isFinished ? "결과" : "플레이",
+      detail: phaseDetail,
+      toneKey: canPlay || canReturnTax || canDecideRevolution ? "active" : isFinished ? "ready" : "idle",
+      tone: canPlay || canReturnTax || canDecideRevolution ? "border-indigo-100 bg-indigo-50 text-indigo-800" : isFinished ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      key: "select",
+      label: "카드 선택",
+      value: phase === "TAX_RETURN" ? `${selectedCount}/${pendingTaxCount || 0}장` : `${selectedCount}장 선택`,
+      artValue: phase === "TAX_RETURN" ? `${selectedCount}/${pendingTaxCount || 0}` : `${selectedCount}`,
+      detail: phase === "TAX_RETURN"
+        ? canReturnTax
+          ? `세금 반환에 필요한 ${pendingTaxCount}장을 맞추면 반환 버튼이 열립니다.`
+          : `${taxProgressText || "다른 플레이어의 반환"}을 기다립니다.`
+        : phase === "REVOLUTION_DECISION"
+          ? "혁명 결정은 카드 선택이 아니라 선언/포기 버튼으로 처리됩니다."
+          : selectedCount
+            ? selectedPlayStatus?.reason || "선택 묶음의 제출 가능 여부를 확인합니다."
+            : `손패 ${Number(handCount || 0).toLocaleString("ko-KR")}장 중 같은 계급 묶음을 고릅니다.`,
+      toneKey: phase === "TAX_RETURN" && canSubmitTax ? "ready" : selectedCount ? (selectedPlayStatus?.legal || canSubmitTax ? "ready" : "blocked") : canReturnTax || canPlay ? "caution" : "idle",
+      tone: phase === "TAX_RETURN" && canSubmitTax ? "border-emerald-100 bg-emerald-50 text-emerald-800" : selectedCount ? (selectedPlayStatus?.legal || canSubmitTax ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-rose-100 bg-rose-50 text-rose-800") : canReturnTax || canPlay ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      key: "submit",
+      label: "제출/반환",
+      value: canSubmitTax ? "반환 가능" : canSubmitPlay ? "제출 가능" : isFinished ? "결과 확인" : "잠김",
+      artValue: canSubmitTax ? "반환" : canSubmitPlay ? "제출" : isFinished ? "결과" : "잠김",
+      detail: canSubmitTax
+        ? "기존 RETURN_TAX payload로 선택한 카드 id만 보냅니다."
+        : canSubmitPlay
+          ? "기존 PLAY payload로 선택한 card_ids만 보냅니다."
+          : isFinished
+            ? "이번 라운드 제출 흐름은 종료되었습니다."
+            : selectedPlayStatus?.reason || "제출 조건이 맞아야 버튼이 열립니다.",
+      toneKey: canSubmitTax || canSubmitPlay || isFinished ? "ready" : "idle",
+      tone: canSubmitTax || canSubmitPlay || isFinished ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-slate-50 text-slate-700",
+    },
+    {
+      key: "fallback",
+      label: "패스/혁명",
+      value: canDecideRevolution ? "선언/포기" : passAvailable ? "패스 가능" : currentTrick ? `${passCount}/${requiredPassCount}` : "대기",
+      artValue: canDecideRevolution ? "혁명" : passAvailable ? "패스" : currentTrick ? `${passCount}/${requiredPassCount}` : "-",
+      detail: canDecideRevolution
+        ? `혁명 대상 ${eligibleCount}명 중 ${declinedCount}명이 포기했습니다. 선언 또는 포기를 고릅니다.`
+        : passAvailable
+          ? `${currentTrickLabel} 기준을 넘기 어렵다면 기존 PASS payload로 넘길 수 있습니다.`
+          : currentTrick
+            ? `${leadName || activeName || "선 플레이어"}의 기준이 유지되는 동안 패스 흐름을 관찰합니다.`
+            : "새 기준이 열리면 패스 대신 카드 제출로 흐름을 시작합니다.",
+      toneKey: canDecideRevolution || passAvailable ? "caution" : currentTrick ? "active" : "idle",
+      tone: canDecideRevolution || passAvailable ? "border-amber-100 bg-amber-50 text-amber-800" : currentTrick ? "border-indigo-100 bg-indigo-50 text-indigo-800" : "border-slate-100 bg-white text-slate-700",
+    },
+  ];
+};
+
+const DalmutiActionRouteArt = ({
+  phase = "PLAYING",
+  items = [],
+  canPlay = false,
+  canReturnTax = false,
+  canDecideRevolution = false,
+}) => {
+  const routeItems = items.length ? items : [
+    { key: "phase", label: "단계", artValue: "-", toneKey: "idle" },
+    { key: "select", label: "선택", artValue: "-", toneKey: "idle" },
+    { key: "submit", label: "제출", artValue: "-", toneKey: "idle" },
+    { key: "fallback", label: "패스", artValue: "-", toneKey: "idle" },
+  ];
+  const activeIndex = phase === "TAX_RETURN"
+    ? 2
+    : phase === "REVOLUTION_DECISION"
+      ? 3
+      : routeItems.findIndex((item) => item.toneKey === "caution" || item.toneKey === "blocked");
+  const safeActiveIndex = activeIndex >= 0 ? activeIndex : canPlay || canReturnTax || canDecideRevolution ? 1 : 0;
+
+  return (
+    <svg
+      data-smoke="dalmuti-action-route-art"
+      viewBox="0 0 400 150"
+      className="h-full min-h-[124px] w-full"
+      role="img"
+      aria-label="달무티 액션 루트"
+      focusable="false"
+    >
+      <rect x="10" y="10" width="380" height="130" rx="24" fill="#f8fafc" stroke="#ddd6fe" strokeWidth="3" />
+      <path d="M58 75h284" stroke="#ddd6fe" strokeWidth="14" strokeLinecap="round" />
+      <path d="M58 75h284" stroke={canPlay || canReturnTax || canDecideRevolution ? "#7c3aed" : "#94a3b8"} strokeWidth="4" strokeLinecap="round" opacity="0.72" />
+      {routeItems.map((item, index) => {
+        const x = 58 + index * 94.6;
+        const tone = dalmutiActionRouteTone[item.toneKey] || dalmutiActionRouteTone.idle;
+        const active = index === safeActiveIndex;
+        return (
+          <g key={item.key} data-smoke="dalmuti-action-route-node" data-route-key={item.key}>
+            <circle cx={x} cy="75" r={active ? 34 : 31} fill="#ffffff" stroke={tone.stroke} strokeWidth={active ? "5" : "4"} />
+            <circle cx={x} cy="75" r="22" fill={tone.fill} stroke="#ffffff" strokeWidth="3" />
+            <text x={x} y="70" textAnchor="middle" fontSize="9" fontWeight="900" fill={tone.text}>{item.label}</text>
+            <text x={x} y="89" textAnchor="middle" fontSize="13" fontWeight="900" fill={tone.text}>{item.artValue}</text>
+          </g>
+        );
+      })}
+      <rect x="64" y="116" width="272" height="18" rx="9" fill="#ffffff" stroke="#c4b5fd" />
+      <text x="200" y="129" textAnchor="middle" fontSize="10" fontWeight="900" fill="#5b21b6">
+        단계 확인 &gt; 카드 선택 &gt; 제출/반환 &gt; 패스/혁명
+      </text>
+      <text x="30" y="28" fontSize="10" fontWeight="900" fill="#5b21b6">{phase || "DALMUTI"}</text>
+    </svg>
+  );
+};
+
+const DalmutiActionRoutePanel = ({
+  phase = "PLAYING",
+  phaseLabel = "",
+  canPlay = false,
+  canReturnTax = false,
+  canDecideRevolution = false,
+  selectedCards = [],
+  selectedPlayStatus = { legal: false, reason: "" },
+  currentTrick = null,
+  currentTrickLabel = "새 기준",
+  currentTrickCount = 0,
+  pendingTaxCount = 0,
+  passCount = 0,
+  requiredPassCount = 0,
+  taxProgressText = "",
+  activeName = "",
+  leadName = "",
+  eligibleCount = 0,
+  declinedCount = 0,
+  handCount = 0,
+}) => {
+  const items = buildDalmutiActionRouteItems({
+    phase,
+    phaseLabel,
+    canPlay,
+    canReturnTax,
+    canDecideRevolution,
+    selectedCards,
+    selectedPlayStatus,
+    currentTrick,
+    currentTrickLabel,
+    currentTrickCount,
+    pendingTaxCount,
+    passCount,
+    requiredPassCount,
+    taxProgressText,
+    activeName,
+    leadName,
+    eligibleCount,
+    declinedCount,
+    handCount,
+  });
+
+  return (
+    <section
+      data-smoke="dalmuti-action-route-panel"
+      data-phase={phase || ""}
+      data-can-play={canPlay ? "true" : "false"}
+      data-can-tax={canReturnTax ? "true" : "false"}
+      data-can-revolution={canDecideRevolution ? "true" : "false"}
+      data-selected-count={selectedCards.length}
+      data-pass-progress={currentTrick ? `${passCount}/${requiredPassCount}` : ""}
+      className="mb-3 overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-white via-violet-50 to-cyan-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
+        <div className="min-h-[132px]">
+          <DalmutiActionRouteArt
+            phase={phase}
+            items={items}
+            canPlay={canPlay}
+            canReturnTax={canReturnTax}
+            canDecideRevolution={canDecideRevolution}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black text-violet-700">달무티 액션 루트</div>
+              <h3 className="text-base font-black text-slate-900">세금, 혁명, 제출, 패스 판단</h3>
+            </div>
+            <div className="rounded-full border border-violet-100 bg-white px-3 py-1 text-[11px] font-black text-violet-700">
+              {canPlay || canReturnTax || canDecideRevolution ? "내가 결정" : phaseLabel || phase || "대기"}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.key} data-smoke="dalmuti-action-route-item" data-route-key={item.key} className={`min-h-[102px] rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 };
 
@@ -3000,6 +10466,29 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
   const trickClearHint = trickLeaderHasCards
     ? `${playerName(trickLeaderSeatNo)}님을 제외한 플레이어가 모두 패스하면 기준이 정리됩니다.`
     : "기준을 낸 플레이어가 이미 나갔으므로 남은 플레이어가 모두 패스하면 다음 선이 정해집니다.";
+  const currentTrickLabel = currentTrick
+    ? `${get(currentTrick, "rank_name", "rankName", "카드")} ${currentTrickCount}장`
+    : "새 기준";
+  const dalmutiRankPressureRows = orderedDalmutiPlayers.map((player, index) => {
+    const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+    const handList = get(player, "hand", "hand", []);
+    const handCount = Number(get(player, "hand_count", "handCount", Array.isArray(handList) ? handList.length : 0)) || 0;
+    const outOrder = Number(get(player, "out_order", "outOrder", 0)) || 0;
+    const role = get(player, "role", "role", "");
+    const nextRole = get(player, "next_role", "nextRole", "");
+    return {
+      seatNo,
+      name: playerName(seatNo),
+      handCount,
+      outOrder,
+      score: Number(get(player, "score", "score", 0)) || 0,
+      roleLabel: dalmutiRoleLabels[role] || role || `${index + 1}순서`,
+      nextRoleLabel: dalmutiRoleLabels[nextRole] || nextRole || "",
+      orderIndex: index,
+      isMe: Number(seatNo) === Number(mySeatNo),
+    };
+  }).filter((row) => row.seatNo);
+  const dalmutiNextLeaderName = nextTurnOrderSeatNos.length ? playerName(nextTurnOrderSeatNos[0]) : "";
   const dalmutiTurnNotice = phase === "TAX_RETURN"
     ? canReturnTax
       ? `내가 세금 반환할 차례입니다. 농노에게 돌려줄 카드 ${pendingTaxCount}장을 고르세요.`
@@ -3030,6 +10519,36 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
     { label: "선택", value: `${selectedCardIds.length}장` },
     { label: "기준", value: currentTrick ? `${get(currentTrick, "rank_name", "rankName", "카드")} ${currentTrickCount}장` : "새 기준" },
   ];
+  const dalmutiFlowItems = [
+    {
+      label: "단계",
+      value: dalmutiPhaseLabels[phase] || phase,
+      detail: dalmutiTurnNotice,
+      icon: "stage",
+      tone: phase === "FINISHED" ? "done" : canPlay || canReturnTax || canDecideRevolution ? "active" : "neutral",
+    },
+    {
+      label: phase === "TAX_RETURN" ? "세금" : phase === "REVOLUTION_DECISION" ? "혁명" : "차례",
+      value: phase === "TAX_RETURN" ? taxProgressText : phase === "REVOLUTION_DECISION" ? `${eligibleSeatNos.length}명 대상` : activeSeatNo ? playerName(activeSeatNo) : "대기",
+      detail: phase === "TAX_RETURN" ? `반환 대기 ${taxExchangeRows.length - completedTaxCount}건` : phase === "REVOLUTION_DECISION" ? `${declinedSeatNoSet.size}명 보류/거절` : `패스 ${passCount}/${requiredPassCount}`,
+      icon: "turn",
+      tone: canReturnTax || canDecideRevolution || canPlay ? "active" : "neutral",
+    },
+    {
+      label: "제출 기준",
+      value: currentTrick ? `${get(currentTrick, "rank_name", "rankName", "카드")} ${currentTrickCount}장` : "새 기준",
+      detail: currentTrick ? trickClearHint : "같은 계급 여러 장으로 새 기준을 열 수 있습니다.",
+      icon: "decision",
+      tone: currentTrick ? "waiting" : "neutral",
+    },
+    {
+      label: phase === "FINISHED" ? "결과" : "선택 카드",
+      value: phase === "FINISHED" && nextTurnOrderSeatNos.length ? `${playerName(nextTurnOrderSeatNos[0])} 다음 대달무티` : `${selectedCardIds.length}장 선택`,
+      detail: phase === "FINISHED" ? "다음 라운드 계급 순서를 확인하세요." : selectedPlayStatus.reason,
+      icon: phase === "FINISHED" ? "win" : "input",
+      tone: phase === "FINISHED" ? "done" : selectedCards.length ? (selectedPlayStatus.legal ? "active" : "danger") : "neutral",
+    },
+  ];
   const playControls = phase === "PLAYING" ? (
     <div className="grid grid-cols-2 gap-2">
       <button
@@ -3057,6 +10576,15 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
       {canReturnTax ? `선택한 ${selectedCardIds.length}/${pendingTaxCount}장 반환` : "세금 반환 대기"}
     </button>
   ) : null;
+  const dalmutiPhaseLabel = dalmutiPhaseLabels[phase] || phase;
+  const myDalmutiRankRow = dalmutiRankPressureRows.find((row) => row.isMe);
+  const myOutOrder = Number(get(myPlayer || {}, "out_order", "outOrder", 0)) || Number(myDalmutiRankRow?.outOrder || 0);
+  const dalmutiEmptyHandActiveName = phase === "FINISHED" ? "종료" : activeSeatNo ? playerName(activeSeatNo) : "대기";
+  const dalmutiEmptyHandNextOrder = nextTurnOrderSeatNos.length
+    ? nextTurnOrderSeatNos.map((seatNo, index) => `${index + 1}. ${playerName(seatNo)}`).join(" · ")
+    : turnOrderSeatNos.length
+      ? turnOrderSeatNos.map((seatNo, index) => `${index + 1}. ${playerName(seatNo)}`).join(" · ")
+      : "다음 순서 대기";
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -3083,6 +10611,42 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">선 {playerName(leadSeatNo)}</span>
             </div>
           </div>
+          <GameFlowMeter
+            title="달무티 라운드 흐름"
+            detail="세금, 혁명, 제출 기준, 선택 카드 상태를 같은 흐름으로 확인합니다."
+            items={dalmutiFlowItems}
+            tone={phase === "FINISHED" ? "amber" : canPlay || canReturnTax || canDecideRevolution ? "emerald" : "slate"}
+            className="mt-4"
+            smoke="dalmuti-flow-meter"
+          />
+          <DalmutiRankPressurePanel
+            rows={dalmutiRankPressureRows}
+            phase={phase}
+            activeSeatNo={activeSeatNo}
+            leadSeatNo={leadSeatNo}
+            passCount={passCount}
+            requiredPassCount={requiredPassCount}
+            currentTrickLabel={currentTrickLabel}
+            nextLeaderName={dalmutiNextLeaderName}
+          />
+          <DalmutiPlayAdvisorPanel
+            phase={phase}
+            canPlay={canPlay}
+            canReturnTax={canReturnTax}
+            canDecideRevolution={canDecideRevolution}
+            selectedCards={selectedCards}
+            selectedPlayStatus={selectedPlayStatus}
+            currentTrick={currentTrick}
+            currentTrickCount={currentTrickCount}
+            currentTrickRank={currentTrickRank}
+            handRankGroups={handRankGroups}
+            pendingTaxCount={pendingTaxCount}
+            passCount={passCount}
+            requiredPassCount={requiredPassCount}
+            taxProgressText={taxProgressText}
+            selectionHint={selectionHint}
+            trickClearHint={trickClearHint}
+          />
           <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-bold leading-relaxed ${dalmutiTurnNoticeTone}`} role="status" aria-live="polite" aria-atomic="true">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 rounded-2xl bg-violet-700 p-2 text-white shadow-sm">
@@ -3353,7 +10917,21 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
                 disabled={phase === "REVOLUTION_DECISION" || phase === "FINISHED"}
               />
             ))}
-            {!hand.length && <div className="col-span-full rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-400">남은 카드가 없습니다.</div>}
+            {!hand.length && (
+              <DalmutiEmptyHandPanel
+                phase={phase}
+                phaseLabel={dalmutiPhaseLabel}
+                outOrder={myOutOrder}
+                activeName={dalmutiEmptyHandActiveName}
+                nextLeaderName={dalmutiNextLeaderName}
+                currentTrickLabel={currentTrickLabel}
+                passCount={passCount}
+                requiredPassCount={requiredPassCount}
+                turnNotice={dalmutiTurnNotice}
+                trickClearHint={trickClearHint}
+                nextOrderText={dalmutiEmptyHandNextOrder}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -3413,7 +10991,17 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
                 {playerName(get(play, "seat_no", "seatNo", 0))} · {get(play, "rank_name", "rankName", "")} {play.count}장
               </div>
             ))}
-            {!playPile.length && <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">아직 제출 없음</div>}
+            {!playPile.length && (
+              <DalmutiPlayPileEmptyState
+                phase={phase}
+                activeName={activeSeatNo ? playerName(activeSeatNo) : ""}
+                leadName={leadSeatNo ? playerName(leadSeatNo) : ""}
+                currentTrickLabel={currentTrickLabel}
+                passCount={passCount}
+                requiredPassCount={requiredPassCount}
+                turnNotice={dalmutiTurnNotice}
+              />
+            )}
           </div>
         </div>
 
@@ -3892,6 +11480,119 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     && Number(resources?.GRAIN || 0) >= 1
     && Number(resources?.WOOL || 0) >= 1
     && Number(resources?.ORE || 0) >= 1;
+  const canAffordCatanCost = (cost) => Object.entries(cost || {}).every(([key, amount]) => Number(resources?.[key] || 0) >= Number(amount || 0));
+  const canAffordRoad = canAffordCatanCost({ BRICK: 1, LUMBER: 1 });
+  const canAffordShip = seafarersRule && canAffordCatanCost({ LUMBER: 1, WOOL: 1 });
+  const canAffordSettlement = canAffordCatanCost({ BRICK: 1, LUMBER: 1, WOOL: 1, GRAIN: 1 });
+  const canAffordCity = canAffordCatanCost({ GRAIN: 2, ORE: 3 });
+  const canAffordDevelopment = canAffordCatanCost({ GRAIN: 1, WOOL: 1, ORE: 1 });
+  const catanBuildSignals = [
+    {
+      key: "road",
+      label: seafarersRule ? "도로/배" : "도로",
+      affordable: canAffordRoad || canAffordShip,
+      ready: myTurn && phase === "ACTION" && (canAffordRoad || canAffordShip),
+      cost: seafarersRule ? "도로: 벽돌+목재 · 배: 목재+양털" : "벽돌 1 + 목재 1",
+      detail: canAffordRoad || canAffordShip ? "연결 후보를 보드에서 고르면 확장 경로를 만들 수 있습니다." : "초반 확장은 벽돌, 목재, 양털 확보가 핵심입니다.",
+    },
+    {
+      key: "settlement",
+      label: explorersPiratesRule ? "정착지/항구" : "마을",
+      affordable: canAffordSettlement,
+      ready: myTurn && phase === "ACTION" && canAffordSettlement,
+      cost: "벽돌 1 + 목재 1 + 양털 1 + 곡물 1",
+      detail: canAffordSettlement ? "빈 정점을 선택하면 생산 기반을 넓힐 준비가 됐습니다." : "네 자원을 한 벌로 모으면 다음 생산 거점이 열립니다.",
+    },
+    {
+      key: "city",
+      label: "도시",
+      affordable: canAffordCity,
+      ready: myTurn && phase === "ACTION" && canAffordCity,
+      cost: "곡물 2 + 광석 3",
+      detail: canAffordCity ? "기존 마을을 도시로 키워 생산과 승점을 동시에 올릴 수 있습니다." : "곡물과 광석이 모이면 승점 압박이 크게 올라갑니다.",
+    },
+    {
+      key: "card",
+      label: citiesKnightsRule ? "진행 카드" : explorersPiratesRule ? "미션 보상" : "개발 카드",
+      affordable: citiesKnightsRule ? actionProgressCards.length > 0 : canAffordDevelopment,
+      ready: citiesKnightsRule ? myTurn && phase === "ACTION" && actionProgressCards.length > 0 : canBuyDevelopmentCard,
+      cost: citiesKnightsRule ? `사용 가능 진행 카드 ${actionProgressCards.length}장` : explorersPiratesRule ? "어장·향신료·해적 소굴 진행" : "곡물 1 + 양털 1 + 광석 1",
+      detail: citiesKnightsRule
+        ? "진행 카드는 현재 단계와 대상 조건을 함께 확인해야 합니다."
+        : explorersPiratesRule
+          ? "미션 토큰과 화물 전달 상태가 승점으로 이어지는지 보드에서 확인하세요."
+          : canAffordDevelopment ? "주사위 전후 카드 사용 타이밍을 확인하세요." : "곡물, 양털, 광석 조합이 카드 선택지를 만듭니다.",
+    },
+  ];
+  const catanScoreRace = catanPlayers
+    .map((player) => {
+      const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+      const victoryPoints = Number(get(player, "victory_points", "victoryPoints", 0));
+      const publicVictoryPoints = Number(get(player, "public_victory_points", "publicVictoryPoints", victoryPoints));
+      const points = seatNo === mySeatNo ? victoryPoints : publicVictoryPoints;
+      return {
+        seatNo,
+        name: playerName(seatNo),
+        points,
+        target: winningPoints,
+        progress: Math.max(0, Math.min(100, Math.round((points / Math.max(1, winningPoints)) * 100))),
+        isMe: seatNo === mySeatNo,
+      };
+    })
+    .filter((player) => player.seatNo)
+    .sort((a, b) => b.points - a.points || (b.isMe ? 1 : 0))
+    .slice(0, 4);
+  const catanVictoryTrackRows = catanPlayers
+    .map((player) => {
+      const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+      const victoryPoints = Number(get(player, "victory_points", "victoryPoints", 0));
+      const publicVictoryPoints = Number(get(player, "public_victory_points", "publicVictoryPoints", victoryPoints));
+      const visiblePoints = seatNo === mySeatNo ? victoryPoints : publicVictoryPoints;
+      const developmentVictoryPoints = Number(get(player, "development_victory_points", "developmentVictoryPoints", 0));
+      const bonusCount = [
+        Boolean(get(player, "has_longest_road", "hasLongestRoad", false)),
+        Boolean(get(player, "has_largest_army", "hasLargestArmy", false)),
+        Number(get(player, "special_victory_points", "specialVictoryPoints", 0)) > 0,
+        Number(get(player, "mission_victory_points", "missionVictoryPoints", 0)) > 0,
+        Number(get(player, "defender_points", "defenderPoints", 0)) > 0,
+        (get(player, "metropolis_types", "metropolisTypes", []) || []).length > 0,
+      ].filter(Boolean).length;
+      return {
+        seatNo,
+        name: playerName(seatNo),
+        visiblePoints,
+        publicVictoryPoints,
+        hiddenPoints: seatNo === mySeatNo ? Math.max(0, victoryPoints - publicVictoryPoints) + developmentVictoryPoints : 0,
+        remaining: Math.max(0, winningPoints - visiblePoints),
+        progress: Math.max(0, Math.min(100, Math.round((visiblePoints / Math.max(1, winningPoints)) * 100))),
+        bonusCount,
+        isMe: seatNo === mySeatNo,
+      };
+    })
+    .filter((player) => player.seatNo)
+    .sort((a, b) => b.visiblePoints - a.visiblePoints || b.bonusCount - a.bonusCount || (b.isMe ? 1 : 0));
+  const catanTradeSummary = canMaritimeTrade
+    ? `${catanTradeCardLabels[tradeForm.give] || tradeForm.give} ${giveTradeRatio}:1 교환 가능`
+    : `${catanTradeCardLabels[tradeForm.give] || tradeForm.give} ${tradeGiveCount}/${giveTradeRatio}장`;
+  const catanDiceFaces = Array.isArray(dice)
+    ? dice.map((item) => Number(typeof item === "object" ? get(item, "value", "value", 0) : item)).filter((value) => value > 0)
+    : [];
+  const catanProductionSummary = useMemo(() => {
+    if (!lastRoll || lastRoll === 7) return [];
+    const counts = {};
+    hexes.forEach((hex) => {
+      const token = Number(get(hex, "number_token", "numberToken", 0));
+      if (token !== lastRoll) return;
+      if (Number(hex.id) === robberHexId) return;
+      const terrainKey = String(get(hex, "terrain", "terrain", "") || "").toUpperCase();
+      const resourceKey = catanTerrainResourceType[terrainKey];
+      if (!resourceKey || !catanResourceKeys.includes(resourceKey)) return;
+      counts[resourceKey] = Number(counts[resourceKey] || 0) + 1;
+    });
+    return catanResourceKeys
+      .map((key) => ({ key, label: catanResourceLabels[key], count: Number(counts[key] || 0) }))
+      .filter((item) => item.count > 0);
+  }, [hexes, lastRoll, robberHexId]);
   const positiveResourceMap = (values) => Object.fromEntries(
     catanResourceKeys
       .map((key) => [key, Math.max(0, Number(values?.[key] || 0))])
@@ -5008,6 +12709,218 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
     { label: "목표", value: `${winningPoints}점` },
     { label: "선택", value: hasSelectedTarget ? `${selectedTargetSummaryItems.length}곳` : "없음" },
   ];
+  const catanLatestEvent = events[events.length - 1];
+  const catanLatestEventType = String(get(catanLatestEvent, "event_type", "eventType", "") || "");
+  const catanLatestEventSeatNo = Number(get(catanLatestEvent, "seat_no", "seatNo", 0));
+  const catanLatestText = catanLatestEvent
+    ? `${catanLatestEventSeatNo ? `${playerName(catanLatestEventSeatNo)} · ` : ""}${catanEventLabels[catanLatestEventType] || catanLatestEventType || "최근 행동"}`
+    : "아직 기록 없음";
+  const catanSelectedText = hasSelectedTarget
+    ? selectedTargetSummaryItems.map((item) => `${item.label} ${item.value}`).join(" · ")
+    : "타일, 간선, 정점을 선택하면 가능한 행동 근거가 여기에 정리됩니다.";
+  const catanFlowItems = [
+    {
+      label: "단계",
+      value: catanPhaseLabel,
+      detail: catanTurnGuidance,
+      icon: "stage",
+      tone: phase === "FINISHED" ? "done" : myTurn ? "active" : "neutral",
+    },
+    {
+      label: "승점 압박",
+      value: phase === "FINISHED" && winnerSeatNo ? `${playerName(winnerSeatNo)} ${winnerVictoryPoints}/${winningPoints}점` : `${winningPoints}점 목표`,
+      detail: catanRuleBrief.title,
+      icon: phase === "FINISHED" ? "win" : "score",
+      tone: phase === "FINISHED" ? "done" : "neutral",
+    },
+    {
+      label: "선택 대상",
+      value: hasSelectedTarget ? `${selectedTargetSummaryItems.length}곳 선택` : "대상 미선택",
+      detail: catanSelectedText,
+      icon: "decision",
+      tone: hasSelectedTarget ? "active" : "waiting",
+    },
+    {
+      label: "최근 근거",
+      value: lastRoll ? `주사위 ${lastRoll}` : catanLatestText,
+      detail: lastRoll ? `${catanLatestText} · 이벤트 주사위 ${eventDie ? catanEventDieLabels[eventDie] || eventDie : "없음"}` : catanRuleBrief.summary,
+      icon: "recent",
+      tone: lastRoll ? "active" : "neutral",
+    },
+  ];
+  const catanEdgeBuildModes = ["ROAD", "BRIDGE", "SHIP", "MOVE_SHIP"];
+  const catanVertexBuildModes = ["SETTLEMENT", "CITY", "HARBOR_SETTLEMENT", "KNIGHT", "CITY_WALL"];
+  const catanBuildTargetKind = catanEdgeBuildModes.includes(buildMode) ? "간선" : "교차점";
+  const catanBuildTargetReady = phase === "SETUP"
+    ? Boolean(selectedVertexId && selectedEdgeId)
+    : phase === "ACTION" && (
+      buildMode === "MOVE_SHIP"
+        ? explorersPiratesRule
+          ? shipMovePath.length >= 2
+          : Boolean(shipMoveFromEdgeId && selectedEdgeId)
+        : catanEdgeBuildModes.includes(buildMode)
+          ? Boolean(selectedEdgeId)
+          : catanVertexBuildModes.includes(buildMode)
+            ? Boolean(selectedVertexId)
+            : false
+    );
+  const catanRobberTargetReady = phase === "ROBBER"
+    ? Boolean(selectedHexId) && !citiesKnightsRobberLocked
+    : selectedDevCard?.type === "KNIGHT"
+      ? Boolean(selectedHexId)
+      : false;
+  const catanActionAtlasActiveKey = phase === "ROBBER" || phase === "DISCARD" || phase === "GOLD_CHOICE" || phase === "AQUEDUCT_CHOICE"
+    ? "target"
+    : pendingDomesticTrade || canMaritimeTrade
+      ? "trade"
+      : "build";
+  const catanActionAtlasTitle = phase === "ACTION"
+    ? `${catanBuildModeLabels[buildMode] || buildMode} 실행 판단`
+    : phase === "ROBBER"
+      ? `${explorersPiratesRule ? "해적" : "도적"} 이동 판단`
+      : phase === "SETUP"
+        ? "초기 배치 판단"
+        : `${catanPhaseLabel} 처리 판단`;
+  const catanActionAtlasItems = [
+    {
+      key: "turn",
+      label: "차례 권한",
+      value: myTurn ? "내가 실행" : `${playerName(activeSeatNo)} 대기`,
+      ready: myTurn || mustDiscard || Boolean(myGoldChoice) || Boolean(myAqueductChoice),
+      detail: myTurn ? "이 패널의 버튼을 실제로 실행할 수 있는 차례입니다." : "내 차례가 아니면 보드 선택은 확인용으로만 유지됩니다.",
+    },
+    {
+      key: "target",
+      label: "보드 대상",
+      value: phase === "SETUP"
+        ? selectedVertexId && selectedEdgeId ? "정점+간선 선택" : "정점과 간선 필요"
+        : phase === "ROBBER"
+          ? selectedHexId ? "타일 선택" : `${explorersPiratesRule ? "바다 칸" : "육지 타일"} 필요`
+          : phase === "ACTION"
+            ? catanBuildTargetReady ? `${catanBuildTargetKind} 선택` : `${catanBuildTargetKind} 필요`
+            : hasSelectedTarget ? `${selectedTargetSummaryItems.length}곳 선택` : "선택 없음",
+      ready: phase === "ROBBER" ? catanRobberTargetReady : catanBuildTargetReady || hasSelectedTarget,
+      detail: phase === "ROBBER"
+        ? citiesKnightsRobberLocked ? "첫 야만인 침공 전이라 도적 이동은 잠겨 있습니다." : "선택한 타일과 훔칠 대상 후보가 이동 버튼의 근거입니다."
+        : phase === "ACTION"
+          ? `${catanBuildModeLabels[buildMode] || buildMode} 모드는 ${catanBuildTargetKind} 선택을 먼저 봅니다.`
+          : "보드에서 선택한 타일, 간선, 교차점이 실행 근거로 쓰입니다.",
+    },
+    {
+      key: "primary",
+      label: "주 액션",
+      value: phase === "ROLL"
+        ? "주사위"
+        : phase === "DISCARD"
+          ? mustDiscard ? `${discardTotal}/${discardRequired}장` : "대기"
+          : phase === "ACTION"
+            ? selectedBuildActionDisabled ? "조건 확인" : "실행 가능"
+            : phase === "ROBBER"
+              ? catanRobberTargetReady ? "이동 가능" : "대상 필요"
+              : catanPhaseLabel,
+      ready: phase === "ROLL"
+        ? myTurn
+        : phase === "DISCARD"
+          ? mustDiscard && discardTotal === discardRequired
+          : phase === "ACTION"
+            ? myTurn && catanBuildTargetReady && !selectedBuildActionDisabled
+            : phase === "ROBBER"
+              ? myTurn && catanRobberTargetReady
+              : myTurn,
+      detail: phase === "ACTION" && buildMode === "KNIGHT" && selectedVertexKnightBuildWarning
+        ? selectedVertexKnightBuildWarning
+        : phase === "DISCARD"
+          ? "정확한 버릴 카드 수를 맞춰야 다음 단계로 넘어갑니다."
+          : "가장 큰 버튼이 실제 서버 액션을 보내기 전에 잠금 근거를 확인합니다.",
+    },
+    {
+      key: "support",
+      label: "보조 선택",
+      value: phase === "ACTION"
+        ? canMaritimeTrade
+          ? "교환 가능"
+          : canBuyDevelopmentCard
+            ? "개발 카드 가능"
+            : actionProgressCards.length
+              ? `진행 카드 ${actionProgressCards.length}장`
+              : "보조 없음"
+        : phase === "ROBBER" && robberTargets.length
+          ? `${robberTargets.length}명 후보`
+          : pendingDomesticTrade
+            ? "거래 응답"
+            : catanTradeSummary,
+      ready: phase === "ACTION"
+        ? canMaritimeTrade || canBuyDevelopmentCard || actionProgressCards.length > 0
+        : phase === "ROBBER"
+          ? robberTargets.length > 0 || catanRobberTargetReady
+          : Boolean(pendingDomesticTrade),
+      detail: phase === "ACTION"
+        ? "교환, 개발/진행 카드, 확장 규칙 액션은 같은 선택값을 보조 근거로 사용합니다."
+        : phase === "ROBBER"
+          ? "대상이 없으면 이동만 실행되고, 후보가 있으면 훔칠 플레이어를 고릅니다."
+          : "거래나 보상 선택이 있을 때 이 영역에서 추가 결정을 확인합니다.",
+    },
+  ];
+  const catanActionRouteItems = buildCatanActionRouteItems({
+    phase,
+    phaseLabel: catanPhaseLabel,
+    myTurn,
+    activeName: playerName(activeSeatNo),
+    lastRoll,
+    mustDiscard,
+    discardTotal,
+    discardRequired,
+    myGoldChoice,
+    goldRequired,
+    myAqueductChoice,
+    catanBuildTargetReady,
+    catanRobberTargetReady,
+    hasSelectedTarget,
+    buildMode,
+    catanBuildTargetKind,
+    selectedBuildActionDisabled,
+    canMaritimeTrade,
+    canBuyDevelopmentCard,
+    actionProgressCount: actionProgressCards.length,
+    pendingDomesticTrade,
+    catanTradeSummary,
+    catanTurnGuidance,
+    winnerSeatNo,
+    winnerVictoryPoints,
+    winningPoints,
+  });
+  const catanScoreStandings = catanPlayers
+    .map((player) => ({
+      seatNo: Number(get(player, "seat_no", "seatNo", 0)),
+      points: Number(get(player, "victory_points", "victoryPoints", get(player, "public_victory_points", "publicVictoryPoints", 0))),
+      publicPoints: Number(get(player, "public_victory_points", "publicVictoryPoints", get(player, "victory_points", "victoryPoints", 0))),
+      developmentPoints: Number(get(player, "development_victory_points", "developmentVictoryPoints", 0)),
+      player,
+    }))
+    .filter((row) => row.seatNo > 0)
+    .sort((left, right) => {
+      if (right.points !== left.points) return right.points - left.points;
+      return left.seatNo - right.seatNo;
+    });
+  const catanRunnerUp = catanScoreStandings.find((row) => row.seatNo !== winnerSeatNo);
+  const catanWinnerSignals = winnerPlayer ? [
+    Boolean(get(winnerPlayer, "has_longest_road", "hasLongestRoad", false)) ? "최장 교역로" : "",
+    Boolean(get(winnerPlayer, "has_largest_army", "hasLargestArmy", false)) ? "최대 기사력" : "",
+    Boolean(get(winnerPlayer, "richest_settler", "richestSettler", false)) ? "부유한 정착민" : "",
+    Boolean(get(winnerPlayer, "best_fisher", "bestFisher", false)) ? "최고 어부" : "",
+    Boolean(get(winnerPlayer, "greatest_spice_merchant", "greatestSpiceMerchant", false)) ? "최고 향신료상" : "",
+    Boolean(get(winnerPlayer, "greatest_pirate_scourge", "greatestPirateScourge", false)) ? "해적 소탕왕" : "",
+    Number(get(winnerPlayer, "special_victory_points", "specialVictoryPoints", 0)) > 0 ? `특별 승점 +${get(winnerPlayer, "special_victory_points", "specialVictoryPoints", 0)}` : "",
+    Number(get(winnerPlayer, "mission_victory_points", "missionVictoryPoints", 0)) > 0 ? `임무 승점 +${get(winnerPlayer, "mission_victory_points", "missionVictoryPoints", 0)}` : "",
+    Number(get(winnerPlayer, "harbor_points", "harborPoints", 0)) > 0 ? `항구 점수 ${get(winnerPlayer, "harbor_points", "harborPoints", 0)}` : "",
+    Number(get(winnerPlayer, "defender_points", "defenderPoints", 0)) > 0 ? `방어자 점수 ${get(winnerPlayer, "defender_points", "defenderPoints", 0)}` : "",
+  ].filter(Boolean) : [];
+  const catanResultDetail = winnerSeatNo > 0
+    ? `${playerName(winnerSeatNo)}님이 목표 ${winningPoints}점에 도달해 최종 ${winnerVictoryPoints}점으로 승리했습니다.${catanRunnerUp ? ` 2위 ${playerName(catanRunnerUp.seatNo)}님과의 차이는 ${Math.max(0, winnerVictoryPoints - catanRunnerUp.points)}점입니다.` : ""} ${catanWinnerSignals.length ? `승리 근거: ${catanWinnerSignals.join(" · ")}.` : "서버 최종 승점에는 공개 승점, 비공개 승점, 보너스 표식이 함께 반영됩니다."}`
+    : "게임 종료 상태입니다. 서버 최종 승점과 보너스 표식 기준으로 승자를 확인합니다.";
+  const catanResultMetric = winnerSeatNo > 0
+    ? `최종 ${winnerVictoryPoints}/${winningPoints}점`
+    : `${winningPoints}점 목표`;
 
   const renderPairedTurnSummary = () => pairedTurnRule && (
     <div className="mb-3 grid gap-2 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-bold text-amber-800 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.15fr_1.35fr]" role="status" aria-live="polite" aria-atomic="true">
@@ -5091,6 +13004,20 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               {!!lastRoll && <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">최근 {lastRoll}</span>}
             </div>
           </div>
+          <GameFlowMeter
+            title="카탄 라운드 흐름"
+            detail="승점 목표, 현재 차례, 선택 대상, 최근 주사위 근거를 같은 흐름으로 확인합니다."
+            items={catanFlowItems}
+            tone={phase === "FINISHED" ? "amber" : myTurn ? "emerald" : "slate"}
+            className="mb-3"
+            smoke="catan-flow-meter"
+          />
+          <CatanVictoryTrackPanel
+            rows={catanVictoryTrackRows}
+            target={winningPoints}
+            phase={phase}
+            mySeatNo={mySeatNo}
+          />
           <div className="mb-3 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-sky-50 p-3 shadow-sm" role="status" aria-live="polite" aria-atomic="true">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 rounded-2xl bg-amber-600 p-2 text-white shadow-sm">
@@ -5110,6 +13037,20 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               </div>
             </div>
           </div>
+          <CatanDiceOutcomePanel
+            diceFaces={catanDiceFaces}
+            lastRoll={lastRoll}
+            redDie={redDie}
+            eventDie={eventDie}
+            phase={phase}
+            myTurn={myTurn}
+            pendingDiscardCount={pendingDiscardSeatNos.length}
+            productionSummary={catanProductionSummary}
+            resourceBank={resourceBank}
+            robberLocked={citiesKnightsRobberLocked}
+            explorersPiratesRule={explorersPiratesRule}
+            citiesKnightsRule={citiesKnightsRule}
+          />
           <div data-smoke="catan-rule-brief" className={`mb-3 rounded-2xl border p-3 shadow-sm ${catanRuleBrief.tone}`}>
             <div className="flex flex-wrap items-start gap-3">
               <div className="flex min-w-0 items-start gap-3">
@@ -5131,16 +13072,16 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               ))}
             </div>
           </div>
-          {phase === "FINISHED" && winnerSeatNo > 0 && (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-black text-amber-900">
-                <Crown className="h-4 w-4 text-amber-500" />
-                최종 승자 · {playerName(winnerSeatNo)}
-              </div>
-              <div className="text-xs font-black text-amber-700">
-                {winnerVictoryPoints} / {winningPoints}점
-              </div>
-            </div>
+          {phase === "FINISHED" && (
+            <GameResultSpotlight
+              title={winnerSeatNo > 0 ? `${playerName(winnerSeatNo)} 승리` : "카탄 최종 결과"}
+              subtitle="승리 근거"
+              detail={catanResultDetail}
+              metric={catanResultMetric}
+              tone="amber"
+              className="mb-3"
+              smoke="catan-result-spotlight"
+            />
           )}
           {renderPairedTurnSummary()}
           {friendlyRobberRule && (
@@ -5701,6 +13642,12 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
             </a>
           </div>
           {renderSelectedTargetSummary({ className: "mb-3" })}
+          <CatanActionAtlasPanel
+            title={catanActionAtlasTitle}
+            detail={catanTurnGuidance}
+            activeKey={catanActionAtlasActiveKey}
+            items={catanActionAtlasItems}
+          />
           {phase === "SETUP" && (
             <div className="space-y-2">
               {seafarersRule && !explorersPiratesRule && seafarersScenarioCode === "NEW_SHORES" && (
@@ -5862,6 +13809,19 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <div className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold leading-relaxed text-rose-700">
                 {sevenDiscardMessage}
               </div>
+              <CatanDiscardPlannerPanel
+                resources={resources}
+                commodities={commodities}
+                discardForm={discardForm}
+                discardCommodityForm={discardCommodityForm}
+                discardRequired={discardRequired}
+                discardTotal={discardTotal}
+                mustDiscard={mustDiscard}
+                pendingNames={listOf(pendingDiscardSeatNos).map((seatNo) => playerName(Number(seatNo)))}
+                citiesKnightsRule={citiesKnightsRule}
+                explorersPiratesRule={explorersPiratesRule}
+                robberLocked={citiesKnightsRobberLocked}
+              />
               {mustDiscard ? (
                 <>
                   <div className="grid grid-cols-2 gap-2">
@@ -5912,6 +13872,14 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <div className="text-xs font-bold leading-relaxed text-fuchsia-800">
                 진행 카드는 승점 카드를 제외하고 4장까지만 보유할 수 있습니다. 초과한 플레이어가 직접 버릴 카드를 고릅니다.
               </div>
+              <CatanProgressDiscardPlannerPanel
+                progressCards={progressCards}
+                nonVictoryCards={nonVictoryProgressCards}
+                selectedCardId={selectedDiscardProgressCardId}
+                discardRequired={progressDiscardRequired}
+                mustDiscardProgress={mustDiscardProgress}
+                pendingNames={listOf(pendingProgressDiscardSeatNos).map((seatNo) => playerName(Number(seatNo)))}
+              />
               {mustDiscardProgress ? (
                 <>
                   <select className="w-full rounded-xl border border-fuchsia-100 px-3 py-2 text-xs font-bold" value={selectedDiscardProgressCardId} onChange={(event) => setSelectedProgressCardId(event.target.value)}>
@@ -6086,6 +14054,17 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               <div className="text-xs font-bold leading-relaxed text-pink-800">
                 {playerName(pendingWeddingAttackerSeatNo)}의 혼례 카드입니다. 점수가 더 높은 대상 플레이어가 줄 카드 2장을 직접 선택합니다.
               </div>
+              <CatanWeddingResponsePanel
+                attackerName={playerName(pendingWeddingAttackerSeatNo)}
+                mustRespondWedding={mustRespondWedding}
+                weddingRequired={weddingRequired}
+                weddingTotal={weddingTotal}
+                weddingResources={weddingResources}
+                weddingCommodities={weddingCommodities}
+                resources={resources}
+                commodities={commodities}
+                pendingNames={listOf(pendingWeddingSeatNos).map((seatNo) => playerName(Number(seatNo)))}
+              />
               {mustRespondWedding ? (
                 <>
                   <div className="grid grid-cols-2 gap-2">
@@ -6633,6 +14612,16 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                     <div className="rounded-xl bg-white/80 px-3 py-2">제공: {resourceBundleLabel(pendingTradeOffer)}</div>
                     <div className="rounded-xl bg-white/80 px-3 py-2">요청: {resourceBundleLabel(pendingTradeRequest)}</div>
                   </div>
+                  <CatanDomesticTradeReviewPanel
+                    offer={pendingTradeOffer}
+                    request={pendingTradeRequest}
+                    proposerName={playerName(pendingTradeProposerSeatNo)}
+                    targetName={playerName(pendingTradeTargetSeatNo)}
+                    proposerSeatNo={pendingTradeProposerSeatNo}
+                    targetSeatNo={pendingTradeTargetSeatNo}
+                    mySeatNo={mySeatNo}
+                    resources={resources}
+                  />
                   <div className="rounded-xl bg-white/70 px-3 py-2 text-[11px] font-bold text-emerald-700">
                     이 제안이 수락, 거절, 취소될 때까지 새 거래 제안은 잠시 보류됩니다.
                   </div>
@@ -6796,6 +14785,17 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
             </div>
           )}
         </div>
+
+        <CatanResourceStrategyPanel
+          resources={resources}
+          resourceBank={resourceBank}
+          buildSignals={catanBuildSignals}
+          scoreRace={catanScoreRace}
+          myCardCount={myCardCount}
+          tradeSummary={catanTradeSummary}
+          phase={phase}
+          myTurn={myTurn}
+        />
 
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
           <div className="mb-3 text-sm font-black text-slate-900">내 자원</div>
@@ -6962,7 +14962,14 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
                 {get(event, "resource_type", "resourceType", "") ? ` · ${catanResourceLabels[get(event, "resource_type", "resourceType", "")] || catanCommodityLabels[get(event, "resource_type", "resourceType", "")] || catanCargoLabels[get(event, "resource_type", "resourceType", "")] || catanSpiceAdvantageLabels[get(event, "resource_type", "resourceType", "")] || catanTerrain[get(event, "resource_type", "resourceType", "")]?.label || catanImprovementLabels[get(event, "resource_type", "resourceType", "")] || catanEventDieLabels[get(event, "resource_type", "resourceType", "")] || catanProgressLabels[get(event, "resource_type", "resourceType", "")] || catanDevelopmentLabels[get(event, "resource_type", "resourceType", "")] || get(event, "resource_type", "resourceType", "")}` : ""}
               </div>
             ))}
-            {!events.length && <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">아직 기록 없음</div>}
+            {!events.length && (
+              <TabletopHistoryEmptyState
+                game="six-nimmt"
+                title="아직 카드 기록이 없습니다"
+                detail="카드 선택이나 행 회수가 처리되면 공개 순서와 벌점 근거가 이 기록 영역에 쌓입니다."
+                nextAction="첫 공개"
+              />
+            )}
           </div>
         </div>
       </aside>
@@ -6994,6 +15001,73 @@ const sixNimmtCardBulls = (card) => Number(get(card, "bulls", "bulls", 0));
 const sixNimmtCardId = (card) => get(card, "id", "id", "");
 const sixNimmtRowCards = (row) => listOf(get(row, "cards", "cards", []));
 const sixNimmtRowPenalty = (row) => sixNimmtRowCards(row).reduce((sum, card) => sum + sixNimmtCardBulls(card), 0);
+
+const sixNimmtCardPalettes = {
+  low: { paper: "#fefce8", rim: "#a16207", wash: "#fde68a", ink: "#1f2937", accent: "#84cc16", badge: "#713f12" },
+  medium: { paper: "#fff7ed", rim: "#c2410c", wash: "#fed7aa", ink: "#431407", accent: "#fb923c", badge: "#9a3412" },
+  high: { paper: "#fff1f2", rim: "#be123c", wash: "#fecdd3", ink: "#3f0a17", accent: "#e11d48", badge: "#9f1239" },
+  extreme: { paper: "#450a0a", rim: "#fde68a", wash: "#b91c1c", ink: "#fff7ed", accent: "#f97316", badge: "#fef3c7" },
+};
+
+const sixNimmtPenaltyMarks = [
+  [40, 110],
+  [58, 102],
+  [76, 110],
+  [94, 102],
+  [112, 110],
+  [58, 126],
+  [94, 126],
+];
+
+const SixNimmtCardArt = ({ card, selected = false }) => {
+  const value = sixNimmtCardValue(card);
+  const bulls = sixNimmtCardBulls(card);
+  const palette = bulls >= 7
+    ? sixNimmtCardPalettes.extreme
+    : bulls >= 5
+      ? sixNimmtCardPalettes.high
+      : bulls >= 2
+        ? sixNimmtCardPalettes.medium
+        : sixNimmtCardPalettes.low;
+  const markCount = Math.max(1, Math.min(sixNimmtPenaltyMarks.length, bulls || 1));
+
+  return (
+    <svg
+      data-smoke="six-nimmt-card-art"
+      viewBox="0 0 152 212"
+      className="block w-full"
+      style={{ aspectRatio: "5 / 7" }}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="6" y="6" width="140" height="200" rx="17" fill={palette.paper} stroke={selected ? "#0f172a" : palette.rim} strokeWidth={selected ? 5 : 3} />
+      <path d="M20 30h112v128c-28 18-56 20-84 8-17-7-27-18-28-33Z" fill={palette.wash} opacity={bulls >= 7 ? 0.42 : 0.7} />
+      <path d="M22 36c18 8 39 8 62 0 20-7 36-5 48 6v22c-17-8-34-8-52 1-25 12-50 8-58-9Z" fill="#ffffff" opacity={bulls >= 7 ? 0.12 : 0.55} />
+      <rect x="18" y="18" width="44" height="28" rx="14" fill={bulls >= 7 ? "#7f1d1d" : "#ffffff"} opacity={bulls >= 7 ? 0.72 : 0.86} />
+      <text x="40" y="37" textAnchor="middle" fontSize="15" fontWeight="900" fill={palette.ink}>{bulls}벌점</text>
+      <rect x="96" y="18" width="36" height="28" rx="14" fill={bulls >= 7 ? palette.badge : "#ffffff"} opacity="0.9" />
+      <text x="114" y="37" textAnchor="middle" fontSize="16" fontWeight="900" fill={bulls >= 7 ? "#7f1d1d" : palette.badge}>x{bulls}</text>
+      <text x="76" y="95" textAnchor="middle" fontSize={value >= 100 ? 54 : 62} fontWeight="950" fill={palette.ink}>{value}</text>
+      <g>
+        {sixNimmtPenaltyMarks.slice(0, markCount).map(([cx, cy], index) => (
+          <g key={`${cx}-${cy}`}>
+            <path d={`M${cx - 12} ${cy + 2}c-5-10 0-20 12-20s17 10 12 20c8-2 14 2 15 9-11 0-15 5-19 12h-20c-4-7-8-12-19-12 1-7 7-11 15-9Z`} fill={bulls >= 7 ? "#fef3c7" : "#ffffff"} stroke={palette.rim} strokeWidth="2" opacity={index > 4 ? 0.64 : 0.94} />
+            <circle cx={cx - 5} cy={cy + 2} r="2" fill={palette.rim} opacity="0.8" />
+            <circle cx={cx + 5} cy={cy + 2} r="2" fill={palette.rim} opacity="0.8" />
+          </g>
+        ))}
+      </g>
+      <rect x="24" y="164" width="104" height="26" rx="13" fill={bulls >= 7 ? "#7f1d1d" : "#ffffff"} opacity={bulls >= 7 ? 0.72 : 0.86} />
+      <text x="76" y="182" textAnchor="middle" fontSize="12" fontWeight="900" fill={palette.ink}>{bulls >= 5 ? "고위험 카드" : bulls >= 2 ? "주의 카드" : "저위험 카드"}</text>
+      {selected && (
+        <g>
+          <rect x="42" y="48" width="68" height="22" rx="11" fill="#0f172a" opacity="0.92" />
+          <text x="76" y="64" textAnchor="middle" fontSize="11" fontWeight="900" fill="#ffffff">선택됨</text>
+        </g>
+      )}
+    </svg>
+  );
+};
 
 const mergeSixNimmtRealtimeState = (previousState, realtimeState, mySeatNo) => {
   if (!realtimeState) return previousState || null;
@@ -7034,8 +15108,15 @@ const mergeSixNimmtRealtimeState = (previousState, realtimeState, mySeatNo) => {
 
 const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note = "", compact = false }) => {
   const clickable = typeof onClick === "function";
+  const cardLabel = [
+    `${sixNimmtCardValue(card)} 카드`,
+    `${sixNimmtCardBulls(card)}벌점`,
+    note,
+    selected ? "선택됨" : "",
+    disabled ? "현재 선택 불가" : clickable ? "선택 가능" : "",
+  ].filter(Boolean).join(" · ");
   const className = [
-    compact ? "min-h-[46px] rounded-md p-1 sm:min-h-[76px] sm:rounded-xl sm:p-2" : "min-h-[70px] rounded-xl p-2 sm:min-h-[92px] sm:rounded-2xl sm:p-3",
+    compact ? "rounded-md p-1 sm:rounded-xl sm:p-1.5" : "rounded-xl p-2 sm:rounded-2xl sm:p-3",
     "border bg-white text-left shadow-sm transition",
     selected ? "border-slate-900 ring-4 ring-slate-900/10" : "border-slate-200",
     disabled ? "opacity-50" : "",
@@ -7043,17 +15124,535 @@ const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note 
   ].join(" ");
   const content = (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <div className={`${compact ? "text-sm sm:text-xl" : "text-xl sm:text-2xl"} font-black leading-none text-slate-950`}>{sixNimmtCardValue(card)}</div>
-        <div className={`${compact ? "px-0.5 py-0.5 text-[7px] sm:px-1.5 sm:text-[9px]" : "px-2 py-1 text-[10px]"} rounded-full bg-rose-100 font-black text-rose-700`}>{sixNimmtCardBulls(card)}벌점</div>
-      </div>
+      <SixNimmtCardArt card={card} selected={selected} />
       {note && <div className={`${compact ? "mt-0.5 max-h-[22px] overflow-hidden text-[8px] leading-tight sm:mt-1 sm:max-h-none sm:text-[10px] sm:leading-snug" : "mt-2 min-h-[30px] text-[11px]"} font-bold text-slate-500`}>{note}</div>}
     </>
   );
   return clickable ? (
-    <button type="button" disabled={disabled} className={className} onClick={onClick}>{content}</button>
+    <button type="button" disabled={disabled} className={className} onClick={onClick} aria-label={cardLabel} aria-pressed={selected} title={cardLabel}>{content}</button>
   ) : (
-    <div className={className}>{content}</div>
+    <div className={className} title={cardLabel}>{content}</div>
+  );
+};
+
+const sixNimmtRiskProfiles = {
+  calm: {
+    label: "낮은 압박",
+    textClass: "text-emerald-700",
+    borderClass: "border-emerald-100 bg-emerald-50/80",
+    fill: "#10b981",
+    wash: "#d1fae5",
+  },
+  watch: {
+    label: "주의",
+    textClass: "text-amber-700",
+    borderClass: "border-amber-100 bg-amber-50/80",
+    fill: "#d97706",
+    wash: "#fef3c7",
+  },
+  danger: {
+    label: "위험",
+    textClass: "text-rose-700",
+    borderClass: "border-rose-100 bg-rose-50/80",
+    fill: "#e11d48",
+    wash: "#ffe4e6",
+  },
+};
+
+const sixNimmtRiskLevel = ({ cardCount, penalty }) => {
+  if (cardCount >= 5 || penalty >= 8) return "danger";
+  if (cardCount >= 4 || penalty >= 5) return "watch";
+  return "calm";
+};
+
+const SixNimmtRowRiskArt = ({ cardCount = 0, penalty = 0, level = "calm", active = false, recommended = false }) => {
+  const profile = sixNimmtRiskProfiles[level] || sixNimmtRiskProfiles.calm;
+  const safeCount = Math.max(0, Math.min(5, Number(cardCount) || 0));
+  const bullCount = Math.max(1, Math.min(7, Number(penalty) || 1));
+
+  return (
+    <svg
+      data-smoke="six-nimmt-row-risk-art"
+      viewBox="0 0 180 72"
+      className="h-16 w-full"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="4" y="6" width="172" height="60" rx="18" fill={profile.wash} stroke={active ? "#0f172a" : profile.fill} strokeWidth={active ? 3 : 2} opacity="0.96" />
+      <path d="M18 48c22-12 42-12 60 0 17 11 38 10 64-5" fill="none" stroke={profile.fill} strokeWidth="4" strokeLinecap="round" opacity="0.26" />
+      {Array.from({ length: 5 }).map((_, index) => {
+        const filled = index < safeCount;
+        const x = 18 + index * 26;
+        return (
+          <g key={index}>
+            <rect x={x} y="18" width="20" height="28" rx="7" fill={filled ? "#ffffff" : "none"} stroke={filled ? profile.fill : "#94a3b8"} strokeWidth="2" opacity={filled ? 0.96 : 0.38} />
+            {filled && <text x={x + 10} y="36" textAnchor="middle" fontSize="10" fontWeight="900" fill={profile.fill}>{index + 1}</text>}
+          </g>
+        );
+      })}
+      <g transform="translate(140 18)">
+        <path d="M12 2c8 0 12 7 8 14 6-1 10 2 11 7-8 0-11 4-14 8H5C2 27-1 23-9 23c1-5 5-8 11-7C-2 9 4 2 12 2Z" fill="#ffffff" stroke={profile.fill} strokeWidth="2" opacity="0.95" />
+        <circle cx="7" cy="15" r="2" fill={profile.fill} />
+        <circle cx="17" cy="15" r="2" fill={profile.fill} />
+        <text x="12" y="45" textAnchor="middle" fontSize="12" fontWeight="900" fill={profile.fill}>{penalty}</text>
+      </g>
+      {recommended && (
+        <g>
+          <rect x="14" y="52" width="54" height="16" rx="8" fill="#064e3b" opacity="0.95" />
+          <text x="41" y="64" textAnchor="middle" fontSize="9" fontWeight="900" fill="#ffffff">추천 회수</text>
+        </g>
+      )}
+      {bullCount >= 5 && (
+        <g opacity="0.65">
+          {Array.from({ length: bullCount - 4 }).map((_, index) => (
+            <circle key={index} cx={124 + index * 7} cy="54" r="2.3" fill={profile.fill} />
+          ))}
+        </g>
+      )}
+    </svg>
+  );
+};
+
+const SixNimmtTurnPressureArt = ({
+  playerSignals = [],
+  selectedCount = 0,
+  playerCount = 0,
+  phase = "",
+  pendingCardValue = 0,
+  activeSeatNo = 0,
+  mySeatNo = 0,
+}) => {
+  const safePlayerCount = Math.max(0, Number(playerCount) || playerSignals.length || 0);
+  const safeSelectedCount = Math.max(0, Math.min(safePlayerCount || playerSignals.length, Number(selectedCount) || 0));
+  const selectedRatio = safePlayerCount ? safeSelectedCount / safePlayerCount : 0;
+  const visiblePlayers = playerSignals.length
+    ? playerSignals.slice(0, 8)
+    : Array.from({ length: Math.max(1, safePlayerCount || 1) }, (_, index) => ({
+      seatNo: index + 1,
+      name: `${index + 1}번`,
+      shortName: `${index + 1}`,
+      selected: false,
+    })).slice(0, 8);
+  const slotGap = visiblePlayers.length > 1 ? 500 / (visiblePlayers.length - 1) : 0;
+  const isRowChoice = phase === "ROW_CHOICE";
+  const isLocked = safePlayerCount > 0 && safeSelectedCount >= safePlayerCount;
+  const revealFill = isRowChoice ? "#f97316" : isLocked ? "#10b981" : "#0f172a";
+  const pendingLabel = pendingCardValue ? `${pendingCardValue}` : isLocked ? "공개" : "대기";
+
+  return (
+    <svg
+      data-smoke="six-nimmt-turn-pressure-art"
+      viewBox="0 0 640 236"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`식스님트 선택 잠금 ${safeSelectedCount}/${safePlayerCount || "-"}명`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="620" height="216" rx="26" fill="#f8fafc" stroke="#fde68a" strokeWidth="3" />
+      <path d="M42 68c58-26 111-28 159-6 54 25 111 25 172 0 65-26 120-18 166 25v104c-63-31-125-30-187 2-56 29-114 27-176-8-54-31-112-33-134-6Z" fill="#fef3c7" opacity="0.7" />
+      <rect x="70" y="58" width="500" height="22" rx="11" fill="#e2e8f0" />
+      <rect x="70" y="58" width={500 * selectedRatio} height="22" rx="11" fill={revealFill} />
+      <text x="320" y="53" textAnchor="middle" fontSize="12" fontWeight="900" fill="#92400e">선택 잠금</text>
+      <text x="320" y="76" textAnchor="middle" fontSize="12" fontWeight="900" fill="#ffffff">{safeSelectedCount}/{safePlayerCount || "-"}명</text>
+      {visiblePlayers.map((player, index) => {
+        const cx = visiblePlayers.length > 1 ? 70 + index * slotGap : 320;
+        const selected = Boolean(player.selected);
+        const active = Number(player.seatNo) === Number(activeSeatNo);
+        const mine = Number(player.seatNo) === Number(mySeatNo);
+        const fill = selected ? "#10b981" : active ? "#f97316" : "#ffffff";
+        const stroke = mine ? "#0f172a" : selected ? "#047857" : active ? "#c2410c" : "#94a3b8";
+        return (
+          <g key={`${player.seatNo}-${index}`} data-smoke="six-nimmt-turn-pressure-node">
+            <path d={`M${cx} 80v24`} stroke={selected ? "#10b981" : "#cbd5e1"} strokeWidth="4" strokeLinecap="round" />
+            <circle cx={cx} cy="120" r={mine ? 27 : 23} fill={fill} stroke={stroke} strokeWidth={mine ? 5 : 3} />
+            <text x={cx} y="125" textAnchor="middle" fontSize="11" fontWeight="900" fill={selected || active ? "#ffffff" : "#475569"}>{player.shortName}</text>
+            <text x={cx} y="158" textAnchor="middle" fontSize="10" fontWeight="900" fill={selected ? "#047857" : active ? "#c2410c" : "#64748b"}>
+              {selected ? "잠금" : active ? "행 선택" : "대기"}
+            </text>
+          </g>
+        );
+      })}
+      {playerSignals.length > visiblePlayers.length && (
+        <text x="580" y="160" textAnchor="middle" fontSize="12" fontWeight="900" fill="#64748b">+{playerSignals.length - visiblePlayers.length}</text>
+      )}
+      <g transform="translate(252 168)">
+        <rect x="0" y="0" width="136" height="44" rx="16" fill="#ffffff" stroke={revealFill} strokeWidth="3" />
+        <path d="M23 30c15-18 31-19 48-3 17 15 33 13 52-7" fill="none" stroke={revealFill} strokeWidth="5" strokeLinecap="round" opacity="0.55" />
+        <rect x="54" y="7" width="28" height="30" rx="8" fill={revealFill} />
+        <text x="68" y="28" textAnchor="middle" fontSize="12" fontWeight="900" fill="#ffffff">{pendingLabel}</text>
+      </g>
+    </svg>
+  );
+};
+
+const SixNimmtTurnPressurePanel = ({
+  playerSignals = [],
+  pressureItems = [],
+  selectedCount = 0,
+  playerCount = 0,
+  phase = "",
+  pendingCard = null,
+  activeSeatNo = 0,
+  mySeatNo = 0,
+}) => {
+  const pendingValue = sixNimmtCardValue(pendingCard);
+  const phaseLabel = sixNimmtPhaseLabels[phase] || phase || "대기";
+
+  return (
+    <section data-smoke="six-nimmt-turn-pressure-panel" className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:mt-4 sm:rounded-[1.5rem] sm:p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-black text-amber-700">선택 공개 압박</div>
+          <div className="mt-1 text-lg font-black text-slate-950">누가 카드를 잠갔고 무엇이 곧 공개될까</div>
+          <div className="mt-1 max-w-2xl text-xs font-bold leading-relaxed text-slate-600">
+            제출 인원, 공개 순서, 행 선택 대기, 벌점 레이스를 현재 상태만으로 요약합니다.
+          </div>
+        </div>
+        <div className="rounded-2xl bg-amber-50 px-3 py-2 text-right">
+          <div className="text-[10px] font-black text-amber-700">현재 단계</div>
+          <div className="mt-0.5 text-sm font-black text-slate-900">{phaseLabel}</div>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <SixNimmtTurnPressureArt
+          playerSignals={playerSignals}
+          selectedCount={selectedCount}
+          playerCount={playerCount}
+          phase={phase}
+          pendingCardValue={pendingValue}
+          activeSeatNo={activeSeatNo}
+          mySeatNo={mySeatNo}
+        />
+        <div className="grid gap-2 sm:grid-cols-2">
+          {pressureItems.map((item) => (
+            <div key={item.label} data-smoke="six-nimmt-turn-pressure-item" className={`rounded-2xl border px-3 py-3 ${item.className}`}>
+              <div className="text-[10px] font-black text-slate-500">{item.label}</div>
+              <div className="mt-1 text-sm font-black text-slate-950">{item.value}</div>
+              <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const sixNimmtActionRouteTone = {
+  idle: { fill: "#f8fafc", stroke: "#94a3b8", text: "#475569", soft: "#e2e8f0" },
+  active: { fill: "#fff7ed", stroke: "#f97316", text: "#c2410c", soft: "#fed7aa" },
+  ready: { fill: "#ecfdf5", stroke: "#10b981", text: "#047857", soft: "#bbf7d0" },
+  risk: { fill: "#fff1f2", stroke: "#e11d48", text: "#be123c", soft: "#fecdd3" },
+  wait: { fill: "#eff6ff", stroke: "#3b82f6", text: "#1d4ed8", soft: "#bfdbfe" },
+};
+
+const buildSixNimmtActionRouteItems = ({
+  phase = "",
+  waitingSelection = false,
+  needsRowChoice = false,
+  mySelected = false,
+  selectedCardValue = 0,
+  pendingCardValue = 0,
+  selectedPreview = null,
+  selectedAnchorX = null,
+  selectedRowIndex = null,
+  recommendedRowIndex = -1,
+  selectedCount = 0,
+  playerCount = 0,
+  waitingCount = 0,
+}) => {
+  const possibleRows = listOf(selectedPreview?.possibleRows);
+  const previewLabel = selectedPreview?.label || "카드 선택 대기";
+  const previewPenalty = Number(selectedPreview?.penalty || 0);
+  const rowTarget = needsRowChoice
+    ? recommendedRowIndex >= 0
+      ? `${recommendedRowIndex + 1}행 추천`
+      : "행 선택 필요"
+    : selectedAnchorX !== null
+      ? `${Number(selectedAnchorX) + 1}행 지정`
+      : selectedRowIndex !== null
+        ? `${Number(selectedRowIndex) + 1}행 후보`
+        : possibleRows.length
+          ? `${possibleRows.map((item) => Number(item.index) + 1).join(", ")}행 가능`
+          : "자동 배치";
+  const revealValue = pendingCardValue
+    ? `${pendingCardValue} 카드 처리`
+    : selectedCount >= playerCount && playerCount > 0
+      ? "낮은 숫자부터 공개"
+      : `${waitingCount}명 대기`;
+
+  return [
+    {
+      key: "select",
+      label: "카드 선택",
+      value: mySelected ? "제출 완료" : selectedCardValue ? `${selectedCardValue} 카드` : waitingSelection ? "선택 필요" : "대기",
+      detail: mySelected ? "내 카드는 공개 큐에 잠겼습니다." : waitingSelection ? "손패에서 한 장을 고르면 배치 후보와 벌점 위험이 미리 표시됩니다." : "다음 선택 단계가 오면 손패 선택이 열립니다.",
+      tone: mySelected ? "border-emerald-100 bg-emerald-50 text-emerald-800" : waitingSelection ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-slate-50 text-slate-700",
+    },
+    {
+      key: "reveal",
+      label: "공개 순서",
+      value: revealValue,
+      detail: pendingCardValue ? "현재 공개된 카드의 행 배치를 먼저 끝내야 다음 카드가 처리됩니다." : "선택이 모두 잠기면 서버 규칙대로 낮은 숫자부터 행에 붙습니다.",
+      tone: pendingCardValue ? "border-sky-100 bg-sky-50 text-sky-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      key: "row",
+      label: "행 판단",
+      value: rowTarget,
+      detail: needsRowChoice ? "강제 회수 상황입니다. 벌점이 가장 낮은 행을 먼저 비교하세요." : selectedPreview ? `${previewLabel} 기준으로 행 후보를 비교합니다.` : "카드를 고르면 가능한 행과 자동 배치 기준이 표시됩니다.",
+      tone: needsRowChoice ? "border-orange-100 bg-orange-50 text-orange-800" : "border-cyan-100 bg-cyan-50 text-cyan-800",
+    },
+    {
+      key: "penalty",
+      label: "벌점 영향",
+      value: previewPenalty ? `${previewPenalty}벌점 위험` : selectedPreview ? "벌점 없음" : "위험 대기",
+      detail: previewPenalty ? "선택 카드가 여섯 번째가 되거나 강제 회수 대상이면 이 벌점이 즉시 중요해집니다." : "행 카드 수와 황소 머리 점수를 함께 보고 손실을 줄입니다.",
+      tone: previewPenalty ? "border-rose-100 bg-rose-50 text-rose-800" : "border-violet-100 bg-violet-50 text-violet-800",
+    },
+  ];
+};
+
+const SixNimmtActionRouteArt = ({
+  phase = "",
+  waitingSelection = false,
+  needsRowChoice = false,
+  mySelected = false,
+  selectedCardValue = 0,
+  pendingCardValue = 0,
+  previewPenalty = 0,
+}) => {
+  const revealActive = Boolean(pendingCardValue) || mySelected;
+  const nodes = [
+    {
+      key: "select",
+      label: "선택",
+      value: mySelected ? "완료" : selectedCardValue || (waitingSelection ? "필요" : "-"),
+      tone: mySelected ? sixNimmtActionRouteTone.ready : waitingSelection ? sixNimmtActionRouteTone.active : sixNimmtActionRouteTone.idle,
+    },
+    {
+      key: "reveal",
+      label: "공개",
+      value: pendingCardValue || (revealActive ? "대기" : "-"),
+      tone: pendingCardValue ? sixNimmtActionRouteTone.wait : revealActive ? sixNimmtActionRouteTone.ready : sixNimmtActionRouteTone.idle,
+    },
+    {
+      key: "row",
+      label: "행",
+      value: needsRowChoice ? "선택" : phase === "SELECTING" ? "예측" : "대기",
+      tone: needsRowChoice ? sixNimmtActionRouteTone.active : phase === "SELECTING" ? sixNimmtActionRouteTone.wait : sixNimmtActionRouteTone.idle,
+    },
+    {
+      key: "penalty",
+      label: "벌점",
+      value: previewPenalty ? `${previewPenalty}` : "회피",
+      tone: previewPenalty ? sixNimmtActionRouteTone.risk : sixNimmtActionRouteTone.ready,
+    },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 400 150"
+      className="h-full min-h-[124px] w-full"
+      role="img"
+      aria-label="식스님트 액션 루트"
+      data-smoke="six-nimmt-action-route-art"
+      focusable="false"
+    >
+      <rect x="10" y="10" width="380" height="130" rx="24" fill="#f8fafc" stroke="#fee2e2" strokeWidth="3" />
+      <path d="M58 75h284" stroke="#fee2e2" strokeWidth="14" strokeLinecap="round" />
+      <path d="M58 75h284" stroke="#dc2626" strokeWidth="4" strokeLinecap="round" opacity="0.72" />
+      {nodes.map((node, index) => {
+        const x = 58 + index * 94.6;
+        return (
+          <g key={node.key} data-smoke="six-nimmt-action-route-node" data-route-key={node.key}>
+            <circle cx={x} cy="75" r="31" fill="#ffffff" stroke={node.tone.stroke} strokeWidth="4" />
+            <circle cx={x} cy="75" r="22" fill={node.tone.fill} stroke="#ffffff" strokeWidth="3" />
+            <text x={x} y="70" textAnchor="middle" fontSize="9" fontWeight="900" fill={node.tone.text}>{node.label}</text>
+            <text x={x} y="89" textAnchor="middle" fontSize="13" fontWeight="900" fill={node.tone.text}>{node.value}</text>
+          </g>
+        );
+      })}
+      <rect x="74" y="116" width="252" height="18" rx="9" fill="#ffffff" stroke="#fecaca" />
+      <text x="200" y="129" textAnchor="middle" fontSize="10" fontWeight="900" fill="#7f1d1d">
+        선택 → 공개 → 행 판단 → 벌점 회피
+      </text>
+    </svg>
+  );
+};
+
+const SixNimmtActionRoutePanel = ({
+  phase = "",
+  waitingSelection = false,
+  needsRowChoice = false,
+  mySelected = false,
+  selectedCard = null,
+  pendingCard = null,
+  selectedPreview = null,
+  selectedAnchorX = null,
+  selectedRowIndex = null,
+  recommendedRowIndex = -1,
+  selectedCount = 0,
+  playerCount = 0,
+  waitingCount = 0,
+}) => {
+  const selectedCardValue = sixNimmtCardValue(selectedCard);
+  const pendingCardValue = sixNimmtCardValue(pendingCard);
+  const previewPenalty = Number(selectedPreview?.penalty || 0);
+  const items = buildSixNimmtActionRouteItems({
+    phase,
+    waitingSelection,
+    needsRowChoice,
+    mySelected,
+    selectedCardValue,
+    pendingCardValue,
+    selectedPreview,
+    selectedAnchorX,
+    selectedRowIndex,
+    recommendedRowIndex,
+    selectedCount,
+    playerCount,
+    waitingCount,
+  });
+
+  return (
+    <section
+      data-smoke="six-nimmt-action-route-panel"
+      data-phase={phase || ""}
+      data-waiting-selection={waitingSelection ? "true" : "false"}
+      data-row-choice={needsRowChoice ? "true" : "false"}
+      data-my-selected={mySelected ? "true" : "false"}
+      data-selected-card={selectedCardValue || ""}
+      className="mt-3 overflow-hidden rounded-2xl border border-red-100 bg-gradient-to-br from-white via-red-50 to-amber-50 p-3 shadow-sm sm:mt-4 sm:rounded-[1.5rem] sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
+        <div className="min-h-[132px]">
+          <SixNimmtActionRouteArt
+            phase={phase}
+            waitingSelection={waitingSelection}
+            needsRowChoice={needsRowChoice}
+            mySelected={mySelected}
+            selectedCardValue={selectedCardValue}
+            pendingCardValue={pendingCardValue}
+            previewPenalty={previewPenalty}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black text-red-700">식스님트 액션 루트</div>
+              <h3 className="text-base font-black text-slate-900">선택, 공개, 행 판단</h3>
+            </div>
+            <div className="rounded-full border border-red-100 bg-white px-3 py-1 text-[11px] font-black text-red-700">
+              {selectedCount}/{playerCount || "-"}명 잠금
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.key} data-smoke="six-nimmt-action-route-item" data-route-key={item.key} className={`min-h-[102px] rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const SixNimmtRiskPanel = ({
+  rows = [],
+  waitingSelection = false,
+  needsRowChoice = false,
+  selectedCard = null,
+  selectedPreview = null,
+  selectedRowIndex = null,
+  recommendedRowIndex = -1,
+  pendingCard = null,
+}) => {
+  const selectedValue = sixNimmtCardValue(selectedCard);
+  const pendingValue = sixNimmtCardValue(pendingCard);
+  const possibleRowSet = new Set(listOf(selectedPreview?.possibleRows).map((item) => Number(item.index)));
+  const activeRowIndex = selectedRowIndex !== null && possibleRowSet.has(Number(selectedRowIndex))
+    ? Number(selectedRowIndex)
+    : Number(selectedPreview?.rowIndex ?? -1);
+  const rowSignals = rows.map((row, index) => {
+    const cards = sixNimmtRowCards(row);
+    const penalty = sixNimmtRowPenalty(row);
+    const cardCount = cards.length;
+    const tail = cards[cards.length - 1] || null;
+    const tailValue = sixNimmtCardValue(tail);
+    const possible = possibleRowSet.has(index);
+    const active = activeRowIndex === index;
+    const recommended = needsRowChoice && recommendedRowIndex === index;
+    const forcedTake = active && selectedPreview?.penalty > 0;
+    const level = forcedTake || (needsRowChoice && recommended) ? sixNimmtRiskLevel({ cardCount, penalty }) : sixNimmtRiskLevel({ cardCount, penalty });
+    const reason = needsRowChoice
+      ? `${index + 1}행을 가져가면 ${penalty}벌점입니다.${recommended ? " 현재 최저 벌점 후보입니다." : ""}`
+      : forcedTake
+        ? `선택 카드가 ${index + 1}행의 여섯 번째가 되어 ${penalty}벌점을 가져갈 수 있습니다.`
+        : possible
+          ? `${selectedValue || "선택 카드"}를 이 행에 놓을 수 있습니다.${cardCount >= 4 ? " 다음 배치가 여섯 번째 위험입니다." : ""}`
+          : cardCount >= 4
+            ? "이미 4장 이상이라 다음 배치가 여섯 번째 위험입니다."
+            : penalty >= 5
+              ? "벌점 밀도가 높아 회수 시 손실이 큽니다."
+              : "현재는 비교적 낮은 압박입니다.";
+    return { index, cards, penalty, cardCount, tailValue, possible, active, recommended, level, reason };
+  });
+  const focusSignal = rowSignals.find((item) => item.active) || rowSignals.find((item) => item.recommended) || rowSignals.slice().sort((left, right) => right.penalty - left.penalty)[0] || null;
+  const titleDetail = needsRowChoice
+    ? `${pendingValue || "대기 카드"} 카드 때문에 행을 하나 회수해야 합니다.`
+    : waitingSelection && selectedCard
+      ? `${selectedValue} 카드의 예상 행과 벌점 압박입니다.`
+      : waitingSelection
+        ? "손패에서 카드를 고르면 행별 배치 후보가 강조됩니다."
+        : "다음 공개 처리 전에 행별 회수 위험을 읽습니다.";
+
+  return (
+    <section data-smoke="six-nimmt-risk-panel" className="mt-3 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-slate-50 p-3 shadow-sm sm:mt-4 sm:rounded-[1.5rem] sm:p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-black text-amber-700">행 위험 해석</div>
+          <div className="mt-1 text-lg font-black text-slate-950">어느 행이 벌점을 만들까</div>
+          <div className="mt-1 max-w-2xl text-xs font-bold leading-relaxed text-slate-600">{titleDetail}</div>
+        </div>
+        {focusSignal && (
+          <div className={`rounded-2xl border px-3 py-2 text-right ${sixNimmtRiskProfiles[focusSignal.level]?.borderClass || sixNimmtRiskProfiles.calm.borderClass}`}>
+            <div className="text-[10px] font-black text-slate-500">핵심 신호</div>
+            <div className={`mt-0.5 text-sm font-black ${sixNimmtRiskProfiles[focusSignal.level]?.textClass || sixNimmtRiskProfiles.calm.textClass}`}>
+              {focusSignal.index + 1}행 · {focusSignal.penalty}벌점
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {rowSignals.map((signal) => {
+          const profile = sixNimmtRiskProfiles[signal.level] || sixNimmtRiskProfiles.calm;
+          return (
+            <div
+              key={signal.index}
+              data-smoke="six-nimmt-risk-item"
+              className={`rounded-2xl border p-2 ${signal.active ? "border-slate-900 bg-white shadow-md" : profile.borderClass}`}
+            >
+              <SixNimmtRowRiskArt
+                cardCount={signal.cardCount}
+                penalty={signal.penalty}
+                level={signal.level}
+                active={signal.active}
+                recommended={signal.recommended}
+              />
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-black text-slate-900">{signal.index + 1}행 · 끝 {signal.tailValue || "-"}</div>
+                <div className={`rounded-full bg-white px-2 py-1 text-[10px] font-black ${profile.textClass}`}>{profile.label}</div>
+              </div>
+              <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-600">{signal.reason}</div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 };
 
@@ -7142,6 +15741,92 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
   const selectedAnchorX = selectedPreview?.possibleRows?.some((item) => item.index === selectedRowIndex) ? selectedRowIndex : null;
   const selectedHasOptionalRows = waitingSelection && selectedPreview?.possibleRows?.length > 1 && selectedAnchorX === null;
   const phaseLabel = sixNimmtPhaseLabels[phase] || phase || "-";
+  const mostDangerousRow = rows.reduce((best, row, index) => {
+    const penalty = sixNimmtRowPenalty(row);
+    const cardCount = sixNimmtRowCards(row).length;
+    if (best.index < 0 || penalty > best.penalty || (penalty === best.penalty && cardCount > best.cardCount)) {
+      return { index, penalty, cardCount };
+    }
+    return best;
+  }, { index: -1, penalty: 0, cardCount: 0 });
+  const sixNimmtTurnPlayers = statePlayers.map((player) => {
+    const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+    const name = playerNameBySeat(seatNo);
+    const playerSelectedCard = get(player, "selected_card", "selectedCard", null);
+    const selected = Boolean(get(player, "selected", "selected", false)) || selectedSeatNos.has(seatNo) || Boolean(playerSelectedCard);
+    return {
+      seatNo,
+      name,
+      shortName: name.replace(/\s+/g, "").slice(0, 3) || `${seatNo}`,
+      selected,
+      selectedCardValue: sixNimmtCardValue(playerSelectedCard),
+      totalPenalty: Number(get(player, "total_penalty", "totalPenalty", 0)),
+      roundPenalty: Number(get(player, "round_penalty", "roundPenalty", 0)),
+      handCount: Number(get(player, "hand_count", "handCount", 0)),
+    };
+  });
+  const sixNimmtPlayerCount = sixNimmtTurnPlayers.length || roomPlayers.length || 0;
+  const sixNimmtSelectedCount = Math.max(selectedSeatNos.size, sixNimmtTurnPlayers.filter((player) => player.selected).length);
+  const sixNimmtWaitingCount = Math.max(0, sixNimmtPlayerCount - sixNimmtSelectedCount);
+  const sixNimmtPenaltyLeader = sixNimmtTurnPlayers.slice().sort((left, right) => left.totalPenalty - right.totalPenalty)[0] || null;
+  const sixNimmtMySignal = sixNimmtTurnPlayers.find((player) => player.seatNo === Number(mySeatNo)) || null;
+  const sixNimmtAllLocked = sixNimmtPlayerCount > 0 && sixNimmtSelectedCount >= sixNimmtPlayerCount;
+  const sixNimmtTurnPressureItems = [
+    {
+      label: "선택 잠금",
+      value: `${sixNimmtSelectedCount}/${sixNimmtPlayerCount || "-"}명`,
+      detail: mySelected ? "내 카드는 숨겨진 선택으로 잠겼습니다." : waitingSelection ? "내 카드가 아직 공개 큐에 들어가지 않았습니다." : `${sixNimmtWaitingCount}명의 선택을 기다립니다.`,
+      className: mySelected ? "border-emerald-100 bg-emerald-50/80" : waitingSelection ? "border-amber-100 bg-amber-50/80" : "border-slate-100 bg-slate-50",
+    },
+    {
+      label: "공개 순서",
+      value: pendingCard ? `${sixNimmtCardValue(pendingCard)} 카드 처리` : sixNimmtAllLocked ? "낮은 숫자부터" : `${sixNimmtWaitingCount}명 대기`,
+      detail: pendingCard ? "현재 공개된 카드가 들어갈 행을 확정해야 합니다." : sixNimmtAllLocked ? "모든 카드가 잠겼고 낮은 숫자부터 행에 배치됩니다." : "아직 선택하지 않은 좌석이 공개를 늦추고 있습니다.",
+      className: pendingCard || sixNimmtAllLocked ? "border-sky-100 bg-sky-50/80" : "border-slate-100 bg-slate-50",
+    },
+    {
+      label: "행 선택",
+      value: needsRowChoice ? "내 선택 차례" : phase === "ROW_CHOICE" ? `${playerNameBySeat(activeSeatNo)} 대기` : recommendedRowIndex >= 0 ? `${recommendedRowIndex + 1}행 최저` : "대기",
+      detail: needsRowChoice ? `${sixNimmtCardValue(pendingCard)} 카드 때문에 가져갈 행을 골라야 합니다.` : phase === "ROW_CHOICE" ? "대상 플레이어가 행을 선택해야 다음 공개가 진행됩니다." : recommendedRowIndex >= 0 ? `강제 회수 시 ${recommendedRowIndex + 1}행이 현재 최저 벌점입니다.` : "행 정보가 도착하면 추천 회수 후보를 표시합니다.",
+      className: needsRowChoice ? "border-orange-100 bg-orange-50/80" : "border-slate-100 bg-slate-50",
+    },
+    {
+      label: "벌점 레이스",
+      value: sixNimmtPenaltyLeader ? `${sixNimmtPenaltyLeader.name} ${sixNimmtPenaltyLeader.totalPenalty}벌점` : "-",
+      detail: sixNimmtMySignal ? `나는 총 ${sixNimmtMySignal.totalPenalty}벌점, 이번 라운드 ${sixNimmtMySignal.roundPenalty}벌점입니다.` : "플레이어 벌점 정보가 도착하면 내 위치를 표시합니다.",
+      className: "border-rose-100 bg-rose-50/80",
+    },
+  ];
+  const sixNimmtFlowItems = [
+    {
+      label: "라운드",
+      value: `${roundNo || "-"}R · ${turnNo || "-"}턴`,
+      detail: phaseLabel,
+      icon: "stage",
+      tone: "neutral",
+    },
+    {
+      label: "제출",
+      value: `${selectedSeatNos.size}/${statePlayers.length || "-"}명`,
+      detail: mySelected ? "내 카드는 제출 완료" : waitingSelection ? "내 카드 선택 필요" : "공개 대기",
+      icon: "player",
+      tone: mySelected ? "done" : waitingSelection ? "active" : "waiting",
+    },
+    {
+      label: "위험 행",
+      value: mostDangerousRow.index >= 0 ? `${mostDangerousRow.index + 1}행 · ${mostDangerousRow.penalty}벌점` : "-",
+      detail: mostDangerousRow.index >= 0 ? `${mostDangerousRow.cardCount}/5장 상태` : "행 정보 대기",
+      icon: "score",
+      tone: mostDangerousRow.penalty >= 8 || mostDangerousRow.cardCount >= 4 ? "danger" : "waiting",
+    },
+    {
+      label: "내 예측",
+      value: mySelected ? "제출 완료" : selectedPreview ? selectedPreview.label : needsRowChoice ? "행 선택 필요" : "카드 선택",
+      detail: selectedPreview?.penalty ? `${selectedPreview.penalty}벌점 위험` : selectedPreview?.possibleRows?.length > 1 ? "행 직접 선택 가능" : "선택 전 미리보기",
+      icon: "decision",
+      tone: selectedPreview?.penalty ? "danger" : mySelected ? "done" : "neutral",
+    },
+  ];
 
   return (
     <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-4">
@@ -7160,6 +15845,37 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
               <div className="text-base font-black text-slate-900 sm:text-lg">{selectedSeatNos.size}/{statePlayers.length}</div>
             </div>
           </div>
+
+          <GameFlowMeter
+            title="6 nimmt! 판 읽기"
+            detail="제출 수, 위험 행, 내 카드 예측을 한 번에 확인합니다."
+            items={sixNimmtFlowItems}
+            tone="amber"
+            smoke="six-nimmt-flow-meter"
+            className="mt-3"
+          />
+
+          <SixNimmtTurnPressurePanel
+            playerSignals={sixNimmtTurnPlayers}
+            pressureItems={sixNimmtTurnPressureItems}
+            selectedCount={sixNimmtSelectedCount}
+            playerCount={sixNimmtPlayerCount}
+            phase={phase}
+            pendingCard={pendingCard}
+            activeSeatNo={activeSeatNo}
+            mySeatNo={mySeatNo}
+          />
+
+          <SixNimmtRiskPanel
+            rows={rows}
+            waitingSelection={waitingSelection}
+            needsRowChoice={needsRowChoice}
+            selectedCard={selectedCard}
+            selectedPreview={selectedPreview}
+            selectedRowIndex={selectedRowIndex}
+            recommendedRowIndex={recommendedRowIndex}
+            pendingCard={pendingCard}
+          />
 
           {needsRowChoice && (
             <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-2 text-xs font-bold leading-relaxed text-amber-800 sm:mt-4 sm:rounded-2xl sm:p-3 sm:text-sm">
@@ -7302,7 +16018,14 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
                 </div>
               );
             })}
-            {!events.length && <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">아직 기록 없음</div>}
+            {!events.length && (
+              <TabletopHistoryEmptyState
+                game="catan"
+                title="아직 카탄 기록이 없습니다"
+                detail="주사위, 생산, 건설, 거래가 처리되면 좌석과 자원 근거가 이 기록 영역에 쌓입니다."
+                nextAction="첫 생산"
+              />
+            )}
           </div>
         </section>
       </aside>
@@ -7318,7 +16041,219 @@ const telestrationsPhaseLabels = {
   FINISHED: "종료",
 };
 
-const TelestrationsEntry = ({ entry, playerNameBySeat, compact = false }) => {
+const telestrationsChainNodes = [
+  { phase: "PROMPT", label: "문장", caption: "시작 단서", color: "#0ea5e9" },
+  { phase: "DRAW", label: "그림", caption: "시각 해석", color: "#f97316" },
+  { phase: "GUESS", label: "추측", caption: "다시 문장", color: "#8b5cf6" },
+  { phase: "REVEAL", label: "공개", caption: "변화 확인", color: "#16a34a" },
+];
+
+const TelestrationsChainArt = ({ phase, currentStep, totalSteps, completedCount, playerCount, previousType }) => {
+  const phaseIndex = Math.max(0, telestrationsChainNodes.findIndex((node) => node.phase === phase));
+  const safePhaseIndex = phaseIndex >= 0 ? phaseIndex : 0;
+  const progressRatio = Math.max(0, Math.min(1, Number(totalSteps) ? (Number(currentStep) + 1) / Number(totalSteps) : 0));
+  const completedRatio = Math.max(0, Math.min(1, Number(playerCount) ? Number(completedCount) / Number(playerCount) : 0));
+  const previousLabel = previousType === "DRAW" ? "이전 그림" : previousType ? "이전 문장" : "첫 단서";
+
+  return (
+    <svg
+      data-smoke="telestrations-chain-art"
+      viewBox="0 0 640 220"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`텔레스트레이션 릴레이 체인 ${telestrationsPhaseLabels[phase] || phase || "대기"}`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="620" height="200" rx="28" fill="#f8fafc" stroke="#dbeafe" strokeWidth="3" />
+      <path d="M42 64c67-26 128-27 183-2 58 27 119 25 184-4 56-25 105-18 148 21v86c-64-30-126-28-185 7-53 32-112 29-177-9-50-29-105-30-153-3Z" fill="#e0f2fe" opacity="0.72" />
+      <path d="M78 114h484" fill="none" stroke="#cbd5e1" strokeWidth="10" strokeLinecap="round" />
+      <path d={`M78 114h${484 * progressRatio}`} fill="none" stroke="#0f172a" strokeWidth="10" strokeLinecap="round" />
+      {telestrationsChainNodes.map((node, index) => {
+        const x = 78 + index * 161.3;
+        const active = index === safePhaseIndex;
+        const done = index < safePhaseIndex || phase === "REVEAL" || phase === "FINISHED";
+        return (
+          <g key={node.phase}>
+            <circle cx={x} cy="114" r={active ? 38 : 30} fill={done || active ? node.color : "#ffffff"} stroke={active ? "#0f172a" : "#94a3b8"} strokeWidth={active ? 5 : 3} />
+            {node.phase === "PROMPT" && (
+              <g>
+                <rect x={x - 15} y="99" width="30" height="30" rx="6" fill={done || active ? "#ffffff" : "#e2e8f0"} />
+                <path d={`M${x - 8} 108h16M${x - 8} 116h12M${x - 8} 124h14`} stroke={done || active ? node.color : "#64748b"} strokeWidth="3" strokeLinecap="round" />
+              </g>
+            )}
+            {node.phase === "DRAW" && (
+              <g>
+                <path d={`M${x - 17} 126c13-27 27-37 44-32-6 20-19 31-39 34Z`} fill={done || active ? "#ffffff" : "#e2e8f0"} stroke={done || active ? "#ffffff" : "#64748b"} strokeWidth="2" />
+                <path d={`M${x - 13} 122l24-24`} stroke={done || active ? node.color : "#64748b"} strokeWidth="5" strokeLinecap="round" />
+              </g>
+            )}
+            {node.phase === "GUESS" && (
+              <g>
+                <path d={`M${x - 18} 103h36v24h-19l-10 9v-9h-7Z`} fill={done || active ? "#ffffff" : "#e2e8f0"} />
+                <path d={`M${x - 9} 113h18M${x - 9} 121h12`} stroke={done || active ? node.color : "#64748b"} strokeWidth="3" strokeLinecap="round" />
+              </g>
+            )}
+            {node.phase === "REVEAL" && (
+              <g>
+                <path d={`M${x} 93l9 19 20 2-15 13 5 20-19-10-18 10 4-20-15-13 21-2Z`} fill={done || active ? "#ffffff" : "#e2e8f0"} stroke={done || active ? "#ffffff" : "#64748b"} strokeWidth="2" />
+              </g>
+            )}
+            <text x={x} y="58" textAnchor="middle" fontSize="15" fontWeight="900" fill={active ? "#0f172a" : "#475569"}>{node.label}</text>
+            <text x={x} y="172" textAnchor="middle" fontSize="11" fontWeight="800" fill="#64748b">{node.caption}</text>
+          </g>
+        );
+      })}
+      <g>
+        <rect x="40" y="24" width="158" height="28" rx="14" fill="#ffffff" stroke="#dbeafe" />
+        <text x="119" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill="#0369a1">책 진행 {Math.min(Number(currentStep) + 1, Number(totalSteps) || 1)}/{Number(totalSteps) || 1}</text>
+        <rect x="460" y="24" width="116" height="28" rx="14" fill="#ffffff" stroke="#dcfce7" />
+        <rect x="466" y="30" width={Math.max(0, Math.min(100, 100 * completedRatio))} height="16" rx="8" fill="#22c55e" opacity="0.85" />
+        <text x="518" y="43" textAnchor="middle" fontSize="11" fontWeight="900" fill="#14532d">제출 {Number(completedCount) || 0}/{Number(playerCount) || 0}</text>
+        <rect x="246" y="184" width="148" height="24" rx="12" fill="#ffffff" stroke="#ede9fe" />
+        <text x="320" y="200" textAnchor="middle" fontSize="11" fontWeight="900" fill="#6d28d9">{previousLabel}</text>
+      </g>
+    </svg>
+  );
+};
+
+const TelestrationsEntryEmptyArt = ({ phase = "", compact = false, stepLabel = "", bookLabel = "" }) => {
+  const profile = telestrationsGuidanceProfiles[phase] || telestrationsGuidanceProfiles.REVEAL;
+  const phaseText = telestrationsPhaseLabels[phase] || phase || "대기";
+  const nodes = [
+    { key: "book", x: 58, y: 88, label: "책", color: "#0ea5e9" },
+    { key: "entry", x: 135, y: 116, label: "항목", color: "#f97316" },
+    { key: "submit", x: 214, y: 88, label: "제출", color: "#8b5cf6" },
+    { key: "replay", x: 292, y: 116, label: "공개", color: "#16a34a" },
+  ];
+
+  return (
+    <svg
+      data-smoke="telestrations-entry-empty-art"
+      viewBox="0 0 360 190"
+      className={compact ? "mx-auto h-auto w-full max-w-[280px]" : "h-auto w-full"}
+      role="img"
+      aria-label={`텔레스트레이션 공개 대기 ${phaseText}`}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="344" height="174" rx="26" fill="#f8fafc" stroke={profile.accent} strokeWidth="3" opacity="0.96" />
+      <path d="M28 142c42-28 83-34 123-18 49 20 89 16 123-16 20-19 38-23 54-12v50H28Z" fill={profile.wash} opacity="0.86" />
+      <path d="M58 108c54-36 99-36 136 0s78 36 136 0" fill="none" stroke="#cbd5e1" strokeWidth="8" strokeLinecap="round" />
+      {nodes.map((node, index) => (
+        <g key={node.key} data-smoke="telestrations-entry-empty-node" data-entry-node={node.key}>
+          <circle cx={node.x} cy={node.y} r={index === 0 ? 24 : 20} fill="#ffffff" stroke={node.color} strokeWidth={index === 0 ? 4 : 3} />
+          {node.key === "book" && (
+            <g>
+              <rect x={node.x - 12} y={node.y - 12} width="24" height="25" rx="5" fill={profile.wash} />
+              <path d={`M${node.x - 3} ${node.y - 10}v22M${node.x - 8} ${node.y - 2}h15M${node.x - 8} ${node.y + 6}h12`} stroke={node.color} strokeWidth="2.5" strokeLinecap="round" />
+            </g>
+          )}
+          {node.key === "entry" && (
+            <g>
+              <path d={`M${node.x - 13} ${node.y - 8}h26v19h-13l-8 7v-7h-5Z`} fill="#ffedd5" stroke={node.color} strokeWidth="2.5" />
+              <path d={`M${node.x - 6} ${node.y - 1}h13M${node.x - 6} ${node.y + 6}h9`} stroke="#9a3412" strokeWidth="2.5" strokeLinecap="round" />
+            </g>
+          )}
+          {node.key === "submit" && (
+            <g>
+              <path d={`M${node.x - 13} ${node.y + 2}l8 8 19-22`} fill="none" stroke={node.color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx={node.x} cy={node.y} r="6" fill="#ede9fe" />
+            </g>
+          )}
+          {node.key === "replay" && (
+            <g>
+              <path d={`M${node.x} ${node.y - 16}l5 11 12 2-9 8 3 12-11-6-11 6 3-12-9-8 12-2Z`} fill="#dcfce7" stroke={node.color} strokeWidth="2.5" />
+            </g>
+          )}
+          <text x={node.x} y={node.y + 38} textAnchor="middle" fontSize="10" fontWeight="900" fill="#475569">{node.label}</text>
+        </g>
+      ))}
+      <rect x="30" y="24" width="136" height="28" rx="14" fill="#ffffff" stroke="#e2e8f0" />
+      <text x="98" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill={profile.accent}>{phaseText}</text>
+      <rect x="190" y="24" width="128" height="28" rx="14" fill="#ffffff" stroke="#e2e8f0" />
+      <text x="254" y="43" textAnchor="middle" fontSize="11" fontWeight="900" fill="#334155">{stepLabel || "항목 대기"}</text>
+      <text x="180" y="170" textAnchor="middle" fontSize="11" fontWeight="900" fill="#0f172a">{bookLabel || "공개 대기 책"}</text>
+    </svg>
+  );
+};
+
+const TelestrationsEntryEmptyState = ({
+  phase = "",
+  compact = false,
+  stepLabel = "",
+  bookLabel = "",
+  completedCount = 0,
+  playerCount = 0,
+}) => {
+  const phaseText = telestrationsPhaseLabels[phase] || phase || "대기";
+  const progressText = Number(playerCount) ? `${completedCount}/${playerCount}명 제출` : "제출 대기";
+  const emptyItems = [
+    {
+      key: "book",
+      label: "릴레이 위치",
+      value: bookLabel || "공개 대기 책",
+      detail: phase === "REVEAL" ? "책 데이터가 도착하면 문장과 그림 흐름이 이 영역에 표시됩니다." : "이전 단서가 도착하면 바로 같은 위치에 표시됩니다.",
+    },
+    {
+      key: "step",
+      label: "현재 항목",
+      value: stepLabel || "항목 대기",
+      detail: "비어 있는 상태도 게임 오류가 아니라 아직 공개할 항목을 기다리는 상태입니다.",
+    },
+    {
+      key: "submit",
+      label: "진행 근거",
+      value: progressText,
+      detail: "참가자 제출이 쌓이면 공개 리플레이의 원문, 그림, 추측 순서가 채워집니다.",
+    },
+    {
+      key: "replay",
+      label: "다음 표시",
+      value: phase === "REVEAL" ? "공개 리플레이" : phaseText,
+      detail: "첫 항목이 생기면 작성자와 내용, 이미지 프레임까지 같은 카드에서 확인합니다.",
+    },
+  ];
+
+  return (
+    <div
+      data-smoke="telestrations-entry-empty-state"
+      data-entry-phase={phase || "UNKNOWN"}
+      data-entry-compact={compact ? "true" : "false"}
+      data-step-label={stepLabel || ""}
+      className={`overflow-hidden rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-violet-50 shadow-sm ${compact ? "p-3" : "p-4"}`}
+    >
+      <div className={`grid gap-3 ${compact ? "" : "lg:grid-cols-[260px_minmax(0,1fr)]"}`}>
+        <TelestrationsEntryEmptyArt phase={phase} compact={compact} stepLabel={stepLabel} bookLabel={bookLabel} />
+        <div>
+          <div className="inline-flex rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-black text-sky-700">공개 내용 대기</div>
+          <div className="mt-2 text-sm font-black text-slate-950">아직 공개된 내용이 없습니다</div>
+          <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+            {phase === "REVEAL" ? "공개 단계지만 아직 선택한 책에 표시할 항목이 없습니다. 책과 항목이 도착하면 원문, 그림, 추측 흐름이 이 자리에서 이어집니다." : "이전 플레이어의 단서가 아직 도착하지 않았습니다. 제출 흐름이 갱신되면 같은 위치에서 바로 확인합니다."}
+          </div>
+          <div className={`mt-3 grid gap-2 ${compact ? "" : "sm:grid-cols-2"}`}>
+            {emptyItems.map((item) => (
+              <div key={item.key} data-smoke="telestrations-entry-empty-item" data-entry-key={item.key} className="rounded-lg border border-white/80 bg-white/85 px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className="mt-0.5 text-xs font-black leading-snug text-slate-900">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TelestrationsEntry = ({
+  entry,
+  playerNameBySeat,
+  compact = false,
+  phase = "",
+  stepLabel = "",
+  bookLabel = "",
+  completedCount = 0,
+  playerCount = 0,
+}) => {
   const imageData = entry ? get(entry, "image_data", "imageData", "") : "";
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -7327,7 +16262,16 @@ const TelestrationsEntry = ({ entry, playerNameBySeat, compact = false }) => {
   }, [imageData]);
 
   if (!entry) {
-    return <div className="rounded-lg bg-slate-50 p-4 text-sm font-bold text-slate-400">아직 공개된 내용이 없습니다.</div>;
+    return (
+      <TelestrationsEntryEmptyState
+        phase={phase}
+        compact={compact}
+        stepLabel={stepLabel}
+        bookLabel={bookLabel}
+        completedCount={completedCount}
+        playerCount={playerCount}
+      />
+    );
   }
   const type = get(entry, "type", "type", "");
   const text = get(entry, "text", "text", "");
@@ -7362,9 +16306,825 @@ const TelestrationsEntry = ({ entry, playerNameBySeat, compact = false }) => {
   );
 };
 
+const telestrationsGuidanceProfiles = {
+  PROMPT: {
+    label: "문장 설계",
+    accent: "#0ea5e9",
+    wash: "#e0f2fe",
+    focus: "그릴 수 있는 장면",
+    quality: "명사, 행동, 장소가 함께 보이면 다음 사람이 바로 그릴 수 있습니다.",
+  },
+  DRAW: {
+    label: "그림 해석",
+    accent: "#f97316",
+    wash: "#ffedd5",
+    focus: "큰 형태 우선",
+    quality: "세부 묘사보다 핵심 물체와 행동을 크게 그리면 추측이 살아납니다.",
+  },
+  GUESS: {
+    label: "추측 작성",
+    accent: "#8b5cf6",
+    wash: "#ede9fe",
+    focus: "그림의 주인공",
+    quality: "가장 크게 보이는 대상, 행동, 장소를 짧은 문장으로 묶습니다.",
+  },
+  REVEAL: {
+    label: "변화 감상",
+    accent: "#16a34a",
+    wash: "#dcfce7",
+    focus: "변한 지점",
+    quality: "원문, 그림, 추측이 어디서 갈라졌는지 비교합니다.",
+  },
+  FINISHED: {
+    label: "종료",
+    accent: "#64748b",
+    wash: "#f1f5f9",
+    focus: "결과 확인",
+    quality: "책자 흐름과 참가자별 변화를 정리합니다.",
+  },
+};
+
+const TelestrationsClueLensArt = ({ phase = "", previousType = "", hasPrevious = false, progress = 0, submitted = false }) => {
+  const profile = telestrationsGuidanceProfiles[phase] || telestrationsGuidanceProfiles.PROMPT;
+  const progressWidth = Math.max(0, Math.min(1, Number(progress) || 0)) * 188;
+  const isDrawing = phase === "DRAW";
+  const isGuess = phase === "GUESS";
+  const isReveal = phase === "REVEAL";
+
+  return (
+    <svg
+      data-smoke="telestrations-clue-lens-art"
+      viewBox="0 0 320 180"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`텔레스트레이션 입력 판단 ${profile.label}`}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="304" height="164" rx="28" fill="#f8fafc" stroke={profile.accent} strokeWidth="3" opacity="0.96" />
+      <path d="M32 126c40-28 82-32 126-12 48 22 91 16 128-20v48H32Z" fill={profile.wash} opacity="0.9" />
+      <g transform="translate(42 35)">
+        <circle cx="48" cy="48" r="38" fill="#ffffff" stroke={profile.accent} strokeWidth="5" />
+        <path d="M76 76l33 33" fill="none" stroke="#0f172a" strokeWidth="12" strokeLinecap="round" opacity="0.9" />
+        <path d="M23 48c11-14 23-21 36-21s25 7 36 21c-11 14-23 21-36 21S34 62 23 48Z" fill={profile.wash} stroke={profile.accent} strokeWidth="3" />
+        <circle cx="59" cy="48" r="12" fill={profile.accent} />
+      </g>
+      <g transform="translate(154 34)">
+        <rect x="0" y="0" width="132" height="36" rx="18" fill="#ffffff" stroke={profile.accent} strokeWidth="2" />
+        <text x="66" y="23" textAnchor="middle" fontSize="13" fontWeight="900" fill={profile.accent}>{profile.label}</text>
+        <rect x="0" y="51" width="132" height="56" rx="16" fill="#ffffff" stroke="#e2e8f0" strokeWidth="2" />
+        {isDrawing ? (
+          <g>
+            <path d="M24 88c14-30 32-40 54-30-8 22-25 33-50 36Z" fill={profile.wash} stroke={profile.accent} strokeWidth="3" />
+            <path d="M30 89l36-36" stroke="#0f172a" strokeWidth="6" strokeLinecap="round" />
+          </g>
+        ) : isGuess ? (
+          <g>
+            <path d="M23 66h82v31H62l-17 14V97H23Z" fill={profile.wash} stroke={profile.accent} strokeWidth="3" />
+            <path d="M36 78h51M36 90h34" stroke="#0f172a" strokeWidth="4" strokeLinecap="round" />
+          </g>
+        ) : isReveal ? (
+          <g>
+            <path d="M67 61l10 23 25 3-18 16 5 24-22-12-22 12 5-24-18-16 25-3Z" fill={profile.wash} stroke={profile.accent} strokeWidth="3" />
+          </g>
+        ) : (
+          <g>
+            <rect x="24" y="64" width="82" height="34" rx="8" fill={profile.wash} stroke={profile.accent} strokeWidth="3" />
+            <path d="M37 75h52M37 87h35" stroke="#0f172a" strokeWidth="4" strokeLinecap="round" />
+          </g>
+        )}
+      </g>
+      <g transform="translate(48 146)">
+        <rect x="0" y="0" width="188" height="12" rx="6" fill="#e2e8f0" />
+        <rect x="0" y="0" width={progressWidth} height="12" rx="6" fill={profile.accent} />
+        <text x="211" y="10" fontSize="10" fontWeight="900" fill={submitted ? "#16a34a" : "#475569"}>{submitted ? "제출됨" : hasPrevious ? "단서 확인" : previousType ? "단서 대기" : "시작"}</text>
+      </g>
+    </svg>
+  );
+};
+
+const TelestrationsInputGuidePanel = ({
+  phase = "",
+  phaseLabel = "",
+  currentTask = "",
+  previousEntry = null,
+  previousEntryLabel = "",
+  awaitingPreviousEntry = false,
+  mySubmitted = false,
+  textLength = 0,
+  hasInk = false,
+  completedCount = 0,
+  playerCount = 0,
+}) => {
+  const profile = telestrationsGuidanceProfiles[phase] || telestrationsGuidanceProfiles.PROMPT;
+  const previousType = previousEntry ? get(previousEntry, "type", "type", "") : "";
+  const previousText = previousEntry ? String(get(previousEntry, "text", "text", "") || "") : "";
+  const hasPrevious = Boolean(previousEntry);
+  const progress = Number(playerCount) ? Number(completedCount) / Number(playerCount) : 0;
+  const inputState = phase === "DRAW"
+    ? hasInk ? "그림 있음" : "빈 캔버스"
+    : phase === "REVEAL"
+      ? "리플레이"
+      : textLength ? `${textLength}/120자` : "입력 전";
+  const clueDetail = phase === "PROMPT"
+    ? "아직 이전 단서가 없습니다. 다음 사람이 바로 떠올릴 수 있는 장면을 시작하세요."
+    : awaitingPreviousEntry
+      ? "이전 플레이어의 입력을 불러오는 중입니다."
+      : previousType === "DRAW"
+        ? "이전 그림의 가장 큰 형태와 관계를 먼저 읽습니다."
+        : previousText
+          ? previousText.slice(0, 54)
+          : previousEntryLabel || "이전 단서를 확인합니다.";
+  const inputDetail = phase === "DRAW"
+    ? "두꺼운 선으로 주인공, 장소, 행동을 먼저 잡으세요."
+    : phase === "GUESS"
+      ? "그림을 설명하는 한 문장으로 줄이면 다음 변형이 자연스럽습니다."
+      : phase === "REVEAL"
+        ? "각 책의 변화 포인트를 순서대로 비교합니다."
+        : "너무 추상적인 단어보다 장면, 행동, 장소가 있는 문장이 좋습니다.";
+  const guideItems = [
+    {
+      label: "보고 있는 단서",
+      value: phase === "PROMPT" ? "새 책 시작" : awaitingPreviousEntry ? "단서 대기" : previousEntryLabel || "단서 확인",
+      detail: clueDetail,
+    },
+    {
+      label: "내 입력",
+      value: inputState,
+      detail: inputDetail,
+    },
+    {
+      label: "품질 목표",
+      value: profile.focus,
+      detail: profile.quality,
+    },
+    {
+      label: "진행 상태",
+      value: mySubmitted ? "제출 완료" : `${completedCount}/${playerCount || "-"}명`,
+      detail: mySubmitted ? "다른 참가자의 입력을 기다립니다." : currentTask || "현재 단계 입력을 완료하세요.",
+    },
+  ];
+
+  return (
+    <section data-smoke="telestrations-input-guide-panel" className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-violet-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
+      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <TelestrationsClueLensArt
+          phase={phase}
+          previousType={previousType}
+          hasPrevious={hasPrevious}
+          progress={progress}
+          submitted={mySubmitted}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-sky-600">입력 판단</div>
+              <div className="mt-1 text-lg font-black text-slate-950">{phaseLabel || profile.label}</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{profile.quality}</div>
+            </div>
+            <span className="rounded-full px-3 py-1 text-[11px] font-black" style={{ backgroundColor: profile.wash, color: profile.accent }}>
+              {profile.label}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {guideItems.map((item) => (
+              <div key={item.label} data-smoke="telestrations-input-guide-item" className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black text-slate-900">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const telestrationsBrushLabel = (brushSize) => {
+  const size = Number(brushSize) || 0;
+  if (size <= 3) return "얇게";
+  if (size >= 9) return "굵게";
+  return "보통";
+};
+
+const telestrationsBrushColorLabel = (brushColor) => ({
+  "#111827": "먹색",
+  "#dc2626": "빨강",
+  "#2563eb": "파랑",
+  "#16a34a": "초록",
+}[String(brushColor || "").toLowerCase()] || "선택 색상");
+
+const TelestrationsDrawingToolArt = ({
+  brushColor = "#111827",
+  brushSize = 5,
+  hasInk = false,
+  mySubmitted = false,
+  awaitingPreviousEntry = false,
+}) => {
+  const brushLabel = telestrationsBrushLabel(brushSize);
+  const ready = hasInk && !mySubmitted && !awaitingPreviousEntry;
+  const statusLabel = mySubmitted ? "제출됨" : awaitingPreviousEntry ? "단서 대기" : hasInk ? "제출 가능" : "잉크 없음";
+  const swatches = ["#111827", "#dc2626", "#2563eb", "#16a34a"];
+
+  return (
+    <svg
+      data-smoke="telestrations-drawing-tool-art"
+      viewBox="0 0 360 176"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`텔레스트레이션 그림 도구 상태 ${statusLabel}`}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="344" height="160" rx="26" fill="#0f172a" />
+      <rect x="24" y="24" width="312" height="128" rx="20" fill="#f8fafc" />
+      <path d="M42 128c42-32 84-38 124-18 44 23 90 18 150-26v44H42Z" fill="#ffedd5" opacity="0.8" />
+      <rect x="40" y="42" width="116" height="76" rx="16" fill="#ffffff" stroke="#fed7aa" strokeWidth="3" />
+      <path d="M58 94c18-33 42-45 70-34-10 26-29 39-58 44Z" fill="#fff7ed" stroke={brushColor} strokeWidth="4" />
+      <path d="M64 96l54-54" stroke="#0f172a" strokeWidth={Math.max(4, Number(brushSize) || 5)} strokeLinecap="round" />
+      <text x="98" y="133" textAnchor="middle" fontSize="11" fontWeight="900" fill="#9a3412">{brushLabel} 브러시</text>
+      <g transform="translate(186 48)">
+        {swatches.map((color, index) => {
+          const selected = color.toLowerCase() === String(brushColor || "").toLowerCase();
+          return (
+            <g key={color} transform={`translate(${index * 36} 0)`} data-smoke="telestrations-drawing-tool-node">
+              <circle cx="0" cy="0" r={selected ? 16 : 12} fill={color} stroke={selected ? "#0f172a" : "#cbd5e1"} strokeWidth={selected ? 4 : 2} />
+              <circle cx="0" cy="0" r="5" fill="#ffffff" opacity={selected ? 0.92 : 0.35} />
+            </g>
+          );
+        })}
+      </g>
+      <g transform="translate(184 90)">
+        <rect x="0" y="0" width="132" height="28" rx="14" fill={ready ? "#dcfce7" : mySubmitted ? "#e0f2fe" : "#f1f5f9"} stroke={ready ? "#22c55e" : mySubmitted ? "#38bdf8" : "#cbd5e1"} strokeWidth="2" />
+        <text x="66" y="19" textAnchor="middle" fontSize="12" fontWeight="900" fill={ready ? "#166534" : mySubmitted ? "#0369a1" : "#475569"}>{statusLabel}</text>
+      </g>
+      <g transform="translate(184 128)">
+        <rect x="0" y="0" width="132" height="12" rx="6" fill="#e2e8f0" />
+        <rect x="0" y="0" width={Math.max(12, Math.min(132, (Number(brushSize) || 5) * 14))} height="12" rx="6" fill={brushColor} opacity="0.88" />
+      </g>
+      <text x="40" y="38" fontSize="11" fontWeight="900" fill="#475569">도구 상태</text>
+      <text x="318" y="38" textAnchor="end" fontSize="11" fontWeight="900" fill="#475569">{hasInk ? "캔버스 잉크 있음" : "빈 캔버스"}</text>
+    </svg>
+  );
+};
+
+const TelestrationsDrawingToolPanel = ({
+  brushColor,
+  brushSize,
+  hasInk,
+  mySubmitted,
+  awaitingPreviousEntry,
+  completedCount,
+  playerCount,
+}) => {
+  const brushLabel = telestrationsBrushLabel(brushSize);
+  const submitReady = hasInk && !mySubmitted && !awaitingPreviousEntry;
+  const toolItems = [
+    {
+      key: "brush",
+      label: "브러시 굵기",
+      value: brushLabel,
+      detail: `현재 선 굵기 ${brushSize}px로 주인공과 행동을 먼저 크게 잡습니다.`,
+      tone: "border-orange-100 bg-orange-50 text-orange-900",
+    },
+    {
+      key: "color",
+      label: "선 색상",
+      value: telestrationsBrushColorLabel(brushColor),
+      detail: "선택한 색상은 캔버스 획에만 적용되며 제출 데이터 형식은 그대로 유지됩니다.",
+      tone: "border-slate-100 bg-slate-50 text-slate-900",
+    },
+    {
+      key: "ink",
+      label: "캔버스 잉크",
+      value: hasInk ? "그림 있음" : "빈 캔버스",
+      detail: hasInk ? "제출 버튼을 누르기 전 핵심 형태가 읽히는지 확인하세요." : "한 획 이상 그려야 그림 제출이 열립니다.",
+      tone: hasInk ? "border-emerald-100 bg-emerald-50 text-emerald-900" : "border-amber-100 bg-amber-50 text-amber-900",
+    },
+    {
+      key: "submit",
+      label: "제출 준비",
+      value: mySubmitted ? "제출 완료" : submitReady ? "제출 가능" : awaitingPreviousEntry ? "단서 대기" : "그림 필요",
+      detail: mySubmitted ? "다른 참가자의 입력을 기다립니다." : `${completedCount}/${playerCount || "-"}명 완료 · 도구 상태만 표시하고 제출 payload는 바꾸지 않습니다.`,
+      tone: mySubmitted || submitReady ? "border-sky-100 bg-sky-50 text-sky-900" : "border-slate-100 bg-white text-slate-900",
+    },
+  ];
+
+  return (
+    <section
+      data-smoke="telestrations-drawing-tool-panel"
+      data-brush-size={brushSize}
+      data-has-ink={hasInk ? "true" : "false"}
+      data-submitted={mySubmitted ? "true" : "false"}
+      className="mt-4 overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-sky-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <TelestrationsDrawingToolArt
+          brushColor={brushColor}
+          brushSize={brushSize}
+          hasInk={hasInk}
+          mySubmitted={mySubmitted}
+          awaitingPreviousEntry={awaitingPreviousEntry}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-orange-600">그림 도구 상태</div>
+              <div className="mt-1 text-lg font-black text-slate-950">제출 전 캔버스 점검</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">색상, 굵기, 잉크 유무, 제출 준비를 같은 위치에서 확인합니다.</div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${submitReady ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+              {submitReady ? "제출 가능" : mySubmitted ? "제출 완료" : "점검 중"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {toolItems.map((item) => (
+              <div key={item.key} data-smoke="telestrations-drawing-tool-item" data-tool-key={item.key} className={`min-h-[96px] rounded-xl border px-3 py-2 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const telestrationsActionRouteTone = (state) => ({
+  ready: "border-emerald-100 bg-emerald-50 text-emerald-900",
+  active: "border-sky-100 bg-sky-50 text-sky-900",
+  waiting: "border-amber-100 bg-amber-50 text-amber-900",
+  done: "border-slate-100 bg-slate-50 text-slate-800",
+  reveal: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-900",
+}[state] || "border-slate-100 bg-white text-slate-900");
+
+const buildTelestrationsActionRouteItems = ({
+  phase = "",
+  phaseLabel = "",
+  currentTask = "",
+  previousEntry = null,
+  previousEntryLabel = "",
+  awaitingPreviousEntry = false,
+  mySubmitted = false,
+  textLength = 0,
+  hasInk = false,
+  completedCount = 0,
+  playerCount = 0,
+  isHost = false,
+  revealInsight = null,
+}) => {
+  const normalizedPhase = String(phase || "").toUpperCase();
+  const isTextPhase = normalizedPhase === "PROMPT" || normalizedPhase === "GUESS";
+  const isDrawPhase = normalizedPhase === "DRAW";
+  const isRevealPhase = normalizedPhase === "REVEAL" || normalizedPhase === "FINISHED";
+  const safeTextLength = Math.max(0, Number(textLength) || 0);
+  const safeCompletedCount = Math.max(0, Number(completedCount) || 0);
+  const safePlayerCount = Math.max(0, Number(playerCount) || 0);
+  const previousType = previousEntry ? String(get(previousEntry, "type", "type", "") || "").toUpperCase() : "";
+  const previousText = previousEntry ? telestrationsEntryText(previousEntry) : "";
+  const textReady = isTextPhase && safeTextLength > 0 && !mySubmitted && !awaitingPreviousEntry;
+  const drawingReady = isDrawPhase && Boolean(hasInk) && !mySubmitted && !awaitingPreviousEntry;
+  const submitReady = textReady || drawingReady;
+  const phaseName = phaseLabel || normalizedPhase || "대기";
+  const progressLabel = safePlayerCount ? `${safeCompletedCount}/${safePlayerCount}명` : `${safeCompletedCount}명`;
+  const clueValue = normalizedPhase === "PROMPT"
+    ? "새 문장"
+    : awaitingPreviousEntry
+      ? "단서 대기"
+      : previousType === "DRAW"
+        ? "그림 단서"
+        : previousEntryLabel || "문장 단서";
+  const clueDetail = normalizedPhase === "PROMPT"
+    ? "앞사람 단서 없이 책의 첫 장면을 시작합니다."
+    : awaitingPreviousEntry
+      ? "이전 참가자의 항목이 도착해야 현재 입력을 확정할 수 있습니다."
+      : previousType === "DRAW"
+        ? "그림에서 보이는 대상, 동작, 관계를 먼저 읽습니다."
+        : previousText
+          ? previousText.slice(0, 64)
+          : "이전 문장을 기준으로 다음 항목을 만듭니다.";
+  const inputValue = isDrawPhase
+    ? hasInk ? "그림 있음" : "그림 필요"
+    : isTextPhase
+      ? safeTextLength ? `${safeTextLength}/120자` : "문장 필요"
+      : isRevealPhase
+        ? `${Math.max(0, Number(revealInsight?.entryCount) || 0)}개 공개`
+        : phaseName;
+  const inputDetail = isDrawPhase
+    ? "캔버스에 한 획 이상 남아 있어야 그림 제출이 열립니다."
+    : normalizedPhase === "GUESS"
+      ? "이전 그림을 짧은 문장으로 다시 번역하는 단계입니다."
+      : normalizedPhase === "PROMPT"
+        ? currentTask || "다음 사람이 바로 떠올릴 수 있는 구체적인 장면을 적습니다."
+        : "공개 단계에서는 입력 대신 책의 변화를 순서대로 확인합니다.";
+  const nextValue = isRevealPhase
+    ? isHost ? "종료 가능" : "리플레이"
+    : mySubmitted
+      ? "다음 사람 대기"
+      : progressLabel;
+  const nextDetail = isRevealPhase
+    ? isHost
+      ? "모든 책을 확인한 뒤 방장이 게임 종료를 확정할 수 있습니다."
+      : "각 책의 처음과 마지막이 어떻게 달라졌는지 차례로 봅니다."
+    : mySubmitted
+      ? "내 항목은 잠겼고 다른 참가자의 제출을 기다립니다."
+      : `${progressLabel} 완료 상태를 보며 현재 단계의 마감을 기다립니다.`;
+
+  return [
+    {
+      key: "clue",
+      label: "단서 확인",
+      value: clueValue,
+      detail: clueDetail,
+      state: awaitingPreviousEntry ? "waiting" : normalizedPhase === "PROMPT" ? "active" : "done",
+    },
+    {
+      key: "input",
+      label: "입력 준비",
+      value: inputValue,
+      detail: inputDetail,
+      state: submitReady ? "ready" : isRevealPhase ? "reveal" : awaitingPreviousEntry ? "waiting" : "active",
+    },
+    {
+      key: "submit",
+      label: "제출",
+      value: mySubmitted ? "완료" : submitReady ? "가능" : awaitingPreviousEntry ? "대기" : isRevealPhase ? "없음" : "준비 중",
+      detail: mySubmitted
+        ? "제출한 항목은 다음 릴레이 순서로 넘어갔습니다."
+        : submitReady
+          ? "아래 실제 제출 버튼으로 현재 항목을 확정할 수 있습니다."
+          : isRevealPhase
+            ? "공개 단계는 더 이상 새 항목을 제출하지 않습니다."
+            : isDrawPhase
+              ? "캔버스에 그림이 있어야 제출할 수 있습니다."
+              : "문장을 입력해야 제출할 수 있습니다.",
+      state: mySubmitted ? "done" : submitReady ? "ready" : isRevealPhase ? "reveal" : "waiting",
+    },
+    {
+      key: "next",
+      label: "다음 흐름",
+      value: nextValue,
+      detail: nextDetail,
+      state: isRevealPhase ? "reveal" : mySubmitted ? "done" : "active",
+    },
+  ];
+};
+
+const TelestrationsActionRouteArt = ({ items = [], phase = "", mySubmitted = false, awaitingPreviousEntry = false }) => {
+  const paletteByState = {
+    ready: { fill: "#dcfce7", stroke: "#16a34a", text: "#166534" },
+    active: { fill: "#e0f2fe", stroke: "#0ea5e9", text: "#075985" },
+    waiting: { fill: "#fef3c7", stroke: "#f59e0b", text: "#92400e" },
+    done: { fill: "#f1f5f9", stroke: "#64748b", text: "#334155" },
+    reveal: { fill: "#fae8ff", stroke: "#d946ef", text: "#86198f" },
+  };
+  const nodes = items.slice(0, 4).map((item, index) => ({
+    ...item,
+    x: 62 + index * 108,
+    y: index % 2 ? 106 : 82,
+  }));
+  const statusLabel = mySubmitted ? "제출 완료" : awaitingPreviousEntry ? "단서 대기" : "입력 확인";
+
+  return (
+    <svg
+      data-smoke="telestrations-action-route-art"
+      viewBox="0 0 420 190"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`텔레스트레이션 액션 루트 ${statusLabel}`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="400" height="170" rx="28" fill="#f8fafc" stroke="#bae6fd" strokeWidth="3" />
+      <path d="M62 82C116 45 168 45 224 82s108 37 170 0" fill="none" stroke="#cbd5e1" strokeWidth="9" strokeLinecap="round" />
+      <path d="M62 106c58 33 112 33 166 0s110-33 178 0" fill="none" stroke="#e2e8f0" strokeWidth="6" strokeLinecap="round" />
+      {nodes.map((node, index) => {
+        const palette = paletteByState[node.state] || paletteByState.active;
+        const active = node.state === "ready" || (!mySubmitted && !awaitingPreviousEntry && index === 1);
+        return (
+          <g key={node.key} data-smoke="telestrations-action-route-node">
+            {index < nodes.length - 1 && (
+              <path
+                d={`M${node.x + 34} ${node.y}L${nodes[index + 1].x - 34} ${nodes[index + 1].y}`}
+                stroke={node.state === "done" || node.state === "ready" ? "#0f172a" : "#94a3b8"}
+                strokeWidth="5"
+                strokeLinecap="round"
+              />
+            )}
+            <circle cx={node.x} cy={node.y} r={active ? 34 : 30} fill={palette.fill} stroke={active ? "#0f172a" : palette.stroke} strokeWidth={active ? 5 : 3} />
+            {node.key === "clue" && (
+              <g>
+                <rect x={node.x - 13} y={node.y - 15} width="26" height="30" rx="6" fill="#ffffff" stroke={palette.stroke} strokeWidth="2" />
+                <path d={`M${node.x - 7} ${node.y - 6}h14M${node.x - 7} ${node.y + 2}h12M${node.x - 7} ${node.y + 10}h9`} stroke={palette.text} strokeWidth="3" strokeLinecap="round" />
+              </g>
+            )}
+            {node.key === "input" && (
+              <g>
+                <path d={`M${node.x - 16} ${node.y + 12}c9-25 27-33 44-20-8 17-21 25-42 26Z`} fill="#ffffff" stroke={palette.stroke} strokeWidth="2" />
+                <path d={`M${node.x - 10} ${node.y + 10}l25-25`} stroke={palette.text} strokeWidth="5" strokeLinecap="round" />
+              </g>
+            )}
+            {node.key === "submit" && (
+              <g>
+                <rect x={node.x - 18} y={node.y - 12} width="36" height="24" rx="7" fill="#ffffff" stroke={palette.stroke} strokeWidth="2" />
+                <path d={`M${node.x - 8} ${node.y}l6 6 13-15`} fill="none" stroke={palette.text} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              </g>
+            )}
+            {node.key === "next" && (
+              <g>
+                <path d={`M${node.x - 15} ${node.y - 8}h25l8 8-8 8h-25Z`} fill="#ffffff" stroke={palette.stroke} strokeWidth="2" />
+                <path d={`M${node.x - 4} ${node.y - 6}l8 6-8 6`} fill="none" stroke={palette.text} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              </g>
+            )}
+            <text x={node.x} y={node.y + 52} textAnchor="middle" fontSize="11" fontWeight="900" fill={palette.text}>{node.label}</text>
+          </g>
+        );
+      })}
+      <rect x="28" y="24" width="138" height="28" rx="14" fill="#ffffff" stroke="#bae6fd" />
+      <text x="97" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill="#075985">{String(phase || "").toUpperCase() || "READY"}</text>
+      <rect x="258" y="24" width="126" height="28" rx="14" fill="#ffffff" stroke="#cbd5e1" />
+      <text x="321" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill="#334155">{statusLabel}</text>
+    </svg>
+  );
+};
+
+const TelestrationsActionRoutePanel = ({
+  phase = "",
+  phaseLabel = "",
+  currentTask = "",
+  previousEntry = null,
+  previousEntryLabel = "",
+  awaitingPreviousEntry = false,
+  mySubmitted = false,
+  textLength = 0,
+  hasInk = false,
+  completedCount = 0,
+  playerCount = 0,
+  isHost = false,
+  revealInsight = null,
+}) => {
+  const routeItems = buildTelestrationsActionRouteItems({
+    phase,
+    phaseLabel,
+    currentTask,
+    previousEntry,
+    previousEntryLabel,
+    awaitingPreviousEntry,
+    mySubmitted,
+    textLength,
+    hasInk,
+    completedCount,
+    playerCount,
+    isHost,
+    revealInsight,
+  });
+  const normalizedPhase = String(phase || "").toUpperCase();
+  const safeTextLength = Math.max(0, Number(textLength) || 0);
+  const safeCompletedCount = Math.max(0, Number(completedCount) || 0);
+  const safePlayerCount = Math.max(0, Number(playerCount) || 0);
+  const statusLabel = mySubmitted
+    ? "내 항목 제출 완료"
+    : awaitingPreviousEntry
+      ? "이전 단서 대기"
+      : routeItems.some((item) => item.state === "ready")
+        ? "제출 가능"
+        : phaseLabel || normalizedPhase || "상태 확인";
+
+  return (
+    <section
+      data-smoke="telestrations-action-route-panel"
+      data-phase={normalizedPhase || "-"}
+      data-submitted={mySubmitted ? "true" : "false"}
+      data-awaiting-previous={awaitingPreviousEntry ? "true" : "false"}
+      data-text-length={safeTextLength}
+      data-has-ink={hasInk ? "true" : "false"}
+      data-progress={`${safeCompletedCount}/${safePlayerCount}`}
+      className="mt-4 overflow-hidden rounded-2xl border border-sky-100 bg-white p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <TelestrationsActionRouteArt
+          items={routeItems}
+          phase={phase}
+          mySubmitted={mySubmitted}
+          awaitingPreviousEntry={awaitingPreviousEntry}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-sky-600">텔레스트레이션 액션 루트</div>
+              <div className="mt-1 text-lg font-black text-slate-950">단서 확인, 입력 준비, 제출, 다음 흐름</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">현재 단계에서 막히는 지점을 먼저 보여주고 실제 입력 컨트롤은 그대로 유지합니다.</div>
+            </div>
+            <span className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-black text-sky-700">
+              {statusLabel}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {routeItems.map((item) => (
+              <div
+                key={item.key}
+                data-smoke="telestrations-action-route-item"
+                data-route-key={item.key}
+                className={`min-h-[96px] rounded-xl border px-3 py-2 ${telestrationsActionRouteTone(item.state)}`}
+              >
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const safeObject = (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : null);
 const telestrationsBooksOf = (value) => listOf(value).filter((book) => safeObject(book));
 const telestrationsEntriesOf = (book) => listOf(get(safeObject(book), "entries", "entries", [])).filter((entry) => safeObject(entry));
+const telestrationsEntryTypeLabel = (type) => {
+  const normalized = String(type || "").toUpperCase();
+  if (normalized === "PROMPT") return "원문";
+  if (normalized === "DRAW") return "그림";
+  if (normalized === "GUESS") return "추측";
+  return normalized || "입력";
+};
+const telestrationsEntryText = (entry) => {
+  if (!entry) return "";
+  const type = String(get(entry, "type", "type", "") || "").toUpperCase();
+  const text = String(get(entry, "text", "text", "") || "").replace(/\s+/g, " ").trim();
+  if (text) return text;
+  return type === "DRAW" && get(entry, "image_data", "imageData", "") ? "그림 단서" : "";
+};
+const telestrationsRevealExcerpt = (value, fallback = "대기") => {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return fallback;
+  return text.length > 42 ? `${text.slice(0, 41)}...` : text;
+};
+const buildTelestrationsRevealInsight = ({ books, revealBook, revealEntries, replayEntryIndex, playerNameBySeat, playerCount, totalSteps }) => {
+  const safeBooks = telestrationsBooksOf(books);
+  const entries = listOf(revealEntries).filter((entry) => safeObject(entry));
+  const entryCount = entries.length;
+  const selectedIndex = entryCount ? Math.max(0, Math.min(entryCount - 1, Number(replayEntryIndex) || 0)) : 0;
+  const selectedEntry = entries[selectedIndex] || null;
+  const ownerSeatNo = Number(get(revealBook, "owner_seat_no", "ownerSeatNo", 0)) || 0;
+  const ownerName = ownerSeatNo ? playerNameBySeat(ownerSeatNo) : "공개 대기";
+  const ownerTitle = ownerSeatNo ? `${ownerName}님의 책 변화` : "공개 대기 책 변화";
+  const drawingCount = entries.filter((entry) => String(get(entry, "type", "type", "") || "").toUpperCase() === "DRAW").length;
+  const textEntries = entries.filter((entry) => String(get(entry, "type", "type", "") || "").toUpperCase() !== "DRAW" && telestrationsEntryText(entry));
+  const promptEntry = entries.find((entry) => String(get(entry, "type", "type", "") || "").toUpperCase() === "PROMPT") || textEntries[0] || null;
+  const finalEntry = [...textEntries].reverse()[0] || entries[entryCount - 1] || null;
+  const promptText = telestrationsEntryText(promptEntry);
+  const finalText = telestrationsEntryText(finalEntry);
+  const selectedText = telestrationsEntryText(selectedEntry);
+  const changed = Boolean(promptText && finalText && promptText.toLowerCase() !== finalText.toLowerCase());
+  const comparisonLabel = !promptText || !finalText ? "비교 대기" : changed ? "문구 변화" : "원문 유지";
+  const comparisonDetail = !promptText || !finalText
+    ? "원문과 마지막 추측이 모두 공개되면 변화 폭을 비교합니다."
+    : changed
+      ? "첫 문장과 마지막 추측이 달라진 지점을 중심으로 리플레이를 보면 됩니다."
+      : "첫 문장과 마지막 추측이 거의 같은 흐름으로 이어졌습니다.";
+  const targetEntryCount = Math.max(1, Number(totalSteps) || Number(playerCount) || entryCount || 1);
+  const completeBookCount = safeBooks.filter((book) => telestrationsEntriesOf(book).length >= targetEntryCount).length;
+  const selectedAuthorSeatNo = Number(get(selectedEntry, "author_seat_no", "authorSeatNo", 0)) || 0;
+  const selectedType = String(get(selectedEntry, "type", "type", "") || "").toUpperCase();
+
+  return {
+    ownerName,
+    ownerTitle,
+    bookCount: safeBooks.length,
+    completeBookCount,
+    entryCount,
+    selectedIndex,
+    selectedType,
+    selectedTypeLabel: telestrationsEntryTypeLabel(selectedType),
+    selectedAuthorName: selectedAuthorSeatNo ? playerNameBySeat(selectedAuthorSeatNo) : "공개 대기",
+    selectedText: telestrationsRevealExcerpt(selectedText, selectedType === "DRAW" ? "그림 단서" : "내용 대기"),
+    comparisonLabel,
+    comparisonDetail,
+    changed,
+    items: [
+      {
+        label: "시작 문장",
+        value: telestrationsRevealExcerpt(promptText, "원문 대기"),
+        detail: promptEntry ? `${playerNameBySeat(get(promptEntry, "author_seat_no", "authorSeatNo", 0))}의 첫 단서` : "첫 문장이 아직 공개되지 않았습니다.",
+      },
+      {
+        label: "그림 전환",
+        value: `${drawingCount}회`,
+        detail: drawingCount ? "문장이 시각 단서로 바뀐 구간입니다." : "그림 항목이 아직 없습니다.",
+      },
+      {
+        label: "최종 추측",
+        value: telestrationsRevealExcerpt(finalText, "추측 대기"),
+        detail: finalEntry ? `${playerNameBySeat(get(finalEntry, "author_seat_no", "authorSeatNo", 0))}의 마지막 문장` : "마지막 문장이 아직 공개되지 않았습니다.",
+      },
+      {
+        label: "공개 진행",
+        value: `${selectedIndex + 1}/${Math.max(1, entryCount)}`,
+        detail: `${completeBookCount}/${safeBooks.length || 0}권이 전체 단계를 채웠습니다.`,
+      },
+    ],
+  };
+};
+
+const TelestrationsRevealArcArt = ({ insight }) => {
+  const activeKey = insight?.selectedType === "DRAW" ? "DRAW" : insight?.selectedType === "GUESS" ? "GUESS" : "PROMPT";
+  const progressRatio = Math.max(0, Math.min(1, Number(insight?.entryCount) ? (Number(insight?.selectedIndex || 0) + 1) / Number(insight.entryCount) : 0));
+  const nodes = [
+    { key: "PROMPT", x: 76, label: "원문", color: "#0ea5e9" },
+    { key: "DRAW", x: 210, label: "그림", color: "#f97316" },
+    { key: "GUESS", x: 344, label: "추측", color: "#8b5cf6" },
+  ];
+
+  return (
+    <svg
+      data-smoke="telestrations-reveal-arc-art"
+      viewBox="0 0 420 220"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`텔레스트레이션 공개 해석 ${insight?.comparisonLabel || "비교 대기"}`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="400" height="200" rx="28" fill="#f8fafc" stroke="#e9d5ff" strokeWidth="3" />
+      <path d="M40 150c48-35 87-44 117-28 45 24 82 25 127 3 40-20 70-12 97 25v40H40Z" fill="#f5d0fe" opacity="0.48" />
+      <path d="M76 112c52-52 101-52 148 0s96 52 148 0" fill="none" stroke="#cbd5e1" strokeWidth="10" strokeLinecap="round" />
+      <path d={`M76 112c${52 * progressRatio}-52 ${101 * progressRatio}-52 ${148 * progressRatio} 0s${96 * progressRatio} 52 ${148 * progressRatio} 0`} fill="none" stroke="#0f172a" strokeWidth="10" strokeLinecap="round" opacity="0.9" />
+      {nodes.map((node) => {
+        const active = node.key === activeKey;
+        return (
+          <g key={node.key} data-smoke="telestrations-reveal-arc-node">
+            <circle cx={node.x} cy="112" r={active ? 34 : 27} fill={active ? node.color : "#ffffff"} stroke={active ? "#0f172a" : "#cbd5e1"} strokeWidth={active ? 5 : 3} />
+            {node.key === "PROMPT" && (
+              <g>
+                <rect x={node.x - 13} y="99" width="26" height="26" rx="6" fill={active ? "#ffffff" : "#e0f2fe"} />
+                <path d={`M${node.x - 7} 107h14M${node.x - 7} 115h10M${node.x - 7} 123h13`} stroke={active ? node.color : "#0369a1"} strokeWidth="3" strokeLinecap="round" />
+              </g>
+            )}
+            {node.key === "DRAW" && (
+              <g>
+                <path d={`M${node.x - 17} 123c12-26 28-35 45-26-8 18-22 27-42 29Z`} fill={active ? "#ffffff" : "#ffedd5"} stroke={active ? "#ffffff" : "#f97316"} strokeWidth="2" />
+                <path d={`M${node.x - 12} 121l28-28`} stroke={active ? node.color : "#9a3412"} strokeWidth="5" strokeLinecap="round" />
+              </g>
+            )}
+            {node.key === "GUESS" && (
+              <g>
+                <path d={`M${node.x - 18} 100h36v25h-17l-10 9v-9h-9Z`} fill={active ? "#ffffff" : "#ede9fe"} />
+                <path d={`M${node.x - 9} 110h18M${node.x - 9} 119h12`} stroke={active ? node.color : "#6d28d9"} strokeWidth="3" strokeLinecap="round" />
+              </g>
+            )}
+            <text x={node.x} y="68" textAnchor="middle" fontSize="13" fontWeight="900" fill={active ? "#0f172a" : "#64748b"}>{node.label}</text>
+          </g>
+        );
+      })}
+      <rect x="44" y="24" width="144" height="28" rx="14" fill="#ffffff" stroke="#e9d5ff" />
+      <text x="116" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill="#86198f">{insight?.comparisonLabel || "비교 대기"}</text>
+      <rect x="234" y="24" width="142" height="28" rx="14" fill="#ffffff" stroke="#dbeafe" />
+      <text x="305" y="43" textAnchor="middle" fontSize="12" fontWeight="900" fill="#1e3a8a">{insight?.selectedIndex + 1 || 1}/{Math.max(1, insight?.entryCount || 0)} 공개</text>
+      <rect x="72" y="170" width="276" height="26" rx="13" fill="#ffffff" stroke={insight?.changed ? "#f0abfc" : "#bbf7d0"} />
+      <text x="210" y="188" textAnchor="middle" fontSize="12" fontWeight="900" fill={insight?.changed ? "#a21caf" : "#15803d"}>{insight?.changed ? "마지막 문장이 달라졌습니다" : "흐름이 이어졌습니다"}</text>
+    </svg>
+  );
+};
+
+const TelestrationsRevealInsightPanel = ({ insight }) => (
+  <section data-smoke="telestrations-reveal-insight-panel" className="mt-4 overflow-hidden rounded-2xl border border-fuchsia-100 bg-gradient-to-br from-fuchsia-50 via-white to-sky-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
+    <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <TelestrationsRevealArcArt insight={insight} />
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-xs font-black text-fuchsia-600">공개 해석</div>
+            <div className="mt-1 text-lg font-black text-slate-950">{insight.ownerTitle || `${insight.ownerName}님의 책 변화`}</div>
+            <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{insight.comparisonDetail}</div>
+          </div>
+          <span data-smoke="telestrations-reveal-drift" className={`rounded-full border px-3 py-1 text-[11px] font-black ${insight.changed ? "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700" : "border-emerald-100 bg-emerald-50 text-emerald-700"}`}>
+            {insight.comparisonLabel}
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {insight.items.map((item) => (
+            <div key={item.label} data-smoke="telestrations-reveal-insight-item" className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+              <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+              <div className="mt-0.5 text-sm font-black leading-snug text-slate-900">{item.value}</div>
+              <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+            </div>
+          ))}
+        </div>
+        <div data-smoke="telestrations-reveal-current" className="mt-3 rounded-xl border border-fuchsia-100 bg-white px-3 py-2">
+          <div className="text-[10px] font-black text-fuchsia-500">현재 보고 있는 항목</div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-black text-slate-900">
+            <span>{insight.selectedTypeLabel}</span>
+            <span className="text-slate-300">/</span>
+            <span>{insight.selectedAuthorName}</span>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">{insight.selectedIndex + 1}/{Math.max(1, insight.entryCount)}</span>
+          </div>
+          <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{insight.selectedText}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+);
 
 const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = false, onAction }) => {
   const safeGameState = safeObject(gameState) || {};
@@ -7397,7 +17157,59 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
   const revealBook = books[replayBookIndex] || books[0] || null;
   const revealEntries = telestrationsEntriesOf(revealBook);
   const revealEntry = revealEntries[replayEntryIndex] || revealEntries[0] || null;
+  const revealOwnerSeatNo = Number(get(revealBook, "owner_seat_no", "ownerSeatNo", 0)) || 0;
+  const revealBookLabel = revealOwnerSeatNo ? `${playerNameBySeat(revealOwnerSeatNo)}님의 책` : "공개 대기 책";
   const awaitingPreviousEntry = (phase === "DRAW" || phase === "GUESS") && !previousEntry;
+  const currentStepLabel = `${Math.min(currentStep + 1, totalSteps)}/${totalSteps}`;
+  const previousEntryLabel = phase === "PROMPT"
+    ? "새 책 시작"
+    : previousEntry
+      ? get(previousEntry, "type", "type", "") === "DRAW" ? "그림 단서" : "문장 단서"
+      : "단서 대기";
+  const inputLabel = phase === "PROMPT" ? "문장 입력"
+    : phase === "DRAW" ? "그림 제출"
+      : phase === "GUESS" ? "문장 추측"
+        : phase === "REVEAL" ? "리플레이"
+          : "상태 확인";
+  const telestrationsFlowItems = [
+    {
+      label: "단계",
+      value: phaseLabel,
+      detail: phase === "REVEAL" ? "책자별 변화를 넘겨 봅니다." : currentTask || "현재 입력을 완료합니다.",
+      icon: "stage",
+      tone: phase === "REVEAL" ? "done" : "neutral",
+    },
+    {
+      label: "책 흐름",
+      value: currentStepLabel,
+      detail: `${playerCount}명 릴레이`,
+      icon: "turn",
+      tone: "neutral",
+    },
+    {
+      label: "이전 단서",
+      value: previousEntryLabel,
+      detail: awaitingPreviousEntry ? "이전 입력을 불러오는 중" : "현재 판단의 근거",
+      icon: "recent",
+      tone: awaitingPreviousEntry ? "waiting" : "neutral",
+    },
+    {
+      label: "내 제출",
+      value: mySubmitted ? "완료" : inputLabel,
+      detail: phase === "REVEAL" ? `${books.length || 0}권 공개` : `${completedSeatNos.size}/${playerCount}명 완료`,
+      icon: "decision",
+      tone: mySubmitted || phase === "REVEAL" ? "done" : "active",
+    },
+  ];
+  const revealInsight = buildTelestrationsRevealInsight({
+    books,
+    revealBook,
+    revealEntries,
+    replayEntryIndex,
+    playerNameBySeat,
+    playerCount,
+    totalSteps,
+  });
 
   useEffect(() => {
     setText("");
@@ -7544,6 +17356,40 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
             </div>
           </div>
 
+          <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-2">
+            <TelestrationsChainArt
+              phase={phase}
+              currentStep={currentStep}
+              totalSteps={totalSteps}
+              completedCount={completedSeatNos.size}
+              playerCount={playerCount}
+              previousType={previousEntry ? get(previousEntry, "type", "type", "") : ""}
+            />
+          </div>
+
+          <GameFlowMeter
+            title="텔레스트레이션 체인"
+            detail="현재 단계, 이전 단서, 제출 진행률을 한 줄로 확인합니다."
+            items={telestrationsFlowItems}
+            tone="slate"
+            smoke="telestrations-flow-meter"
+            className="mt-4"
+          />
+
+          <TelestrationsInputGuidePanel
+            phase={phase}
+            phaseLabel={phaseLabel}
+            currentTask={currentTask}
+            previousEntry={previousEntry}
+            previousEntryLabel={previousEntryLabel}
+            awaitingPreviousEntry={awaitingPreviousEntry}
+            mySubmitted={mySubmitted}
+            textLength={text.trim().length}
+            hasInk={hasInk}
+            completedCount={completedSeatNos.size}
+            playerCount={playerCount}
+          />
+
           {awaitingPreviousEntry && (
             <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm font-black text-amber-700">
               이전 플레이어의 입력을 불러오는 중입니다. 잠시 후 자동으로 갱신됩니다.
@@ -7566,50 +17412,78 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
           )}
 
           {phase === "DRAW" && (
-            <div className="mt-4 grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-              <div>
-                <div className="mb-2 text-sm font-black text-slate-900">보고 그릴 문장</div>
-                <TelestrationsEntry entry={previousEntry} playerNameBySeat={playerNameBySeat} compact />
-              </div>
-              <div>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-sm font-black text-slate-900">내 그림</div>
-                  <div className="flex items-center gap-1.5">
-                    {["#111827", "#dc2626", "#2563eb", "#16a34a"].map((color) => (
-                      <button key={color} type="button" className={`h-8 w-8 rounded-full border-2 ${brushColor === color ? "border-slate-900" : "border-white"}`} style={{ backgroundColor: color }} onClick={() => setBrushColor(color)} aria-label={`색상 ${color}`} />
-                    ))}
-                    <select value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-black">
-                      <option value={3}>얇게</option>
-                      <option value={5}>보통</option>
-                      <option value={9}>굵게</option>
-                    </select>
-                    <button type="button" onClick={clearCanvas} disabled={mySubmitted} className="h-8 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-600 disabled:opacity-40">지우기</button>
-                  </div>
+            <>
+              <TelestrationsDrawingToolPanel
+                brushColor={brushColor}
+                brushSize={brushSize}
+                hasInk={hasInk}
+                mySubmitted={mySubmitted}
+                awaitingPreviousEntry={awaitingPreviousEntry}
+                completedCount={completedSeatNos.size}
+                playerCount={playerCount}
+              />
+              <div className="mt-4 grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <div>
+                  <div className="mb-2 text-sm font-black text-slate-900">보고 그릴 문장</div>
+                  <TelestrationsEntry
+                    entry={previousEntry}
+                    playerNameBySeat={playerNameBySeat}
+                    compact
+                    phase={phase}
+                    stepLabel={currentStepLabel}
+                    bookLabel={previousEntryLabel}
+                    completedCount={completedSeatNos.size}
+                    playerCount={playerCount}
+                  />
                 </div>
-                <canvas
-                  ref={canvasRef}
-                  width={640}
-                  height={420}
-                  className={`h-auto w-full touch-none rounded-lg border border-slate-200 bg-white shadow-inner ${awaitingPreviousEntry ? "pointer-events-none opacity-60" : ""}`}
-                  aria-disabled={awaitingPreviousEntry ? "true" : undefined}
-                  onPointerDown={beginDraw}
-                  onPointerMove={moveDraw}
-                  onPointerUp={endDraw}
-                  onPointerLeave={endDraw}
-                  onPointerCancel={endDraw}
-                />
-                <button type="button" onClick={submitDrawing} disabled={mySubmitted || !hasInk || awaitingPreviousEntry} className="mt-3 min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
-                  {mySubmitted ? "제출 완료" : "그림 제출"}
-                </button>
+                <div>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-black text-slate-900">내 그림</div>
+                    <div className="flex items-center gap-1.5">
+                      {["#111827", "#dc2626", "#2563eb", "#16a34a"].map((color) => (
+                        <button key={color} type="button" className={`h-8 w-8 rounded-full border-2 ${brushColor === color ? "border-slate-900" : "border-white"}`} style={{ backgroundColor: color }} onClick={() => setBrushColor(color)} aria-label={`색상 ${color}`} />
+                      ))}
+                      <select value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-black">
+                        <option value={3}>얇게</option>
+                        <option value={5}>보통</option>
+                        <option value={9}>굵게</option>
+                      </select>
+                      <button type="button" onClick={clearCanvas} disabled={mySubmitted} className="h-8 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-600 disabled:opacity-40">지우기</button>
+                    </div>
+                  </div>
+                  <canvas
+                    ref={canvasRef}
+                    width={640}
+                    height={420}
+                    className={`h-auto w-full touch-none rounded-lg border border-slate-200 bg-white shadow-inner ${awaitingPreviousEntry ? "pointer-events-none opacity-60" : ""}`}
+                    aria-disabled={awaitingPreviousEntry ? "true" : undefined}
+                    onPointerDown={beginDraw}
+                    onPointerMove={moveDraw}
+                    onPointerUp={endDraw}
+                    onPointerLeave={endDraw}
+                    onPointerCancel={endDraw}
+                  />
+                  <button type="button" onClick={submitDrawing} disabled={mySubmitted || !hasInk || awaitingPreviousEntry} className="mt-3 min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+                    {mySubmitted ? "제출 완료" : "그림 제출"}
+                  </button>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {phase === "GUESS" && (
             <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(360px,1fr)_minmax(280px,360px)]">
               <div className="min-w-0">
                 <div className="mb-2 text-sm font-black text-slate-900">보고 추측할 그림</div>
-                <TelestrationsEntry entry={previousEntry} playerNameBySeat={playerNameBySeat} />
+                <TelestrationsEntry
+                  entry={previousEntry}
+                  playerNameBySeat={playerNameBySeat}
+                  phase={phase}
+                  stepLabel={currentStepLabel}
+                  bookLabel={previousEntryLabel}
+                  completedCount={completedSeatNos.size}
+                  playerCount={playerCount}
+                />
               </div>
               <div className="space-y-3">
                 <textarea
@@ -7638,7 +17512,7 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-500">Replay</div>
-                <h2 className="mt-1 text-2xl font-black text-slate-900">{playerNameBySeat(get(revealBook, "owner_seat_no", "ownerSeatNo", 0))}님의 책</h2>
+                <h2 className="mt-1 text-2xl font-black text-slate-900">{revealBookLabel}</h2>
               </div>
               <div className="flex flex-wrap gap-2">
                 <select value={replayBookIndex} onChange={(event) => { setReplayBookIndex(Number(event.target.value)); setReplayEntryIndex(0); }} className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black">
@@ -7649,8 +17523,17 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
                 {isHost && <button type="button" onClick={endGame} className="min-h-10 rounded-lg bg-rose-600 px-4 text-sm font-black text-white">데이터 삭제 후 종료</button>}
               </div>
             </div>
+            <TelestrationsRevealInsightPanel insight={revealInsight} />
             <div className="mt-4">
-              <TelestrationsEntry entry={revealEntry} playerNameBySeat={playerNameBySeat} />
+              <TelestrationsEntry
+                entry={revealEntry}
+                playerNameBySeat={playerNameBySeat}
+                phase={phase}
+                stepLabel={`${Math.min(replayEntryIndex + 1, Math.max(1, revealEntries.length))}/${Math.max(1, revealEntries.length)}`}
+                bookLabel={revealBookLabel}
+                completedCount={revealEntries.length}
+                playerCount={totalSteps}
+              />
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <button type="button" onClick={() => setReplayEntryIndex((value) => Math.max(0, value - 1))} disabled={replayEntryIndex <= 0} className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-700 disabled:opacity-40">이전</button>
                 <div className="flex items-center justify-center rounded-lg bg-slate-50 text-xs font-black text-slate-500">{replayEntryIndex + 1}/{Math.max(1, revealEntries.length)}</div>
@@ -7730,11 +17613,998 @@ const mafiaRoleTone = {
   CITIZEN: "from-slate-500 via-slate-800 to-zinc-950 text-white",
 };
 
-const mafiaRoleIcons = {
-  MAFIA: Skull,
-  POLICE: Eye,
-  DOCTOR: HeartPulse,
-  CITIZEN: Users,
+const mafiaRoleSigilPalettes = {
+  MAFIA: { field: "#450a0a", rim: "#fb7185", wash: "#991b1b", ink: "#fff1f2", accent: "#f97316" },
+  POLICE: { field: "#0c4a6e", rim: "#7dd3fc", wash: "#1d4ed8", ink: "#eff6ff", accent: "#facc15" },
+  DOCTOR: { field: "#064e3b", rim: "#86efac", wash: "#0f766e", ink: "#ecfdf5", accent: "#f9fafb" },
+  CITIZEN: { field: "#334155", rim: "#cbd5e1", wash: "#475569", ink: "#f8fafc", accent: "#38bdf8" },
+};
+
+const MafiaRoleSigil = ({ role = "", className = "" }) => {
+  const normalizedRole = role && mafiaRoleLabels[role] ? role : "CITIZEN";
+  const palette = mafiaRoleSigilPalettes[normalizedRole] || mafiaRoleSigilPalettes.CITIZEN;
+  const label = mafiaRoleLabels[normalizedRole] || "역할";
+  const initials = label.slice(0, 2);
+
+  return (
+    <svg
+      data-smoke="mafia-role-sigil"
+      viewBox="0 0 120 120"
+      className={className}
+      role="img"
+      aria-label={`${label} 역할 표식`}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="104" height="104" rx="24" fill={palette.field} stroke={palette.rim} strokeWidth="5" />
+      <path d="M23 30c18 11 36 11 54 0 14-8 27-6 39 6v35c-18-10-34-9-49 3-22 18-48 12-64-12Z" fill={palette.wash} opacity="0.72" />
+      {normalizedRole === "MAFIA" && (
+        <g>
+          <path d="M34 76c5-25 18-39 26-39s21 14 26 39c-8 12-16 18-26 18S42 88 34 76Z" fill="#111827" stroke={palette.rim} strokeWidth="4" />
+          <path d="M38 47c11-15 37-15 48 0-6 7-14 11-24 11s-18-4-24-11Z" fill={palette.accent} />
+          <circle cx="49" cy="70" r="4" fill={palette.ink} />
+          <circle cx="71" cy="70" r="4" fill={palette.ink} />
+        </g>
+      )}
+      {normalizedRole === "POLICE" && (
+        <g>
+          <path d="M60 30l36 13v23c0 22-13 35-36 43-23-8-36-21-36-43V43Z" fill="#0f172a" stroke={palette.rim} strokeWidth="4" />
+          <path d="M35 66c15-16 35-16 50 0-15 16-35 16-50 0Z" fill={palette.ink} opacity="0.9" />
+          <circle cx="60" cy="66" r="11" fill={palette.wash} stroke={palette.accent} strokeWidth="4" />
+        </g>
+      )}
+      {normalizedRole === "DOCTOR" && (
+        <g>
+          <circle cx="60" cy="64" r="35" fill="#052e2b" stroke={palette.rim} strokeWidth="4" />
+          <path d="M53 37h14v19h19v14H67v20H53V70H34V56h19Z" fill={palette.accent} />
+          <path d="M33 89c12-9 26-12 42-9" fill="none" stroke={palette.rim} strokeWidth="5" strokeLinecap="round" />
+        </g>
+      )}
+      {normalizedRole === "CITIZEN" && (
+        <g>
+          <circle cx="44" cy="55" r="13" fill={palette.ink} opacity="0.92" />
+          <circle cx="76" cy="55" r="13" fill={palette.ink} opacity="0.92" />
+          <path d="M25 91c4-18 17-27 35-27s31 9 35 27Z" fill={palette.ink} opacity="0.86" />
+          <path d="M36 88c5-11 13-17 24-17s19 6 24 17" fill="none" stroke={palette.accent} strokeWidth="5" strokeLinecap="round" />
+        </g>
+      )}
+      <rect x="31" y="13" width="58" height="20" rx="10" fill="#020617" opacity="0.5" />
+      <text x="60" y="28" textAnchor="middle" fontSize="12" fontWeight="900" fill={palette.ink}>{initials}</text>
+    </svg>
+  );
+};
+
+const mafiaActionProfiles = {
+  MAFIA_KILL: {
+    label: "습격",
+    shortLabel: "제거",
+    tone: "rose",
+    title: "시민팀 생존자를 줄입니다.",
+    detail: "마피아는 같은 대상을 고를수록 밤 결과가 선명해집니다.",
+    color: "#e11d48",
+    wash: "#ffe4e6",
+  },
+  POLICE_CHECK: {
+    label: "조사",
+    shortLabel: "확인",
+    tone: "sky",
+    title: "의심 대상을 확인합니다.",
+    detail: "경찰 결과는 다음 낮 토론의 가장 강한 근거가 됩니다.",
+    color: "#0284c7",
+    wash: "#e0f2fe",
+  },
+  DOCTOR_SAVE: {
+    label: "보호",
+    shortLabel: "보호",
+    tone: "emerald",
+    title: "밤 습격을 막을 후보를 고릅니다.",
+    detail: "마피아가 노릴 법한 핵심 플레이어를 살리는 판단이 중요합니다.",
+    color: "#059669",
+    wash: "#d1fae5",
+  },
+  VOTE: {
+    label: "투표",
+    shortLabel: "처형",
+    tone: "amber",
+    title: "낮 토론의 결론을 냅니다.",
+    detail: "투표는 생존 균형을 바꾸는 공개 선택입니다.",
+    color: "#d97706",
+    wash: "#fef3c7",
+  },
+};
+
+const MafiaTargetIntelArt = ({ actionType = "", aliveMafia = 0, aliveTown = 0, targetCount = 0, submittedCount = 0, selected = false }) => {
+  const profile = mafiaActionProfiles[actionType] || {
+    label: "대기",
+    shortLabel: "대기",
+    color: "#64748b",
+    wash: "#f1f5f9",
+  };
+  const mafiaDots = Math.max(0, Math.min(6, Number(aliveMafia) || 0));
+  const townDots = Math.max(0, Math.min(8, Number(aliveTown) || 0));
+  const targetDots = Math.max(0, Math.min(6, Number(targetCount) || 0));
+  const submittedDots = Math.max(0, Math.min(6, Number(submittedCount) || 0));
+
+  return (
+    <svg
+      data-smoke="mafia-target-intel-art"
+      viewBox="0 0 320 160"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`마피아 행동 상황도 ${profile.label}`}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="304" height="144" rx="28" fill="#020617" />
+      <path d="M30 108c39-41 78-46 117-16 42 33 85 32 128-9v46H30Z" fill={profile.color} opacity="0.22" />
+      <circle cx="76" cy="66" r="38" fill={profile.wash} opacity="0.95" />
+      <path d="M76 36c17 24 27 37 27 51 0 18-13 30-27 30S49 105 49 87c0-14 10-27 27-51Z" fill={profile.color} opacity="0.95" />
+      <text x="76" y="87" textAnchor="middle" fontSize="15" fontWeight="900" fill="#ffffff">{profile.shortLabel}</text>
+      <g transform="translate(132 34)">
+        <text x="0" y="0" fontSize="11" fontWeight="900" fill="#fecdd3">마피아</text>
+        {Array.from({ length: Math.max(1, mafiaDots) }).map((_, index) => (
+          <circle key={`mafia-${index}`} cx={index * 13} cy="20" r="5.5" fill="#fb7185" opacity={index < mafiaDots ? 0.96 : 0.18} />
+        ))}
+        <text x="0" y="48" fontSize="11" fontWeight="900" fill="#bfdbfe">시민팀</text>
+        {Array.from({ length: Math.max(1, townDots) }).map((_, index) => (
+          <circle key={`town-${index}`} cx={index * 13} cy="68" r="5.5" fill="#60a5fa" opacity={index < townDots ? 0.96 : 0.18} />
+        ))}
+      </g>
+      <g transform="translate(132 116)">
+        <text x="0" y="0" fontSize="10" fontWeight="900" fill="#cbd5e1">후보</text>
+        {Array.from({ length: Math.max(1, targetDots) }).map((_, index) => (
+          <rect key={`target-${index}`} x={36 + index * 17} y="-11" width="12" height="12" rx="4" fill={profile.color} opacity={index < targetDots ? 0.95 : 0.2} />
+        ))}
+        <text x="154" y="0" fontSize="10" fontWeight="900" fill="#cbd5e1">제출</text>
+        {Array.from({ length: Math.max(1, submittedDots) }).map((_, index) => (
+          <circle key={`done-${index}`} cx={190 + index * 14} cy="-5" r="5" fill="#22c55e" opacity={index < submittedDots ? 0.95 : 0.18} />
+        ))}
+      </g>
+      {selected && (
+        <g>
+          <path d="M258 47l18 18-18 18-18-18Z" fill="#ffffff" stroke={profile.color} strokeWidth="4" />
+          <circle cx="258" cy="65" r="5" fill={profile.color} />
+          <text x="258" y="103" textAnchor="middle" fontSize="10" fontWeight="900" fill="#ffffff">대상 선택</text>
+        </g>
+      )}
+    </svg>
+  );
+};
+
+const MafiaTargetEmptyBriefArt = ({
+  reasonLabel = "대기",
+  mySubmitted = false,
+  myAlive = true,
+  actionType = "",
+  aliveMafia = 0,
+  aliveTown = 0,
+}) => {
+  const tone = !myAlive ? "#94a3b8" : mySubmitted ? "#22c55e" : actionType ? "#f59e0b" : "#64748b";
+  const nodeLabels = [
+    { label: "이유", value: reasonLabel, x: 76, y: 110, active: true },
+    { label: "단계", value: actionType ? "행동" : "대기", x: 172, y: 66, active: Boolean(actionType) },
+    { label: "제출", value: mySubmitted ? "완료" : "확인", x: 258, y: 110, active: mySubmitted },
+  ];
+
+  return (
+    <svg
+      data-smoke="mafia-target-empty-art"
+      viewBox="0 0 330 178"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`마피아 대상 후보 없음: ${reasonLabel}`}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="314" height="162" rx="24" fill="#020617" stroke="#475569" strokeWidth="3" />
+      <path d="M42 122c43-45 83-48 121-9 35 36 74 31 116-16" fill="none" stroke="#334155" strokeWidth="16" strokeLinecap="round" />
+      <path d="M42 122c43-45 83-48 121-9 35 36 74 31 116-16" fill="none" stroke={tone} strokeWidth="5" strokeLinecap="round" />
+      <g transform="translate(34 32)">
+        <text x="0" y="0" fontSize="11" fontWeight="900" fill="#cbd5e1">대상 후보 없음</text>
+        <text x="0" y="21" fontSize="18" fontWeight="900" fill="#ffffff">{reasonLabel}</text>
+      </g>
+      <g transform="translate(230 31)">
+        <text x="0" y="0" fontSize="10" fontWeight="900" fill="#fecdd3">마피아</text>
+        <text x="0" y="20" fontSize="18" fontWeight="900" fill="#ffffff">{aliveMafia}</text>
+        <text x="48" y="0" fontSize="10" fontWeight="900" fill="#bfdbfe">시민</text>
+        <text x="48" y="20" fontSize="18" fontWeight="900" fill="#ffffff">{aliveTown}</text>
+      </g>
+      {nodeLabels.map((node, index) => (
+        <g key={`${node.label}-${index}`} data-smoke="mafia-target-empty-node">
+          <circle cx={node.x} cy={node.y} r="22" fill={node.active ? tone : "#1e293b"} stroke={node.active ? "#f8fafc" : "#64748b"} strokeWidth="3" />
+          <text x={node.x} y={node.y - 4} textAnchor="middle" fontSize="9" fontWeight="900" fill={node.active ? "#ffffff" : "#cbd5e1"}>{node.label}</text>
+          <text x={node.x} y={node.y + 11} textAnchor="middle" fontSize="10" fontWeight="900" fill="#ffffff">{node.value}</text>
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+const MafiaTargetEmptyBrief = ({
+  actionType = "",
+  phaseLabel = "",
+  mySubmitted = false,
+  myAlive = true,
+  aliveMafia = 0,
+  aliveTown = 0,
+  profile = null,
+}) => {
+  const emptyReason = !myAlive
+    ? "탈락 관전"
+    : mySubmitted
+      ? "행동 제출 완료"
+      : !actionType
+        ? "현재 행동 없음"
+        : "선택 후보 없음";
+  const emptyDetail = !myAlive
+    ? "탈락한 플레이어는 투표와 밤 행동을 제출하지 않고 진행 상황을 확인합니다."
+    : mySubmitted
+      ? "이미 제출한 행동은 서버 반영을 기다리는 상태라 새 후보를 표시하지 않습니다."
+      : !actionType
+        ? "현재 단계에서 내 차례 행동이 없어서 선택 가능한 대상이 없습니다."
+        : "살아 있는 후보가 없거나 현재 규칙상 선택할 수 있는 대상이 없습니다.";
+  const balanceTone = Number(aliveMafia) >= Number(aliveTown) ? "마피아가 시민팀을 압박 중입니다." : "시민팀이 수적 우위를 유지 중입니다.";
+  const items = [
+    {
+      label: "비어 있는 이유",
+      value: emptyReason,
+      detail: emptyDetail,
+    },
+    {
+      label: "현재 단계",
+      value: phaseLabel || profile?.label || "대기",
+      detail: profile?.detail || "사회자 진행과 다음 액션을 기다립니다.",
+    },
+    {
+      label: "생존 균형",
+      value: `마피아 ${aliveMafia} · 시민 ${aliveTown}`,
+      detail: balanceTone,
+    },
+  ];
+
+  return (
+    <div data-smoke="mafia-target-empty-brief" className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 sm:grid-cols-[180px_minmax(0,1fr)]">
+      <MafiaTargetEmptyBriefArt
+        reasonLabel={emptyReason}
+        actionType={actionType}
+        mySubmitted={mySubmitted}
+        myAlive={myAlive}
+        aliveMafia={aliveMafia}
+        aliveTown={aliveTown}
+      />
+      <div className="grid gap-2">
+        {items.map((item) => (
+          <div key={item.label} data-smoke="mafia-target-empty-item" className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+            <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+            <div className="mt-0.5 text-sm font-black text-slate-950">{item.value}</div>
+            <div className="mt-1 text-[11px] font-bold leading-snug text-slate-600">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const MafiaTargetIntelPanel = ({
+  actionType = "",
+  phaseLabel = "",
+  mySubmitted = false,
+  myAlive = true,
+  aliveMafia = 0,
+  aliveTown = 0,
+  targetPlayers = [],
+  selectedTargetSeatNo = 0,
+  completedSeatNos = new Set(),
+  votedSeatNos = new Set(),
+  playerNameBySeat = (seatNo) => `${seatNo}번`,
+}) => {
+  const profile = mafiaActionProfiles[actionType] || {
+    label: "대기",
+    title: myAlive ? "현재 단계에서는 내 행동이 없습니다." : "탈락 상태로 관전 중입니다.",
+    detail: "사회자 진행과 생존 균형을 확인하세요.",
+    color: "#64748b",
+    wash: "#f1f5f9",
+    tone: "slate",
+  };
+  const submittedSeats = new Set([...completedSeatNos, ...votedSeatNos].map(Number));
+  const selectedName = selectedTargetSeatNo ? playerNameBySeat(selectedTargetSeatNo) : "";
+  const actionLocked = !actionType || mySubmitted || !myAlive;
+  const balanceTone = Number(aliveMafia) >= Number(aliveTown) ? "마피아 압박 우세" : "시민팀 수적 우세";
+  const intelItems = [
+    {
+      label: "이번 목표",
+      value: actionType ? profile.label : "대기",
+      detail: profile.title,
+    },
+    {
+      label: "선택 대상",
+      value: selectedName || "미선택",
+      detail: selectedName ? `${selectedName}님으로 제출 준비` : `${targetPlayers.length}명 후보 중 선택`,
+    },
+    {
+      label: "제출 상태",
+      value: mySubmitted ? "완료" : actionLocked ? "잠김" : "선택 필요",
+      detail: `${submittedSeats.size}명 행동 반영`,
+    },
+    {
+      label: "승리 압력",
+      value: `마피아 ${aliveMafia} · 시민 ${aliveTown}`,
+      detail: balanceTone,
+    },
+  ];
+
+  return (
+    <section data-smoke="mafia-target-intel-panel" className="mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-zinc-50 p-3 shadow-sm">
+      <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+        <MafiaTargetIntelArt
+          actionType={actionType}
+          aliveMafia={aliveMafia}
+          aliveTown={aliveTown}
+          targetCount={targetPlayers.length}
+          submittedCount={submittedSeats.size}
+          selected={Boolean(selectedTargetSeatNo)}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-slate-500">{phaseLabel || "마피아 진행"}</div>
+              <div className="mt-1 text-lg font-black text-slate-950">{profile.title}</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{profile.detail}</div>
+            </div>
+            <div className="rounded-full px-3 py-1 text-[11px] font-black" style={{ backgroundColor: profile.wash, color: profile.color }}>
+              {profile.label}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {intelItems.map((item) => (
+              <div key={item.label} data-smoke="mafia-target-intel-item" className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black text-slate-900">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3">
+            {targetPlayers.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {targetPlayers.slice(0, 6).map((player) => {
+                  const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+                  const selected = Number(selectedTargetSeatNo) === seatNo;
+                  return (
+                    <span
+                      key={seatNo}
+                      data-smoke="mafia-target-candidate"
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-black ${selected ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}
+                    >
+                      {playerNameBySeat(seatNo)}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <MafiaTargetEmptyBrief
+                actionType={actionType}
+                phaseLabel={phaseLabel}
+                mySubmitted={mySubmitted}
+                myAlive={myAlive}
+                aliveMafia={aliveMafia}
+                aliveTown={aliveTown}
+                profile={profile}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const MafiaVotePressureArt = ({
+  rows = [],
+  aliveMafia = 0,
+  aliveTown = 0,
+  phase = "",
+  selectedTargetSeatNo = 0,
+}) => {
+  const visibleRows = rows.slice(0, 8);
+  const aliveTotal = Math.max(1, Number(aliveMafia || 0) + Number(aliveTown || 0));
+  const mafiaRatio = Math.max(0, Math.min(1, Number(aliveMafia || 0) / aliveTotal));
+  const townRatio = Math.max(0, Math.min(1, Number(aliveTown || 0) / aliveTotal));
+  const submittedCount = rows.filter((row) => row.alive && row.submitted).length;
+  const aliveCount = rows.filter((row) => row.alive).length;
+  const selectedRow = rows.find((row) => Number(row.seatNo) === Number(selectedTargetSeatNo));
+  const maxVotes = Math.max(0, ...rows.map((row) => Number(row.voteCount || 0)));
+  const centerLabel = phase === "DAY_VOTE" || phase === "TRIAL_RESULT" || maxVotes > 0 ? "투표" : phase?.startsWith("NIGHT") ? "밤" : "토론";
+  const nodeGap = visibleRows.length > 1 ? 470 / (visibleRows.length - 1) : 0;
+
+  return (
+    <svg
+      data-smoke="mafia-vote-pressure-art"
+      viewBox="0 0 640 230"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`마피아 추리 투표 압박 생존 ${aliveCount}명`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="620" height="210" rx="28" fill="#020617" stroke="#475569" strokeWidth="3" />
+      <path d="M36 70c68-33 130-34 187-2 60 35 125 32 196-9 56-32 104-19 143 39v90c-62-32-123-31-183 3-57 33-119 31-185-7-54-31-108-31-158 1Z" fill="#1e293b" opacity="0.78" />
+      <g transform="translate(56 36)">
+        <text x="0" y="0" fontSize="11" fontWeight="900" fill="#fecdd3">마피아</text>
+        <rect x="0" y="11" width="220" height="16" rx="8" fill="#1f2937" />
+        <rect x="0" y="11" width={220 * mafiaRatio} height="16" rx="8" fill="#fb7185" />
+        <text x="234" y="24" fontSize="12" fontWeight="900" fill="#fecdd3">{aliveMafia}명</text>
+      </g>
+      <g transform="translate(360 36)">
+        <text x="0" y="0" fontSize="11" fontWeight="900" fill="#bfdbfe">시민팀</text>
+        <rect x="0" y="11" width="170" height="16" rx="8" fill="#1f2937" />
+        <rect x="0" y="11" width={170 * townRatio} height="16" rx="8" fill="#60a5fa" />
+        <text x="184" y="24" fontSize="12" fontWeight="900" fill="#bfdbfe">{aliveTown}명</text>
+      </g>
+      <circle cx="320" cy="118" r="42" fill={maxVotes > 0 ? "#92400e" : "#0f172a"} stroke={maxVotes > 0 ? "#fbbf24" : "#64748b"} strokeWidth="5" />
+      <text x="320" y="112" textAnchor="middle" fontSize="13" fontWeight="900" fill="#ffffff">{centerLabel}</text>
+      <text x="320" y="133" textAnchor="middle" fontSize="18" fontWeight="900" fill={maxVotes > 0 ? "#fef3c7" : "#cbd5e1"}>{maxVotes > 0 ? `${maxVotes}표` : `${submittedCount}/${aliveCount}`}</text>
+      {visibleRows.map((row, index) => {
+        const x = visibleRows.length > 1 ? 85 + index * nodeGap : 320;
+        const y = 178;
+        const danger = Number(row.voteCount || 0) === maxVotes && maxVotes > 0;
+        const selected = Number(row.seatNo) === Number(selectedTargetSeatNo);
+        const mine = Boolean(row.mine);
+        const fill = !row.alive ? "#334155" : danger ? "#fef3c7" : row.submitted ? "#dcfce7" : selected ? "#ffe4e6" : "#f8fafc";
+        const stroke = mine ? "#f8fafc" : danger ? "#f59e0b" : selected ? "#fb7185" : row.submitted ? "#22c55e" : "#94a3b8";
+        return (
+          <g key={`${row.seatNo}-${index}`} data-smoke="mafia-vote-pressure-node">
+            <path d={`M${x} ${y - 31}Q${(x + 320) / 2} ${row.voteCount > 0 || selected ? 122 : 151} 320 118`} fill="none" stroke={danger ? "#fbbf24" : selected ? "#fb7185" : row.submitted ? "#22c55e" : "#64748b"} strokeWidth={danger ? 4 : 2.5} strokeLinecap="round" opacity={row.alive ? 0.82 : 0.28} />
+            <circle cx={x} cy={y} r={mine ? 23 : 19} fill={fill} stroke={stroke} strokeWidth={mine ? 5 : 3} opacity={row.alive ? 1 : 0.58} />
+            <text x={x} y={y - 2} textAnchor="middle" fontSize="11" fontWeight="900" fill={!row.alive ? "#cbd5e1" : danger ? "#92400e" : "#0f172a"}>{row.shortName}</text>
+            <text x={x} y={y + 13} textAnchor="middle" fontSize="8" fontWeight="900" fill={!row.alive ? "#cbd5e1" : danger ? "#92400e" : "#475569"}>{row.voteCount > 0 ? `${row.voteCount}표` : row.submitted ? "완료" : row.alive ? "대기" : "탈락"}</text>
+          </g>
+        );
+      })}
+      {rows.length > visibleRows.length && (
+        <text x="594" y="183" textAnchor="middle" fontSize="12" fontWeight="900" fill="#cbd5e1">+{rows.length - visibleRows.length}</text>
+      )}
+      {selectedRow && (
+        <text x="320" y="202" textAnchor="middle" fontSize="11" fontWeight="900" fill="#fecdd3">선택 대상: {selectedRow.name}</text>
+      )}
+    </svg>
+  );
+};
+
+const MafiaVotePressurePanel = ({
+  phase = "",
+  phaseLabel = "",
+  rows = [],
+  aliveMafia = 0,
+  aliveTown = 0,
+  selectedTargetSeatNo = 0,
+}) => {
+  if (!rows.length) return null;
+  const aliveRows = rows.filter((row) => row.alive);
+  const submittedRows = aliveRows.filter((row) => row.submitted);
+  const voteRows = aliveRows.filter((row) => Number(row.voteCount || 0) > 0);
+  const maxVoteCount = Math.max(0, ...aliveRows.map((row) => Number(row.voteCount || 0)));
+  const dangerRows = maxVoteCount > 0 ? aliveRows.filter((row) => Number(row.voteCount || 0) === maxVoteCount) : [];
+  const selectedRow = rows.find((row) => Number(row.seatNo) === Number(selectedTargetSeatNo));
+  const mafiaParityPressure = Number(aliveMafia) >= Number(aliveTown);
+  const pressureItems = [
+    {
+      label: "생존 균형",
+      value: `마피아 ${aliveMafia} · 시민 ${aliveTown}`,
+      detail: mafiaParityPressure ? "마피아 수가 시민팀을 따라잡으면 즉시 위험해집니다." : "시민팀은 생존 수 우위를 투표 근거로 바꿔야 합니다.",
+      className: mafiaParityPressure ? "border-rose-100 bg-rose-50" : "border-sky-100 bg-sky-50",
+    },
+    {
+      label: "제출 완료",
+      value: `${submittedRows.length}/${aliveRows.length || "-"}명`,
+      detail: "밤 행동 완료와 낮 투표 완료를 같은 흐름에서 읽습니다.",
+      className: "border-emerald-100 bg-emerald-50",
+    },
+    {
+      label: "투표 압박",
+      value: voteRows.length ? `${dangerRows.map((row) => row.name).join(", ")} ${maxVoteCount}표` : "득표 대기",
+      detail: voteRows.length ? "공개 득표가 있으면 최다 득표자가 처형 위험 후보입니다." : "투표 단계가 되면 좌석별 득표가 이 패널에 누적됩니다.",
+      className: "border-amber-100 bg-amber-50",
+    },
+    {
+      label: "처형 위험",
+      value: selectedRow ? `${selectedRow.name} 선택 중` : dangerRows.length ? dangerRows.map((row) => row.name).join(", ") : "후보 없음",
+      detail: selectedRow ? "현재 내가 고른 대상이 전체 압박 지도에 강조됩니다." : "선택 또는 득표 정보가 없으면 생존 균형을 먼저 확인합니다.",
+      className: "border-slate-100 bg-slate-50",
+    },
+  ];
+
+  return (
+    <section data-smoke="mafia-vote-pressure-panel" className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-black text-rose-700">추리 투표 압박</div>
+          <div className="mt-1 text-lg font-black text-slate-950">누가 위험하고 어느 팀이 유리한가</div>
+          <div className="mt-1 max-w-2xl text-xs font-bold leading-relaxed text-slate-600">
+            생존 균형, 행동 완료, 공개 득표, 선택 대상을 한 장면에서 읽어 다음 토론과 투표 판단을 정리합니다.
+          </div>
+        </div>
+        <div className="rounded-2xl bg-slate-50 px-3 py-2 text-right">
+          <div className="text-[10px] font-black text-slate-500">현재 단계</div>
+          <div className="mt-0.5 text-sm font-black text-slate-900">{phaseLabel || phase || "대기"}</div>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.78fr)]">
+        <MafiaVotePressureArt
+          rows={rows}
+          aliveMafia={aliveMafia}
+          aliveTown={aliveTown}
+          phase={phase}
+          selectedTargetSeatNo={selectedTargetSeatNo}
+        />
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+          {pressureItems.map((item) => (
+            <div key={item.label} data-smoke="mafia-vote-pressure-item" className={`rounded-xl border px-3 py-2 ${item.className}`}>
+              <div className="text-[10px] font-black text-slate-500">{item.label}</div>
+              <div className="mt-0.5 text-sm font-black text-slate-950">{item.value}</div>
+              <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const mafiaActionRouteTone = (state) => ({
+  ready: "border-emerald-100 bg-emerald-50 text-emerald-900",
+  active: "border-rose-100 bg-rose-50 text-rose-900",
+  waiting: "border-amber-100 bg-amber-50 text-amber-900",
+  done: "border-slate-100 bg-slate-50 text-slate-800",
+  host: "border-indigo-100 bg-indigo-50 text-indigo-900",
+}[state] || "border-slate-100 bg-white text-slate-900");
+
+const buildMafiaActionRouteItems = ({
+  phase = "",
+  phaseLabel = "",
+  actionType = "",
+  myAlive = true,
+  mySubmitted = false,
+  myTask = "",
+  targetPlayers = [],
+  selectedTargetSeatNo = 0,
+  selectedTargetName = "",
+  completedCount = 0,
+  votedCount = 0,
+  aliveCount = 0,
+  aliveMafia = 0,
+  aliveTown = 0,
+  remainingSeconds = 0,
+  isHost = false,
+}) => {
+  const profile = mafiaActionProfiles[actionType] || null;
+  const normalizedPhase = String(phase || "").toUpperCase();
+  const finished = normalizedPhase === "FINISHED";
+  const hasAction = Boolean(actionType);
+  const hasTargets = targetPlayers.length > 0;
+  const hasSelection = Boolean(Number(selectedTargetSeatNo));
+  const submittedCount = Math.max(Number(completedCount) || 0, Number(votedCount) || 0);
+  const safeAliveCount = Math.max(0, Number(aliveCount) || 0);
+  const actionLabel = profile?.label || (finished ? "결과" : "대기");
+  const phaseText = phaseLabel || normalizedPhase || "대기";
+  const submitReady = hasAction && hasTargets && hasSelection && myAlive && !mySubmitted;
+  const submitLockedReason = !myAlive
+    ? "탈락 상태라 행동을 제출하지 않습니다."
+    : mySubmitted
+      ? "이미 제출한 행동은 현재 단계에서 잠겼습니다."
+      : !hasAction
+        ? "현재 내 역할이 제출할 행동을 받지 않았습니다."
+        : !hasTargets
+          ? "선택 가능한 대상이 없습니다."
+          : !hasSelection
+            ? "대상을 먼저 선택해야 제출할 수 있습니다."
+            : "실제 제출 버튼으로 확정할 수 있습니다.";
+
+  return [
+    {
+      key: "state",
+      label: "상황 파악",
+      value: phaseText,
+      detail: finished ? "게임 결과를 확인하는 단계입니다." : myTask || "사회자 진행과 남은 시간을 먼저 확인합니다.",
+      state: finished ? "done" : hasAction ? "active" : "waiting",
+    },
+    {
+      key: "target",
+      label: "대상 선택",
+      value: selectedTargetName || (hasTargets ? `${targetPlayers.length}명 후보` : "후보 없음"),
+      detail: hasAction
+        ? `${actionLabel} 행동은 후보 목록에서 한 명을 고른 뒤 제출됩니다.`
+        : "행동 후보가 없으면 생존 균형과 진행 상태를 보는 단계입니다.",
+      state: hasSelection ? "ready" : hasAction && hasTargets ? "active" : "waiting",
+    },
+    {
+      key: "submit",
+      label: "제출",
+      value: mySubmitted ? "완료" : submitReady ? "가능" : "잠김",
+      detail: submitLockedReason,
+      state: mySubmitted ? "done" : submitReady ? "ready" : "waiting",
+    },
+    {
+      key: "advance",
+      label: "다음 진행",
+      value: finished ? "결과" : isHost ? "방장 진행" : `${Math.max(0, Number(remainingSeconds) || 0)}초`,
+      detail: finished
+        ? `최종 생존 균형은 마피아 ${aliveMafia}명, 시민 ${aliveTown}명입니다.`
+        : isHost
+          ? "방장은 수동 진행 버튼이나 자동 타이머로 다음 단계를 넘깁니다."
+          : `${submittedCount}/${safeAliveCount || "-"}명 제출 흐름을 보며 다음 밤/낮 전환을 기다립니다.`,
+      state: finished ? "done" : isHost ? "host" : submittedCount >= safeAliveCount && safeAliveCount > 0 ? "ready" : "active",
+    },
+  ];
+};
+
+const MafiaActionRouteArt = ({ items = [], actionType = "", mySubmitted = false, selectedTargetSeatNo = 0 }) => {
+  const profile = mafiaActionProfiles[actionType] || { label: "대기", color: "#64748b", wash: "#f1f5f9" };
+  const paletteByState = {
+    ready: { fill: "#dcfce7", stroke: "#16a34a", text: "#166534" },
+    active: { fill: "#ffe4e6", stroke: "#e11d48", text: "#9f1239" },
+    waiting: { fill: "#fef3c7", stroke: "#d97706", text: "#92400e" },
+    done: { fill: "#f1f5f9", stroke: "#64748b", text: "#334155" },
+    host: { fill: "#e0e7ff", stroke: "#4f46e5", text: "#3730a3" },
+  };
+  const nodes = items.slice(0, 4).map((item, index) => ({ ...item, x: 66 + index * 108, y: index % 2 ? 104 : 78 }));
+  const statusLabel = mySubmitted ? "제출 완료" : selectedTargetSeatNo ? "대상 선택" : profile.label;
+
+  return (
+    <svg
+      data-smoke="mafia-action-route-art"
+      viewBox="0 0 430 192"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`마피아 액션 루트 ${statusLabel}`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="410" height="172" rx="28" fill="#020617" stroke="#475569" strokeWidth="3" />
+      <path d="M40 126c44-46 86-48 125-6 39 41 80 39 124-6 36-36 67-32 92 9v38H40Z" fill={profile.color} opacity="0.18" />
+      <path d="M64 80c54-32 109-25 164 21 47 40 94 41 141 3" fill="none" stroke="#334155" strokeWidth="10" strokeLinecap="round" />
+      {nodes.map((node, index) => {
+        const palette = paletteByState[node.state] || paletteByState.waiting;
+        const active = node.state === "ready" || node.state === "host";
+        return (
+          <g key={node.key} data-smoke="mafia-action-route-node">
+            {index < nodes.length - 1 && (
+              <path
+                d={`M${node.x + 31} ${node.y}L${nodes[index + 1].x - 31} ${nodes[index + 1].y}`}
+                stroke={node.state === "done" || node.state === "ready" ? "#f8fafc" : "#64748b"}
+                strokeWidth="4"
+                strokeLinecap="round"
+              />
+            )}
+            <circle cx={node.x} cy={node.y} r={active ? 32 : 28} fill={palette.fill} stroke={active ? "#ffffff" : palette.stroke} strokeWidth={active ? 5 : 3} />
+            {node.key === "state" && (
+              <g>
+                <circle cx={node.x} cy={node.y} r="12" fill="#ffffff" stroke={palette.stroke} strokeWidth="2" />
+                <path d={`M${node.x - 13} ${node.y + 14}c4-12 10-18 13-18s9 6 13 18`} fill="none" stroke={palette.text} strokeWidth="4" strokeLinecap="round" />
+              </g>
+            )}
+            {node.key === "target" && (
+              <g>
+                <path d={`M${node.x} ${node.y - 17}l16 16-16 16-16-16Z`} fill="#ffffff" stroke={palette.stroke} strokeWidth="2" />
+                <circle cx={node.x} cy={node.y - 1} r="5" fill={palette.text} />
+              </g>
+            )}
+            {node.key === "submit" && (
+              <g>
+                <rect x={node.x - 18} y={node.y - 13} width="36" height="26" rx="8" fill="#ffffff" stroke={palette.stroke} strokeWidth="2" />
+                <path d={`M${node.x - 8} ${node.y}l6 7 14-15`} fill="none" stroke={palette.text} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              </g>
+            )}
+            {node.key === "advance" && (
+              <g>
+                <path d={`M${node.x - 17} ${node.y - 10}h25l10 10-10 10h-25Z`} fill="#ffffff" stroke={palette.stroke} strokeWidth="2" />
+                <path d={`M${node.x - 3} ${node.y - 6}l8 6-8 6`} fill="none" stroke={palette.text} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              </g>
+            )}
+            <text x={node.x} y={node.y + 50} textAnchor="middle" fontSize="11" fontWeight="900" fill="#e2e8f0">{node.label}</text>
+          </g>
+        );
+      })}
+      <rect x="30" y="26" width="128" height="28" rx="14" fill={profile.wash} stroke={profile.color} />
+      <text x="94" y="45" textAnchor="middle" fontSize="12" fontWeight="900" fill={profile.color}>{profile.label}</text>
+      <rect x="276" y="26" width="96" height="28" rx="14" fill="#f8fafc" stroke="#cbd5e1" />
+      <text x="324" y="45" textAnchor="middle" fontSize="12" fontWeight="900" fill="#334155">{statusLabel}</text>
+    </svg>
+  );
+};
+
+const MafiaActionRoutePanel = ({
+  phase = "",
+  phaseLabel = "",
+  actionType = "",
+  myAlive = true,
+  mySubmitted = false,
+  myTask = "",
+  targetPlayers = [],
+  selectedTargetSeatNo = 0,
+  selectedTargetName = "",
+  completedCount = 0,
+  votedCount = 0,
+  aliveCount = 0,
+  aliveMafia = 0,
+  aliveTown = 0,
+  remainingSeconds = 0,
+  isHost = false,
+}) => {
+  const routeItems = buildMafiaActionRouteItems({
+    phase,
+    phaseLabel,
+    actionType,
+    myAlive,
+    mySubmitted,
+    myTask,
+    targetPlayers,
+    selectedTargetSeatNo,
+    selectedTargetName,
+    completedCount,
+    votedCount,
+    aliveCount,
+    aliveMafia,
+    aliveTown,
+    remainingSeconds,
+    isHost,
+  });
+  const normalizedPhase = String(phase || "").toUpperCase();
+  const selectedLabel = selectedTargetName || (selectedTargetSeatNo ? `${selectedTargetSeatNo}번` : "미선택");
+  const statusLabel = mySubmitted ? "제출 완료" : selectedTargetSeatNo ? "제출 준비" : actionType ? "대상 필요" : "대기";
+
+  return (
+    <section
+      data-smoke="mafia-action-route-panel"
+      data-phase={normalizedPhase || "-"}
+      data-action-type={actionType || "-"}
+      data-submitted={mySubmitted ? "true" : "false"}
+      data-alive={myAlive ? "true" : "false"}
+      data-selected-target={selectedTargetSeatNo || ""}
+      data-target-count={targetPlayers.length}
+      data-progress={`${Math.max(Number(completedCount) || 0, Number(votedCount) || 0)}/${Math.max(Number(aliveCount) || 0, 0)}`}
+      className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm"
+    >
+      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <MafiaActionRouteArt
+          items={routeItems}
+          actionType={actionType}
+          mySubmitted={mySubmitted}
+          selectedTargetSeatNo={selectedTargetSeatNo}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-rose-700">마피아 액션 루트</div>
+              <div className="mt-1 text-lg font-black text-slate-950">상황 파악, 대상 선택, 제출, 다음 진행</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">밤 행동과 낮 투표가 실제 버튼으로 이어지는 이유를 한 번에 확인합니다.</div>
+            </div>
+            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-black text-zinc-700">
+              {statusLabel} · {selectedLabel}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {routeItems.map((item) => (
+              <div
+                key={item.key}
+                data-smoke="mafia-action-route-item"
+                data-route-key={item.key}
+                className={`min-h-[96px] rounded-xl border px-3 py-2 ${mafiaActionRouteTone(item.state)}`}
+              >
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const normalizeMafiaOutcomeTeam = (team = "") => String(team || "").trim().toUpperCase();
+
+const mafiaOutcomeTeamLabel = (team = "") => {
+  const normalizedTeam = normalizeMafiaOutcomeTeam(team);
+  if (normalizedTeam.includes("MAFIA")) return "마피아팀";
+  if (normalizedTeam.includes("TOWN") || normalizedTeam.includes("CITIZEN")) return "시민팀";
+  return "승리팀 미정";
+};
+
+const mafiaOutcomeTone = (team = "") => {
+  const normalizedTeam = normalizeMafiaOutcomeTeam(team);
+  if (normalizedTeam.includes("MAFIA")) {
+    return {
+      accent: "#e11d48",
+      deep: "#881337",
+      soft: "#ffe4e6",
+      pale: "#fff1f2",
+      border: "border-rose-200",
+      badge: "bg-rose-100 text-rose-800",
+      item: "border-rose-100 bg-rose-50 text-rose-950",
+    };
+  }
+  if (normalizedTeam.includes("TOWN") || normalizedTeam.includes("CITIZEN")) {
+    return {
+      accent: "#2563eb",
+      deep: "#1e3a8a",
+      soft: "#dbeafe",
+      pale: "#eff6ff",
+      border: "border-blue-200",
+      badge: "bg-blue-100 text-blue-800",
+      item: "border-blue-100 bg-blue-50 text-blue-950",
+    };
+  }
+  return {
+    accent: "#64748b",
+    deep: "#334155",
+    soft: "#e2e8f0",
+    pale: "#f8fafc",
+    border: "border-slate-200",
+    badge: "bg-slate-100 text-slate-700",
+    item: "border-slate-100 bg-slate-50 text-slate-900",
+  };
+};
+
+const latestMafiaOutcomeEventText = (events = []) => {
+  const latestEvent = [...listOf(events)].reverse().find((event) => {
+    const message = get(event, "message", "message", "");
+    return typeof message === "string" && message.trim();
+  });
+  return latestEvent ? String(get(latestEvent, "message", "message", "") || "").trim() : "";
+};
+
+const buildMafiaOutcomeLedgerItems = ({
+  winnerTeam = "",
+  outcomeMessage = "",
+  aliveMafia = 0,
+  aliveTown = 0,
+  events = [],
+  phaseLabel = "",
+} = {}) => {
+  const normalizedWinner = normalizeMafiaOutcomeTeam(winnerTeam);
+  const teamLabel = mafiaOutcomeTeamLabel(normalizedWinner);
+  const aliveSummary = `마피아 ${Number(aliveMafia) || 0}명 · 시민 ${Number(aliveTown) || 0}명`;
+  const latestEventText = latestMafiaOutcomeEventText(events);
+  const winnerFallback = normalizedWinner.includes("MAFIA")
+    ? "마피아가 생존 균형을 장악해 서버가 마피아팀 승리로 정산했습니다."
+    : normalizedWinner.includes("TOWN") || normalizedWinner.includes("CITIZEN")
+      ? "시민이 마피아 위협을 제거해 서버가 시민팀 승리로 정산했습니다."
+      : "서버가 내려준 최종 결과를 기준으로 승리 상태를 표시합니다.";
+  const conditionValue = normalizedWinner.includes("MAFIA")
+    ? "수 균형 장악"
+    : normalizedWinner.includes("TOWN") || normalizedWinner.includes("CITIZEN")
+      ? "마피아 전원 제거"
+      : "결과 확인 필요";
+  const conditionDetail = normalizedWinner.includes("MAFIA")
+    ? `최종 생존 수가 ${aliveSummary}로 정산되어 마피아팀 승리 조건이 표시됩니다.`
+    : normalizedWinner.includes("TOWN") || normalizedWinner.includes("CITIZEN")
+      ? `최종 생존 수가 ${aliveSummary}로 정산되어 시민팀 승리 조건이 표시됩니다.`
+      : `${aliveSummary} 상태에서 서버 결과 메시지를 기다립니다.`;
+
+  return [
+    {
+      key: "winner",
+      label: "승리 팀",
+      value: `${teamLabel}${normalizedWinner ? " 승리" : ""}`,
+      detail: outcomeMessage || winnerFallback,
+    },
+    {
+      key: "condition",
+      label: "승리 조건",
+      value: conditionValue,
+      detail: conditionDetail,
+    },
+    {
+      key: "survival",
+      label: "생존 균형",
+      value: aliveSummary,
+      detail: "최종 판정에 쓰인 생존자 수를 서버 상태 그대로 보여줍니다.",
+    },
+    {
+      key: "trace",
+      label: "결정 근거",
+      value: latestEventText || phaseLabel || "최종 정산",
+      detail: "마지막 공개 이벤트와 결과 메시지를 함께 읽어 누가 왜 이겼는지 확인합니다.",
+    },
+  ];
+};
+
+const MafiaOutcomeLedgerArt = ({ items = [], winnerTeam = "" }) => {
+  const tone = mafiaOutcomeTone(winnerTeam);
+  const teamLabel = mafiaOutcomeTeamLabel(winnerTeam);
+  const nodePositions = [
+    { x: 94, y: 154 },
+    { x: 236, y: 86 },
+    { x: 382, y: 154 },
+    { x: 520, y: 86 },
+  ];
+
+  return (
+    <svg
+      data-smoke="mafia-outcome-ledger-art"
+      viewBox="0 0 620 240"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`${teamLabel} 결과 해설`}
+      focusable="false"
+    >
+      <rect x="12" y="12" width="596" height="216" rx="24" fill={tone.pale} stroke={tone.accent} strokeWidth="3" />
+      <path d="M72 176C140 82 221 71 300 132c76 58 154 50 235-54" fill="none" stroke={tone.soft} strokeWidth="22" strokeLinecap="round" />
+      <path d="M72 176C140 82 221 71 300 132c76 58 154 50 235-54" fill="none" stroke={tone.accent} strokeWidth="5" strokeLinecap="round" />
+      <text x="42" y="52" fontSize="14" fontWeight="900" fill={tone.deep}>누가 왜 이겼는지</text>
+      <text x="42" y="76" fontSize="24" fontWeight="900" fill={tone.accent}>{teamLabel}</text>
+      {items.slice(0, 4).map((item, index) => {
+        const node = nodePositions[index] || nodePositions[nodePositions.length - 1];
+        return (
+          <g key={item.key} data-smoke="mafia-outcome-ledger-node" data-outcome-key={item.key}>
+            <circle cx={node.x} cy={node.y} r="29" fill="#ffffff" stroke={tone.accent} strokeWidth="5" />
+            <circle cx={node.x} cy={node.y} r="17" fill={tone.soft} stroke={tone.deep} strokeWidth="2" />
+            <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="14" fontWeight="900" fill={tone.deep}>{index + 1}</text>
+            <text x={node.x} y={node.y + 48} textAnchor="middle" fontSize="11" fontWeight="900" fill={tone.deep}>{item.label}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+const MafiaOutcomeLedgerPanel = ({
+  winnerTeam = "",
+  outcomeMessage = "",
+  aliveMafia = 0,
+  aliveTown = 0,
+  events = [],
+  phaseLabel = "",
+}) => {
+  const normalizedWinner = normalizeMafiaOutcomeTeam(winnerTeam);
+  const tone = mafiaOutcomeTone(normalizedWinner);
+  const items = buildMafiaOutcomeLedgerItems({
+    winnerTeam: normalizedWinner,
+    outcomeMessage,
+    aliveMafia,
+    aliveTown,
+    events,
+    phaseLabel,
+  });
+
+  return (
+    <section
+      data-smoke="mafia-outcome-ledger-panel"
+      data-winner-team={normalizedWinner || ""}
+      data-alive-mafia={Number(aliveMafia) || 0}
+      data-alive-town={Number(aliveTown) || 0}
+      className={`mt-4 rounded-2xl border ${tone.border} bg-white p-3 shadow-lg`}
+    >
+      <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <MafiaOutcomeLedgerArt items={items} winnerTeam={normalizedWinner} />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-slate-500">마피아 결과 해설</div>
+              <div className="mt-1 text-lg font-black text-slate-950">누가 왜 이겼는지</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+                서버가 내려준 최종 승리팀, 결과 문구, 생존 균형, 마지막 공개 이벤트를 한 화면에서 정리합니다.
+              </div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${tone.badge}`}>
+              {mafiaOutcomeTeamLabel(normalizedWinner)}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div
+                key={item.key}
+                data-smoke="mafia-outcome-ledger-item"
+                data-outcome-key={item.key}
+                className={`min-h-[96px] rounded-xl border px-3 py-2 ${tone.item}`}
+              >
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-3 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 };
 
 const MAFIA_TTS_VOLUME = 1;
@@ -7770,7 +18640,6 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
   const lastNightResult = get(gameState, "last_night_result", "lastNightResult", null);
   const lastTrialResult = get(gameState, "last_trial_result", "lastTrialResult", null);
   const voteCounts = get(gameState, "vote_counts", "voteCounts", {}) || {};
-  const RoleIcon = mafiaRoleIcons[myRole] || Shield;
 
   const playerNameBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
   const playerProfileBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.profileUrl || "";
@@ -7800,6 +18669,63 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
   const serverAliveTown = Number(get(gameState, "alive_town_count", "aliveTownCount", Number.NaN));
   const aliveMafia = Number.isFinite(serverAliveMafia) ? serverAliveMafia : visibleAliveMafia;
   const aliveTown = Number.isFinite(serverAliveTown) ? serverAliveTown : visibleAliveTown;
+  const mafiaVotePressureRows = mafiaPlayers.map((player) => {
+    const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+    const name = playerNameBySeat(seatNo);
+    const voteCount = Number(voteCounts?.[seatNo] ?? voteCounts?.[String(seatNo)] ?? 0);
+    return {
+      seatNo,
+      name,
+      shortName: name.replace(/\s+/g, "").slice(0, 3) || `${seatNo}`,
+      alive: Boolean(get(player, "alive", "alive", true)),
+      knownRole: String(get(player, "role", "role", "") || get(player, "revealed_role", "revealedRole", "") || ""),
+      mine: Number(seatNo) === Number(mySeatNo),
+      mafiaKnown: mafiaSeatNos.has(seatNo),
+      submitted: completedSeatNos.has(seatNo) || votedSeatNos.has(seatNo),
+      completed: completedSeatNos.has(seatNo),
+      voted: votedSeatNos.has(seatNo),
+      voteCount,
+    };
+  });
+  const mafiaFlowItems = [
+    {
+      label: "단계",
+      value: phaseLabel,
+      detail: narratorLine || "사회자 진행 대기",
+      icon: phase === "FINISHED" ? "win" : "stage",
+      tone: phase === "FINISHED" ? "done" : "neutral",
+    },
+    {
+      label: "시간",
+      value: phase === "FINISHED" ? "종료" : `${remainingSeconds}s`,
+      detail: phaseDuration ? `총 ${phaseDuration}초 단계` : "수동 진행",
+      icon: "turn",
+      tone: remainingSeconds > 0 ? "waiting" : "danger",
+    },
+    {
+      label: "내 역할",
+      value: mafiaRoleLabels[myRole] || "미확인",
+      detail: myAlive ? (mySubmitted ? "행동 완료" : myTask || "역할 행동 확인") : "탈락 관전",
+      icon: "player",
+      tone: mySubmitted ? "done" : actionType ? "active" : "neutral",
+    },
+    {
+      label: "생존 균형",
+      value: `마피아 ${aliveMafia} · 시민 ${aliveTown}`,
+      detail: winnerTeam ? `${winnerTeam === "MAFIA" ? "마피아팀" : "시민팀"} 승리` : "승리 조건의 핵심 수치",
+      icon: winnerTeam ? "win" : "score",
+      tone: winnerTeam ? "done" : aliveMafia >= aliveTown ? "danger" : "neutral",
+    },
+  ];
+  const mafiaResultTitle = winnerTeam
+    ? `${winnerTeam === "MAFIA" ? "마피아팀" : "시민팀"} 승리`
+    : "마피아 최종 결과";
+  const mafiaResultDetail = winnerTeam === "MAFIA"
+    ? `${outcomeMessage || "마피아 수가 시민팀 이상이 되어 밤과 낮의 균형을 장악했습니다."} 생존 조건: 마피아 ${aliveMafia}명, 시민팀 ${aliveTown}명.`
+    : winnerTeam === "TOWN"
+      ? `${outcomeMessage || "남은 마피아를 모두 찾아내 시민팀이 마을을 지켰습니다."} 생존 조건: 마피아 ${aliveMafia}명, 시민팀 ${aliveTown}명.`
+      : outcomeMessage || "최종 생존 수와 투표/밤 행동 결과를 기준으로 승리팀을 확인합니다.";
+  const mafiaResultMetric = `마피아 ${aliveMafia} · 시민 ${aliveTown}`;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 500);
@@ -7864,7 +18790,7 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
           <div className="bg-gradient-to-br from-zinc-950 via-indigo-950 to-rose-950 p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-200">Mafia Narrator</div>
+                <div className="text-[11px] font-black tracking-[0.18em] text-indigo-200">마피아 사회자</div>
                 <h2 className="mt-1 text-2xl font-black">{phaseLabel}</h2>
                 <p className="mt-2 max-w-2xl text-sm font-bold leading-relaxed text-indigo-50/85">{narratorLine}</p>
               </div>
@@ -7882,6 +18808,35 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
               <div className="h-full rounded-full bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-300 transition-all" style={{ width: `${progressPercent}%` }} />
             </div>
+            <GameFlowMeter
+              title="마피아 진행 판독"
+              detail="단계, 남은 시간, 내 역할 행동, 생존 균형을 한 번에 확인합니다."
+              items={mafiaFlowItems}
+              tone="dark"
+              smoke="mafia-flow-meter"
+              className="mt-4"
+            />
+            {phase === "FINISHED" && (
+              <>
+                <GameResultSpotlight
+                  title={mafiaResultTitle}
+                  subtitle="승리 조건"
+                  detail={mafiaResultDetail}
+                  metric={mafiaResultMetric}
+                  tone={winnerTeam === "MAFIA" ? "amber" : "emerald"}
+                  className="mt-4"
+                  smoke="mafia-result-spotlight"
+                />
+                <MafiaOutcomeLedgerPanel
+                  winnerTeam={winnerTeam}
+                  outcomeMessage={outcomeMessage}
+                  aliveMafia={aliveMafia}
+                  aliveTown={aliveTown}
+                  events={events}
+                  phaseLabel={phaseLabel}
+                />
+              </>
+            )}
             <div className="mt-5 grid gap-3 md:grid-cols-[260px_minmax(0,1fr)]">
               <div className={`rounded-2xl bg-gradient-to-br ${mafiaRoleTone[myRole] || mafiaRoleTone.CITIZEN} p-4 shadow-xl`}>
                 <div className="flex items-center justify-between gap-3">
@@ -7890,7 +18845,7 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
                     <div className="mt-1 text-2xl font-black">{mafiaRoleLabels[myRole] || "미확인"}</div>
                     <div className="mt-1 text-xs font-bold text-white/70">{myTeam === "MAFIA" ? "마피아팀" : "시민팀"}</div>
                   </div>
-                  <RoleIcon className="h-10 w-10 text-white/85" />
+                  <MafiaRoleSigil role={myRole} className="h-16 w-16 shrink-0" />
                 </div>
                 {mafiaSeatNos.size > 0 && (
                   <div className="mt-4 rounded-xl bg-white/10 px-3 py-2 text-xs font-black">
@@ -7928,6 +18883,29 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
               </button>
             )}
           </div>
+
+          <MafiaTargetIntelPanel
+            actionType={actionType}
+            phaseLabel={phaseLabel}
+            mySubmitted={mySubmitted}
+            myAlive={myAlive}
+            aliveMafia={aliveMafia}
+            aliveTown={aliveTown}
+            targetPlayers={targetPlayers}
+            selectedTargetSeatNo={selectedTargetSeatNo}
+            completedSeatNos={completedSeatNos}
+            votedSeatNos={votedSeatNos}
+            playerNameBySeat={playerNameBySeat}
+          />
+
+          <MafiaVotePressurePanel
+            phase={phase}
+            phaseLabel={phaseLabel}
+            rows={mafiaVotePressureRows}
+            aliveMafia={aliveMafia}
+            aliveTown={aliveTown}
+            selectedTargetSeatNo={selectedTargetSeatNo}
+          />
 
           {investigation && (
             <div className={`mt-3 rounded-xl px-3 py-2 text-sm font-black ${get(investigation, "mafia", "mafia", false) ? "bg-rose-50 text-rose-700" : "bg-sky-50 text-sky-700"}`}>
@@ -7983,7 +18961,6 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
               const seatNo = Number(get(player, "seat_no", "seatNo", 0));
               const alive = Boolean(get(player, "alive", "alive", true));
               const role = String(get(player, "role", "role", "") || get(player, "revealed_role", "revealedRole", "") || "");
-              const Role = mafiaRoleIcons[role] || Shield;
               return (
                 <div key={seatNo} className={`rounded-xl border px-3 py-2 ${alive ? "border-slate-100 bg-slate-50" : "border-zinc-200 bg-zinc-100 opacity-75"}`}>
                   <div className="flex items-center justify-between gap-3">
@@ -7996,7 +18973,12 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
                     </div>
                     <div className="flex items-center gap-2">
                       {(completedSeatNos.has(seatNo) || votedSeatNos.has(seatNo)) && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">완료</span>}
-                      {role && <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-black text-white"><Role className="h-3 w-3" />{mafiaRoleLabels[role] || role}</span>}
+                      {role && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 py-1 pl-1 pr-2 text-[10px] font-black text-white">
+                          <MafiaRoleSigil role={role} className="h-5 w-5 shrink-0" />
+                          {mafiaRoleLabels[role] || role}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {phase === "TRIAL_RESULT" && Object.prototype.hasOwnProperty.call(voteCounts, seatNo) && (
@@ -8037,15 +19019,6 @@ const pokerPhaseLabels = {
   HAND_FINISHED: "핸드 종료",
   FINISHED: "게임 종료",
 };
-
-const pokerSuitSymbols = {
-  SPADES: "♠",
-  HEARTS: "♥",
-  DIAMONDS: "♦",
-  CLUBS: "♣",
-};
-
-const pokerSuitTone = (suit) => (suit === "HEARTS" || suit === "DIAMONDS" ? "text-rose-600" : "text-slate-900");
 
 const pokerCardRank = (card) => get(card, "rank", "rank", "");
 const pokerCardSuit = (card) => get(card, "suit", "suit", "");
@@ -8183,21 +19156,16 @@ const drawPokerAdvice = (cards) => {
 };
 
 const PokerCard = ({ card, hidden = false, compact = false, selected = false, suggested = false }) => {
-  const sizeClass = compact ? "h-16 w-11 rounded-lg text-sm" : "h-24 w-16 rounded-xl text-lg";
-  if (hidden || !card) {
-    return (
-      <div className={`${sizeClass} flex items-center justify-center border border-emerald-200/30 bg-gradient-to-br from-zinc-900 via-emerald-950 to-zinc-800 shadow-lg`}>
-        <Dices className="h-5 w-5 text-emerald-100/80" />
-      </div>
-    );
-  }
-  const suit = pokerCardSuit(card);
   return (
-    <div className={`${sizeClass} flex flex-col justify-between border border-slate-200 bg-white p-1.5 font-black shadow-lg ${pokerSuitTone(suit)} ${selected ? "ring-4 ring-sky-300" : suggested ? "ring-2 ring-amber-300" : ""}`}>
-      <span>{pokerCardRank(card)}</span>
-      <span className="self-center text-xl leading-none">{pokerSuitSymbols[suit] || suit}</span>
-      <span className="self-end rotate-180">{pokerCardRank(card)}</span>
-    </div>
+    <PlayingCardArt
+      rank={pokerCardRank(card)}
+      suit={pokerCardSuit(card)}
+      hidden={hidden || !card}
+      compact={compact}
+      selected={selected}
+      suggested={suggested}
+      smoke="poker-card-art"
+    />
   );
 };
 
@@ -8246,6 +19214,899 @@ const roughPokerAdvice = (myCards, communityCards, callAmount, pot, { isFiveCard
   return potOdds <= 0.18 ? "콜 비용이 낮습니다. 한 장 더 보는 선택이 가능합니다." : "완성된 족보가 약합니다. 큰 콜은 피하는 편이 안전합니다.";
 };
 
+const pokerSeatNoOf = (player) => Number(get(player, "seat_no", "seatNo", 0));
+
+const pokerResultHandText = (summary) => {
+  const rankLabel = String(get(summary.player, "hand_rank_label", "handRankLabel", "") || "").trim();
+  if (rankLabel) return rankLabel;
+  if (!summary.hand.ready) return "공개되지 않은 패";
+  return `${summary.hand.label}${summary.hand.summary ? `(${summary.hand.summary})` : ""}`;
+};
+
+const pokerResultRankText = (hand) => {
+  if (!hand?.ranks?.length) return "";
+  return hand.ranks.map(pokerValueLabel).filter(Boolean).join(", ");
+};
+
+const comparePokerHands = (left, right) => {
+  if (!left?.ready && !right?.ready) return 0;
+  if (!left?.ready) return -1;
+  if (!right?.ready) return 1;
+  if (left.category !== right.category) return left.category - right.category;
+  return comparePokerRanks(left.ranks, right.ranks);
+};
+
+const buildPokerResultExplanation = ({ gameState, pokerPlayers, roomPlayers, communityCards, isFiveCardDraw, winnerSeatNo, lastPot, pot }) => {
+  const stateWinnerSeatNos = listOf(get(gameState, "winner_seat_nos", "winnerSeatNos", []))
+    .map(Number)
+    .filter(Boolean);
+  const flaggedWinnerSeatNos = pokerPlayers
+    .filter((player) => Boolean(get(player, "winner", "winner", false)) || Boolean(get(player, "won", "won", false)))
+    .map(pokerSeatNoOf)
+    .filter(Boolean);
+  const winnerSeatNos = [...new Set([
+    ...(winnerSeatNo ? [winnerSeatNo] : []),
+    ...stateWinnerSeatNos,
+    ...flaggedWinnerSeatNos,
+  ])];
+  const activePlayers = pokerPlayers.filter((player) => !Boolean(get(player, "folded", "folded", false)));
+  if (!winnerSeatNos.length && activePlayers.length === 1) {
+    winnerSeatNos.push(pokerSeatNoOf(activePlayers[0]));
+  }
+  if (!winnerSeatNos.length) return "";
+
+  const summaries = pokerPlayers.map((player) => {
+    const seatNo = pokerSeatNoOf(player);
+    const cards = listOf(get(player, "hole_cards", "holeCards", []));
+    const hand = evaluatePokerHand(isFiveCardDraw ? cards : [...cards, ...communityCards]);
+    return {
+      player,
+      seatNo,
+      name: pokerPlayerName(roomPlayers, player),
+      folded: Boolean(get(player, "folded", "folded", false)),
+      hand,
+    };
+  });
+  const winnerSummaries = summaries.filter((summary) => winnerSeatNos.includes(summary.seatNo));
+  if (!winnerSummaries.length) return "";
+
+  const potText = Number(lastPot || pot || 0) > 0 ? `팟 ${Number(lastPot || pot)}칩을 ` : "팟을 ";
+  const winnerNames = winnerSummaries.map((summary) => `${summary.name}님`).join(", ");
+  const showdownSummaries = summaries.filter((summary) => !summary.folded && summary.hand.ready);
+  const foldedOpponents = summaries.filter((summary) => summary.folded && !winnerSeatNos.includes(summary.seatNo));
+
+  if (!showdownSummaries.length && foldedOpponents.length) {
+    return `${winnerNames}이 다른 플레이어의 폴드로 승부 공개 없이 ${potText}획득했습니다.`;
+  }
+
+  const sortedWinners = [...winnerSummaries].sort((left, right) => comparePokerHands(right.hand, left.hand));
+  const bestWinner = sortedWinners[0];
+  const winnerHandText = pokerResultHandText(bestWinner);
+  const opponentSummaries = summaries
+    .filter((summary) => !winnerSeatNos.includes(summary.seatNo) && !summary.folded && summary.hand.ready)
+    .sort((left, right) => comparePokerHands(right.hand, left.hand));
+
+  if (winnerSummaries.length > 1) {
+    return `${winnerNames}이 ${winnerHandText}로 동률이 되어 ${potText}나눠 가졌습니다.`;
+  }
+  if (!bestWinner.hand.ready || !opponentSummaries.length) {
+    return `${winnerNames}이 ${winnerHandText}로 ${potText}획득했습니다.`;
+  }
+
+  const bestOpponent = opponentSummaries[0];
+  const opponentHandText = pokerResultHandText(bestOpponent);
+  const sameCategory = bestWinner.hand.category === bestOpponent.hand.category;
+  const winnerRanks = pokerResultRankText(bestWinner.hand);
+  const opponentRanks = pokerResultRankText(bestOpponent.hand);
+  const tieBreakerText = sameCategory && winnerRanks && opponentRanks
+    ? ` 같은 ${bestWinner.hand.label}였지만 비교 카드가 ${winnerRanks} 대 ${opponentRanks}로 앞섰습니다.`
+    : "";
+  return `${winnerNames}이 ${winnerHandText}로 ${bestOpponent.name}님의 ${opponentHandText}보다 앞서 ${potText}획득했습니다.${tieBreakerText}`;
+};
+
+const buildPokerShowdownBreakdown = ({ gameState, pokerPlayers, roomPlayers, communityCards, isFiveCardDraw, winnerSeatNo, lastPot, pot }) => {
+  const stateWinnerSeatNos = listOf(get(gameState, "winner_seat_nos", "winnerSeatNos", []))
+    .map(Number)
+    .filter(Boolean);
+  const flaggedWinnerSeatNos = pokerPlayers
+    .filter((player) => Boolean(get(player, "winner", "winner", false)) || Boolean(get(player, "won", "won", false)))
+    .map(pokerSeatNoOf)
+    .filter(Boolean);
+  const winnerSeatNos = [...new Set([
+    ...(winnerSeatNo ? [winnerSeatNo] : []),
+    ...stateWinnerSeatNos,
+    ...flaggedWinnerSeatNos,
+  ])];
+  const activePlayers = pokerPlayers.filter((player) => !Boolean(get(player, "folded", "folded", false)));
+  if (!winnerSeatNos.length && activePlayers.length === 1) {
+    winnerSeatNos.push(pokerSeatNoOf(activePlayers[0]));
+  }
+  if (!winnerSeatNos.length) return null;
+
+  const summaries = pokerPlayers.map((player) => {
+    const seatNo = pokerSeatNoOf(player);
+    const holeCards = listOf(get(player, "hole_cards", "holeCards", []));
+    const hand = evaluatePokerHand(isFiveCardDraw ? holeCards : [...holeCards, ...communityCards]);
+    return {
+      player,
+      seatNo,
+      name: pokerPlayerName(roomPlayers, player),
+      folded: Boolean(get(player, "folded", "folded", false)),
+      allIn: Boolean(get(player, "all_in", "allIn", false)),
+      holeCards,
+      hand,
+      winner: winnerSeatNos.includes(seatNo),
+    };
+  });
+  const winnerSummaries = summaries.filter((summary) => summary.winner);
+  if (!winnerSummaries.length) return null;
+
+  const sortedWinners = [...winnerSummaries].sort((left, right) => comparePokerHands(right.hand, left.hand));
+  const bestWinner = sortedWinners[0];
+  const opponentSummaries = summaries
+    .filter((summary) => !summary.winner && !summary.folded && summary.hand.ready)
+    .sort((left, right) => comparePokerHands(right.hand, left.hand));
+  const bestOpponent = opponentSummaries[0] || null;
+  const winnerNames = winnerSummaries.map((summary) => summary.name).join(", ");
+  const potValue = Number(lastPot || pot || 0);
+  const topHandText = pokerResultHandText(bestWinner);
+  const title = winnerSummaries.length > 1 ? "공동 쇼다운 승리" : `${bestWinner.name} 승리`;
+  const reason = (() => {
+    if (winnerSummaries.length > 1) return `${winnerNames}이 ${topHandText}로 동률이라 팟을 나눠 가졌습니다.`;
+    if (!bestOpponent) return `${bestWinner.name}이 ${topHandText}로 팟 ${potValue.toLocaleString("ko-KR")}칩을 가져갔습니다.`;
+    const winnerRanks = pokerResultRankText(bestWinner.hand);
+    const opponentRanks = pokerResultRankText(bestOpponent.hand);
+    if (bestWinner.hand.category === bestOpponent.hand.category && winnerRanks && opponentRanks) {
+      return `${bestWinner.name}이 같은 ${bestWinner.hand.label} 안에서 비교 카드 ${winnerRanks}로 ${bestOpponent.name}님의 ${opponentRanks}보다 앞섰습니다.`;
+    }
+    return `${bestWinner.name}이 ${topHandText}로 ${bestOpponent.name}님의 ${pokerResultHandText(bestOpponent)}보다 높은 족보를 만들었습니다.`;
+  })();
+
+  const items = summaries.map((summary) => {
+    const handText = pokerResultHandText(summary);
+    const rankText = pokerResultRankText(summary.hand);
+    if (summary.winner) {
+      return {
+        ...summary,
+        state: "winner",
+        stateLabel: winnerSummaries.length > 1 ? "공동 승자" : "승자",
+        handText,
+        rankText,
+        detail: winnerSummaries.length > 1 ? "같은 최고 족보로 팟을 분배했습니다." : reason,
+      };
+    }
+    if (summary.folded) {
+      return {
+        ...summary,
+        state: "folded",
+        stateLabel: "폴드",
+        handText: "비교 제외",
+        rankText: "",
+        detail: "폴드한 플레이어는 쇼다운 족보 비교에 참여하지 않습니다.",
+      };
+    }
+    if (!summary.hand.ready) {
+      return {
+        ...summary,
+        state: "waiting",
+        stateLabel: "공개 부족",
+        handText,
+        rankText,
+        detail: "공개 카드 정보가 부족해 로컬 비교는 서버 결과 설명을 우선합니다.",
+      };
+    }
+    const sameCategory = bestWinner?.hand?.category === summary.hand.category;
+    return {
+      ...summary,
+      state: "lost",
+      stateLabel: sameCategory ? "비교 카드 패배" : "족보 패배",
+      handText,
+      rankText,
+      detail: sameCategory && pokerResultRankText(bestWinner.hand) && rankText
+        ? `같은 ${summary.hand.label}였지만 비교 카드가 ${pokerResultRankText(bestWinner.hand)} 대 ${rankText}로 밀렸습니다.`
+        : `${bestWinner?.hand?.label || "승자 족보"}보다 낮은 ${summary.hand.label}였습니다.`,
+    };
+  });
+
+  return {
+    title,
+    reason,
+    potValue,
+    winnerNames,
+    topHandText,
+    communityCards,
+    items,
+    winnerCount: winnerSummaries.length,
+    foldedCount: summaries.filter((summary) => summary.folded).length,
+    showdownCount: summaries.filter((summary) => !summary.folded && summary.hand.ready).length,
+  };
+};
+
+const PokerShowdownTraceArt = ({ breakdown }) => {
+  const items = (breakdown?.items || []).slice(0, 4);
+  const nodePositions = [
+    { x: 66, y: 52 },
+    { x: 250, y: 52 },
+    { x: 66, y: 146 },
+    { x: 250, y: 146 },
+  ];
+  return (
+    <svg
+      data-smoke="poker-showdown-trace-art"
+      viewBox="0 0 320 200"
+      className="h-auto w-full"
+      role="img"
+      aria-label="포커 쇼다운 승리 근거 요약"
+      focusable="false"
+    >
+      <rect x="8" y="8" width="304" height="184" rx="28" fill="#052e2b" stroke="#14b8a6" strokeWidth="3" />
+      <ellipse cx="160" cy="100" rx="92" ry="58" fill="#065f46" stroke="#34d399" strokeWidth="5" />
+      <ellipse cx="160" cy="100" rx="48" ry="28" fill="#064e3b" stroke="#a7f3d0" strokeWidth="2" opacity="0.82" />
+      <circle cx="146" cy="98" r="20" fill="#fbbf24" stroke="#92400e" strokeWidth="4" />
+      <circle cx="165" cy="105" r="20" fill="#fde68a" stroke="#92400e" strokeWidth="4" />
+      <text x="156" y="101" textAnchor="middle" fontSize="11" fontWeight="900" fill="#78350f">POT</text>
+      <text x="156" y="117" textAnchor="middle" fontSize="15" fontWeight="900" fill="#78350f">{breakdown?.potValue || 0}</text>
+      {items.map((item, index) => {
+        const position = nodePositions[index] || nodePositions[0];
+        const winner = item.state === "winner";
+        const folded = item.state === "folded";
+        return (
+          <g key={`${item.seatNo}-${index}`} data-smoke="poker-showdown-trace-node">
+            <path d={`M${position.x} ${position.y} Q160 100 ${position.x + (position.x < 160 ? 32 : -32)} ${position.y + (position.y < 100 ? 28 : -28)}`} fill="none" stroke={winner ? "#fbbf24" : folded ? "#94a3b8" : "#67e8f9"} strokeWidth={winner ? 4 : 2.5} strokeLinecap="round" opacity={folded ? 0.55 : 0.9} />
+            <circle cx={position.x} cy={position.y} r={winner ? 24 : 20} fill={winner ? "#fef3c7" : folded ? "#334155" : "#ecfeff"} stroke={winner ? "#f59e0b" : folded ? "#64748b" : "#06b6d4"} strokeWidth="4" />
+            <text x={position.x} y={position.y - 2} textAnchor="middle" fontSize="13" fontWeight="900" fill={winner ? "#92400e" : folded ? "#cbd5e1" : "#0e7490"}>{item.seatNo}</text>
+            <text x={position.x} y={position.y + 13} textAnchor="middle" fontSize="8" fontWeight="900" fill={winner ? "#92400e" : folded ? "#cbd5e1" : "#0e7490"}>{item.stateLabel}</text>
+          </g>
+        );
+      })}
+      <text x="28" y="29" fontSize="11" fontWeight="900" fill="#a7f3d0">쇼다운 해설</text>
+      <text x="292" y="29" textAnchor="end" fontSize="10" fontWeight="900" fill="#ccfbf1">
+        {breakdown?.showdownCount || 0}명 비교 · {breakdown?.foldedCount || 0}명 폴드
+      </text>
+    </svg>
+  );
+};
+
+const PokerHiddenCardsBriefArt = ({ isFiveCardDraw = false, folded = false }) => {
+  const slotCount = isFiveCardDraw ? 5 : 2;
+  const accent = folded ? "#94a3b8" : "#38bdf8";
+  const label = folded ? "폴드" : "비공개";
+  return (
+    <svg
+      viewBox="0 0 220 96"
+      className="h-24 w-full"
+      role="img"
+      aria-label={`포커 ${label} 카드 브리핑`}
+      data-smoke="poker-hidden-cards-brief-art"
+      focusable="false"
+    >
+      <rect x="8" y="8" width="204" height="80" rx="18" fill="#f8fafc" stroke={accent} strokeWidth="3" />
+      <path d="M28 68 C68 28, 140 28, 180 68" fill="none" stroke={accent} strokeWidth="4" strokeLinecap="round" opacity="0.28" />
+      {Array.from({ length: slotCount }, (_, index) => {
+        const x = 28 + index * (slotCount === 5 ? 28 : 42);
+        return (
+          <g key={`hidden-card-${index}`} data-smoke="poker-hidden-cards-brief-node" data-hidden-slot={index + 1}>
+            <rect x={x} y={26 + (index % 2) * 4} width="30" height="42" rx="7" fill={folded ? "#e2e8f0" : "#dbeafe"} stroke={accent} strokeWidth="2" />
+            <path d={`M${x + 8} ${40 + (index % 2) * 4}h14M${x + 8} ${50 + (index % 2) * 4}h14`} stroke={folded ? "#64748b" : "#1d4ed8"} strokeWidth="2" strokeLinecap="round" opacity="0.72" />
+          </g>
+        );
+      })}
+      <g data-smoke="poker-hidden-cards-brief-node" data-hidden-slot="state">
+        <circle cx="178" cy="39" r="17" fill={folded ? "#475569" : "#0f766e"} stroke="#ffffff" strokeWidth="3" />
+        <text x="178" y="43" textAnchor="middle" fill="#ffffff" fontSize="10" fontWeight="900">{label}</text>
+      </g>
+      <text x="178" y="68" textAnchor="middle" fill="#334155" fontSize="10" fontWeight="900">{slotCount}장 기준</text>
+    </svg>
+  );
+};
+
+const PokerHiddenCardsBrief = ({ item, isFiveCardDraw = false }) => {
+  const folded = item?.state === "folded";
+  const slotText = isFiveCardDraw ? "5장 손패" : "2장 홀카드";
+  const detail = folded
+    ? "폴드한 플레이어의 카드는 쇼다운 비교에서 제외되어 공개되지 않습니다."
+    : "서버가 카드 정보를 공개하지 않은 상태라 결과 설명과 공개된 비교 근거를 우선합니다.";
+  const items = [
+    { key: "cards", label: "카드 상태", value: folded ? "폴드로 비공개" : "미공개", detail: slotText },
+    { key: "compare", label: "비교 여부", value: folded ? "비교 제외" : "서버 결과 우선", detail },
+  ];
+
+  return (
+    <div className="w-full rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2" data-smoke="poker-hidden-cards-brief" data-hidden-state={folded ? "folded" : "hidden"}>
+      <PokerHiddenCardsBriefArt isFiveCardDraw={isFiveCardDraw} folded={folded} />
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {items.map((entry) => (
+          <div key={entry.key} data-smoke="poker-hidden-cards-brief-item" data-hidden-key={entry.key} className="rounded-lg bg-slate-50 px-2.5 py-2">
+            <div className="text-[10px] font-black text-slate-400">{entry.label}</div>
+            <div className="mt-0.5 text-xs font-black text-slate-900">{entry.value}</div>
+            <div className="mt-0.5 text-[11px] font-bold leading-relaxed text-slate-500">{entry.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const PokerShowdownBreakdownPanel = ({ breakdown, isFiveCardDraw = false }) => {
+  if (!breakdown?.items?.length) return null;
+  const communityCards = listOf(breakdown.communityCards);
+  return (
+    <section data-smoke="poker-showdown-breakdown-panel" className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-emerald-50 shadow-sm">
+      <div className="grid gap-3 p-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <PokerShowdownTraceArt breakdown={breakdown} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-amber-700">쇼다운 해설</div>
+              <div className="mt-1 text-lg font-black text-slate-950">{breakdown.title}</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{breakdown.reason}</div>
+            </div>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black text-amber-800">
+              팟 {Number(breakdown.potValue || 0).toLocaleString("ko-KR")}칩
+            </span>
+          </div>
+          {!isFiveCardDraw && communityCards.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-xl bg-emerald-950/90 px-3 py-2">
+              <span className="mr-1 text-[10px] font-black text-emerald-100">공용 카드</span>
+              {communityCards.map((card, index) => <PokerCard key={`${pokerCardId(card)}-${index}`} card={card} compact />)}
+            </div>
+          )}
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {breakdown.items.map((item) => (
+              <div key={item.seatNo} data-smoke="poker-showdown-breakdown-item" className={`rounded-xl border px-3 py-2 ${item.state === "winner" ? "border-amber-200 bg-amber-50" : item.state === "folded" ? "border-slate-200 bg-slate-50" : "border-sky-100 bg-sky-50"}`}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-slate-950">{item.name}</div>
+                    <div className="mt-0.5 text-[10px] font-black text-slate-500">좌석 {item.seatNo} · {item.stateLabel}</div>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${item.state === "winner" ? "bg-amber-200 text-amber-900" : item.state === "folded" ? "bg-slate-200 text-slate-600" : "bg-white text-sky-700"}`}>
+                    {item.handText}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {item.holeCards.slice(0, isFiveCardDraw ? 5 : 2).map((card, index) => (
+                    <PokerCard key={`${item.seatNo}-${pokerCardId(card)}-${index}`} card={card} compact />
+                  ))}
+                  {!item.holeCards.length && <PokerHiddenCardsBrief item={item} isFiveCardDraw={isFiveCardDraw} />}
+                </div>
+                <div className="mt-2 text-[11px] font-bold leading-relaxed text-slate-600">
+                  {item.detail}
+                  {item.rankText ? ` 비교 카드: ${item.rankText}` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const PokerCommunityStandbyArt = ({ isFiveCardDraw = false, maxDrawCards = 3, phaseLabel = "" }) => {
+  const nodes = isFiveCardDraw
+    ? [
+      { key: "private", label: "5장", x: 62, y: 70, active: true },
+      { key: "draw", label: "교체", x: 134, y: 44, active: true },
+      { key: "showdown", label: "비교", x: 214, y: 70, active: false },
+      { key: "pot", label: "팟", x: 282, y: 46, active: false },
+    ]
+    : [
+      { key: "preflop", label: "프리", x: 62, y: 70, active: true },
+      { key: "flop", label: "플랍", x: 134, y: 44, active: false },
+      { key: "turn", label: "턴", x: 214, y: 70, active: false },
+      { key: "river", label: "리버", x: 282, y: 46, active: false },
+    ];
+
+  return (
+    <svg
+      data-smoke="poker-community-standby-art"
+      viewBox="0 0 340 150"
+      className="h-auto w-full"
+      role="img"
+      aria-label={isFiveCardDraw ? "포커 공용 카드가 없는 Five-card Draw 흐름" : "포커 공용 카드 공개 대기 흐름"}
+      focusable="false"
+    >
+      <rect x="8" y="8" width="324" height="134" rx="24" fill="#052e2b" stroke="#34d399" strokeWidth="3" />
+      <ellipse cx="170" cy="83" rx="118" ry="48" fill="#065f46" stroke="#a7f3d0" strokeWidth="3" opacity="0.9" />
+      <path d="M60 96C100 62 145 62 176 88C209 116 254 102 302 50" fill="none" stroke="#5eead4" strokeWidth="4" strokeLinecap="round" opacity="0.48" />
+      {nodes.map((node, index) => (
+        <g key={node.key} data-smoke="poker-community-standby-node" data-community-key={node.key}>
+          {index > 0 && (
+            <path
+              d={`M${nodes[index - 1].x + 20} ${nodes[index - 1].y} C${nodes[index - 1].x + 42} ${nodes[index - 1].y - 20} ${node.x - 42} ${node.y - 20} ${node.x - 20} ${node.y}`}
+              fill="none"
+              stroke={node.active ? "#fbbf24" : "#94a3b8"}
+              strokeWidth="3"
+              strokeLinecap="round"
+              opacity={node.active ? 0.82 : 0.42}
+            />
+          )}
+          <circle cx={node.x} cy={node.y} r="21" fill={node.active ? "#fef3c7" : "#134e4a"} stroke={node.active ? "#f59e0b" : "#5eead4"} strokeWidth="4" />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="10" fontWeight="900" fill={node.active ? "#92400e" : "#ccfbf1"}>{node.label}</text>
+        </g>
+      ))}
+      <rect x="24" y="20" width="106" height="22" rx="11" fill="#ecfeff" />
+      <text x="77" y="35" textAnchor="middle" fontSize="10" fontWeight="900" fill="#0f766e">{isFiveCardDraw ? "공용 카드 없음" : "공개 대기"}</text>
+      <rect x="190" y="116" width="108" height="18" rx="9" fill="#022c22" stroke="#14b8a6" />
+      <text x="244" y="129" textAnchor="middle" fontSize="9" fontWeight="900" fill="#ccfbf1">{isFiveCardDraw ? `최대 ${maxDrawCards}장 교체` : phaseLabel || "프리플랍"}</text>
+    </svg>
+  );
+};
+
+const PokerCommunityStandbyPanel = ({ isFiveCardDraw = false, maxDrawCards = 3, phaseLabel = "", myCards = [], communityCards = [] }) => {
+  const visibleCount = myCards.length + communityCards.length;
+  const items = isFiveCardDraw
+    ? [
+      { key: "board", label: "중앙 카드", value: "없음", detail: "Five-card Draw는 공용 카드가 열리지 않고 각자의 손패만으로 승부를 봅니다." },
+      { key: "private", label: "판단 기준", value: `${myCards.length || 0}장 손패`, detail: "내 카드 조합과 교체 후보가 핵심 정보입니다." },
+      { key: "draw", label: "다음 행동", value: `최대 ${maxDrawCards}장 교체`, detail: "교체 단계에서는 약한 카드만 골라 현재 족보를 보강합니다." },
+      { key: "result", label: "결과 비교", value: "쇼다운", detail: "교체 후 최종 5장 족보를 비교해 팟을 정산합니다." },
+    ]
+    : [
+      { key: "board", label: "중앙 카드", value: "공개 대기", detail: "플랍 전에는 공용 카드가 아직 열리지 않습니다." },
+      { key: "private", label: "판단 기준", value: `${visibleCount}장 정보`, detail: "내 홀카드와 팟 비용으로 첫 결정을 잡습니다." },
+      { key: "street", label: "다음 공개", value: phaseLabel || "플랍", detail: "다음 거리에서 공용 카드가 열리면 족보 강도가 다시 계산됩니다." },
+      { key: "result", label: "결과 비교", value: "최고 5장", detail: "홀카드와 공용 카드 중 가장 강한 5장 조합을 비교합니다." },
+    ];
+
+  return (
+    <div
+      className="w-full max-w-3xl rounded-2xl border border-emerald-200/30 bg-zinc-950/45 p-3 text-left"
+      data-smoke="poker-community-standby-panel"
+      data-community-mode={isFiveCardDraw ? "five-card-draw" : "holdem"}
+      data-phase-label={phaseLabel || ""}
+    >
+      <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
+        <PokerCommunityStandbyArt isFiveCardDraw={isFiveCardDraw} maxDrawCards={maxDrawCards} phaseLabel={phaseLabel} />
+        <div className="min-w-0">
+          <div className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black text-emerald-800">공용 카드 브리핑</div>
+          <div className="mt-2 text-sm font-black text-white">{isFiveCardDraw ? "공용 카드가 없습니다" : "아직 공용 카드가 열리지 않았습니다"}</div>
+          <div className="mt-1 text-xs font-bold leading-relaxed text-emerald-100/85">
+            {isFiveCardDraw
+              ? "이 변형은 중앙 공개 카드 대신 각자 받은 5장과 교체 선택으로 승부를 봅니다. 중앙이 비어 있는 것은 오류가 아니라 규칙에 맞는 상태입니다."
+              : "프리플랍 구간에서는 중앙 카드가 비어 있습니다. 다음 공개 전까지 홀카드, 팟 비용, 상대 행동을 먼저 읽으세요."}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {items.map((item) => (
+              <div key={item.key} data-smoke="poker-community-standby-item" data-community-key={item.key} className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                <div className="text-[10px] font-black text-emerald-100/65">{item.label}</div>
+                <div className="mt-1 text-xs font-black text-white">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed text-emerald-100/75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PokerDecisionLensArt = ({
+  handInfo,
+  myCards = [],
+  communityCards = [],
+  pot = 0,
+  callAmount = 0,
+  myTurn = false,
+  phaseLabel = "",
+  isFinished = false,
+}) => {
+  const strength = Math.max(0, Math.min(8, Number(handInfo?.category || 0)));
+  const strengthWidth = 34 + strength * 15;
+  const potPressure = callAmount > 0 ? Math.min(1, callAmount / Math.max(1, pot + callAmount)) : 0;
+  const pressureWidth = Math.round(124 * potPressure);
+  const visibleCards = [...myCards, ...communityCards].filter((card) => pokerCardValue(card)).slice(0, 7);
+  const cardSlots = Array.from({ length: 7 }, (_, index) => visibleCards[index]);
+
+  return (
+    <svg
+      viewBox="0 0 360 190"
+      role="img"
+      aria-label="포커 핸드 강도, 팟 압력, 액션 상태를 요약한 판단 렌즈"
+      className="h-full min-h-[190px] w-full"
+      data-smoke="poker-decision-lens-art"
+    >
+      <rect x="10" y="10" width="340" height="170" rx="22" fill="#082f2a" />
+      <rect x="26" y="28" width="308" height="118" rx="22" fill="#064e3b" stroke="#34d399" strokeWidth="4" />
+      <path d="M52 108c34 28 126 34 196 6 36-14 58-11 78 0" fill="none" stroke="#10b981" strokeWidth="4" opacity=".55" />
+      <circle cx="286" cy="72" r="26" fill="#fbbf24" stroke="#92400e" strokeWidth="5" />
+      <circle cx="304" cy="88" r="24" fill="#fde68a" stroke="#92400e" strokeWidth="5" />
+      <text x="295" y="82" textAnchor="middle" fontSize="11" fontWeight="900" fill="#78350f">POT</text>
+      <text x="295" y="105" textAnchor="middle" fontSize="17" fontWeight="900" fill="#78350f">{pot}</text>
+
+      {cardSlots.map((card, index) => {
+        const x = 42 + index * 31;
+        const rank = card ? pokerCardRank(card) : "";
+        const suit = card ? pokerCardSuit(card) : "";
+        const red = ["HEARTS", "DIAMONDS"].includes(suit);
+        return (
+          <g key={`${rank}-${suit}-${index}`} transform={`translate(${x} ${index % 2 ? 61 : 55}) rotate(${index - 3})`}>
+            <rect width="28" height="42" rx="6" fill={card ? "#f8fafc" : "#134e4a"} stroke={card ? "#e2e8f0" : "#2dd4bf"} strokeWidth="2" />
+            {card ? (
+              <>
+                <text x="14" y="18" textAnchor="middle" fontSize="11" fontWeight="900" fill={red ? "#be123c" : "#0f172a"}>{rank}</text>
+                <circle cx="14" cy="28" r="4" fill={red ? "#be123c" : "#0f172a"} />
+              </>
+            ) : (
+              <path d="M8 14h12M8 22h12M8 30h12" stroke="#5eead4" strokeWidth="2" strokeLinecap="round" />
+            )}
+          </g>
+        );
+      })}
+
+      <rect x="36" y="155" width="156" height="10" rx="5" fill="#134e4a" />
+      <rect x="36" y="155" width={strengthWidth} height="10" rx="5" fill={strength >= 4 ? "#fbbf24" : strength >= 1 ? "#38bdf8" : "#94a3b8"} />
+      <text x="36" y="151" fontSize="10" fontWeight="900" fill="#d1fae5">핸드 강도 {handInfo?.label || "대기"}</text>
+
+      <rect x="210" y="155" width="124" height="10" rx="5" fill="#134e4a" />
+      <rect x="210" y="155" width={pressureWidth} height="10" rx="5" fill={callAmount > 0 ? "#fb7185" : "#34d399"} />
+      <text x="210" y="151" fontSize="10" fontWeight="900" fill="#d1fae5">콜 압력 {callAmount}칩</text>
+
+      <text x="28" y="25" fontSize="10" fontWeight="900" fill="#a7f3d0">포커 판단 렌즈</text>
+      <text x="184" y="25" textAnchor="middle" fontSize="10" fontWeight="900" fill="#ecfeff">{phaseLabel}</text>
+      <text x="334" y="25" textAnchor="end" fontSize="10" fontWeight="900" fill={isFinished ? "#fde68a" : myTurn ? "#86efac" : "#cbd5e1"}>
+        {isFinished ? "정산" : myTurn ? "내 차례" : "관찰"}
+      </text>
+    </svg>
+  );
+};
+
+const PokerDecisionLensPanel = ({
+  handInfo,
+  myCards,
+  communityCards,
+  phase,
+  phaseLabel,
+  myTurn,
+  isFiveCardDraw,
+  pot,
+  lastPot,
+  callAmount,
+  potOddsText,
+  advice,
+  drawHelp,
+  drawSelection,
+  maxDrawCards,
+  activePlayerName,
+  resultMessage,
+}) => {
+  const isFinished = phase === "HAND_FINISHED" || phase === "FINISHED";
+  const visibleCardCount = myCards.length + communityCards.length;
+  const handValue = handInfo.ready ? `${handInfo.label}${handInfo.summary ? ` · ${handInfo.summary}` : ""}` : handInfo.summary;
+  const drawValue = isFiveCardDraw && phase === "DRAW" ? `${drawSelection.length}/${maxDrawCards}장` : `${visibleCardCount}장 정보`;
+  const actionValue = isFinished ? "정산 확인" : myTurn ? (callAmount > 0 ? `콜 ${callAmount}` : "체크 가능") : `${activePlayerName} 차례`;
+  const potValue = `${pot || lastPot || 0}칩`;
+  const guidance = (() => {
+    if (isFinished) return resultMessage || "핸드가 끝났습니다. 승리 사유와 팟 정산을 확인하세요.";
+    if (isFiveCardDraw && phase === "DRAW") return drawHelp.message || "교체할 카드를 고르고 현재 족보 유지 여부를 비교하세요.";
+    if (myTurn && callAmount > 0) return `콜 비용이 팟 대비 ${potOddsText}입니다. 내 족보 강도와 다음 카드 가능성을 같이 보세요.`;
+    if (myTurn) return "무료 체크 또는 공격적인 베팅 중 현재 족보와 팟 크기를 기준으로 고르세요.";
+    return "상대 행동을 기다리며 팟 압력과 내 족보 변화를 관찰하세요.";
+  })();
+  const tiles = [
+    {
+      key: "hand",
+      icon: "decision",
+      label: "내 족보",
+      value: handValue,
+      detail: handInfo.ready ? `강도 ${handInfo.category}/8 · 공개 정보 ${visibleCardCount}장` : "공용 카드가 더 열리면 족보 강도가 확정됩니다.",
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    },
+    {
+      key: "pot",
+      icon: "score",
+      label: "팟 압력",
+      value: potValue,
+      detail: callAmount > 0 ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : "콜 비용이 없으면 다음 카드를 무료로 볼 수 있는지 확인합니다.",
+      tone: "border-amber-200 bg-amber-50 text-amber-900",
+    },
+    {
+      key: "action",
+      icon: "turn",
+      label: "다음 액션",
+      value: actionValue,
+      detail: myTurn ? advice : `${activePlayerName}의 베팅 크기와 폴드 여부를 기다립니다.`,
+      tone: "border-sky-200 bg-sky-50 text-sky-900",
+    },
+    {
+      key: "draw",
+      icon: isFinished ? "win" : "stage",
+      label: isFinished ? "승리 사유" : isFiveCardDraw ? "교체 판단" : "공개 카드",
+      value: isFinished ? "결과 읽기" : drawValue,
+      detail: isFinished ? (resultMessage || "서버 결과 또는 로컬 비교 설명을 표시합니다.") : isFiveCardDraw ? drawHelp.message : `${communityCards.length}/5장 공개 · ${phaseLabel}`,
+      tone: "border-rose-200 bg-rose-50 text-rose-900",
+    },
+  ];
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-lg" data-smoke="poker-decision-lens-panel">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_1fr]">
+        <div className="bg-emerald-950">
+          <PokerDecisionLensArt
+            handInfo={handInfo}
+            myCards={myCards}
+            communityCards={communityCards}
+            pot={pot || lastPot || 0}
+            callAmount={callAmount}
+            myTurn={myTurn}
+            phaseLabel={phaseLabel}
+            isFinished={isFinished}
+          />
+        </div>
+        <div className="min-w-0 p-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+                <GameUxGlyph type="decision" className="h-4 w-4 text-emerald-600" />
+                포커 판단 렌즈
+              </div>
+              <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">{guidance}</p>
+            </div>
+            <span className={`inline-flex shrink-0 rounded-full px-3 py-1 text-[11px] font-black ${myTurn ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+              {isFinished ? "정산" : myTurn ? "내 판단" : "상대 차례"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {tiles.map((tile) => (
+              <div key={tile.key} className={`min-h-[112px] rounded-xl border px-3 py-2 ${tile.tone}`} data-smoke="poker-decision-lens-item">
+                <div className="flex items-center gap-2 text-[11px] font-black">
+                  <GameUxGlyph type={tile.icon} className="h-3.5 w-3.5" />
+                  {tile.label}
+                </div>
+                <div className="mt-2 truncate text-sm font-black">{tile.value}</div>
+                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{tile.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const pokerActionRouteTone = {
+  fold: { fill: "#fff1f2", stroke: "#e11d48", text: "#be123c", soft: "#fecdd3" },
+  call: { fill: "#ecfdf5", stroke: "#059669", text: "#047857", soft: "#bbf7d0" },
+  raise: { fill: "#fffbeb", stroke: "#f59e0b", text: "#b45309", soft: "#fde68a" },
+  draw: { fill: "#eff6ff", stroke: "#3b82f6", text: "#1d4ed8", soft: "#bfdbfe" },
+  locked: { fill: "#f8fafc", stroke: "#94a3b8", text: "#475569", soft: "#e2e8f0" },
+  result: { fill: "#fef3c7", stroke: "#d97706", text: "#92400e", soft: "#fde68a" },
+};
+
+const buildPokerActionRouteItems = ({
+  phase = "",
+  phaseLabel = "",
+  myTurn = false,
+  isFiveCardDraw = false,
+  isFinished = false,
+  callAmount = 0,
+  fixedBet = 0,
+  pot = 0,
+  lastPot = 0,
+  potOddsText = "0%",
+  availableActions = [],
+  drawSelection = [],
+  maxDrawCards = 3,
+  canSubmitDraw = false,
+  resultMessage = "",
+  activePlayerName = "",
+  handInfo = null,
+}) => {
+  const normalizedActions = listOf(availableActions).map((action) => String(action || "").toUpperCase());
+  const explicitActions = normalizedActions.length > 0;
+  const actionSet = new Set(normalizedActions);
+  const callCost = Number(callAmount || 0);
+  const raiseStep = Number(fixedBet || 0);
+  const currentPot = Number(pot || lastPot || 0);
+  const isDrawPhase = phase === "DRAW";
+  const checkCallAction = callCost > 0 ? "CALL" : "CHECK";
+  const turnOwner = activePlayerName || "상대";
+  const actionAllowed = (action) => myTurn && !isFinished && !isDrawPhase && (!explicitActions || actionSet.has(action));
+  const drawAllowed = myTurn && !isFinished && isDrawPhase && canSubmitDraw;
+  const lockedDetail = isFinished
+    ? "핸드가 끝나 현재 버튼은 결과 확인 흐름으로 전환됩니다."
+    : isDrawPhase
+      ? "카드 교체 단계에서는 베팅 버튼 대신 교체 제출을 사용합니다."
+      : myTurn
+        ? "서버가 내려준 가능 액션 기준으로 버튼 상태를 읽습니다."
+        : `${turnOwner} 차례라 내 액션 버튼은 잠겨 있습니다.`;
+
+  return [
+    {
+      key: "fold",
+      label: "폴드",
+      value: actionAllowed("FOLD") ? "가능" : "잠김",
+      artValue: actionAllowed("FOLD") ? "가능" : "잠김",
+      detail: actionAllowed("FOLD")
+        ? `이번 팟 ${currentPot}칩을 포기하고 추가 손실을 막는 선택입니다.`
+        : lockedDetail,
+      toneKey: actionAllowed("FOLD") ? "fold" : "locked",
+      tone: actionAllowed("FOLD") ? "border-rose-100 bg-rose-50 text-rose-800" : "border-slate-100 bg-slate-50 text-slate-700",
+    },
+    {
+      key: "check-call",
+      label: callCost > 0 ? "콜" : "체크",
+      value: actionAllowed(checkCallAction) ? (callCost > 0 ? `${callCost}칩` : "무료") : "잠김",
+      artValue: actionAllowed(checkCallAction) ? (callCost > 0 ? `${callCost}` : "무료") : "잠김",
+      detail: actionAllowed(checkCallAction)
+        ? callCost > 0
+          ? `콜 비용은 ${callCost}칩, 팟오즈는 ${potOddsText}입니다. 현재 패 강도와 비교하세요.`
+          : "비용 없이 다음 공개 카드나 상대 반응을 볼 수 있는 선택입니다."
+        : lockedDetail,
+      toneKey: actionAllowed(checkCallAction) ? "call" : "locked",
+      tone: actionAllowed(checkCallAction) ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-slate-50 text-slate-700",
+    },
+    {
+      key: "raise",
+      label: "레이즈",
+      value: actionAllowed("RAISE") ? `+${raiseStep}칩` : "잠김",
+      artValue: actionAllowed("RAISE") ? `+${raiseStep}` : "잠김",
+      detail: actionAllowed("RAISE")
+        ? `고정 레이즈 단위 ${raiseStep}칩으로 팟 압박을 올립니다.`
+        : lockedDetail,
+      toneKey: actionAllowed("RAISE") ? "raise" : "locked",
+      tone: actionAllowed("RAISE") ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-slate-50 text-slate-700",
+    },
+    {
+      key: "draw",
+      label: isFiveCardDraw ? "카드 교체" : "공개/정산",
+      value: isFinished ? "결과 확인" : isDrawPhase ? `${drawSelection.length}/${maxDrawCards}` : isFiveCardDraw ? "교체 대기" : phaseLabel,
+      artValue: isFinished ? "결과" : isDrawPhase ? `${drawSelection.length}/${maxDrawCards}` : isFiveCardDraw ? "대기" : "공개",
+      detail: isFinished
+        ? (resultMessage || `${handInfo?.label || "최종 패"} 기준으로 승부 근거를 확인합니다.`)
+        : isDrawPhase
+          ? drawAllowed
+            ? `${drawSelection.length}장을 교체 제출할 수 있습니다. 선택하지 않으면 현재 패를 유지합니다.`
+            : `최대 ${maxDrawCards}장까지만 교체할 수 있습니다.`
+          : isFiveCardDraw
+            ? "베팅 뒤 교체 단계가 오면 손패에서 바꿀 카드를 고릅니다."
+            : "커뮤니티 카드 공개와 베팅 라운드가 이어지는 구간입니다.",
+      toneKey: isFinished ? "result" : isDrawPhase ? "draw" : "locked",
+      tone: isFinished ? "border-amber-100 bg-amber-50 text-amber-800" : isDrawPhase ? "border-sky-100 bg-sky-50 text-sky-800" : "border-indigo-100 bg-indigo-50 text-indigo-800",
+    },
+  ];
+};
+
+const PokerActionRouteArt = ({
+  phase = "",
+  phaseLabel = "",
+  myTurn = false,
+  callAmount = 0,
+  drawSelectionCount = 0,
+  maxDrawCards = 3,
+  isFinished = false,
+  items = [],
+}) => {
+  const routeItems = items.length ? items : [
+    { key: "fold", label: "폴드", artValue: "-" },
+    { key: "check-call", label: Number(callAmount || 0) > 0 ? "콜" : "체크", artValue: "-" },
+    { key: "raise", label: "레이즈", artValue: "-" },
+    { key: "draw", label: "교체", artValue: `${drawSelectionCount}/${maxDrawCards}` },
+  ];
+  const activeIndex = isFinished ? 3 : phase === "DRAW" ? 3 : myTurn ? 1 : 0;
+
+  return (
+    <svg
+      viewBox="0 0 400 150"
+      className="h-full min-h-[124px] w-full"
+      role="img"
+      aria-label="포커 액션 루트"
+      data-smoke="poker-action-route-art"
+      focusable="false"
+    >
+      <rect x="10" y="10" width="380" height="130" rx="24" fill="#f8fafc" stroke="#d1fae5" strokeWidth="3" />
+      <path d="M58 75h284" stroke="#d1fae5" strokeWidth="14" strokeLinecap="round" />
+      <path d="M58 75h284" stroke={myTurn ? "#059669" : "#94a3b8"} strokeWidth="4" strokeLinecap="round" opacity="0.72" />
+      {routeItems.map((item, index) => {
+        const x = 58 + index * 94.6;
+        const tone = pokerActionRouteTone[item.toneKey] || pokerActionRouteTone.locked;
+        const active = index === activeIndex;
+        return (
+          <g key={item.key} data-smoke="poker-action-route-node" data-route-key={item.key}>
+            <circle cx={x} cy="75" r={active ? 34 : 31} fill="#ffffff" stroke={tone.stroke} strokeWidth={active ? "5" : "4"} />
+            <circle cx={x} cy="75" r="22" fill={tone.fill} stroke="#ffffff" strokeWidth="3" />
+            <text x={x} y="70" textAnchor="middle" fontSize="9" fontWeight="900" fill={tone.text}>{item.label}</text>
+            <text x={x} y="89" textAnchor="middle" fontSize="13" fontWeight="900" fill={tone.text}>{item.artValue}</text>
+          </g>
+        );
+      })}
+      <rect x="64" y="116" width="272" height="18" rx="9" fill="#ffffff" stroke="#bbf7d0" />
+      <text x="200" y="129" textAnchor="middle" fontSize="10" fontWeight="900" fill="#047857">
+        폴드 → 체크/콜 → 레이즈 → 교체/정산
+      </text>
+      <text x="30" y="28" fontSize="10" fontWeight="900" fill="#047857">{phaseLabel || phase || "포커"}</text>
+    </svg>
+  );
+};
+
+const PokerActionRoutePanel = ({
+  phase = "",
+  phaseLabel = "",
+  myTurn = false,
+  isFiveCardDraw = false,
+  isFinished = false,
+  callAmount = 0,
+  fixedBet = 0,
+  pot = 0,
+  lastPot = 0,
+  potOddsText = "0%",
+  availableActions = [],
+  drawSelection = [],
+  maxDrawCards = 3,
+  canSubmitDraw = false,
+  resultMessage = "",
+  activePlayerName = "",
+  handInfo = null,
+}) => {
+  const normalizedActions = listOf(availableActions).map((action) => String(action || "").toUpperCase());
+  const items = buildPokerActionRouteItems({
+    phase,
+    phaseLabel,
+    myTurn,
+    isFiveCardDraw,
+    isFinished,
+    callAmount,
+    fixedBet,
+    pot,
+    lastPot,
+    potOddsText,
+    availableActions: normalizedActions,
+    drawSelection,
+    maxDrawCards,
+    canSubmitDraw,
+    resultMessage,
+    activePlayerName,
+    handInfo,
+  });
+
+  return (
+    <section
+      data-smoke="poker-action-route-panel"
+      data-phase={phase || ""}
+      data-my-turn={myTurn ? "true" : "false"}
+      data-call-amount={Number(callAmount || 0)}
+      data-draw-count={drawSelection.length}
+      data-available-actions={normalizedActions.join(",")}
+      className="mt-3 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-sky-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
+        <div className="min-h-[132px]">
+          <PokerActionRouteArt
+            phase={phase}
+            phaseLabel={phaseLabel}
+            myTurn={myTurn}
+            callAmount={callAmount}
+            drawSelectionCount={drawSelection.length}
+            maxDrawCards={maxDrawCards}
+            isFinished={isFinished}
+            items={items}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black text-emerald-700">포커 액션 루트</div>
+              <h3 className="text-base font-black text-slate-900">누를 버튼과 잠긴 이유</h3>
+            </div>
+            <div className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[11px] font-black text-emerald-700">
+              {isFinished ? "결과 확인" : myTurn ? "내 차례" : `${activePlayerName || "상대"} 차례`}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div key={item.key} data-smoke="poker-action-route-item" data-route-key={item.key} className={`min-h-[102px] rounded-xl border px-3 py-2.5 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }) => {
   const [drawSelection, setDrawSelection] = useState([]);
   const phase = get(gameState, "phase", "phase", "");
@@ -8278,20 +20139,57 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
   const drawHelp = isFiveCardDraw ? drawPokerAdvice(myCards) : { message: "", suggestedIds: [] };
   const myCardKey = myCards.map(pokerCardId).join("|");
   const advice = roughPokerAdvice(myCards, communityCards, callAmount, pot, { isFiveCardDraw });
-  const winnerName = pokerPlayerName(roomPlayers, pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === winnerSeatNo) || {});
+  const winnerName = winnerSeatNo ? pokerPlayerName(roomPlayers, pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === winnerSeatNo) || {}) : "";
   const resultTitle = get(gameState, "result_title", "resultTitle", "");
   const resultDetail = get(gameState, "result_detail", "resultDetail", "");
   const resultEvent = events
     .slice()
     .reverse()
     .find((event) => ["SHOWDOWN", "POT_AWARDED", "GAME_FINISHED"].includes(get(event, "event_type", "eventType", "")));
-  const resultMessage = resultDetail || get(resultEvent, "message", "message", "");
-  const resultHeading = resultTitle || (phase === "FINISHED" ? `${winnerName} 최종 승리` : phase === "HAND_FINISHED" ? "핸드 결과" : "");
+  const pokerResultExplanation = buildPokerResultExplanation({ gameState, pokerPlayers, roomPlayers, communityCards, isFiveCardDraw, winnerSeatNo, lastPot, pot });
+  const resultMessage = resultDetail || pokerResultExplanation || get(resultEvent, "message", "message", "");
+  const pokerShowdownBreakdown = (phase === "HAND_FINISHED" || phase === "FINISHED")
+    ? buildPokerShowdownBreakdown({ gameState, pokerPlayers, roomPlayers, communityCards, isFiveCardDraw, winnerSeatNo, lastPot, pot })
+    : null;
+  const resultHeading = resultTitle || (phase === "FINISHED" ? (winnerName ? `${winnerName} 최종 승리` : "최종 결과") : phase === "HAND_FINISHED" ? "핸드 결과" : "");
   const canUse = (action) => myTurn && (!availableActions.length || availableActions.includes(action));
   const send = (actionType, extra = {}) => onAction({ actionType, ...extra });
   const tableLabel = isFiveCardDraw ? "Five-card Draw" : "Limit Texas Hold'em";
   const holeCardSlots = isFiveCardDraw ? 5 : 2;
   const canSubmitDraw = myTurn && phase === "DRAW" && drawSelection.length <= maxDrawCards;
+  const activePlayerName = activeSeatNo
+    ? pokerPlayerName(roomPlayers, pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === activeSeatNo) || { seatNo: activeSeatNo })
+    : "-";
+  const pokerFlowItems = [
+    {
+      label: "핸드",
+      value: `${handNo || "-"} / ${maxHands || "-"}`,
+      detail: phaseLabel,
+      icon: "stage",
+      tone: phase === "FINISHED" ? "done" : "neutral",
+    },
+    {
+      label: "팟",
+      value: `${pot || lastPot || 0}칩`,
+      detail: callAmount > 0 ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : "체크 가능 여부 확인",
+      icon: "score",
+      tone: callAmount > 0 ? "waiting" : "neutral",
+    },
+    {
+      label: "순번",
+      value: myTurn ? "내 차례" : activePlayerName,
+      detail: myTurn ? "아래 액션 선택 가능" : "상대 행동 대기",
+      icon: "turn",
+      tone: myTurn ? "active" : "neutral",
+    },
+    {
+      label: phase === "DRAW" ? "교체 판단" : "족보 판단",
+      value: phase === "DRAW" ? `${drawSelection.length}/${maxDrawCards}장 선택` : handInfo.ready ? handInfo.label : phaseLabel,
+      detail: phase === "DRAW" ? drawHelp.message : (phase === "HAND_FINISHED" || phase === "FINISHED") ? resultMessage || "정산 결과 확인" : advice,
+      icon: (phase === "HAND_FINISHED" || phase === "FINISHED") ? "win" : "decision",
+      tone: phase === "HAND_FINISHED" || phase === "FINISHED" ? "done" : myTurn ? "active" : "neutral",
+    },
+  ];
 
   useEffect(() => {
     setDrawSelection([]);
@@ -8331,13 +20229,45 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
             </div>
           </div>
 
+          <GameFlowMeter
+            title="포커 핸드 판독"
+            detail="핸드 진행, 팟 압박, 현재 순번, 족보 판단을 한 번에 확인합니다."
+            items={pokerFlowItems}
+            tone="dark"
+            smoke="poker-flow-meter"
+            className="mt-4"
+          />
+
+          <PokerDecisionLensPanel
+            handInfo={handInfo}
+            myCards={myCards}
+            communityCards={communityCards}
+            phase={phase}
+            phaseLabel={phaseLabel}
+            myTurn={myTurn}
+            isFiveCardDraw={isFiveCardDraw}
+            pot={pot}
+            lastPot={lastPot}
+            callAmount={callAmount}
+            potOddsText={potOddsText}
+            advice={advice}
+            drawHelp={drawHelp}
+            drawSelection={drawSelection}
+            maxDrawCards={maxDrawCards}
+            activePlayerName={activePlayerName}
+            resultMessage={resultMessage}
+          />
+
           <div className="relative mt-5 rounded-[2rem] border border-amber-200/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-emerald-950 p-4 shadow-inner">
             <div className="flex min-h-28 flex-wrap items-center justify-center gap-2">
               {isFiveCardDraw ? (
-                <div className="max-w-sm rounded-2xl border border-white/15 bg-zinc-950/35 px-4 py-3 text-center">
-                  <div className="text-sm font-black text-white">공용 카드 없음</div>
-                  <div className="mt-1 text-xs font-bold leading-relaxed text-emerald-100/80">각자 받은 5장 중 최대 {maxDrawCards}장을 한 번 교체한 뒤 족보를 비교합니다.</div>
-                </div>
+                <PokerCommunityStandbyPanel
+                  isFiveCardDraw
+                  maxDrawCards={maxDrawCards}
+                  phaseLabel={phaseLabel}
+                  myCards={myCards}
+                  communityCards={communityCards}
+                />
               ) : (
                 Array.from({ length: 5 }, (_, index) => (
                   <PokerCard key={index} card={communityCards[index]} hidden={!communityCards[index]} />
@@ -8381,7 +20311,7 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
                               type="button"
                               className="rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300"
                               onClick={() => toggleDrawCard(card)}
-                              aria-label={`${pokerCardRank(card)} ${pokerSuitSymbols[pokerCardSuit(card)] || pokerCardSuit(card)} ${selected ? "교체 선택 해제" : "교체 선택"}`}
+                              aria-label={`${pokerCardRank(card)} ${playingCardSuitLabel(pokerCardSuit(card))} ${selected ? "교체 선택 해제" : "교체 선택"}`}
                             >
                               <PokerCard card={card} compact selected={selected} suggested={suggested} />
                             </button>
@@ -8426,10 +20356,18 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
           </div>
 
           {(phase === "HAND_FINISHED" || phase === "FINISHED") && resultMessage && (
-            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold leading-relaxed text-amber-800">
-              <div className="text-xs font-black text-amber-600">승리 사유</div>
-              <div className="mt-1">{resultMessage}</div>
-            </div>
+            <GameResultSpotlight
+              title={resultHeading || "핸드 결과"}
+              subtitle="승리 사유"
+              detail={resultMessage}
+              metric={`팟 ${lastPot || pot}칩`}
+              tone="amber"
+              smoke="poker-result-explanation"
+              className="mt-3"
+            />
+          )}
+          {(phase === "HAND_FINISHED" || phase === "FINISHED") && pokerShowdownBreakdown && (
+            <PokerShowdownBreakdownPanel breakdown={pokerShowdownBreakdown} isFiveCardDraw={isFiveCardDraw} />
           )}
 
           {phase === "HAND_FINISHED" ? (
@@ -8531,6 +20469,92 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
 
 const isBettingPokerPhase = (phase) => ["OPENING_BET", "PREFLOP", "FLOP", "TURN", "RIVER", "FINAL_BET"].includes(phase);
 
+const tabletopActionTypeLabels = {
+  PLACE: "조각 배치",
+  PASS: "패스",
+  ROLL_DIE: "주사위 굴리기",
+  STOP_ROLLING: "굴림 멈추기",
+  CHOOSE_DICE_COUNT: "주사위 개수 선택",
+  PLAY: "카드 내기",
+  RETURN_TAX: "세금 카드 반납",
+  DECLARE_REVOLUTION: "혁명 선언",
+  SKIP_REVOLUTION: "혁명 포기",
+  SETUP_BUILD: "초기 배치",
+  ROLL_DICE: "주사위 굴리기",
+  BUILD_ROAD: "도로 건설",
+  BUILD_BRIDGE: "다리 건설",
+  BUILD_SHIP: "배 건설",
+  MOVE_SHIP: "배 이동",
+  BUILD_KNIGHT: "기사 배치",
+  BUILD_CITY_WALL: "성벽 건설",
+  BUILD_SETTLEMENT: "마을 건설",
+  BUILD_CITY: "도시 건설",
+  MOVE_ROBBER: "도둑 이동",
+  MOVE_PIRATE: "해적 이동",
+  MARITIME_TRADE: "해상 교역",
+  PROPOSE_TRADE: "교역 제안",
+  ACCEPT_TRADE: "교역 수락",
+  REJECT_TRADE: "교역 거절",
+  BUILD_SETTLER: "개척자 준비",
+  LOAD_SETTLER: "개척자 승선",
+  BUILD_CREW: "선원 배치",
+  UNLOAD_CREW_TO_PIRATE_LAIR: "해적 소굴 상륙",
+  ROLL_FISH_HAUL: "물고기 수확",
+  CATCH_FISH: "물고기 획득",
+  SPEND_FISH_TAKE_RESOURCE: "물고기 교환",
+  COLLECT_SPICE: "향신료 수집",
+  SELL_RESOURCE_FOR_GOLD: "자원 판매",
+  SPEND_GOLD_FOR_RESOURCE: "금화 교환",
+  BID_CAMEL: "낙타 입찰",
+  PLACE_CAMEL: "낙타 배치",
+  RECRUIT_BARBARIAN_KNIGHT: "야만족 기사 모집",
+  EXPEL_BARBARIANS: "야만족 축출",
+  CHASE_AWAY_PIRATE: "해적 추방",
+  TRANSFER_CARGO: "화물 이동",
+  DELIVER_CARGO: "화물 전달",
+  FOUND_SETTLEMENT_FROM_SHIP: "해상 정착",
+  DISCARD_RESOURCES: "자원 버리기",
+  DISCARD_PROGRESS_CARD: "발전 카드 버리기",
+  CHOOSE_GOLD_RESOURCE: "금 자원 선택",
+  CHOOSE_AQUEDUCT_RESOURCE: "수로 자원 선택",
+  CHOOSE_MASTER_MERCHANT_CARDS: "상인 카드 선택",
+  CHOOSE_SPY_PROGRESS_CARD: "스파이 카드 선택",
+  CHOOSE_DEFENDER_PROGRESS_CARD: "방어자 카드 선택",
+  RESPOND_WEDDING_CARDS: "혼례 카드 응답",
+  BUY_DEVELOPMENT_CARD: "발전 카드 구매",
+  PLAY_DEVELOPMENT_CARD: "발전 카드 사용",
+  PLAY_PROGRESS_CARD: "진보 카드 사용",
+  ACTIVATE_KNIGHT: "기사 활성화",
+  PROMOTE_KNIGHT: "기사 승급",
+  MOVE_KNIGHT: "기사 이동",
+  CHASE_ROBBER_WITH_KNIGHT: "기사로 도둑 추방",
+  MOVE_DISPLACED_KNIGHT: "밀린 기사 이동",
+  REMOVE_DESERTER_KNIGHT: "탈영 기사 제거",
+  PLACE_DESERTER_KNIGHT: "탈영 기사 배치",
+  MOVE_INTRIGUE_KNIGHT: "음모 기사 이동",
+  RESPOND_COMMERCIAL_HARBOR: "상업항 응답",
+  BUILD_CITY_IMPROVEMENT: "도시 개선",
+  END_TURN: "턴 종료",
+  SELECT_CARD: "카드 선택",
+  CHOOSE_ROW: "줄 선택",
+  SUBMIT_PROMPT: "시작 문장 제출",
+  SUBMIT_GUESS: "추측 제출",
+  SUBMIT_DRAWING: "그림 제출",
+  END_GAME: "게임 종료",
+  MAFIA_KILL: "마피아 습격",
+  POLICE_CHECK: "경찰 조사",
+  DOCTOR_SAVE: "의사 보호",
+  VOTE: "투표",
+  ADVANCE: "단계 진행",
+  CHECK: "체크",
+  CALL: "콜",
+  BET: "베팅",
+  RAISE: "레이즈",
+  FOLD: "폴드",
+  DRAW: "카드 교체",
+  STAND_PAT: "그대로 진행",
+};
+
 export const TabletopGame = ({ game }) => {
   const config = gameConfigs[game];
   const { user } = useAuth();
@@ -8631,7 +20655,6 @@ export const TabletopGame = ({ game }) => {
     );
   }, [players.length, variants]);
   const selectedSettingsTooManyPlayers = Boolean(selectedSettingsVariant && players.length > variantMaxPlayers(selectedSettingsVariant));
-
   const isLatestLobbyLoad = (seq) => mountedRef.current && seq === lobbyLoadSeqRef.current;
   const isLatestRoomOpen = (seq) => mountedRef.current && seq === roomOpenSeqRef.current;
   const realtimeRoomRef = useRef(null);
@@ -8686,6 +20709,14 @@ export const TabletopGame = ({ game }) => {
     return tabletopGameAdapter.fetchMyRooms(game);
   };
 
+  const resumeTitleStorageKey = config.storageKey.replace(/_id$/, "_title");
+  const rememberRoomSelection = (room) => {
+    const roomId = idOf(room);
+    if (!roomId) return;
+    localStorage.setItem(config.storageKey, String(roomId));
+    localStorage.setItem(resumeTitleStorageKey, String(room?.title || codeOf(room) || `${config.title} 최근 방`));
+  };
+
   const clearRoomSelection = (roomId) => {
     roomOpenSeqRef.current += 1;
     realtimeRoomRef.current = null;
@@ -8694,6 +20725,7 @@ export const TabletopGame = ({ game }) => {
     const storedId = localStorage.getItem(config.storageKey);
     if (!roomId || storedId === String(roomId)) {
       localStorage.removeItem(config.storageKey);
+      localStorage.removeItem(resumeTitleStorageKey);
     }
     if (gameSubRef.current) {
       gameSubRef.current.unsubscribe();
@@ -8801,7 +20833,7 @@ export const TabletopGame = ({ game }) => {
     setSelectedRoom(room);
     const roomId = idOf(room);
     if (!roomId) return;
-    localStorage.setItem(config.storageKey, String(roomId));
+    rememberRoomSelection(room);
     setSettingsForm({
       variantCode: variantCodeOf(room),
       turnTimeSeconds: String(turnSecondsOf(room)),
@@ -8860,7 +20892,11 @@ export const TabletopGame = ({ game }) => {
         if (!active) return;
         const storedId = Number(localStorage.getItem(config.storageKey) || 0);
         const room = myRooms.find((item) => Number(idOf(item)) === storedId) || myRooms[0];
-        if (room) await openRoom(room);
+        if (room) {
+          await openRoom(room);
+        } else {
+          clearRoomSelection();
+        }
       } catch {
         if (!active) return;
         setSelectedRoom(null);
@@ -9041,6 +21077,8 @@ export const TabletopGame = ({ game }) => {
         setGameState(result?.gameState || null);
       }
       return result;
+    } catch (error) {
+      throw error;
     } finally {
       actionBusyRef.current = false;
       setActionBusy(false);
@@ -9137,22 +21175,36 @@ export const TabletopGame = ({ game }) => {
     <div className={`tabletop-game tabletop-${game} animate-fade-in space-y-6`}>
       <section className={`overflow-hidden rounded-2xl bg-gradient-to-br ${config.accent} p-[1px] shadow-2xl sm:rounded-[2rem]`}>
         <div className="bg-white p-5 sm:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
-              <Dices className="h-3.5 w-3.5 text-primary-500" />
-              {config.eyebrow}
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
+                  <Dices className="h-3.5 w-3.5 text-primary-500" />
+                  {config.eyebrow}
+                </div>
+                <Link to="/app/games" className="hidden min-h-10 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+                  게임 목록
+                </Link>
+              </div>
+              <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">{config.title}</h1>
+              <span
+                className="mt-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                title={config.description}
+                aria-label={`${config.title} 설명: ${config.description}`}
+              >
+                <CircleHelp className="h-4 w-4" />
+              </span>
             </div>
-            <Link to="/app/games" className="hidden min-h-10 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
-              게임 목록
-            </Link>
+            <div className="w-full" data-smoke="tabletop-route-artwork">
+              <TabletopGameArtwork type={config.board} compact className="h-36 w-full" />
+            </div>
           </div>
-          <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">{config.title}</h1>
-          <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-600 sm:text-base">{config.description}</p>
         </div>
       </section>
 
       {!selectedRoom && (
-        <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]" aria-busy={initialLoading ? "true" : "false"}>
+        <section className="space-y-4" aria-busy={initialLoading ? "true" : "false"}>
+          <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
           <form onSubmit={createRoom} className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg sm:p-5" aria-label={`${config.title} 방 만들기`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-lg font-black text-slate-900">방 만들기</div>
@@ -9198,20 +21250,20 @@ export const TabletopGame = ({ game }) => {
                 onBlur={() => setCreateForm((prev) => ({ ...prev, turnTimeSeconds: clampDigits(prev.turnTimeSeconds, 5, 180, 30) }))}
               />
               {selectedVariant && (
-                <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
-                  <span className="mb-1 inline-flex rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-700">
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
+                  <span className="inline-flex rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-700">
                     {variantGroupLabel(game, selectedVariant)}
                   </span>
-                  <div>
-                    {get(selectedVariant, "summary", "summary", "")} · {get(selectedVariant, "min_players", "minPlayers", 0)}~{get(selectedVariant, "max_players", "maxPlayers", 0)}명
-                  </div>
-                  {game === "mafia" && (
-                    <div className="mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-black text-white">
-                      <Skull className="h-3.5 w-3.5 text-rose-300" />
-                      {mafiaCountGuideText}
-                    </div>
-                  )}
-                  <VariantFeatureTags game={game} variant={selectedVariant} className="mt-2" />
+                  <span className="text-[11px] font-black text-slate-500">
+                    {get(selectedVariant, "min_players", "minPlayers", 0)}~{get(selectedVariant, "max_players", "maxPlayers", 0)}명
+                  </span>
+                  <span
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200"
+                    title={`${get(selectedVariant, "summary", "summary", "")}${game === "mafia" ? ` ${mafiaCountGuideText}` : ""}`}
+                    aria-label={`${variantDisplayName(selectedVariant)} 규칙 설명`}
+                  >
+                    <CircleHelp className="h-3.5 w-3.5" />
+                  </span>
                 </div>
               )}
               <button type="submit" className="min-h-11 rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:opacity-50" disabled={busy || initialLoading || !variants.length} aria-label={`${config.title} ${variantDisplayName(selectedVariant)} 방 만들기`}>
@@ -9241,60 +21293,101 @@ export const TabletopGame = ({ game }) => {
                 </button>
               </div>
             )}
-            <form onSubmit={joinByCode} className="mt-4 flex flex-col gap-2 sm:flex-row" aria-label={`${config.title} 방 코드 입장`}>
-              <input
-                className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase"
-                placeholder="방 코드로 입장"
-                aria-label="방 코드"
-                value={joinCode}
-                maxLength={8}
-                onChange={(event) => setJoinCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-              />
-              <button type="submit" className="min-h-11 rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={busy || initialLoading || !joinCode.trim()} aria-label={`${joinCode.trim() || "입력한"} 방 코드로 입장`}>
-                입장
-              </button>
-            </form>
+            <TabletopJoinCodePanel
+              game={game}
+              config={config}
+              joinCode={joinCode}
+              setJoinCode={setJoinCode}
+              busy={busy}
+              initialLoading={initialLoading}
+              joinByCode={joinByCode}
+            />
             <div className="mt-4 space-y-2.5">
-              {initialLoading && !rooms.length && <div className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-400" role="status" aria-live="polite">대기방을 불러오는 중입니다.</div>}
-              {!initialLoading && !rooms.length && <div className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-400">대기 중인 방이 없습니다.</div>}
+              {initialLoading && !rooms.length && (
+                <TabletopLobbyEmptyState game={game} config={config} initialLoading />
+              )}
+              {!initialLoading && !rooms.length && (
+                <TabletopLobbyEmptyState game={game} config={config} initialLoading={false} />
+              )}
               {rooms.map((room) => {
                 const roomVariant = variantForRoom(room, variants);
                 const listedPlayers = playersOf(room);
                 const listedMaxPlayers = maxPlayersOf(room);
+                const listedMinPlayers = minPlayersOf(room);
+                const listedStatus = statusOf(room);
                 const alreadyInListedRoom = listedPlayers.some((player) => memberIdOf(player) === myMemberId);
                 const listedRoomFull = listedMaxPlayers > 0 && listedPlayers.length >= listedMaxPlayers;
-                const listedJoinDisabled = busy || (listedRoomFull && !alreadyInListedRoom);
+                const listedJoinDisabled = busy || (!alreadyInListedRoom && (listedRoomFull || listedStatus !== "WAITING"));
+                const listedCanJoin = listedStatus === "WAITING" && !listedRoomFull;
+                const readiness = tabletopLobbyRoomReadiness(room);
+                const actionSignal = tabletopLobbyRoomActionSignal(room, alreadyInListedRoom);
+                const hostPlayer = listedPlayers.find((player) => memberIdOf(player) === hostMemberIdOf(room));
+                const statusTone = tabletopRoomStatusTone(listedStatus);
+                const listedVariantGroupLabel = variantGroupLabel(game, roomVariant);
+                const roomHelpText = [
+                  variantNameOf(room),
+                  variantSummaryOf(room) || get(roomVariant, "summary", "summary", ""),
+                  readiness.detail,
+                  actionSignal.detail,
+                ].filter(Boolean).join(" · ");
                 return (
-                  <div key={idOf(room)} className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="break-words text-sm font-black text-slate-900">{room.title}</div>
-                      <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-black">
-                        <span className="rounded-full bg-white px-2 py-1 text-slate-600">{variantGroupLabel(game, roomVariant)}</span>
-                        <span className={`rounded-full px-2 py-1 ${listedRoomFull ? "bg-rose-50 text-rose-700" : "bg-white text-slate-600"}`}>
-                          {listedPlayers.length}/{listedMaxPlayers}명{listedRoomFull ? " · 가득 참" : ""}
-                        </span>
-                        <span className="rounded-full bg-white px-2 py-1 text-slate-600">코드 {codeOf(room)}</span>
-                        {alreadyInListedRoom && <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">참가 중</span>}
+                  <div
+                    key={idOf(room)}
+                    className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3"
+                    data-smoke="tabletop-lobby-room-card"
+                    data-room-status={listedStatus || ""}
+                    data-joinable={listedCanJoin ? "true" : "false"}
+                    data-member-count={listedPlayers.length}
+                    data-max-players={listedMaxPlayers || ""}
+                  >
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_168px] lg:items-center">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="break-words text-sm font-black text-slate-900">{room.title}</div>
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${statusTone}`}>
+                            {statusLabels[listedStatus] || listedStatus || "대기 중"}
+                          </span>
+                          {alreadyInListedRoom && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">참가 중</span>}
+                          <span
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200"
+                            title={roomHelpText}
+                            aria-label={`${room.title} 설명: ${roomHelpText}`}
+                          >
+                            <CircleHelp className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-black">
+                          <span className="rounded-full bg-white px-2 py-1 text-slate-600">{listedVariantGroupLabel}</span>
+                          <span className={`rounded-full px-2 py-1 ${listedRoomFull ? "bg-rose-50 text-rose-700" : "bg-white text-slate-600"}`}>
+                            {listedPlayers.length}/{listedMaxPlayers || "-"}명{listedRoomFull ? " · 가득 참" : ""}
+                          </span>
+                          <span className="rounded-full bg-white px-2 py-1 text-slate-600">최소 {listedMinPlayers || "-"}명</span>
+                          <span className="rounded-full bg-white px-2 py-1 text-slate-600">코드 {codeOf(room)}</span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-500">
+                          <span>방장 {hostPlayer?.nickname || "-"}</span>
+                          <span>턴 {turnSecondsOf(room)}초</span>
+                          <span>{readiness.value}</span>
+                        </div>
                       </div>
-                      <div className="mt-2 break-words text-xs font-bold leading-relaxed text-slate-500">
-                        {variantNameOf(room)} · {variantSummaryOf(room) || get(roomVariant, "summary", "summary", "")}
-                      </div>
-                      <VariantFeatureTags game={game} variant={roomVariant} className="mt-2" />
+                      <button
+                        type="button"
+                        className="min-h-11 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={listedJoinDisabled}
+                        onClick={() => (alreadyInListedRoom ? openRoom(room) : joinRoom(idOf(room)))}
+                        aria-label={`${room.title} ${variantNameOf(room)} ${listedPlayers.length}/${listedMaxPlayers || "-"}명 ${alreadyInListedRoom ? "열기" : listedRoomFull ? "가득 참" : listedStatus !== "WAITING" ? "진행 중" : "입장"}`}
+                        title={`${room.title} · ${variantNameOf(room)} · ${listedPlayers.length}/${listedMaxPlayers || "-"}명`}
+                        data-smoke="tabletop-lobby-room-primary"
+                      >
+                        {alreadyInListedRoom ? "열기" : listedRoomFull ? "가득 참" : listedStatus !== "WAITING" ? "진행 중" : "입장"}
+                      </button>
                     </div>
-                    <button
-                      className="min-h-11 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[84px]"
-                      disabled={listedJoinDisabled}
-                      onClick={() => (alreadyInListedRoom ? openRoom(room) : joinRoom(idOf(room)))}
-                      aria-label={`${room.title} ${variantNameOf(room)} ${listedPlayers.length}/${listedMaxPlayers}명 ${alreadyInListedRoom ? "열기" : listedRoomFull ? "가득 참" : "입장"}`}
-                      title={`${room.title} · ${variantNameOf(room)} · ${listedPlayers.length}/${listedMaxPlayers}명`}
-                    >
-                      {alreadyInListedRoom ? "열기" : listedRoomFull ? "가득 참" : "입장"}
-                    </button>
                   </div>
                 );
               })}
             </div>
           </section>
+          </div>
         </section>
       )}
 
@@ -9303,7 +21396,16 @@ export const TabletopGame = ({ game }) => {
           <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="break-words text-xl font-black text-slate-900">{selectedRoom.title}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="break-words text-xl font-black text-slate-900">{selectedRoom.title}</div>
+                  <span
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                    title={`${config.description} ${variantSummaryOf(selectedRoom) || get(selectedRoomVariant, "summary", "summary", "")} ${startRuleHint}`}
+                    aria-label={`${config.title} 방 설명`}
+                  >
+                    <CircleHelp className="h-3.5 w-3.5" />
+                  </span>
+                </div>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black">
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">방 코드 {codeOf(selectedRoom)}</span>
                   <button
@@ -9319,16 +21421,6 @@ export const TabletopGame = ({ game }) => {
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">{variantGroupLabel(game, selectedRoomVariant)}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">{variantNameOf(selectedRoom)}</span>
                 </div>
-                <div className="mt-2 break-words text-xs font-bold leading-relaxed text-slate-500">
-                  {variantSummaryOf(selectedRoom) || get(selectedRoomVariant, "summary", "summary", "")}
-                </div>
-                <VariantFeatureTags game={game} variant={selectedRoomVariant} className="mt-2" />
-                {game === "mafia" && (
-                  <div className="mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-black text-white">
-                    <Skull className="h-3.5 w-3.5 text-rose-300" />
-                    {mafiaCountGuideText}
-                  </div>
-                )}
               </div>
               <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:flex sm:flex-wrap">
                 <Link to="/app/games" className="hidden min-h-11 items-center justify-center rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
@@ -9360,39 +21452,11 @@ export const TabletopGame = ({ game }) => {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
               <div className="rounded-xl bg-slate-50 px-3 py-2" role="status" aria-live="polite" aria-atomic="true"><div className="font-black text-slate-700">상태</div><div className="font-bold text-slate-500">{statusLabels[status] || status}</div></div>
               <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">규칙</div><div className="font-bold text-slate-500">{variantGroupLabel(game, selectedRoomVariant)}</div></div>
               <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">인원</div><div className="font-bold text-slate-500">{players.length}/{maxPlayersOf(selectedRoom)}명</div></div>
-              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">최소 인원</div><div className="font-bold text-slate-500">{minPlayersOf(selectedRoom)}명</div></div>
-              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">턴 시간</div><div className="font-bold text-slate-500">{turnSecondsOf(selectedRoom)}초</div></div>
-              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">방장</div><div className="font-bold text-slate-500">{players.find((player) => memberIdOf(player) === hostMemberIdOf(selectedRoom))?.nickname || "-"}</div></div>
             </div>
-
-            {status === "WAITING" && (
-              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-sm font-black text-slate-900">시작 조건</div>
-                  <div className={`rounded-full px-3 py-1 text-[11px] font-black ${canStart ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                    {startStatusText}
-                  </div>
-                </div>
-                <div className="grid gap-2 md:grid-cols-3">
-                  {startChecks.map((check) => (
-                    <div key={check.key} className={`rounded-xl border px-3 py-2 ${check.done ? "border-emerald-100 bg-white text-emerald-700" : "border-amber-100 bg-white text-amber-700"}`}>
-                      <div className="flex items-center gap-2 text-xs font-black">
-                        <span className={`h-2.5 w-2.5 rounded-full ${check.done ? "bg-emerald-500" : "bg-amber-400"}`} />
-                        {check.label}
-                      </div>
-                      <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">{check.detail}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 text-[11px] font-bold leading-relaxed text-slate-500">
-                  {startRuleHint}
-                </div>
-              </div>
-            )}
 
             {isHost && status === "WAITING" && (
               <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-[1fr_140px_140px]">
@@ -9429,20 +21493,21 @@ export const TabletopGame = ({ game }) => {
                 </div>
                 {selectedSettingsVariant && (
                   <div className="rounded-xl bg-white px-3 py-2 text-xs font-bold leading-relaxed text-slate-500 md:col-span-3">
-                    <div className="mb-1 flex flex-wrap gap-1.5 text-[10px] font-black">
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{variantGroupLabel(game, selectedSettingsVariant)}</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
-                        {get(selectedSettingsVariant, "min_players", "minPlayers", 0)}~{get(selectedSettingsVariant, "max_players", "maxPlayers", 0)}명
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap gap-1.5 text-[10px] font-black">
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{variantGroupLabel(game, selectedSettingsVariant)}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
+                          {get(selectedSettingsVariant, "min_players", "minPlayers", 0)}~{get(selectedSettingsVariant, "max_players", "maxPlayers", 0)}명
+                        </span>
+                      </div>
+                      <span
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                        title={`${get(selectedSettingsVariant, "summary", "summary", "")}${game === "mafia" ? ` ${mafiaCountGuideText}` : ""}`}
+                        aria-label={`${variantDisplayName(selectedSettingsVariant)} 규칙 설명`}
+                      >
+                        <CircleHelp className="h-3.5 w-3.5" />
                       </span>
                     </div>
-                    <div>{get(selectedSettingsVariant, "summary", "summary", "")}</div>
-                    {game === "mafia" && (
-                      <div className="mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-black text-white">
-                        <Skull className="h-3.5 w-3.5 text-rose-300" />
-                        {mafiaCountGuideText}
-                      </div>
-                    )}
-                    <VariantFeatureTags game={game} variant={selectedSettingsVariant} className="mt-2" />
                     {players.length < Number(get(selectedSettingsVariant, "min_players", "minPlayers", 0)) && (
                       <div className="mt-1 text-amber-700">
                         현재 인원으로는 시작할 수 없습니다. 최소 {get(selectedSettingsVariant, "min_players", "minPlayers", 0)}명이 필요합니다.
@@ -9470,7 +21535,6 @@ export const TabletopGame = ({ game }) => {
           </div>
 
           {gameState && <MobileGameJumpNav game={game} gameState={gameState} />}
-
           <div className="tabletop-board-shell relative" aria-busy={actionBusy ? "true" : "false"}>
             {actionBusy && gameState && (
               <div className="absolute inset-0 z-40 flex items-start justify-center rounded-[1.5rem] bg-white/55 p-4 backdrop-blur-[1px]">
@@ -9496,24 +21560,8 @@ export const TabletopGame = ({ game }) => {
             ) : game === "poker" && gameState ? (
               <PokerBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
             ) : (
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
-                  <div className="mb-4 flex items-center gap-2 text-sm font-black text-slate-900">
-                    <Shield className="h-4 w-4 text-primary-600" />
-                    플레이 보드
-                  </div>
-                  <div className="flex justify-center">
-                    <BoardPreview type={config.board} room={selectedRoom} />
-                  </div>
-                  <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm font-bold leading-relaxed text-slate-600">
-                    {status === "PLAYING" ? "게임 상태를 불러오는 중입니다. 잠시 후 방을 다시 열어주세요." : "모든 참가자가 준비하면 방장이 게임을 시작할 수 있습니다."}
-                  </div>
-                </div>
-
-                <aside className="space-y-4">
-                  <PlayersPanel players={players} selectedRoom={selectedRoom} status={status} />
-                  <GuidePanel lines={config.guide} />
-                </aside>
+              <div className="grid gap-4">
+                <PlayersPanel game={game} gameState={gameState} players={players} selectedRoom={selectedRoom} status={status} mySeatNo={mySeatNo} />
               </div>
             )}
 
@@ -9521,8 +21569,7 @@ export const TabletopGame = ({ game }) => {
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <div />
                 <aside className="space-y-4">
-                  <PlayersPanel players={players} selectedRoom={selectedRoom} status={status} />
-                  <GuidePanel lines={config.guide} />
+                  <PlayersPanel game={game} gameState={gameState} players={players} selectedRoom={selectedRoom} status={status} mySeatNo={mySeatNo} />
                 </aside>
               </div>
             )}
@@ -9533,78 +21580,463 @@ export const TabletopGame = ({ game }) => {
   );
 };
 
-const PlayersPanel = ({ players, selectedRoom, status }) => (
-  <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
-    <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
-      <Users className="h-4 w-4" />
-      플레이어
-    </div>
-    <div className="space-y-2">
-      {players.map((player) => {
-        const pid = memberIdOf(player);
-        const host = pid === hostMemberIdOf(selectedRoom);
-        return (
-          <div key={pid} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
-              <div className="min-w-0">
-              <div className="truncate text-sm font-black text-slate-900">{player.nickname}</div>
-              <div className="text-[11px] font-bold text-slate-500">{host ? "방장" : `좌석 ${seatNoOf(player)}`}</div>
-              </div>
-            </div>
-            {status === "WAITING" && host && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">
-                <Crown className="h-3.5 w-3.5" />
-                방장
-              </span>
-            )}
-            {status === "WAITING" && !host && (
-              <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${isReady(player) ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {isReady(player) ? "준비" : "대기"}
-              </span>
-            )}
-            {host && status !== "WAITING" && <Crown className="h-4 w-4 text-amber-500" />}
-          </div>
-        );
-      })}
-    </div>
-  </div>
-);
+const tabletopPlayerPanelScore = (game, gameState, seatNo) => {
+  if (!gameState || !seatNo) return "";
+  const statePlayers = listOf(get(gameState, "players", "players", []));
+  const statePlayer = statePlayers.find((player) => tabletopStateSeatNo(player) === Number(seatNo));
+  const scoreRows = listOf(get(gameState, "scores", "scores", []));
+  const scoreRow = scoreRows.find((row) => tabletopStateSeatNo(row) === Number(seatNo));
+  if (game === "catan" && statePlayer) {
+    const points = tabletopNumber(get(statePlayer, "public_victory_points", "publicVictoryPoints", get(statePlayer, "victory_points", "victoryPoints", NaN)), NaN);
+    return Number.isFinite(points) ? `${points}점` : "";
+  }
+  if (game === "blokus" && scoreRow) {
+    const score = tabletopNumber(get(scoreRow, "score", "score", NaN), NaN);
+    return Number.isFinite(score) ? `${score}점` : "";
+  }
+  if (game === "mahe" && (statePlayer || scoreRow)) {
+    const source = statePlayer || scoreRow;
+    const score = tabletopNumber(get(source, "score", "score", get(source, "egg_score", "eggScore", NaN)), NaN);
+    return Number.isFinite(score) ? `${score}점` : "";
+  }
+  if (game === "dalmuti" && statePlayer) {
+    const cardCount = tabletopNumber(get(statePlayer, "card_count", "cardCount", get(statePlayer, "hand_count", "handCount", NaN)), NaN);
+    const rank = get(statePlayer, "rank", "rank", "");
+    if (Number.isFinite(cardCount)) return `${cardCount}장`;
+    if (rank) return dalmutiRankLabel(rank);
+  }
+  const genericScore = tabletopNumber(get(statePlayer, "score", "score", get(scoreRow, "score", "score", NaN)), NaN);
+  return Number.isFinite(genericScore) ? `${genericScore}점` : "";
+};
 
-const GuidePanel = ({ lines }) => (
-  <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
-    <div className="flex items-center justify-between gap-2">
-      <div className="text-sm font-black text-slate-900">규칙 기준</div>
-      <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">서버 판정</div>
-    </div>
-    <div className="mt-3 space-y-2">
-      {lines.map((line) => {
-        if (typeof line === "string") {
+const tabletopPlayerPanelWinners = (gameState) => {
+  const winners = new Set();
+  const winnerSeatNo = tabletopNumber(get(gameState, "winner_seat_no", "winnerSeatNo", 0));
+  if (winnerSeatNo) winners.add(winnerSeatNo);
+  listOf(get(gameState, "winner_seat_nos", "winnerSeatNos", [])).forEach((seatNo) => {
+    const normalized = Number(seatNo);
+    if (normalized) winners.add(normalized);
+  });
+  [...listOf(get(gameState, "players", "players", [])), ...listOf(get(gameState, "scores", "scores", []))].forEach((item) => {
+    if (Boolean(get(item, "winner", "winner", false))) {
+      const seatNo = tabletopStateSeatNo(item);
+      if (seatNo) winners.add(seatNo);
+    }
+  });
+  return winners;
+};
+
+const tabletopPlayerPanelNodeStatus = ({ active, host, mine, ready, status, winner }) => {
+  if (winner) return { label: "승리", fill: "#059669", stroke: "#a7f3d0", text: "#ecfdf5" };
+  if (active) return { label: "차례", fill: "#f59e0b", stroke: "#fde68a", text: "#1f2937" };
+  if (mine) return { label: "나", fill: "#0284c7", stroke: "#bae6fd", text: "#f0f9ff" };
+  if (status === "WAITING" && host) return { label: "방장", fill: "#7c3aed", stroke: "#ddd6fe", text: "#f5f3ff" };
+  if (status === "WAITING") {
+    return ready
+      ? { label: "준비", fill: "#10b981", stroke: "#bbf7d0", text: "#ecfdf5" }
+      : { label: "대기", fill: "#64748b", stroke: "#cbd5e1", text: "#f8fafc" };
+  }
+  return host
+    ? { label: "방장", fill: "#334155", stroke: "#cbd5e1", text: "#f8fafc" }
+    : { label: "참가", fill: "#475569", stroke: "#cbd5e1", text: "#f8fafc" };
+};
+
+const TabletopPlayersPanelArt = ({ game, gameState, players, selectedRoom, status, mySeatNo, activeSeatNo, winnerSeatNos }) => {
+  const safePlayers = Array.isArray(players) ? players.slice(0, 12) : [];
+  const hostId = hostMemberIdOf(selectedRoom);
+  const nodes = safePlayers.map((player, index) => {
+    const pid = memberIdOf(player);
+    const seatNo = seatNoOf(player);
+    const host = pid === hostId;
+    const active = activeSeatNo === seatNo;
+    const mine = Number(mySeatNo) === seatNo;
+    const winner = winnerSeatNos.has(seatNo);
+    const ready = host || isReady(player);
+    const nodeStatus = tabletopPlayerPanelNodeStatus({ active, host, mine, ready, status, winner });
+    const name = String(player.nickname || `좌석 ${seatNo || index + 1}`);
+    return {
+      key: pid || seatNo || index,
+      x: 36 + (index % 6) * 58,
+      y: index < 6 ? 52 : 106,
+      name: name.length > 5 ? `${name.slice(0, 5)}…` : name,
+      seatNo,
+      score: tabletopPlayerPanelScore(game, gameState, seatNo),
+      status: nodeStatus,
+    };
+  });
+  const rowGroups = [nodes.slice(0, 6), nodes.slice(6, 12)].filter((row) => row.length > 1);
+
+  return (
+    <svg
+      viewBox="0 0 360 132"
+      className="mb-3 h-[132px] w-full rounded-2xl bg-slate-950"
+      role="img"
+      aria-label="참가자 상태 지도"
+      data-smoke="tabletop-players-art"
+      data-player-count={safePlayers.length}
+      focusable="false"
+    >
+      <rect x="0" y="0" width="360" height="132" rx="22" fill="#020617" />
+      <rect x="14" y="16" width="332" height="100" rx="20" fill="#0f172a" stroke="#1e293b" strokeWidth="2" />
+      <path d="M28 80C74 30 118 112 172 64s90-10 158 18" fill="none" stroke="#334155" strokeWidth="12" strokeLinecap="round" opacity=".52" />
+      <path d="M28 80C74 30 118 112 172 64s90-10 158 18" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5 7" opacity=".72" />
+      <text x="26" y="31" fontSize="10" fontWeight="900" fill="#bfdbfe">참가자 상태 지도</text>
+      <text x="334" y="31" textAnchor="end" fontSize="10" fontWeight="900" fill="#e2e8f0">{status === "WAITING" ? "준비 확인" : "차례 확인"}</text>
+      {rowGroups.map((row, rowIndex) => (
+        <path
+          key={`row-${rowIndex}`}
+          d={row.map((node, index) => `${index ? "L" : "M"}${node.x} ${node.y}`).join(" ")}
+          fill="none"
+          stroke="#e2e8f0"
+          strokeWidth="2"
+          strokeLinecap="round"
+          opacity=".26"
+        />
+      ))}
+      {nodes.map((node) => (
+        <g key={node.key} data-smoke="tabletop-players-art-node" data-seat-no={node.seatNo || ""}>
+          <circle cx={node.x} cy={node.y} r="18" fill={node.status.fill} stroke={node.status.stroke} strokeWidth="4" />
+          <circle cx={node.x} cy={node.y} r="24" fill="none" stroke={node.status.stroke} strokeWidth="1.5" opacity=".45" />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="9" fontWeight="900" fill={node.status.text}>{node.status.label}</text>
+          <text x={node.x} y={node.y + 34} textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#e2e8f0">{node.name}</text>
+          {node.score && (
+            <text x={node.x} y={node.y - 28} textAnchor="middle" fontSize="8" fontWeight="900" fill="#bae6fd">{node.score}</text>
+          )}
+        </g>
+      ))}
+      {!nodes.length && (
+        <text x="180" y="72" textAnchor="middle" fontSize="12" fontWeight="900" fill="#cbd5e1">참가자 정보를 기다리는 중입니다</text>
+      )}
+    </svg>
+  );
+};
+
+const tabletopPlayersInsightToneClasses = {
+  active: "border-amber-200 bg-amber-50 text-amber-900",
+  done: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  mine: "border-sky-200 bg-sky-50 text-sky-800",
+  waiting: "border-slate-200 bg-slate-50 text-slate-700",
+};
+
+const buildTabletopPlayersInsightItems = ({ game, gameState, players, selectedRoom, status, phaseLabel, activeSeatNo, winnerSeatNos, mySeatNo }) => {
+  const safePlayers = Array.isArray(players) ? players : [];
+  const hostId = hostMemberIdOf(selectedRoom);
+  const readyCount = safePlayers.filter((player) => memberIdOf(player) === hostId || isReady(player)).length;
+  const hostPlayer = safePlayers.find((player) => memberIdOf(player) === hostId);
+  const winnerNames = [...(winnerSeatNos || new Set())]
+    .map((seatNo) => tabletopPlayerName(safePlayers, seatNo))
+    .filter(Boolean);
+  const activeName = activeSeatNo ? tabletopPlayerName(safePlayers, activeSeatNo) : "";
+  const mySeat = Number(mySeatNo || 0);
+  const myPlayer = safePlayers.find((player) => seatNoOf(player) === mySeat);
+  const myScore = mySeat ? tabletopPlayerPanelScore(game, gameState, mySeat) : "";
+  const playerCountText = `${safePlayers.length || 0}명`;
+  const readyValue = status === "WAITING" ? `${readyCount}/${safePlayers.length || 0}` : phaseLabel || "진행 중";
+
+  return [
+    {
+      key: "flow",
+      icon: status === "WAITING" ? "state" : "turn",
+      label: status === "WAITING" ? "준비 흐름" : "현재 흐름",
+      value: readyValue,
+      detail: status === "WAITING" ? "방장 포함 준비 상태를 같은 패널에서 확인합니다." : `${phaseLabel || "현재 단계"} 기준으로 참가자 상태를 읽습니다.`,
+      tone: status === "WAITING" ? "waiting" : "active",
+    },
+    {
+      key: "actor",
+      icon: winnerNames.length ? "win" : "turn",
+      label: winnerNames.length ? "승자" : "차례/주체",
+      value: winnerNames.length ? winnerNames.join(", ") : activeName || "대기 중",
+      detail: winnerNames.length ? "정산된 승자는 지도와 카드에도 함께 표시됩니다." : activeName ? "지금 행동하거나 관찰해야 할 플레이어입니다." : "상태가 도착하면 행동 주체가 표시됩니다.",
+      tone: winnerNames.length ? "done" : activeName ? "active" : "waiting",
+    },
+    {
+      key: "mine",
+      icon: "player",
+      label: "내 좌석",
+      value: mySeat ? `${mySeat}번${myPlayer?.nickname ? ` · ${myPlayer.nickname}` : ""}` : "입장 확인",
+      detail: mySeat ? (myScore ? `${myScore} · 내 카드에서 하늘색으로 표시됩니다.` : "내 카드가 하늘색으로 표시됩니다.") : "방 입장 후 내 좌석과 상태가 표시됩니다.",
+      tone: mySeat ? "mine" : "waiting",
+    },
+    {
+      key: "table",
+      icon: "signal",
+      label: "참가자",
+      value: playerCountText,
+      detail: hostPlayer?.nickname ? `방장 ${hostPlayer.nickname} · 준비 ${readyCount}/${safePlayers.length || 0}` : `준비 ${readyCount}/${safePlayers.length || 0}`,
+      tone: winnerNames.length ? "done" : "waiting",
+    },
+  ];
+};
+
+const TabletopPlayersInsightRail = ({ items = [] }) => {
+  const visibleItems = Array.isArray(items) ? items.filter(Boolean).slice(0, 4) : [];
+  if (!visibleItems.length) return null;
+
+  return (
+    <div className="mb-3 rounded-2xl border border-slate-100 bg-slate-50 p-2" data-smoke="tabletop-players-insight-rail">
+      <div className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-black text-slate-500">
+        <GameUxGlyph type="signal" className="h-3.5 w-3.5 text-primary-600" />
+        상태 요약
+      </div>
+      <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
+        {visibleItems.map((item) => {
+          const tone = tabletopPlayersInsightToneClasses[item.tone] || tabletopPlayersInsightToneClasses.waiting;
           return (
-            <div key={line} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-500">
-              {line}
+            <div key={item.key} className={`min-h-[92px] rounded-xl border px-3 py-2 ${tone}`} data-smoke="tabletop-players-insight-item" data-insight-key={item.key}>
+              <div className="flex items-center gap-1.5 text-[10px] font-black opacity-75">
+                <GameUxGlyph type={item.icon || "state"} className="h-3 w-3" />
+                {item.label}
+              </div>
+              <div className="mt-1 truncate text-sm font-black leading-tight">{item.value}</div>
+              <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
             </div>
           );
-        }
-        const items = Array.isArray(line.items) ? line.items : [];
-        return (
-          <div key={line.title} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-            <div className="text-xs font-black text-slate-800">{line.title}</div>
-            <div className="mt-1 space-y-1 text-[11px] font-bold leading-relaxed text-slate-500">
-              {items.map((item) => (
-                <div key={item} className="flex gap-1.5">
-                  <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo }) => {
+  const activeSeatNo = tabletopTurnSeatForSound(game, gameState);
+  const phaseLabel = tabletopPhaseLabel(game, gameState, status);
+  const winnerSeatNos = tabletopPlayerPanelWinners(gameState);
+  const readyCount = players.filter((player) => memberIdOf(player) === hostMemberIdOf(selectedRoom) || isReady(player)).length;
+  const insightItems = buildTabletopPlayersInsightItems({ game, gameState, players, selectedRoom, status, phaseLabel, activeSeatNo, winnerSeatNos, mySeatNo });
+  const panelStatusText = status === "WAITING"
+    ? `준비 ${readyCount}/${players.length}`
+    : activeSeatNo
+      ? `현재 ${tabletopPlayerName(players, activeSeatNo)}`
+      : phaseLabel;
+
+  return (
+    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg" data-smoke="tabletop-players-panel">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+          <GameUxGlyph type="player" className="h-4 w-4 text-primary-600" />
+          플레이어
+        </div>
+        <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500" data-smoke="tabletop-players-summary">
+          {panelStatusText}
+        </div>
+      </div>
+      <TabletopPlayersPanelArt
+        game={game}
+        gameState={gameState}
+        players={players}
+        selectedRoom={selectedRoom}
+        status={status}
+        mySeatNo={mySeatNo}
+        activeSeatNo={activeSeatNo}
+        winnerSeatNos={winnerSeatNos}
+      />
+      <TabletopPlayersInsightRail items={insightItems} />
+      <div className="space-y-2">
+        {players.map((player) => {
+          const pid = memberIdOf(player);
+          const seatNo = seatNoOf(player);
+          const host = pid === hostMemberIdOf(selectedRoom);
+          const active = activeSeatNo === seatNo;
+          const mine = Number(mySeatNo) === seatNo;
+          const winner = winnerSeatNos.has(seatNo);
+          const scoreText = tabletopPlayerPanelScore(game, gameState, seatNo);
+          const cardTone = winner
+            ? "border-emerald-200 bg-emerald-50"
+            : active
+              ? "border-amber-200 bg-amber-50"
+              : mine
+                ? "border-sky-200 bg-sky-50"
+                : "border-slate-100 bg-slate-50";
+          return (
+            <div key={pid || seatNo} className={`rounded-xl border px-3 py-2 ${cardTone}`} data-smoke="tabletop-player-card">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-slate-900">{player.nickname}</div>
+                    <div className="text-[11px] font-bold text-slate-500">
+                      좌석 {seatNo || "-"}{host ? " · 방장" : ""}{scoreText ? ` · ${scoreText}` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {winner && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-black text-white" data-smoke="tabletop-player-winner">
+                      <GameUxGlyph type="win" className="h-3 w-3" />
+                      승리
+                    </span>
+                  )}
+                  {active && !winner && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-800" data-smoke="tabletop-player-active">
+                      <GameUxGlyph type="turn" className="h-3 w-3" />
+                      현재 차례
+                    </span>
+                  )}
+                  {mine && !winner && !active && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-1 text-[10px] font-black text-sky-700" data-smoke="tabletop-player-me">
+                      <GameUxGlyph type="state" className="h-3 w-3" />
+                      내 좌석
+                    </span>
+                  )}
+                  {status === "WAITING" && !host && (
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${isReady(player) ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {isReady(player) ? "준비" : "대기"}
+                    </span>
+                  )}
+                  {host && !winner && !active && !mine && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">
+                      <Crown className="h-3.5 w-3.5" />
+                      방장
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const normalizeGuideEntries = (lines = []) => (Array.isArray(lines) ? lines : [])
+  .map((line, index) => {
+    if (typeof line === "string") {
+      return {
+        key: `line-${index}`,
+        title: index === 0 ? "핵심 규칙" : "규칙 메모",
+        items: [line].filter(Boolean),
+        flat: true,
+      };
+    }
+    const items = Array.isArray(line?.items) ? line.items.filter(Boolean) : [];
+    return {
+      key: line?.title || `section-${index}`,
+      title: line?.title || "규칙 묶음",
+      items,
+      flat: false,
+    };
+  })
+  .filter((entry) => entry.title || entry.items.length);
+
+const guideItemPreview = (entry) => entry?.items?.[0] || entry?.title || "규칙 확인";
+
+const buildGuideBriefItems = (entries) => {
+  const ruleCount = entries.reduce((sum, entry) => sum + Math.max(entry.items.length, 1), 0);
+  const first = entries[0];
+  const decision = entries.find((entry) => entry.items.length > 1) || entries[1] || first;
+  const final = entries[entries.length - 1] || first;
+  return {
+    ruleCount,
+    items: [
+      {
+        key: "basis",
+        label: "판정 기준",
+        value: entries.length ? `${entries.length}개 묶음` : "규칙 대기",
+        detail: entries.length ? `${ruleCount}개 규칙 문장을 서버 판정 기준으로 읽습니다.` : "규칙 정보가 도착하면 이 영역에서 먼저 요약합니다.",
+      },
+      {
+        key: "first",
+        label: "첫 확인",
+        value: first?.title || "핵심 규칙",
+        detail: guideItemPreview(first),
+      },
+      {
+        key: "watch",
+        label: "주의 지점",
+        value: decision?.title || final?.title || "잠금 조건",
+        detail: guideItemPreview(decision || final),
+      },
+    ],
+  };
+};
+
+const TabletopGuideBriefArt = ({ sectionCount = 0, ruleCount = 0 }) => {
+  const nodes = [
+    { key: "rules", label: "규칙", value: `${sectionCount}`, x: 58, y: 94, fill: "#2563eb" },
+    { key: "judge", label: "판정", value: `${ruleCount}`, x: 146, y: 58, fill: "#7c3aed" },
+    { key: "lock", label: "잠금", value: "확인", x: 234, y: 94, fill: "#f59e0b" },
+    { key: "play", label: "행동", value: "연결", x: 318, y: 58, fill: "#059669" },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 380 140"
+      role="img"
+      aria-label="보드게임 규칙 브리핑 흐름"
+      className="h-auto w-full"
+      data-smoke="tabletop-guide-art"
+      focusable="false"
+    >
+      <rect x="8" y="8" width="364" height="124" rx="22" fill="#0f172a" stroke="#334155" strokeWidth="3" />
+      <path d="M58 94C99 42 116 42 146 58c43 23 53 56 88 36 37-21 53-55 84-36" fill="none" stroke="#475569" strokeWidth="12" strokeLinecap="round" />
+      <path d="M58 94C99 42 116 42 146 58c43 23 53 56 88 36 37-21 53-55 84-36" fill="none" stroke="#93c5fd" strokeWidth="5" strokeLinecap="round" />
+      <text x="26" y="34" fill="#bfdbfe" fontSize="11" fontWeight="900">규칙 브리핑</text>
+      <text x="26" y="54" fill="#ffffff" fontSize="17" fontWeight="900">판정과 행동 연결</text>
+      {nodes.map((node) => (
+        <g key={node.key} data-smoke="tabletop-guide-node" data-guide-node={node.key}>
+          <circle cx={node.x} cy={node.y} r="22" fill={node.fill} stroke="#f8fafc" strokeWidth="3" />
+          <text x={node.x} y={node.y - 2} textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="900">{node.label}</text>
+          <text x={node.x} y={node.y + 13} textAnchor="middle" fill="#ffffff" fontSize="10" fontWeight="900">{node.value}</text>
+        </g>
+      ))}
+      <rect x="254" y="24" width="92" height="28" rx="12" fill="#1e293b" stroke="#94a3b8" />
+      <text x="300" y="43" textAnchor="middle" fill="#e2e8f0" fontSize="10" fontWeight="900">서버 판정 유지</text>
+    </svg>
+  );
+};
+
+const GuidePanel = ({ lines }) => {
+  const entries = normalizeGuideEntries(lines);
+  const guideBrief = buildGuideBriefItems(entries);
+
+  return (
+    <div
+      className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg"
+      data-smoke="tabletop-guide-panel"
+      data-guide-sections={entries.length}
+      data-guide-rules={guideBrief.ruleCount}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-black text-slate-900">도움말</div>
+        <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">서버 판정</div>
+      </div>
+      <TabletopGuideBriefArt sectionCount={entries.length} ruleCount={guideBrief.ruleCount} />
+      <div className="mt-3 grid gap-2">
+        {guideBrief.items.map((item) => (
+          <div key={item.key} className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2" data-smoke="tabletop-guide-item" data-guide-key={item.key}>
+            <div className="text-[10px] font-black text-blue-700">{item.label}</div>
+            <div className="mt-1 text-sm font-black text-slate-950">{item.value}</div>
+            <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 space-y-2">
+        {entries.map((entry) => (
+          entry.flat ? (
+            <div key={entry.key} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-500">
+              {entry.items[0]}
+            </div>
+          ) : (
+            <div key={entry.key} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="text-xs font-black text-slate-800">{entry.title}</div>
+              <div className="mt-1 space-y-1 text-[11px] font-bold leading-relaxed text-slate-500">
+                {entry.items.map((item) => (
+                  <div key={item} className="flex gap-1.5">
+                    <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export const CatanGame = () => <TabletopGame game="catan" />;
 export const BlokusGame = () => <TabletopGame game="blokus" />;

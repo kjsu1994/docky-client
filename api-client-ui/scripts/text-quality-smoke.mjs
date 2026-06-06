@@ -57,6 +57,7 @@ const appSource = await readFile(path.join(root, "src", "App.jsx"), "utf8");
 const consoleGuardSource = await readFile(path.join(root, "src", "utils", "consoleGuard.js"), "utf8");
 const clientDiagnosticsSource = await readFile(path.join(root, "src", "utils", "clientDiagnostics.js"), "utf8");
 const apiSource = await readFile(path.join(root, "src", "utils", "api.js"), "utf8");
+const toastSource = await readFile(path.join(root, "src", "utils", "toast.js"), "utf8");
 const appErrorBoundarySource = await readFile(path.join(root, "src", "common", "AppErrorBoundary.jsx"), "utf8");
 const appErrorFallbackSource = await readFile(path.join(root, "src", "common", "AppErrorFallback.jsx"), "utf8");
 const helpersSource = await readFile(path.join(root, "src", "utils", "helpers.js"), "utf8");
@@ -275,6 +276,20 @@ if (!apiSource.includes("TECHNICAL_SERVER_MESSAGE_PATTERN")
     failures.push("src/utils/api.js: Korean safe API error-message contract is missing");
 }
 
+if (!toastSource.includes("scheduleToastCleanup")
+    || !toastSource.includes("dismissAndRemoveToast")
+    || !toastSource.includes("cleanupTimers")
+    || !toastSource.includes("게임을 시작했습니다.")
+    || !toastSource.includes("플레이어가 입장했습니다.")
+    || !toastSource.includes("방을 만들었습니다.")
+    || !toastSource.includes("행동이 반영되었습니다.")
+    || !toastSource.includes("방 설정을 저장했습니다.")
+    || !toastSource.includes("__toastRuntimeTest")
+    || toastSource.includes("Math.max(0, duration) + Math.max(0, removeDelay)")
+    || toastSource.includes("?뚮")) {
+    failures.push("src/utils/toast.js: Korean managed toast cleanup contract is missing");
+}
+
 if (!helpersSource.includes("logClientError(\"storage.set\"")
     || !helpersSource.includes("logClientError(\"storage.remove\"")
     || /console\.(warn|error)\s*\(/.test(helpersSource)) {
@@ -291,6 +306,10 @@ if (!authContextSource.includes("logClientError(\"auth.member.fetch\"")
 if (!loginSource.includes("logClientError(\"login.submit\"")
     || /console\.error\s*\(/.test(loginSource)) {
     failures.push("src/pages/access/Login.jsx: login errors must use safe client diagnostics");
+}
+if (!loginSource.includes("notifyLoading(\"해제 요청을 제출하는 중입니다...\"")
+    || loginSource.includes("loadToast")) {
+    failures.push("src/pages/access/Login.jsx: release request toasts must use managed Korean loading helper");
 }
 
 if (!registerSource.includes("logClientError(\"register.submit\"")

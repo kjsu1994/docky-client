@@ -5,7 +5,7 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 import { BrandMark } from "../../common/BrandLogo.jsx";
 import { trapFocus } from "../../utils/focusTrap.js";
 import { logClientError } from "../../utils/clientDiagnostics.js";
-import { loadToast, notifyError, notifySuccess } from "../../utils/toast.js";
+import { notifyError, notifyLoading, notifySuccess } from "../../utils/toast.js";
 
 const loadAuthAdapter = () => import("../../adapters/authAdapter.js");
 
@@ -199,25 +199,16 @@ export const Login = () => {
         if (!lockInfo?.email || releaseLoading) return;
 
         setReleaseLoading(true);
-        const toast = await loadToast().catch(() => null);
-        const toastId = toast?.loading("해제 요청을 제출하는 중...", { duration: 20000 });
+        const loadingToast = await notifyLoading("해제 요청을 제출하는 중입니다...");
         try {
-            const { authAdapter, extractAuthErrorMessage } = await loadAuthAdapter();
+            const { authAdapter } = await loadAuthAdapter();
             await authAdapter.requestSanctionRelease({ email: lockInfo.email, reason: releaseReason });
-            if (toast && toastId) {
-                toast.success("해제 요청이 제출되었습니다.", { id: toastId, duration: 3200 });
-            } else {
-                notifySuccess("해제 요청이 제출되었습니다.");
-            }
+            loadingToast.success("해제 요청이 제출되었습니다.");
             setReleaseReason("");
         } catch (error) {
             const { extractAuthErrorMessage } = await loadAuthAdapter();
             const message = extractAuthErrorMessage(error, "해제 요청 제출에 실패했습니다.");
-            if (toast && toastId) {
-                toast.error(message, { id: toastId, duration: 4200 });
-            } else {
-                notifyError(message);
-            }
+            loadingToast.error(message);
         } finally {
             setReleaseLoading(false);
         }
