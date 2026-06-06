@@ -14800,21 +14800,18 @@ const SixNimmtTurnPressurePanel = ({
   const phaseLabel = sixNimmtPhaseLabels[phase] || phase || "대기";
 
   return (
-    <section data-smoke="six-nimmt-turn-pressure-panel" className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:mt-4 sm:rounded-[1.5rem] sm:p-4">
+    <section data-smoke="six-nimmt-turn-pressure-panel" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-black text-amber-700">선택 공개 압박</div>
-          <div className="mt-1 text-lg font-black text-slate-950">누가 카드를 잠갔고 무엇이 곧 공개될까</div>
-          <div className="mt-1 max-w-2xl text-xs font-bold leading-relaxed text-slate-600">
-            제출 인원, 공개 순서, 행 선택 대기, 벌점 레이스를 현재 상태만으로 요약합니다.
-          </div>
+          <div className="mt-1 text-base font-black text-slate-950 sm:text-lg">선택 잠금과 공개 순서</div>
         </div>
         <div className="rounded-2xl bg-amber-50 px-3 py-2 text-right">
           <div className="text-[10px] font-black text-amber-700">현재 단계</div>
           <div className="mt-0.5 text-sm font-black text-slate-900">{phaseLabel}</div>
         </div>
       </div>
-      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+      <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(260px,0.82fr)_minmax(0,1.18fr)]">
         <SixNimmtTurnPressureArt
           playerSignals={playerSignals}
           selectedCount={selectedCount}
@@ -14824,12 +14821,12 @@ const SixNimmtTurnPressurePanel = ({
           activeSeatNo={activeSeatNo}
           mySeatNo={mySeatNo}
         />
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 md:grid-cols-4 xl:grid-cols-2">
           {pressureItems.map((item) => (
-            <div key={item.label} data-smoke="six-nimmt-turn-pressure-item" className={`rounded-2xl border px-3 py-3 ${item.className}`}>
+            <div key={item.label} data-smoke="six-nimmt-turn-pressure-item" className={`rounded-xl border px-3 py-2 ${item.className}`}>
               <div className="text-[10px] font-black text-slate-500">{item.label}</div>
               <div className="mt-1 text-sm font-black text-slate-950">{item.value}</div>
-              <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
+              <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
             </div>
           ))}
         </div>
@@ -15112,11 +15109,11 @@ const SixNimmtRiskPanel = ({
         : "다음 공개 처리 전에 행별 회수 위험을 읽습니다.";
 
   return (
-    <section data-smoke="six-nimmt-risk-panel" className="mt-3 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-slate-50 p-3 shadow-sm sm:mt-4 sm:rounded-[1.5rem] sm:p-4">
+    <section data-smoke="six-nimmt-risk-panel" className="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-slate-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-black text-amber-700">행 위험 해석</div>
-          <div className="mt-1 text-lg font-black text-slate-950">어느 행이 벌점을 만들까</div>
+          <div className="mt-1 text-base font-black text-slate-950 sm:text-lg">행별 벌점 압박</div>
           <div className="mt-1 max-w-2xl text-xs font-bold leading-relaxed text-slate-600">{titleDetail}</div>
         </div>
         {focusSignal && (
@@ -15128,7 +15125,7 @@ const SixNimmtRiskPanel = ({
           </div>
         )}
       </div>
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
+      <div className="mt-3 grid gap-2 lg:grid-cols-4">
         {rowSignals.map((signal) => {
           const profile = sixNimmtRiskProfiles[signal.level] || sixNimmtRiskProfiles.calm;
           return (
@@ -15148,7 +15145,7 @@ const SixNimmtRiskPanel = ({
                 <div className="text-sm font-black text-slate-900">{signal.index + 1}행 · 끝 {signal.tailValue || "-"}</div>
                 <div className={`rounded-full bg-white px-2 py-1 text-[10px] font-black ${profile.textClass}`}>{profile.label}</div>
               </div>
-              <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-600">{signal.reason}</div>
+              <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-600">{signal.reason}</div>
             </div>
           );
         })}
@@ -15347,36 +15344,14 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             </div>
           </div>
 
-          <GameFlowMeter
-            title="6 nimmt! 판 읽기"
-            detail="제출 수, 위험 행, 내 카드 예측을 한 번에 확인합니다."
-            items={sixNimmtFlowItems}
-            tone="amber"
-            smoke="six-nimmt-flow-meter"
-            className="mt-3"
-          />
-
-          <SixNimmtTurnPressurePanel
-            playerSignals={sixNimmtTurnPlayers}
-            pressureItems={sixNimmtTurnPressureItems}
-            selectedCount={sixNimmtSelectedCount}
-            playerCount={sixNimmtPlayerCount}
-            phase={phase}
-            pendingCard={pendingCard}
-            activeSeatNo={activeSeatNo}
-            mySeatNo={mySeatNo}
-          />
-
-          <SixNimmtRiskPanel
-            rows={rows}
-            waitingSelection={waitingSelection}
-            needsRowChoice={needsRowChoice}
-            selectedCard={selectedCard}
-            selectedPreview={selectedPreview}
-            selectedRowIndex={selectedRowIndex}
-            recommendedRowIndex={recommendedRowIndex}
-            pendingCard={pendingCard}
-          />
+          <div className="mt-3 grid gap-2 text-xs font-black text-slate-700 sm:grid-cols-4">
+            {sixNimmtFlowItems.map((item) => (
+              <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                <div className="text-[10px] text-slate-400">{item.label}</div>
+                <div className="mt-0.5 truncate text-sm text-slate-900">{item.value}</div>
+              </div>
+            ))}
+          </div>
 
           {needsRowChoice && (
             <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-2 text-xs font-bold leading-relaxed text-amber-800 sm:mt-4 sm:rounded-2xl sm:p-3 sm:text-sm">
@@ -15479,6 +15454,45 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
               <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-black leading-relaxed text-slate-500">다른 플레이어의 선택을 기다리는 중입니다.</div>
             )}
           </div>
+        </section>
+
+        <section className="scroll-mt-24 space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:rounded-[1.5rem] sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-black text-slate-900">하단 분석</div>
+              <div className="mt-0.5 text-xs font-bold text-slate-500">보드와 손패를 본 뒤 필요한 판단만 압축해서 확인합니다.</div>
+            </div>
+            <div className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">
+              {sixNimmtSelectedCount}/{sixNimmtPlayerCount || "-"}명 선택
+            </div>
+          </div>
+          <GameFlowMeter
+            title="6 nimmt! 판 읽기"
+            detail="제출 수, 위험 행, 내 카드 예측을 압축해서 확인합니다."
+            items={sixNimmtFlowItems}
+            tone="amber"
+            smoke="six-nimmt-flow-meter"
+          />
+          <SixNimmtTurnPressurePanel
+            playerSignals={sixNimmtTurnPlayers}
+            pressureItems={sixNimmtTurnPressureItems}
+            selectedCount={sixNimmtSelectedCount}
+            playerCount={sixNimmtPlayerCount}
+            phase={phase}
+            pendingCard={pendingCard}
+            activeSeatNo={activeSeatNo}
+            mySeatNo={mySeatNo}
+          />
+          <SixNimmtRiskPanel
+            rows={rows}
+            waitingSelection={waitingSelection}
+            needsRowChoice={needsRowChoice}
+            selectedCard={selectedCard}
+            selectedPreview={selectedPreview}
+            selectedRowIndex={selectedRowIndex}
+            recommendedRowIndex={recommendedRowIndex}
+            pendingCard={pendingCard}
+          />
         </section>
       </main>
 
