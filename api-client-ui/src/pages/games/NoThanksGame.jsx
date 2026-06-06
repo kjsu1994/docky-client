@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
-import { CheckCircle2, CircleHelp, Crown, MessageSquare, Play, TimerReset } from "lucide-react";
+import { CheckCircle2, Crown, MessageSquare, Play, TimerReset } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
@@ -1473,16 +1473,10 @@ const NoThanksPlayerStateCard = ({ player, index, roomStatus, turnMemberId, myMe
   const cardScore = scoreNoThanksCards(cards);
   const serverScore = Number(player?.score);
   const finalScore = Number.isFinite(serverScore) ? serverScore : cardScore - chips;
-  const runs = summarizeNoThanksRuns(cards);
-  const normalizedStatus = String(roomStatus || "WAITING").toUpperCase();
   const isCurrent = id > 0 && id === Number(turnMemberId || 0);
   const isMe = id > 0 && id === Number(myMemberId || 0);
   const isWinner = id > 0 && id === Number(winnerMemberId || 0);
   const isHost = id > 0 && id === Number(hostMemberId || 0);
-  const isReady = id > 0 && (readyMemberIds?.has(id) || isHost);
-  const statusLabel = isWinner ? "우승" : isCurrent ? "현재 차례" : isMe ? "내 좌석" : isHost ? "방장" : normalizedStatus === "WAITING" ? (isReady ? "준비" : "대기") : "참가";
-  const chipPressure = chips <= 1 ? "칩 압력 높음" : chips >= 5 ? "칩 완충 충분" : "칩 압력 보통";
-  const cardFlow = runs.longestRun > 1 ? `${runs.label} 카드 흐름` : cards.length ? `${cardsLabel(cards)} 카드 흐름` : "카드 없음";
   const toneClass = isWinner
     ? "border-amber-300 bg-amber-50"
     : isCurrent
@@ -1503,45 +1497,16 @@ const NoThanksPlayerStateCard = ({ player, index, roomStatus, turnMemberId, myMe
           <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
           <div className="min-w-0">
             <div className="truncate text-sm font-black text-slate-900">{player.nickname || `플레이어 ${index + 1}`}</div>
-            <div className="text-[11px] font-bold text-slate-500">좌석 {index + 1} · {statusLabel}</div>
+            <div className="truncate text-[11px] font-bold text-slate-500">
+              좌석 {index + 1}{isHost ? " · 방장" : ""} · 점수 {Number.isFinite(finalScore) ? finalScore : "-"} · 칩 {chips} · 카드 {cards.length}
+            </div>
           </div>
         </div>
-        <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${isReady || normalizedStatus !== "WAITING" ? "bg-white text-slate-700 ring-1 ring-slate-200" : "bg-slate-200 text-slate-500"}`}>
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          {statusLabel}
-        </span>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(150px,0.92fr)_minmax(0,1fr)] sm:items-center">
-        <NoThanksPlayerStateArt
-          cards={cards}
-          chips={chips}
-          finalScore={finalScore}
-          isCurrent={isCurrent}
-          isMe={isMe}
-          isWinner={isWinner}
-          statusLabel={statusLabel}
-        />
-        <div className="min-w-0 space-y-2">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div data-smoke="no-thanks-player-state-item" className="min-w-0 border-r border-slate-200 pr-2">
-              <div className="text-[10px] font-black text-slate-400">칩</div>
-              <div className="text-sm font-black text-slate-900">{chips}</div>
-            </div>
-            <div data-smoke="no-thanks-player-state-item" className="min-w-0 border-r border-slate-200 pr-2">
-              <div className="text-[10px] font-black text-slate-400">카드</div>
-              <div className="truncate text-sm font-black text-slate-900">{cards.length || "-"}</div>
-            </div>
-            <div data-smoke="no-thanks-player-state-item" className="min-w-0">
-              <div className="text-[10px] font-black text-slate-400">점수</div>
-              <div className="text-sm font-black text-slate-900">{Number.isFinite(finalScore) ? finalScore : "-"}</div>
-            </div>
-          </div>
-          <div data-smoke="no-thanks-player-state-item" className="text-xs font-bold leading-relaxed text-slate-600">
-            {chipPressure} · {cardFlow}
-          </div>
-          <div data-smoke="no-thanks-player-state-item" className="text-[11px] font-bold leading-relaxed text-slate-500">
-            카드 묶음 {cardScore}점에서 남은 칩 {chips}개를 차감해 현재 점수 압력을 읽습니다.
-          </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+          {isWinner && <span className="rounded-full bg-amber-500 px-2 py-1 text-[10px] font-black text-white">우승</span>}
+          {isCurrent && !isWinner && <span className="rounded-full bg-primary-100 px-2 py-1 text-[10px] font-black text-primary-700">현재 차례</span>}
+          {isMe && !isWinner && <span className="rounded-full bg-violet-100 px-2 py-1 text-[10px] font-black text-violet-700">내 좌석</span>}
+          {!isWinner && !isCurrent && !isMe && isHost && <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">방장</span>}
         </div>
       </div>
     </div>
@@ -3572,11 +3537,6 @@ export const NoThanksGame = () => {
           </div>
           <div className="mt-4 flex items-center gap-2">
             <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">노땡스</h1>
-            <CircleHelp
-              className="h-5 w-5 shrink-0 text-slate-400"
-              aria-label="노땡스 설명"
-              title="더 많은 칩 그리고 더 적은 숫자의 카드를 보유하여 승리하세요."
-            />
           </div>
         </section>
       )}
@@ -3586,11 +3546,6 @@ export const NoThanksGame = () => {
           <form onSubmit={createRoom} className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
             <div className="flex items-center gap-2">
               <div className="text-lg font-black text-slate-900">방 만들기</div>
-              <CircleHelp
-                className="h-4 w-4 shrink-0 text-slate-400"
-                aria-label="방 만들기 설정 설명"
-                title="시작 칩은 5~20개, 제한 시간은 5~60초 범위에서 설정합니다."
-              />
             </div>
             <div className="mt-4 space-y-3">
               <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="방 제목" value={createForm.title} onChange={(e) => setCreateForm((prev) => ({ ...prev, title: e.target.value }))} />
@@ -3646,11 +3601,6 @@ export const NoThanksGame = () => {
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${noThanksRoomStatusTone(status)}`}>
                             {noThanksRoomStatusLabel(status)}
                           </span>
-                          <CircleHelp
-                            className="h-4 w-4 shrink-0 text-slate-400"
-                            aria-label={`${room.title} 상세 설명`}
-                            title={`${readiness.value} · ${readiness.detail} / ${actionSignal.value} · ${actionSignal.detail}`}
-                          />
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-black">
                           <span className={`rounded-full px-2 py-1 ${roomFull ? "bg-rose-50 text-rose-700" : "bg-white text-slate-600"}`}>
@@ -3693,11 +3643,6 @@ export const NoThanksGame = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <div className="text-lg font-black text-slate-900">{selectedRoom.title}</div>
-                  <CircleHelp
-                    className="h-4 w-4 shrink-0 text-slate-400"
-                    aria-label="노땡스 방 설정 설명"
-                    title={`시작 칩 ${parseIntSafe(selectedRoom.startChipCount, 11)}개 · 턴 ${parseIntSafe(selectedRoom.turnTimeSeconds, 15)}초 · 칩을 내고 넘기거나 카드를 가져갑니다.`}
-                  />
                 </div>
                 <div className="text-xs text-slate-500">방 코드 {selectedRoom.roomCode}</div>
               </div>
@@ -3733,7 +3678,7 @@ export const NoThanksGame = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <div className="space-y-4">
               <div className={`rounded-[1.8rem] border p-5 shadow-xl ${isMyTurn ? "border-sky-200 bg-sky-50" : "border-slate-200 bg-white"}`}>
                 <div className="flex flex-wrap items-center gap-2 text-xs font-black text-slate-700">
@@ -3743,17 +3688,12 @@ export const NoThanksGame = () => {
                   {isMyTurn && <span className="rounded-full bg-sky-100 px-2.5 py-1 text-sky-700">내 차례</span>}
                   {secondsLeft !== null && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${secondsLeft <= 5 ? "bg-rose-100 text-rose-600" : "bg-slate-100 text-slate-700"}`}><TimerReset className="h-3.5 w-3.5" />{secondsLeft}초</span>}
                 </div>
-                <div className="mt-5 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
-                  <div className="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-700 p-6 text-white">
+                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(360px,520px)_minmax(300px,360px)] lg:justify-center">
+                  <div className="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-700 p-4 text-white sm:p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-300">
                           현재 카드
-                          <CircleHelp
-                            className="h-4 w-4 shrink-0 text-slate-400"
-                            aria-label="노땡스 행동 설명"
-                            title="카드와 칩을 가져가거나 칩 1개를 내고 다음 플레이어에게 넘길 수 있습니다. 시간이 초과되면 가능한 자동 행동이 실행됩니다."
-                          />
                         </div>
                         <div className="mt-1 text-sm font-bold text-slate-300">{currentCard ? `${currentCard}점 카드 공개` : "공개 카드 대기"}</div>
                       </div>
@@ -3762,8 +3702,8 @@ export const NoThanksGame = () => {
                         팟 {potChips}
                       </div>
                     </div>
-                    <div className="mt-5 grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center">
-                      <NoThanksCardFace value={currentCard} className="mx-auto h-[212px] w-[160px] max-w-full" />
+                    <div className="mt-5 grid gap-4 sm:grid-cols-[150px_228px] sm:items-center sm:justify-center">
+                      <NoThanksCardFace value={currentCard} className="mx-auto h-[198px] w-[150px] max-w-full" />
                       <div className="relative mx-auto h-[196px] w-[228px] max-w-full">
                         {!potChipStack.length && (
                           <NoThanksChipToken className="absolute left-[84px] top-[72px] h-[54px] w-[54px] opacity-45" label="빈 팟 칩 자리" />
@@ -3806,7 +3746,7 @@ export const NoThanksGame = () => {
                       />
                     )}
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-4 lg:self-start">
                     <NoThanksActionAvailabilityPanel
                       roomStatus={roomStatus}
                       isMyTurn={isMyTurn}
@@ -3844,7 +3784,7 @@ export const NoThanksGame = () => {
 
             <aside className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">
               <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900"><MessageSquare className="h-4 w-4" />방 채팅</div>
-              <div ref={chatScrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-2xl bg-slate-50 p-3 text-xs sm:h-[320px] xl:h-[420px]">
+              <div ref={chatScrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-2xl bg-slate-50 p-3 text-xs sm:h-[320px] 2xl:h-[420px]">
                 {!chatMessages.length && (
                   <GameChatEmptyState
                     game="no-thanks"

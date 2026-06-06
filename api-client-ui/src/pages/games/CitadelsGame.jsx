@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, CheckCircle2, CircleHelp, Coins, Crown, Hammer, RefreshCw, Shield, Sparkles, Target, Users } from "lucide-react";
+import { BookOpen, CheckCircle2, Coins, Crown, Hammer, RefreshCw, Shield, Sparkles, Target, Users } from "lucide-react";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import {
@@ -3612,11 +3612,6 @@ const CitadelsLobbyRoomCard = ({ room, busy, onJoin }) => {
               <div className="flex items-center gap-2 text-sm font-black text-slate-900">
                 <GameUxGlyph type="stage" className="h-4 w-4 text-amber-600" />
                 <span className="min-w-0 truncate">{room.title}</span>
-                <CircleHelp
-                  className="h-4 w-4 shrink-0 text-slate-400"
-                  aria-label={`${room.title} 상세 설명`}
-                  title={`${readinessText} · ${actionDetail}`}
-                />
               </div>
               <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-500">
                 <span className="rounded-full bg-white px-2 py-1">코드 {roomCode}</span>
@@ -4965,11 +4960,6 @@ export const CitadelsGame = () => {
           </div>
           <div className="mt-4 flex items-center gap-2">
             <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">시티델</h1>
-            <CircleHelp
-              className="h-5 w-5 shrink-0 text-slate-400"
-              aria-label="시티델 설명"
-              title="비밀 캐릭터 선택, 금화 관리, 구역 건설을 한 화면에서 진행합니다."
-            />
           </div>
         </div>
       </section>
@@ -4980,11 +4970,6 @@ export const CitadelsGame = () => {
           <form onSubmit={createRoom} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
             <div className="flex items-center gap-2">
               <div className="text-lg font-black text-slate-900">방 만들기</div>
-              <CircleHelp
-                className="h-4 w-4 shrink-0 text-slate-400"
-                aria-label="시티델 방 만들기 설정 설명"
-                title="규칙과 턴 시간을 선택하면 바로 방을 생성합니다. 자세한 선택 흐름은 게임 안에서 필요한 순간에 표시됩니다."
-              />
             </div>
             <div className="mt-4 space-y-3">
               <input aria-label="방 제목" className="min-h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="방 제목" value={createForm.title} onChange={(event) => setCreateForm((prev) => ({ ...prev, title: event.target.value }))} />
@@ -5032,11 +5017,6 @@ export const CitadelsGame = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <div className="text-xl font-black text-slate-900">{selectedRoom.title}</div>
-                  <CircleHelp
-                    className="h-4 w-4 shrink-0 text-slate-400"
-                    aria-label="시티델 방 상태 설명"
-                    title={`규칙 ${selectedRoom.variantName || "기본 규칙"} · ${players.length}/${selectedRoom.maxPlayers}명 · ${startBlockedText}`}
-                  />
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
                   <span className="rounded-full bg-slate-100 px-2 py-1">방 코드 {roomCodeOf(selectedRoom)}</span>
@@ -5126,11 +5106,6 @@ export const CitadelsGame = () => {
                     <div>
                       <div className="flex items-center gap-2 text-sm font-black text-slate-500">
                         현재 흐름
-                        <CircleHelp
-                          className="h-4 w-4 shrink-0 text-slate-400"
-                          aria-label="시티델 진행 규칙 설명"
-                          title="캐릭터는 비공개로 선택하고 순서대로 호출됩니다. 차례에는 금화나 구역 카드를 고른 뒤 건설할 수 있고, 누군가 8번째 구역을 건설하면 마지막 라운드가 됩니다."
-                        />
                       </div>
                       <div className="mt-1 text-2xl font-black text-slate-900">
                         {phase === "CHARACTER_SELECTION" ? `${playerName(players, chooserSeatNo)} 캐릭터 ${selectionStep === "DISCARD" ? "버림" : "선택"}` : phase === "DISTRICT_CHOICE" ? `${playerName(players, pendingChoiceSeatNo)} 구역 카드 선택` : phase === "GRAVEYARD_CHOICE" ? `${playerName(players, pendingGraveyardSeatNo)} 묘지 선택` : phase === "FINISHED" ? "게임 종료" : `${characterName(activeCharacter)} · ${playerName(players, activeSeatNo)} 차례`}

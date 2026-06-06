@@ -212,8 +212,8 @@ const gameManuals = {
       {
         title: "목표",
         items: [
-          "기본판은 보통 10승점을 먼저 달성하면 승리합니다. 선택한 확장이나 시나리오에 따라 목표 점수가 달라질 수 있습니다.",
-          "마을, 도시, 최장 교역로, 최대 기사력, 개발 카드, 확장별 보너스가 승점의 주요 원천입니다.",
+          "기본판은 보통 10승점을 먼저 달성하면 승리합니다. 5~6인 확장은 추가 인원 흐름을 적용합니다.",
+          "마을, 도시, 최장 교역로, 최대 기사력, 개발 카드가 승점의 주요 원천입니다.",
         ],
       },
       {
@@ -226,11 +226,10 @@ const gameManuals = {
         ],
       },
       {
-        title: "확장과 선택 규칙",
+        title: "제공 규칙",
         items: [
+          "현재 로비에서는 서버에서 실제 진행 가능한 기본판과 5~6인 확장만 노출합니다.",
           "5~6인 방에서는 추가 인원과 보드 확장, 카타니안 보조 턴 흐름이 적용됩니다.",
-          "방장이 항해사, 도시와 기사, 상인과 야만인 같은 구현된 선택 규칙을 고르면 해당 규칙의 배, 기사, 화물, 특수 보상 UI가 게임 중에 나타납니다.",
-          "처음이라면 기본판 또는 5~6인 확장부터 시작하고, 익숙해진 뒤 복잡한 확장을 고르는 편이 좋습니다.",
         ],
       },
       {
@@ -1407,9 +1406,6 @@ const GameHubQuickFilterPanel = ({ activeTab, activeFilter, onFilterChange }) =>
           조건 필터
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">{selectedCount}개</span>
         </div>
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500" title={selectedOption.detail} aria-label={`현재 필터 설명: ${selectedOption.detail}`}>
-          <CircleHelp className="h-3.5 w-3.5" />
-        </span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {gameHubFilterOptions.map((option) => {
@@ -2649,13 +2645,6 @@ const GameCardBriefPanel = ({ game, experience }) => {
               <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{item.label}</span>
             </span>
-            <span
-              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-slate-400 ring-1 ring-slate-200"
-              aria-label={`${item.label} 설명: ${item.detail}`}
-              title={item.detail}
-            >
-              <CircleHelp className="h-3 w-3" />
-            </span>
           </div>
           <div className="mt-1 line-clamp-2 text-[11px] font-black leading-snug text-slate-900 sm:text-xs">{item.value}</div>
         </div>
@@ -3710,13 +3699,6 @@ export const GamesHub = () => {
           <div className="flex flex-row items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <h2 className="text-lg font-black text-slate-900 sm:text-xl">{section.title}</h2>
-              <span
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                title={section.description}
-                aria-label={`${section.title} 설명: ${section.description}`}
-              >
-                <CircleHelp className="h-3.5 w-3.5" />
-              </span>
             </div>
             <div className="text-[11px] font-black text-slate-400">{section.games.length}개</div>
           </div>

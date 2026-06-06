@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle2,
-  CircleHelp,
   Copy,
   Dices,
   Gamepad2,
@@ -4652,13 +4651,6 @@ export const GoodEtcVideoGame = () => {
                 Good_ETC 비디오게임
               </div>
               <h1 className="mt-3 break-words text-2xl font-black leading-tight sm:text-4xl">{profile.title}</h1>
-              <span
-                className="mt-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15"
-                title={artProfile?.tagline || profile.storage}
-                aria-label={`${profile.title} 설명: ${artProfile?.tagline || profile.storage}`}
-              >
-                <CircleHelp className="h-4 w-4" />
-              </span>
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-black text-white ring-1 ring-white/15">
                   <Users className="h-3.5 w-3.5" />
@@ -4753,13 +4745,6 @@ export const GoodEtcVideoGame = () => {
                   </div>
                   <h2 className="mt-2 break-words text-xl font-black text-slate-900">{selectedRoom.title}</h2>
                   <div className="mt-1 text-sm font-bold text-slate-500">방 코드 {roomCode} · 내 좌석 {mySeatNo || "-"}</div>
-                  <span
-                    className="mt-3 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                    title={artProfile?.roomNote || profile.storage}
-                    aria-label={`${selectedRoom.title} 설명: ${artProfile?.roomNote || profile.storage}`}
-                  >
-                    <CircleHelp className="h-3.5 w-3.5" />
-                  </span>
                 </div>
                 <div>
                   <button type="button" className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-black text-slate-700 hover:bg-slate-900 hover:text-white" onClick={copyRoomCode}>

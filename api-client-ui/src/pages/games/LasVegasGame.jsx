@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
-import { CheckCircle2, Crown, Dices, MessageSquare, Play, TimerReset, Users } from "lucide-react";
+import { Crown, Dices, MessageSquare, Play, RefreshCw, TimerReset, Users } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { CasinoEmptyLaneArt, CasinoTableSign, DiceCountBadge, DiceFace, MoneyCard } from "../../common/LasVegasVisuals.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
-import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
-import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
+import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
 import {
     buildLasVegasActionPayload,
     getLasVegasChatRoomId,
@@ -857,32 +856,6 @@ const LasVegasSetupPreviewPanel = ({ createForm, rooms }) => {
             </div>
         </section>
     );
-};
-
-const lasVegasActionLabels = {
-    ROLL_DICE: "주사위 굴리기",
-    PLACE_DICE: "카지노 배팅",
-};
-
-const initialLasVegasActionFeedback = () => ({
-    status: "idle",
-    label: "행동 대기",
-    message: "아직 실행한 행동이 없습니다.",
-    detail: "주사위를 굴리거나 카지노에 배팅하면 전송 상태와 반영 근거가 여기에 남습니다.",
-});
-
-const lasVegasActionLabel = (actionType, casinoNo = null) => {
-    const normalized = String(actionType || "").toUpperCase();
-    const base = lasVegasActionLabels[normalized] || normalized.replace(/_/g, " ") || "게임 행동";
-    if (normalized === "PLACE_DICE" && casinoNo) return `${casinoName[casinoNo] || `${casinoNo}번 카지노`} 배팅`;
-    return base;
-};
-
-const lasVegasFeedbackStatusLabel = (status) => {
-    if (status === "pending") return "전송 중";
-    if (status === "done") return "전송 완료";
-    if (status === "error") return "실패";
-    return "대기";
 };
 
 const casinoName = {
@@ -2158,9 +2131,17 @@ const LasVegasSessionRoutePanel = ({ roomStatus, isHost, startReadiness, selecte
 
 const CasinoPanel = ({ casino, statePlayers, isHot, isLastPlaced }) => {
     const casinoNo = toPlainInt(casino.casinoNo, 0);
-    const total = casino.totalMoney || 0;
-    const moneyCards = casino.moneyCards || [];
-    const diceByPlayer = casino.diceByPlayer || {};
+    const total = casino.totalMoney || casino.total_money || 0;
+    const moneyCards = Array.isArray(casino.moneyCards)
+        ? casino.moneyCards
+        : Array.isArray(casino.money_cards)
+            ? casino.money_cards
+            : [];
+    const diceByPlayer = casino.diceByPlayer && typeof casino.diceByPlayer === "object" && !Array.isArray(casino.diceByPlayer)
+        ? casino.diceByPlayer
+        : casino.dice_by_player && typeof casino.dice_by_player === "object" && !Array.isArray(casino.dice_by_player)
+            ? casino.dice_by_player
+            : {};
     const diceEntries = Object.entries(diceByPlayer).sort((a, b) => Number(b[1]) - Number(a[1]));
     const playerMap = useMemo(() => {
         const map = new Map();
@@ -2866,7 +2847,6 @@ export const LasVegasGame = () => {
     const [creating, setCreating] = useState(false);
     const [rematching, setRematching] = useState(false);
     const [forceFinishing, setForceFinishing] = useState(false);
-    const [actionFeedback, setActionFeedback] = useState(initialLasVegasActionFeedback);
     const [secondsLeft, setSecondsLeft] = useState(null);
     const [createForm, setCreateForm] = useState({
         title: "",
@@ -2895,7 +2875,10 @@ export const LasVegasGame = () => {
     const myMemberId = getMemberId(user) || user?.id || null;
     const chatRoomId = normalizeChatRoomId(state) || normalizeChatRoomId(selectedRoom) || null;
     const roomStatus = state?.roomStatus || selectedRoom?.roomStatus || null;
-    const isFinished = roomStatus === "FINISHED";
+    const normalizedRoomStatus = String(roomStatus || "WAITING").toUpperCase();
+    const isWaiting = normalizedRoomStatus === "WAITING";
+    const isPlaying = normalizedRoomStatus === "PLAYING";
+    const isFinished = normalizedRoomStatus === "FINISHED";
 
     const isHost = selectedRoom && myMemberId &&
         Number(selectedRoom.hostMemberId) === Number(myMemberId);
@@ -2905,6 +2888,8 @@ export const LasVegasGame = () => {
     const canBet = !isFinished && myTurn && (state?.currentRoll?.length || 0) > 0;
 
     const currentRoll = state?.currentRoll || [];
+    const casinoRows = Array.isArray(state?.casinos) ? state.casinos : [];
+    const showGameBoard = casinoRows.length > 0 || isPlaying || isFinished;
     const currentRollCountByFace = useMemo(() => {
         const count = {};
         currentRoll.forEach((value) => {
@@ -2916,114 +2901,6 @@ export const LasVegasGame = () => {
     const livePlayers = Array.isArray(state?.players) ? state.players : [];
     const roomPlayers = Array.isArray(selectedRoom?.players) ? selectedRoom.players : [];
     const players = livePlayers.length > 0 ? livePlayers : roomPlayers;
-    const readyMemberIds = useMemo(() => extractReadyMemberIds(players), [players]);
-    const hostNickname = useMemo(() => {
-        const hostId = Number(selectedRoom?.hostMemberId || 0);
-        return roomPlayers.find((player) => Number(player.memberId) === hostId)?.nickname || "-";
-    }, [roomPlayers, selectedRoom]);
-    const lobbySetup = useMemo(() => {
-        const title = String(createForm.title || "").trim();
-        const roundCount = toPlainInt(createForm.roundCount, 4);
-        const turnTimeSeconds = toPlainInt(createForm.turnTimeSeconds, 25);
-        const code = String(joinCode || "").trim().toUpperCase();
-        const waitingRoomCount = Array.isArray(rooms) ? rooms.filter((room) => String(room?.roomStatus || "WAITING").toUpperCase() === "WAITING").length : 0;
-        return {
-            statusText: code ? "코드 입장 준비" : "호스트 설정 준비",
-            items: [
-                {
-                    label: "방 제목",
-                    value: title ? "제목 입력됨" : "자동 제목 가능",
-                    detail: title || "제목이 비어 있어도 기본 라스베가스 테이블로 만들 수 있습니다.",
-                    icon: "state",
-                    tone: title ? "done" : "waiting",
-                    progress: title ? Math.min(100, Math.max(18, (title.length / 24) * 100)) : 8,
-                },
-                {
-                    label: "라운드",
-                    value: `${roundCount}라운드`,
-                    detail: "라운드 수가 길수록 카지노 수익 역전 기회가 늘어납니다.",
-                    icon: "stage",
-                    tone: "active",
-                    progress: (roundCount / 10) * 100,
-                },
-                {
-                    label: "턴 시간",
-                    value: `${turnTimeSeconds}초`,
-                    detail: "각 플레이어가 주사위 배치 결정을 내릴 제한 시간입니다.",
-                    icon: "turn",
-                    tone: turnTimeSeconds >= 20 ? "done" : "waiting",
-                    progress: (turnTimeSeconds / 180) * 100,
-                },
-                {
-                    label: "코드 입장",
-                    value: code ? "코드 입력됨" : `${waitingRoomCount}개 대기방`,
-                    detail: code ? `${code} 코드로 바로 합류합니다.` : "코드가 없으면 대기방 카드에서 입장할 수 있습니다.",
-                    icon: "signal",
-                    tone: code ? "done" : waitingRoomCount ? "active" : "waiting",
-                    progress: code ? Math.min(100, Math.max(24, (code.length / 8) * 100)) : 8,
-                },
-            ],
-            ruleHint: "이 셋업 패널은 입력값 설명만 담당합니다. 방 생성, 코드 입장, 라운드 진행, 자동 행동 규칙은 기존 서버 로직을 그대로 따릅니다.",
-        };
-    }, [createForm.roundCount, createForm.title, createForm.turnTimeSeconds, joinCode, rooms]);
-    const roomStatusNormalized = String(roomStatus || "WAITING").toUpperCase();
-    const startReadiness = useMemo(() => {
-        if (!selectedRoom) return null;
-        const roomPlayersForReadiness = Array.isArray(players) ? players : [];
-        const hostId = Number(selectedRoom.hostMemberId || 0);
-        const guestPlayers = roomPlayersForReadiness.filter((player) => Number(getLasVegasPlayerId(player) || 0) !== hostId);
-        const readyGuestCount = guestPlayers.filter((player) => readyMemberIds.has(Number(getLasVegasPlayerId(player) || 0))).length;
-        const minPlayers = toPlainInt(selectedRoom.minPlayers, 2);
-        const maxPlayers = toPlainInt(selectedRoom.maxPlayers, 6);
-        const roundCount = toPlainInt(selectedRoom.roundCount, 4);
-        const turnTimeSeconds = toPlainInt(selectedRoom.turnTimeSeconds, 25);
-        const enoughPlayers = roomPlayersForReadiness.length >= minPlayers;
-        const guestsReady = !guestPlayers.length || readyGuestCount === guestPlayers.length;
-        const startSignalReady = enoughPlayers && guestsReady;
-        const playerProgress = minPlayers > 0 ? (roomPlayersForReadiness.length / minPlayers) * 100 : 100;
-        const guestProgress = guestPlayers.length > 0 ? (readyGuestCount / guestPlayers.length) * 100 : 100;
-        return {
-            canStart: Boolean(isHost && startSignalReady),
-            statusText: isHost
-                ? (startSignalReady ? "방장 시작 가능" : "시작 조건 확인 중")
-                : (startSignalReady ? "방장 시작 대기" : "준비 조건 확인 중"),
-            items: [
-                {
-                    label: "인원 조건",
-                    value: `${roomPlayersForReadiness.length}/${maxPlayers || "-"}명`,
-                    detail: enoughPlayers ? `최소 ${minPlayers}명 조건을 충족했습니다.` : `${Math.max(0, minPlayers - roomPlayersForReadiness.length)}명이 더 필요합니다.`,
-                    icon: "player",
-                    tone: enoughPlayers ? "done" : "waiting",
-                    progress: playerProgress,
-                },
-                {
-                    label: "게스트 준비",
-                    value: guestPlayers.length ? `${readyGuestCount}/${guestPlayers.length}명 준비` : "게스트 없음",
-                    detail: guestPlayers.length
-                        ? (guestsReady ? "게스트 준비가 완료되었습니다." : "아직 준비하지 않은 게스트가 있습니다.")
-                        : (minPlayers <= 1 ? "1인 시작 가능한 테이블입니다." : "초대 또는 입장으로 최소 인원을 채웁니다."),
-                    icon: "turn",
-                    tone: guestPlayers.length ? (guestsReady ? "done" : "waiting") : "neutral",
-                    progress: guestProgress,
-                },
-                {
-                    label: "시작 권한",
-                    value: isHost ? (startSignalReady ? "시작 가능" : "방장 대기") : "방장 전용",
-                    detail: isHost ? "방장만 현재 방을 시작할 수 있습니다." : "모든 조건이 맞으면 방장이 시작합니다.",
-                    icon: "signal",
-                    tone: isHost && startSignalReady ? "done" : startSignalReady ? "active" : "waiting",
-                },
-                {
-                    label: "라운드 설정",
-                    value: `${roundCount}라운드`,
-                    detail: `턴 ${turnTimeSeconds}초 · 주사위 배치 전 확인`,
-                    icon: "stage",
-                    tone: "active",
-                },
-            ],
-            ruleHint: "라스베가스는 최소 인원과 게스트 준비가 맞으면 방장이 시작합니다. 시작 후 라운드, 턴 시간, 주사위 배치 규칙은 기존 서버 상태를 그대로 따릅니다.",
-        };
-    }, [isHost, players, readyMemberIds, selectedRoom]);
     const sortedPlayers = [...players].sort((a, b) => {
         const aMoney = a.totalMoney || 0;
         const bMoney = b.totalMoney || 0;
@@ -3047,56 +2924,6 @@ export const LasVegasGame = () => {
     const lastPlacedText = lastPlacedCasinoNo
         ? `${lastPlacedPlayer?.nickname || `플레이어 ${lastPlacedMemberId}`}님이 ${casinoName[lastPlacedCasinoNo] || `${lastPlacedCasinoNo}번`}에 주사위 ${lastPlacedDiceCount}개를 배팅했습니다.`
         : "";
-
-    const selectedRoomId = normalizeRoomId(selectedRoom);
-    const actionFeedbackTone = actionFeedback.status === "error"
-        ? "error"
-        : actionFeedback.status === "pending"
-            ? "pending"
-            : actionFeedback.status === "done"
-                ? "done"
-                : "idle";
-    const actionFeedbackItems = useMemo(() => {
-        const statusLabel = roomStatus ? lasVegasRoomStatusLabel(roomStatus) : "대기";
-        const turnText = isFinished
-            ? "게임 종료"
-            : myTurn
-                ? "내 차례"
-                : currentRollPlayerName && currentRollPlayerName !== "-"
-                    ? `${currentRollPlayerName} 차례`
-                    : "차례 대기";
-        const syncDetail = lastPlacedText || (currentRoll.length ? `${currentRollPlayerName}의 공개 주사위 ${currentRoll.length}개` : "실시간 보드 상태를 기다리는 중입니다.");
-        return [
-            {
-                label: "전송 상태",
-                value: lasVegasFeedbackStatusLabel(actionFeedback.status),
-                detail: actionFeedback.label,
-                icon: actionFeedback.status === "error" ? "recent" : "signal",
-                tone: actionFeedbackTone,
-            },
-            {
-                label: "최근 행동",
-                value: actionFeedback.message,
-                detail: actionFeedback.detail,
-                icon: "decision",
-                tone: actionFeedback.status === "error" ? "error" : actionFeedback.status === "done" ? "done" : "neutral",
-            },
-            {
-                label: "차례",
-                value: turnText,
-                detail: statusLabel,
-                icon: "turn",
-                tone: myTurn ? "done" : "neutral",
-            },
-            {
-                label: "반영 근거",
-                value: actionFeedback.status === "done" ? "실시간 갱신 대기" : actionFeedback.status === "error" ? "재시도 필요" : "상태 확인",
-                detail: syncDetail,
-                icon: "recent",
-                tone: actionFeedback.status === "error" ? "error" : actionFeedback.status === "pending" ? "pending" : "neutral",
-            },
-        ];
-    }, [actionFeedback, actionFeedbackTone, currentRoll.length, currentRollPlayerName, isFinished, lastPlacedText, myTurn, roomStatus]);
 
     const ensureSocket = async () => {
         if (stompRef.current) return stompRef.current;
@@ -3349,10 +3176,6 @@ export const LasVegasGame = () => {
         };
     }, []);
 
-    useEffect(() => {
-        setActionFeedback(initialLasVegasActionFeedback());
-    }, [selectedRoomId]);
-
     const createRoom = async (e) => {
         e.preventDefault();
         try {
@@ -3527,24 +3350,11 @@ export const LasVegasGame = () => {
 
     const publishGameAction = async (actionType, casinoNo = null) => {
         if (!selectedRoom || !myMemberId) return;
-        const actionLabel = lasVegasActionLabel(actionType, casinoNo);
-        setActionFeedback({
-            status: "pending",
-            label: actionLabel,
-            message: `${actionLabel} 전송 중`,
-            detail: "실시간 연결을 확인하고 게임 서버로 행동을 보내는 중입니다.",
-        });
         const roomId = normalizeRoomId(selectedRoom);
         if (!roomId) return;
         const client = await ensureSocket();
         if (!client?.connected) {
             notifyError("실시간 연결이 아직 준비되지 않았습니다.");
-            setActionFeedback({
-                status: "error",
-                label: actionLabel,
-                message: `${actionLabel} 실패`,
-                detail: "실시간 연결이 준비되지 않았습니다. 잠시 후 다시 시도하세요.",
-            });
             return;
         }
         playActionSound(actionType);
@@ -3554,20 +3364,8 @@ export const LasVegasGame = () => {
                 body: JSON.stringify(buildLasVegasActionPayload({ actionType, casinoNo })),
                 headers: { "content-type": "application/json" },
             });
-            setActionFeedback({
-                status: "done",
-                label: actionLabel,
-                message: `${actionLabel} 전송 완료`,
-                detail: "서버가 실시간 상태를 다시 보내면 주사위와 카지노 패널에 반영됩니다.",
-            });
         } catch {
             notifyError("행동 전송에 실패했습니다.");
-            setActionFeedback({
-                status: "error",
-                label: actionLabel,
-                message: `${actionLabel} 실패`,
-                detail: "전송 중 오류가 발생했습니다. 연결 상태를 확인하고 다시 시도하세요.",
-            });
         }
     };
 
@@ -3604,7 +3402,7 @@ export const LasVegasGame = () => {
 
     const toggleReady = async () => {
         if (!selectedRoom) return;
-        if (roomStatus !== "WAITING") {
+        if (!isWaiting) {
             notifyError("대기 상태에서만 준비를 변경할 수 있습니다.");
             return;
         }
@@ -3619,7 +3417,7 @@ export const LasVegasGame = () => {
 
     const startGame = async () => {
         if (!selectedRoom) return;
-        if (roomStatus !== "WAITING") {
+        if (!isWaiting) {
             notifyError("한 판 더 하기로 대기 상태를 만든 뒤 시작할 수 있습니다.");
             return;
         }
@@ -3727,23 +3525,6 @@ export const LasVegasGame = () => {
                         게임 목록
                     </Link>
                 </div>
-                <div className="mb-4" data-smoke="las-vegas-route-artwork">
-                    <TabletopGameArtwork type="dice" compact className="h-32 w-full" />
-                </div>
-                <div className="mb-3 grid grid-cols-1 gap-2 text-xs text-slate-300 md:grid-cols-3">
-                    <div className="rounded-xl bg-white/10 px-3 py-2">
-                        <div className="font-black text-slate-100">방 제목</div>
-                        <div>플레이어 목록에서 구분되는 방 이름</div>
-                    </div>
-                    <div className="rounded-xl bg-white/10 px-3 py-2">
-                        <div className="font-black text-slate-100">라운드 수</div>
-                        <div>게임 시작 후 총 진행 라운드(1~10)</div>
-                    </div>
-                    <div className="rounded-xl bg-white/10 px-3 py-2">
-                        <div className="font-black text-slate-100">턴 시간(초)</div>
-                        <div>각 턴 제한 시간, 만료 시 자동행동(5~180초)</div>
-                    </div>
-                </div>
                 <form className="grid grid-cols-1 gap-3 md:grid-cols-4" onSubmit={createRoom}>
                     <input
                         className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300"
@@ -3769,18 +3550,6 @@ export const LasVegasGame = () => {
                         {creating ? "생성 중..." : "방 만들기"}
                     </button>
                 </form>
-                <LasVegasSetupPreviewPanel createForm={createForm} rooms={rooms} />
-                <GameStartReadinessPanel
-                    className="mt-4"
-                    title="라스베가스 방 만들기 셋업"
-                    detail="새 테이블을 만들거나 코드로 합류하기 전, 제목과 라운드/턴 설정이 어떤 플레이 흐름을 만드는지 확인합니다."
-                    statusText={lobbySetup.statusText}
-                    items={lobbySetup.items}
-                    ruleHint={lobbySetup.ruleHint}
-                    canStart={false}
-                    smoke="las-vegas-room-setup-panel"
-                    itemSmoke="las-vegas-room-setup-item"
-                />
                 </section>
             )}
 
@@ -3823,26 +3592,10 @@ export const LasVegasGame = () => {
                             const players = lasVegasLobbyPlayers(room);
                             const playersCount = toPlainInt(room.memberCount, players.length);
                             const maxPlayers = toPlainInt(room.maxPlayers, 6);
-                            const minPlayers = toPlainInt(room.minPlayers, 2);
                             const status = String(room.roomStatus || "WAITING").toUpperCase();
                             const roomFull = maxPlayers > 0 && playersCount >= maxPlayers;
                             const joinable = status === "WAITING" && !roomFull;
                             const joinDisabled = loading || !joinable;
-                            const readiness = lasVegasLobbyRoomReadiness(room);
-                            const actionSignal = lasVegasLobbyRoomActionSignal(room);
-                            const decisionItems = buildLasVegasLobbyRoomDecisionItems({
-                                room,
-                                playersCount,
-                                minPlayers,
-                                maxPlayers,
-                                status,
-                                roomFull,
-                                joinable,
-                                readiness,
-                                actionSignal,
-                            });
-                            const hostPlayer = players.find((player) => Number(getLasVegasPlayerId(player) || 0) === Number(room.hostMemberId || 0));
-                            const visibleSlots = Math.max(1, Math.min(maxPlayers || playersCount || 1, 6));
                             return (
                                 <div
                                     key={roomId}
@@ -3853,19 +3606,7 @@ export const LasVegasGame = () => {
                                     data-member-count={playersCount}
                                     data-max-players={maxPlayers || ""}
                                 >
-                                    <div className="grid gap-3 lg:grid-cols-[150px_minmax(0,1fr)_132px] lg:items-center">
-                                        <LasVegasLobbyRoomCardArt
-                                            status={status}
-                                            playersCount={playersCount}
-                                            minPlayers={minPlayers}
-                                            maxPlayers={maxPlayers}
-                                            roundCount={room.roundCount}
-                                            turnTimeSeconds={room.turnTimeSeconds}
-                                            readiness={readiness}
-                                            joinable={joinable}
-                                            roomFull={roomFull}
-                                            className="h-28 w-full lg:h-24"
-                                        />
+                                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_132px] lg:items-center">
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <div className="break-words text-sm font-black text-slate-900">{room.title}</div>
@@ -3877,40 +3618,9 @@ export const LasVegasGame = () => {
                                                 <span className={`rounded-full px-2 py-1 ${roomFull ? "bg-rose-50 text-rose-700" : "bg-white text-slate-600"}`}>
                                                     {playersCount}/{maxPlayers || "-"}명{roomFull ? " · 가득 참" : ""}
                                                 </span>
-                                                <span className="rounded-full bg-white px-2 py-1 text-slate-600">최소 {minPlayers || "-"}명</span>
                                                 <span className="rounded-full bg-white px-2 py-1 text-slate-600">코드 {room.roomCode}</span>
                                                 <span className="rounded-full bg-white px-2 py-1 text-slate-600">{toPlainInt(room.roundCount, 4)}라운드</span>
                                                 <span className="rounded-full bg-white px-2 py-1 text-slate-600">턴 {toPlainInt(room.turnTimeSeconds, 25)}초</span>
-                                            </div>
-                                            <LasVegasLobbyRoomDecisionRail items={decisionItems} />
-                                            <div className="mt-3 grid gap-2 md:grid-cols-2">
-                                                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2" data-smoke="las-vegas-lobby-room-readiness">
-                                                    <div className="flex items-center gap-2 text-[11px] font-black text-slate-700">
-                                                        {readiness.done ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <TimerReset className="h-3.5 w-3.5 text-amber-600" />}
-                                                        {readiness.value}
-                                                    </div>
-                                                    <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">{readiness.detail}</div>
-                                                </div>
-                                                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2" data-smoke="las-vegas-lobby-room-action-signal">
-                                                    <div className="flex items-center gap-2 text-[11px] font-black text-slate-700">
-                                                        <GameUxGlyph type="decision" className="h-3.5 w-3.5 text-amber-600" />
-                                                        {actionSignal.value}
-                                                    </div>
-                                                    <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">{actionSignal.detail}</div>
-                                                </div>
-                                            </div>
-                                            <div className="mt-3 flex gap-1.5" aria-label={`좌석 ${playersCount}/${maxPlayers || "-"}`}>
-                                                {Array.from({ length: visibleSlots }).map((_, index) => (
-                                                    <span
-                                                        key={index}
-                                                        className={`h-2 flex-1 rounded-full ${index < playersCount ? "bg-amber-500" : "bg-slate-200"}`}
-                                                        data-smoke="las-vegas-lobby-room-slot"
-                                                    />
-                                                ))}
-                                            </div>
-                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-500">
-                                                <span>방장 {hostPlayer?.nickname || "-"}</span>
-                                                <span>수익 경쟁 테이블</span>
                                             </div>
                                         </div>
                                         <button
@@ -3939,7 +3649,22 @@ export const LasVegasGame = () => {
                             <div>
                                 <div className="text-lg font-black text-slate-900">{selectedRoom.title}</div>
                                 <div className="text-xs text-slate-500">방 코드 {selectedRoom.roomCode}</div>
-                                {isHost && roomStatus === "PLAYING" && (
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Link to="/app/games" className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
+                                    게임 목록
+                                </Link>
+                                {isWaiting && !isHost && (
+                                    <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>
+                                        준비하기
+                                    </button>
+                                )}
+                                {isHost && isWaiting && (
+                                    <button className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white" onClick={startGame}>
+                                        시작
+                                    </button>
+                                )}
+                                {isHost && isPlaying && (
                                     <button
                                         className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700 disabled:opacity-50"
                                         onClick={forceFinishGame}
@@ -3948,16 +3673,6 @@ export const LasVegasGame = () => {
                                         {forceFinishing ? "종료 중..." : "강제 종료"}
                                     </button>
                                 )}
-                            </div>
-                            <div className="w-full shrink-0 sm:w-56" data-smoke="las-vegas-room-artwork">
-                                <TabletopGameArtwork type="dice" compact className="h-28 w-full" />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Link to="/app/games" className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
-                                    게임 목록
-                                </Link>
-                                <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>준비하기</button>
-                                {isHost && <button className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white" onClick={startGame}>시작</button>}
                                 <button className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" onClick={leaveRoom}>퇴장</button>
                             </div>
                         </div>
@@ -3972,55 +3687,7 @@ export const LasVegasGame = () => {
                                 </button>
                             </div>
                         )}
-                        <div className="mt-3 grid grid-cols-1 gap-2 text-xs md:grid-cols-4">
-                            <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                <div className="font-black text-slate-700">방 제목</div>
-                                <div className="text-slate-500">{selectedRoom.title}</div>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                <div className="font-black text-slate-700">방장</div>
-                                <div className="text-slate-500">{hostNickname}</div>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                <div className="font-black text-slate-700">방코드</div>
-                                <div className="text-slate-500">{selectedRoom.roomCode}</div>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                <div className="font-black text-slate-700">라운드 수</div>
-                                <div className="text-slate-500">{toPlainInt(selectedRoom.roundCount, 0)} 라운드</div>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                <div className="font-black text-slate-700">턴 시간</div>
-                                <div className="text-slate-500">{toPlainInt(selectedRoom.turnTimeSeconds, 0)}초</div>
-                            </div>
-                        </div>
-
-                        <LasVegasSessionRoutePanel
-                            roomStatus={roomStatus}
-                            isHost={isHost}
-                            startReadiness={startReadiness}
-                            selectedRoom={selectedRoom}
-                            players={players}
-                            readyMemberIds={readyMemberIds}
-                            forceFinishing={forceFinishing}
-                            rematching={rematching}
-                        />
-
-                        {roomStatusNormalized === "WAITING" && startReadiness && (
-                            <GameStartReadinessPanel
-                                className="mt-4"
-                                title="라스베가스 시작 준비"
-                                detail="대기방에서 바로 판단해야 하는 인원, 준비, 방장 권한, 라운드 설정을 한 화면에 모았습니다."
-                                statusText={startReadiness.statusText}
-                                items={startReadiness.items}
-                                ruleHint={startReadiness.ruleHint}
-                                canStart={startReadiness.canStart}
-                                smoke="las-vegas-start-readiness-panel"
-                                itemSmoke="las-vegas-start-readiness-item"
-                            />
-                        )}
-
-                        {isHost && roomStatus === "WAITING" && (
+                        {isHost && isWaiting && (
                             <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
                                 <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.roundCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, roundCount: normalizeNumericText(e.target.value, 1, 10) }))} />
                                 <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumericText(e.target.value, 5, 180) }))} />
@@ -4028,40 +3695,6 @@ export const LasVegasGame = () => {
                             </div>
                         )}
                     </div>
-
-                    <LasVegasTurnRailPanel
-                        players={players}
-                        selectedRoom={selectedRoom}
-                        state={state}
-                        myMemberId={myMemberId}
-                        readyMemberIds={readyMemberIds}
-                        roomStatus={roomStatus}
-                        winnerMemberId={winnerMemberId}
-                        winnerNickname={winnerNickname}
-                        lastPlacedText={lastPlacedText}
-                    />
-
-                    <LasVegasProgressDigestPanel
-                        state={state}
-                        players={players}
-                        roomStatus={roomStatus}
-                        lastPlacedText={lastPlacedText}
-                        winnerMemberId={winnerMemberId}
-                        winnerNickname={winnerNickname}
-                        currentRollCountByFace={currentRollCountByFace}
-                    />
-
-                    <LasVegasDecisionPanel
-                        state={state}
-                        players={players}
-                        myMemberId={myMemberId}
-                        currentRollCountByFace={currentRollCountByFace}
-                        canRoll={canRoll}
-                        canBet={canBet}
-                        isFinished={isFinished}
-                        lastPlacedText={lastPlacedText}
-                        winnerMemberId={winnerMemberId}
-                    />
 
                     <LasVegasSessionActionPanel
                         selectedRoom={selectedRoom}
@@ -4079,91 +3712,65 @@ export const LasVegasGame = () => {
 
                     <div className={`grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] ${myTurn ? "rounded-[1.8rem] bg-sky-100/70 p-3 ring-2 ring-sky-300/70" : ""}`}>
                         <div className="space-y-4">
-                            <div className={`rounded-[1.8rem] border p-4 shadow-2xl transition-all ${
-                                myTurn
-                                    ? "border-sky-200 bg-gradient-to-br from-sky-500 via-cyan-500 to-blue-600"
-                                    : "border-white/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800"
-                            }`}>
-                                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-black text-emerald-50">
-                                    <span className="rounded-full bg-white/20 px-2.5 py-1">라운드 {state?.roundNo || 0} / {state?.roundCount || 0}</span>
-                                    <span className="rounded-full bg-white/20 px-2.5 py-1">
-                                        차례 {state?.players?.find((p) => Number(p.memberId) === Number(state.turnMemberId))?.nickname || "-"}
-                                    </span>
-                                    {myTurn && (
-                                        <span className="animate-pulse rounded-full bg-sky-100 px-2.5 py-1 text-sky-700 ring-2 ring-sky-200">
-                                            내 차례
+                            {showGameBoard ? (
+                                <div className={`rounded-[1.8rem] border p-4 shadow-2xl transition-all ${
+                                    myTurn
+                                        ? "border-sky-200 bg-gradient-to-br from-sky-500 via-cyan-500 to-blue-600"
+                                        : "border-white/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800"
+                                }`}>
+                                    <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-black text-emerald-50">
+                                        <span className="rounded-full bg-white/20 px-2.5 py-1">라운드 {state?.roundNo || 0} / {state?.roundCount || selectedRoom?.roundCount || 0}</span>
+                                        <span className="rounded-full bg-white/20 px-2.5 py-1">
+                                            차례 {state?.players?.find((p) => Number(p.memberId) === Number(state?.turnMemberId))?.nickname || "-"}
                                         </span>
-                                    )}
-                                    {secondsLeft !== null && (
-                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${
-                                            secondsLeft <= 5
-                                                ? "animate-pulse bg-rose-500/30 text-rose-100 ring-2 ring-rose-300/50"
-                                                : "bg-amber-300/20 text-amber-100"
-                                        }`}>
-                                            <TimerReset className="h-3.5 w-3.5" />
-                                            {secondsLeft}s
-                                        </span>
-                                    )}
-                                </div>
+                                        {myTurn && (
+                                            <span className="animate-pulse rounded-full bg-sky-100 px-2.5 py-1 text-sky-700 ring-2 ring-sky-200">
+                                                내 차례
+                                            </span>
+                                        )}
+                                        {secondsLeft !== null && (
+                                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${
+                                                secondsLeft <= 5
+                                                    ? "animate-pulse bg-rose-500/30 text-rose-100 ring-2 ring-rose-300/50"
+                                                    : "bg-amber-300/20 text-amber-100"
+                                            }`}>
+                                                <TimerReset className="h-3.5 w-3.5" />
+                                                {secondsLeft}s
+                                            </span>
+                                        )}
+                                    </div>
 
-                                {!!currentRoll.length ? (
-                                    <div className="mb-3 rounded-2xl border border-white/20 bg-white/15 p-3 shadow-inner">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div>
-                                                <div className="text-[11px] font-black text-cyan-100">공개 굴림</div>
-                                                <div className="text-sm font-black text-white">{currentRollPlayerName}님의 주사위</div>
-                                            </div>
-                                            <div className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-black text-white">
-                                                배팅할 숫자 선택 대기
-                                            </div>
-                                        </div>
-                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                            {currentRoll.map((value, idx) => <DiceFace key={`public-roll-${idx}`} value={toPlainInt(value, 1)} size={32} />)}
-                                        </div>
-                                        <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-                                            {[1, 2, 3, 4, 5, 6].map((face) => (
-                                                <div key={`public-roll-count-${face}`} className="rounded-xl bg-white/10 px-2 py-1.5 text-center text-[11px] font-black text-white">
-                                                    {face}번 {toPlainInt(currentRollCountByFace[face], 0)}개
+                                    {!!currentRoll.length ? (
+                                        <div className="mb-3 rounded-2xl border border-white/20 bg-white/15 p-3 shadow-inner">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div>
+                                                    <div className="text-[11px] font-black text-cyan-100">공개 굴림</div>
+                                                    <div className="text-sm font-black text-white">{currentRollPlayerName}님의 주사위</div>
                                                 </div>
-                                            ))}
+                                                <div className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-black text-white">
+                                                    배팅할 숫자 선택 대기
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                                {currentRoll.map((value, idx) => <DiceFace key={`public-roll-${idx}`} value={toPlainInt(value, 1)} size={32} />)}
+                                            </div>
+                                            <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+                                                {[1, 2, 3, 4, 5, 6].map((face) => (
+                                                    <div key={`public-roll-count-${face}`} className="rounded-xl bg-white/10 px-2 py-1.5 text-center text-[11px] font-black text-white">
+                                                        {face}번 {toPlainInt(currentRollCountByFace[face], 0)}개
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    !isFinished && (
-                                        <LasVegasRollStandbyPanel
-                                            roomStatus={roomStatus}
-                                            myTurn={myTurn}
-                                            canRoll={canRoll}
-                                            canBet={canBet}
-                                            roundNo={state?.roundNo}
-                                            roundCount={state?.roundCount}
-                                            turnName={currentRollPlayerName}
-                                            casinoCount={(state?.casinos || []).length}
-                                            lastPlacedText={lastPlacedText}
-                                        />
-                                    )
-                                )}
+                                    ) : null}
 
-                                {lastPlacedText && (
-                                    <div className="mb-3 rounded-2xl border border-amber-200/50 bg-amber-300/20 px-3 py-2 text-xs font-black leading-relaxed text-amber-50">
-                                        {lastPlacedText}
-                                    </div>
-                                )}
+                                    {lastPlacedText && (
+                                        <div className="mb-3 rounded-2xl border border-amber-200/50 bg-amber-300/20 px-3 py-2 text-xs font-black leading-relaxed text-amber-50">
+                                            {lastPlacedText}
+                                        </div>
+                                    )}
 
-                                {!isFinished && (
-                                    <>
-                                        <LasVegasActionRoutePanel
-                                            roomStatus={roomStatus}
-                                            myTurn={myTurn}
-                                            canRoll={canRoll}
-                                            canBet={canBet}
-                                            currentRollCountByFace={currentRollCountByFace}
-                                            roundNo={state?.roundNo}
-                                            roundCount={state?.roundCount}
-                                            casinoCount={(state?.casinos || []).length}
-                                            lastPlacedText={lastPlacedText}
-                                            turnName={currentRollPlayerName}
-                                        />
+                                    {!isFinished && (
                                         <LasVegasActionAvailabilityPanel
                                             roomStatus={roomStatus}
                                             myTurn={myTurn}
@@ -4173,48 +3780,63 @@ export const LasVegasGame = () => {
                                             onRoll={() => publishGameAction("ROLL_DICE")}
                                             onBet={(face) => publishGameAction("PLACE_DICE", face)}
                                         />
-                                    </>
-                                )}
+                                    )}
 
-                                <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-3">
-                                    {(state?.casinos || []).map((casino) => (
-                                        <CasinoPanel
-                                            key={casino.casinoNo}
-                                            casino={casino}
-                                            statePlayers={state?.players}
-                                            isHot={Number(casino.casinoNo) === Number(hotCasinoNo)}
-                                            isLastPlaced={Number(casino.casinoNo) === Number(lastPlacedCasinoNo)}
-                                        />
-                                    ))}
+                                    <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-3">
+                                        {casinoRows.map((casino) => (
+                                            <CasinoPanel
+                                                key={casino.casinoNo}
+                                                casino={casino}
+                                                statePlayers={state?.players}
+                                                isHot={Number(casino.casinoNo) === Number(hotCasinoNo)}
+                                                isLastPlaced={Number(casino.casinoNo) === Number(lastPlacedCasinoNo)}
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <div className="text-sm font-black text-slate-900">대기방</div>
+                                            <div className="mt-1 text-xs font-bold text-slate-500">참가자 준비 후 방장이 시작합니다.</div>
+                                        </div>
+                                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600">
+                                            {players.length}/{toPlainInt(selectedRoom?.maxPlayers, 6)}명
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">
                                 <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
                                     <Crown className="h-4 w-4 text-amber-500" />
-                                    플레이어 자산 현황
+                                    플레이어
                                 </div>
                                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                                    {sortedPlayers.map((player) => {
+                                    {sortedPlayers.map((player, index) => {
                                         const memberId = player.memberId;
                                         const isCurrent = Number(memberId) === Number(state?.turnMemberId);
-                                        const isReady = readyMemberIds.has(Number(memberId));
+                                        const isMe = Number(memberId) === Number(myMemberId);
+                                        const isWinner = Number(memberId) === Number(winnerMemberId || 0);
+                                        const seatNo = player.seatNo || player.seat_no || index + 1;
                                         return (
-                                            <div key={`player-${memberId}`} className={`rounded-xl border p-3 ${isCurrent ? "border-primary-400 bg-primary-50" : "border-slate-100 bg-slate-50"}`}>
+                                            <div key={`player-${memberId}`} className={`rounded-xl border p-3 ${isWinner ? "border-amber-200 bg-amber-50" : isCurrent ? "border-primary-400 bg-primary-50" : isMe ? "border-sky-200 bg-sky-50" : "border-slate-100 bg-slate-50"}`}>
                                                 <div className="flex items-center justify-between gap-3">
                                                     <div className="flex min-w-0 items-center gap-2">
                                                         <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
-                                                        <div className="min-w-0 truncate text-sm font-black text-slate-900">{player.nickname}</div>
+                                                        <div className="min-w-0">
+                                                            <div className="truncate text-sm font-black text-slate-900">{player.nickname}</div>
+                                                            <div className="mt-1 truncate text-xs font-bold text-slate-600">
+                                                                좌석 {seatNo} · 보유금 {formatWon(player.totalMoney || 0)} · 주사위 {player.remainingDice || 8}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    {roomStatus === "WAITING" && (
-                                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${isReady ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
-                                                            <CheckCircle2 className="h-3.5 w-3.5" />
-                                                            {isReady ? "준비" : "대기"}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="mt-1 text-xs font-bold text-slate-600">
-                                                    보유금 {formatWon(player.totalMoney || 0)} | 남은 주사위 {player.remainingDice || 8}
+                                                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                                                        {isWinner && <span className="rounded-full bg-amber-500 px-2 py-1 text-[10px] font-black text-white">우승</span>}
+                                                        {isCurrent && !isWinner && <span className="rounded-full bg-primary-100 px-2 py-1 text-[10px] font-black text-primary-700">현재 차례</span>}
+                                                        {isMe && !isWinner && <span className="rounded-full bg-sky-100 px-2 py-1 text-[10px] font-black text-sky-700">내 좌석</span>}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -4244,13 +3866,9 @@ export const LasVegasGame = () => {
                             </div>
                             <div ref={chatScrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-2xl bg-slate-50 p-3 text-xs sm:h-[320px] xl:h-[420px]">
                                 {!chatMessages.length && (
-                                    <GameChatEmptyState
-                                        game="las-vegas"
-                                        title="아직 채팅 내역이 없습니다"
-                                        detail="첫 인사, 방 코드 공유, 주사위 배팅 방향을 남기면 같은 테이블의 판단 기준이 채팅에 쌓입니다."
-                                        prompts={["첫 인사", "배팅 방향", "준비 확인"]}
-                                        tone="amber"
-                                    />
+                                    <div className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-500">
+                                        아직 채팅 내역이 없습니다.
+                                    </div>
                                 )}
                                 {chatMessages.map((msg) => {
                                     const normalized = normalizeMessage(msg);

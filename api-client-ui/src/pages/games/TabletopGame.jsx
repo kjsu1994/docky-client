@@ -7,7 +7,6 @@ import {
   Bot,
   CheckCircle2,
   CircleDollarSign,
-  CircleHelp,
   Copy,
   Crown,
   Dices,
@@ -61,7 +60,7 @@ const gameConfigs = {
       },
       {
         title: "확장 선택",
-        items: ["방 생성 전에 기본판과 구현된 공식 확장/시나리오를 선택합니다.", "확장별 배, 해적, 기사, 임무, 특수 승점은 선택한 변형의 상태 패널과 액션에서만 나타납니다."],
+        items: ["방 생성 전에는 서버에서 실제 진행 가능한 기본판과 5~6인 확장만 표시합니다.", "규칙 선택 영역은 실제 플레이 가능한 항목만 보여줍니다."],
       },
     ],
   },
@@ -4663,166 +4662,6 @@ const TabletopStartReadinessPanel = ({
   );
 };
 
-const TabletopStateSyncArt = ({ status, canStart, playerCount, minPlayers, maxPlayers, className = "" }) => {
-  const waiting = status === "WAITING";
-  const playing = status === "PLAYING";
-  const accent = playing ? "#2563eb" : canStart ? "#059669" : "#d97706";
-  const nodes = [
-    { key: "room", label: "방", x: 54, y: 118, fill: "#f8fafc", stroke: "#94a3b8" },
-    { key: "ready", label: canStart ? "시작" : "준비", x: 154, y: 82, fill: canStart ? "#ecfdf5" : "#fffbeb", stroke: canStart ? "#10b981" : "#f59e0b" },
-    { key: "sync", label: playing ? "수신" : "대기", x: 254, y: 118, fill: playing ? "#dbeafe" : "#f8fafc", stroke: playing ? "#3b82f6" : "#94a3b8" },
-    { key: "board", label: "보드", x: 354, y: 82, fill: playing ? "#eff6ff" : "#f1f5f9", stroke: playing ? "#60a5fa" : "#94a3b8" },
-  ];
-  const playerText = `${playerCount || 0}/${maxPlayers || "-"}명`;
-  const minText = `최소 ${minPlayers || 0}명`;
-
-  return (
-    <svg
-      viewBox="0 0 420 180"
-      role="img"
-      aria-label="보드게임 상태 동기화 흐름"
-      className={className}
-      data-smoke="tabletop-state-sync-art"
-    >
-      <rect x="10" y="10" width="400" height="160" rx="22" fill="#0f172a" stroke="#1e293b" strokeWidth="3" />
-      <rect x="24" y="22" width="170" height="42" rx="14" fill="#ffffff" opacity="0.94" />
-      <text x="38" y="40" fill="#0f172a" fontSize="13" fontWeight="900">보드 상태 수신</text>
-      <text x="38" y="57" fill="#64748b" fontSize="11" fontWeight="800">{playing ? "게임 서버 동기화" : "시작 전 테이블 준비"}</text>
-      <rect x="284" y="24" width="92" height="30" rx="15" fill={canStart ? "#dcfce7" : waiting ? "#fef3c7" : "#dbeafe"} stroke={canStart ? "#86efac" : waiting ? "#fcd34d" : "#93c5fd"} />
-      <text x="330" y="43" textAnchor="middle" fill={canStart ? "#166534" : waiting ? "#92400e" : "#1d4ed8"} fontSize="11" fontWeight="900">
-        {playing ? "수신 중" : canStart ? "시작 가능" : "대기 확인"}
-      </text>
-      <path d="M58 118 C94 80, 122 80, 154 82 S220 120, 254 118 S320 82, 354 82" fill="none" stroke={accent} strokeWidth="12" strokeLinecap="round" opacity="0.2" />
-      <path d="M58 118 C94 80, 122 80, 154 82 S220 120, 254 118 S320 82, 354 82" fill="none" stroke={accent} strokeWidth="4" strokeLinecap="round" />
-      {nodes.map((node) => (
-        <g key={node.key} data-smoke="tabletop-state-sync-node" data-sync-key={node.key}>
-          <circle cx={node.x} cy={node.y} r="30" fill={node.fill} stroke={node.stroke} strokeWidth="3" />
-          <circle cx={node.x} cy={node.y} r="17" fill="#ffffff" stroke={node.stroke} strokeWidth="2" />
-          <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#0f172a" fontSize="11" fontWeight="900">{node.label}</text>
-          <text x={node.x} y={node.y + 46} textAnchor="middle" fill="#e2e8f0" fontSize="10" fontWeight="900">
-            {node.key === "room" ? playerText : node.key === "ready" ? minText : node.key === "sync" ? (playing ? "상태" : "준비") : "입장"}
-          </text>
-        </g>
-      ))}
-      <rect x="76" y="148" width="268" height="22" rx="11" fill="#1e293b" stroke="#334155" />
-      <text x="210" y="163" textAnchor="middle" fill="#cbd5e1" fontSize="10" fontWeight="800">
-        방 정보 → 준비 조건 → 서버 상태 → 플레이 보드
-      </text>
-    </svg>
-  );
-};
-
-const TabletopStateSyncPanel = ({
-  game,
-  config,
-  selectedRoom,
-  status,
-  players,
-  canStart,
-  startStatusText,
-  isHost,
-  myReady,
-}) => {
-  const playerCount = Array.isArray(players) ? players.length : 0;
-  const minPlayers = minPlayersOf(selectedRoom);
-  const maxPlayers = maxPlayersOf(selectedRoom);
-  const waiting = status === "WAITING";
-  const playing = status === "PLAYING";
-  const title = playing ? "보드 상태 수신 중" : "시작 전 보드 준비";
-  const detail = playing
-    ? "게임은 시작됐고 서버의 첫 보드 상태를 받아오는 중입니다. 수신되면 실제 보드와 행동 패널로 전환됩니다."
-    : "아직 실제 보드 상태가 없어서 시작 조건, 준비 여부, 규칙 정보를 먼저 확인합니다.";
-  const items = [
-    {
-      key: "status",
-      icon: "state",
-      label: "현재 상태",
-      value: statusLabels[status] || status || "대기",
-      detail: playing ? "상태 응답이 도착하면 보드와 점수 정보가 표시됩니다." : "대기방에서는 준비와 시작 조건이 핵심 정보입니다.",
-      tone: playing ? "active" : "waiting",
-    },
-    {
-      key: "players",
-      icon: "player",
-      label: "좌석",
-      value: `${playerCount}/${maxPlayers || "-"}명`,
-      detail: `이 규칙은 최소 ${minPlayers || 0}명부터 시작할 수 있습니다.`,
-      tone: playerCount >= minPlayers ? "done" : "waiting",
-    },
-    {
-      key: "start",
-      icon: "decision",
-      label: isHost ? "방장 행동" : "내 준비",
-      value: isHost ? (canStart ? "시작 가능" : "조건 대기") : myReady ? "준비 완료" : "준비 필요",
-      detail: isHost ? startStatusText : "준비 버튼으로 방장에게 시작 가능 상태를 전달합니다.",
-      tone: canStart || myReady ? "done" : "waiting",
-    },
-    {
-      key: "rule",
-      icon: "stage",
-      label: "선택 규칙",
-      value: variantNameOf(selectedRoom) || config?.title || game,
-      detail: variantSummaryOf(selectedRoom) || "방 설정과 규칙 요약은 상단에서 계속 확인할 수 있습니다.",
-      tone: "neutral",
-    },
-  ];
-  const toneClass = {
-    active: "border-sky-100 bg-sky-50 text-sky-900",
-    done: "border-emerald-100 bg-emerald-50 text-emerald-900",
-    waiting: "border-amber-100 bg-amber-50 text-amber-900",
-    neutral: "border-slate-100 bg-slate-50 text-slate-900",
-  };
-
-  return (
-    <section
-      className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-      data-smoke="tabletop-state-sync-panel"
-      data-room-status={status || ""}
-      data-can-start={canStart ? "true" : "false"}
-    >
-      <div className="grid gap-3 p-3 lg:grid-cols-[minmax(220px,340px)_minmax(0,1fr)]">
-        <div className="rounded-xl bg-slate-950">
-          <TabletopStateSyncArt
-            status={status}
-            canStart={canStart}
-            playerCount={playerCount}
-            minPlayers={minPlayers}
-            maxPlayers={maxPlayers}
-            className="h-44 w-full"
-          />
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600">
-                <GameUxGlyph type="stage" className="h-3.5 w-3.5" />
-                상태 동기화
-              </div>
-              <h3 className="mt-3 text-lg font-black text-slate-900">{title}</h3>
-              <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">{detail}</p>
-            </div>
-            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${canStart ? "bg-emerald-100 text-emerald-700" : playing ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"}`}>
-              {playing ? "수신 대기" : canStart ? "시작 가능" : startStatusText}
-            </span>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {items.map((item) => (
-              <div key={item.key} className={`min-h-[104px] rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="tabletop-state-sync-item" data-sync-key={item.key}>
-                <div className="flex items-center gap-2 text-[11px] font-black opacity-75">
-                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
-                  {item.label}
-                </div>
-                <div className="mt-1 text-sm font-black leading-snug">{item.value}</div>
-                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
 const TabletopLobbyBriefPanel = ({
   game,
   config,
@@ -5978,6 +5817,24 @@ const catanVariantGroupOf = (variant) => {
   if (code === "EXPLORERS_PIRATES") return "explorersPirates";
   return "other";
 };
+
+const unsupportedCatanVariantGroups = new Set(["seafarers", "citiesKnights", "tradersBarbarians", "explorersPirates"]);
+
+const isSupportedTabletopVariant = (game, variant) => (
+  game !== "catan" || !unsupportedCatanVariantGroups.has(catanVariantGroupOf(variant))
+);
+
+const visibleTabletopVariants = (game, variants) => (
+  (Array.isArray(variants) ? variants : []).filter((variant) => isSupportedTabletopVariant(game, variant))
+);
+
+const isVisibleTabletopRoom = (game, room) => (
+  game !== "catan" || isSupportedTabletopVariant(game, { code: variantCodeOf(room) })
+);
+
+const visibleTabletopRooms = (game, rooms) => (
+  (Array.isArray(rooms) ? rooms : []).filter((room) => isVisibleTabletopRoom(game, room))
+);
 
 const variantGroupLabelsByGame = {
   blokus: {
@@ -8005,342 +7862,6 @@ const TurtleStack = ({ seatNos = [], compact = false }) => (
   </div>
 );
 
-const maheRiskCompassTone = {
-  ready: { fill: "#e0f2fe", stroke: "#0284c7", accent: "#0f766e", text: "#075985" },
-  safe: { fill: "#dcfce7", stroke: "#16a34a", accent: "#059669", text: "#14532d" },
-  caution: { fill: "#fef3c7", stroke: "#d97706", accent: "#f59e0b", text: "#92400e" },
-  danger: { fill: "#ffe4e6", stroke: "#e11d48", accent: "#f97316", text: "#9f1239" },
-  bust: { fill: "#fecaca", stroke: "#be123c", accent: "#dc2626", text: "#881337" },
-};
-
-const MaheRiskCompassArt = ({
-  diceSum = 0,
-  diceCount = 0,
-  stopSteps = 0,
-  safeFaces = [],
-  bustFaces = [],
-  riskLevel = "ready",
-  stopScores = false,
-}) => {
-  const tone = maheRiskCompassTone[riskLevel] || maheRiskCompassTone.ready;
-  const safeSet = new Set(safeFaces.map(Number));
-  const bustSet = new Set(bustFaces.map(Number));
-  const faces = [1, 2, 3, 4, 5, 6];
-
-  return (
-    <svg
-      viewBox="0 0 360 220"
-      className="h-full min-h-[150px] w-full"
-      role="img"
-      aria-label={`마헤 위험 나침반, 현재 합계 ${diceSum || 0}, 멈추면 ${stopSteps || 0}칸`}
-      data-smoke="mahe-risk-compass-art"
-    >
-      <defs>
-        <linearGradient id="maheRiskCompassGlow" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0" stopColor="#ecfeff" />
-          <stop offset="0.56" stopColor={tone.fill} />
-          <stop offset="1" stopColor="#fff7ed" />
-        </linearGradient>
-      </defs>
-      <rect x="14" y="14" width="332" height="192" rx="28" fill="url(#maheRiskCompassGlow)" stroke="#ffffff" strokeWidth="3" />
-      <path d="M60 154c42-74 116-108 208-82" fill="none" stroke="#ffffff" strokeWidth="16" strokeLinecap="round" opacity="0.72" />
-      <path d="M60 154c42-74 116-108 208-82" fill="none" stroke={tone.stroke} strokeWidth="6" strokeLinecap="round" opacity="0.72" />
-      <circle cx="184" cy="122" r="52" fill="#0f172a" opacity="0.12" />
-      <circle cx="180" cy="116" r="50" fill="#0f172a" opacity="0.08" />
-      <g>
-        <circle cx="178" cy="112" r="52" fill="#ffffff" stroke={tone.stroke} strokeWidth="5" />
-        <circle cx="178" cy="112" r="38" fill={tone.fill} stroke="#ffffff" strokeWidth="3" />
-        <text x="178" y="98" textAnchor="middle" fontSize="12" fontWeight="900" fill={tone.text}>현재 합계</text>
-        <text x="178" y="126" textAnchor="middle" fontSize="32" fontWeight="900" fill={tone.text}>{diceSum || 0}</text>
-        <text x="178" y="146" textAnchor="middle" fontSize="11" fontWeight="900" fill={tone.text}>주사위 {diceCount}/3</text>
-      </g>
-      <g>
-        <rect x="42" y="34" width="82" height="42" rx="16" fill="#ffffff" opacity="0.88" />
-        <text x="83" y="51" textAnchor="middle" fontSize="11" fontWeight="900" fill="#475569">멈추면</text>
-        <text x="83" y="68" textAnchor="middle" fontSize="17" fontWeight="900" fill={stopScores ? "#b45309" : "#0f172a"}>{stopSteps || 0}칸</text>
-      </g>
-      <g>
-        <rect x="238" y="34" width="82" height="42" rx="16" fill="#ffffff" opacity="0.88" />
-        <text x="279" y="51" textAnchor="middle" fontSize="11" fontWeight="900" fill="#475569">위험 눈</text>
-        <text x="279" y="68" textAnchor="middle" fontSize="17" fontWeight="900" fill="#be123c">{bustFaces.length}/6</text>
-      </g>
-      <g>
-        {faces.map((face, index) => {
-          const x = 62 + index * 43;
-          const bust = bustSet.has(face);
-          const safe = safeSet.has(face);
-          const fill = bust ? "#fee2e2" : safe ? "#dcfce7" : "#f8fafc";
-          const stroke = bust ? "#e11d48" : safe ? "#16a34a" : "#cbd5e1";
-          const text = bust ? "#be123c" : safe ? "#166534" : "#475569";
-          return (
-            <g key={face}>
-              <rect x={x} y="166" width="34" height="34" rx="10" fill={fill} stroke={stroke} strokeWidth="3" />
-              <text x={x + 17} y="188" textAnchor="middle" fontSize="16" fontWeight="900" fill={text}>{face}</text>
-              {bust && <path d={`M${x + 8} 194l18-18M${x + 26} 194l-18-18`} stroke="#be123c" strokeWidth="3" strokeLinecap="round" opacity="0.72" />}
-            </g>
-          );
-        })}
-      </g>
-      <path d="M178 112l48-58" stroke={tone.accent} strokeWidth="6" strokeLinecap="round" />
-      <circle cx="178" cy="112" r="7" fill={tone.accent} />
-    </svg>
-  );
-};
-
-const MaheRiskCompassPanel = ({
-  phase,
-  canRoll,
-  canChoose,
-  dice = [],
-  diceSum = 0,
-  diceRollsLeft = 0,
-  safeRemaining = 0,
-  nextSafeRolls = [],
-  nextBustRolls = [],
-  stopSteps = 0,
-  stopScores = false,
-  projectedSteps = 0,
-  projectedDestination = 0,
-  riskLevel = "ready",
-  scoreRecipientText = "",
-  bustReturnText = "",
-  finalEggText = "",
-}) => {
-  const diceCount = dice.length || 0;
-  const hasRolled = diceCount > 0;
-  const decision = phase === "FINISHED"
-    ? "결과 확인"
-    : canChoose
-      ? "주사위 수 선택"
-      : !canRoll
-        ? "차례 대기"
-        : !hasRolled
-          ? "첫 주사위"
-          : diceSum > 7
-            ? "초과 처리"
-            : stopScores
-              ? "멈추면 보상"
-              : nextBustRolls.length >= 4
-                ? "멈춤 우선"
-                : diceRollsLeft <= 0
-                  ? "자동 이동"
-                  : "추가 굴림 검토";
-  const rollRiskText = !hasRolled
-    ? "첫 주사위는 초과 위험 없이 시작합니다."
-    : diceRollsLeft <= 0
-      ? "세 번째 주사위까지 굴렸으므로 서버가 이동을 확정합니다."
-      : `다음 주사위 안전 눈 ${nextSafeRolls.join(", ") || "없음"}, 초과 눈 ${nextBustRolls.join(", ") || "없음"}`;
-  const stopText = stopSteps > 0
-    ? `${stopSteps}칸 이동${stopScores ? " · 알 보상 가능" : ""}`
-    : "아직 멈출 이동값이 없습니다.";
-  const guideItems = [
-    {
-      label: "멈추면",
-      value: stopText,
-      detail: stopScores ? scoreRecipientText : `예상 도착 ${projectedDestination || "출발점"} · 현재 보상은 다음 기회로 남습니다.`,
-      tone: stopScores ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-white text-slate-700",
-    },
-    {
-      label: "더 굴리면",
-      value: hasRolled ? `${nextBustRolls.length}/6 초과 위험` : "초과 위험 없음",
-      detail: rollRiskText,
-      tone: nextBustRolls.length >= 4 ? "border-rose-100 bg-rose-50 text-rose-800" : "border-emerald-100 bg-emerald-50 text-emerald-800",
-    },
-    {
-      label: "움직이는 말",
-      value: projectedSteps > 0 ? `${projectedSteps}칸 예상` : "대기",
-      detail: bustReturnText,
-      tone: "border-cyan-100 bg-cyan-50 text-cyan-800",
-    },
-    {
-      label: "판정",
-      value: decision,
-      detail: finalEggText || `합계 7까지 안전 여유 ${Math.max(0, safeRemaining)}입니다.`,
-      tone: riskLevel === "danger" || riskLevel === "bust" ? "border-rose-100 bg-rose-50 text-rose-800" : "border-violet-100 bg-violet-50 text-violet-800",
-    },
-  ];
-
-  return (
-    <section data-smoke="mahe-risk-compass-panel" className="mb-4 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-amber-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1fr)]">
-        <div className="min-h-[170px]">
-          <MaheRiskCompassArt
-            diceSum={diceSum}
-            diceCount={diceCount}
-            stopSteps={stopSteps}
-            safeFaces={nextSafeRolls}
-            bustFaces={nextBustRolls}
-            riskLevel={riskLevel}
-            stopScores={stopScores}
-          />
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] font-black uppercase text-cyan-700">Mahe Risk Compass</div>
-              <h3 className="text-base font-black text-slate-900">굴릴지 멈출지 판단</h3>
-            </div>
-            <div className={`rounded-full border px-3 py-1 text-[11px] font-black ${maheRiskToneClasses[riskLevel] || maheRiskToneClasses.ready}`}>
-              {decision}
-            </div>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {guideItems.map((item) => (
-              <div key={item.label} data-smoke="mahe-risk-compass-item" className={`rounded-xl border px-3 py-2.5 ${item.tone}`}>
-                <div className="text-[10px] font-black opacity-70">{item.label}</div>
-                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const MaheRewardPressureArt = ({ rows = [], trackSize = 21, currentEgg = 0, activeSeatNo = 0, mySeatNo = 0 }) => {
-  const safeTrack = Math.max(1, Number(trackSize) || 21);
-  const visibleRows = rows.slice(0, 5);
-  const laneWidth = 258;
-  const laneStart = 86;
-
-  return (
-    <svg
-      viewBox="0 0 420 240"
-      className="h-full min-h-[170px] w-full"
-      role="img"
-      aria-label={`마헤 보상 압력, 현재 알 ${currentEgg ?? "-"}점`}
-      data-smoke="mahe-reward-pressure-art"
-    >
-      <rect x="14" y="14" width="392" height="212" rx="26" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="3" />
-      <path d="M55 186c48-74 126-114 232-104 32 3 57 13 78 31" fill="none" stroke="#d1fae5" strokeWidth="16" strokeLinecap="round" />
-      <path d="M55 186c48-74 126-114 232-104 32 3 57 13 78 31" fill="none" stroke="#0f766e" strokeWidth="5" strokeLinecap="round" opacity="0.65" />
-      <rect x="292" y="28" width="76" height="48" rx="16" fill="#fffbeb" stroke="#f59e0b" strokeWidth="3" />
-      <text x="330" y="47" textAnchor="middle" fontSize="11" fontWeight="900" fill="#92400e">현재 알</text>
-      <text x="330" y="67" textAnchor="middle" fontSize="20" fontWeight="900" fill="#b45309">{currentEgg ?? "-"}</text>
-      <rect x="32" y="28" width="162" height="38" rx="15" fill="#ecfeff" stroke="#0891b2" strokeWidth="2" />
-      <text x="48" y="52" fontSize="13" fontWeight="900" fill="#0e7490">보상 압력</text>
-      <text x="134" y="52" fontSize="10" fontWeight="800" fill="#64748b">결승선까지 {safeTrack}칸</text>
-
-      {visibleRows.map((row, index) => {
-        const y = 94 + index * 29;
-        const progress = Math.max(0, Math.min(1, Number(row.position || 0) / Math.max(1, safeTrack - 1)));
-        const x = laneStart + progress * laneWidth;
-        const active = Number(row.seatNo) === Number(activeSeatNo);
-        const mine = Number(row.seatNo) === Number(mySeatNo);
-        const fill = active ? "#f59e0b" : mine ? "#0284c7" : row.isLeader ? "#16a34a" : "#64748b";
-        return (
-          <g key={row.seatNo || index} data-smoke="mahe-reward-pressure-node">
-            <text x="34" y={y + 5} fontSize="11" fontWeight="900" fill={fill}>{row.name}</text>
-            <rect x={laneStart} y={y - 8} width={laneWidth} height="13" rx="7" fill="#e2e8f0" />
-            <rect x={laneStart} y={y - 8} width={Math.max(8, progress * laneWidth)} height="13" rx="7" fill={fill} opacity="0.76" />
-            <circle cx={x} cy={y - 1.5} r={active ? 9 : 7} fill="#ffffff" stroke={fill} strokeWidth={active ? 4 : 3} />
-            <text x={x} y={y + 3} textAnchor="middle" fontSize="9" fontWeight="900" fill={fill}>{row.seatNo}</text>
-            <text x="370" y={y + 5} textAnchor="end" fontSize="10" fontWeight="900" fill="#475569">
-              {row.score}점
-            </text>
-          </g>
-        );
-      })}
-      <path d="M344 80v132" stroke="#f59e0b" strokeWidth="3" strokeDasharray="5 6" strokeLinecap="round" />
-      <text x="352" y="218" fontSize="10" fontWeight="900" fill="#b45309">결승</text>
-    </svg>
-  );
-};
-
-const MaheRewardPressurePanel = ({
-  rows = [],
-  trackSize = 21,
-  currentEgg = 0,
-  eggDeckCount = 0,
-  finalEggRound = false,
-  activeSeatNo = 0,
-  mySeatNo = 0,
-  activeStackOrderText = "-",
-  activeMovingText = "-",
-  projectedScorerText = "",
-  stopScores = false,
-  projectedScores = false,
-}) => {
-  const sortedRows = rows.slice().sort((left, right) => (
-    Number(right.score || 0) - Number(left.score || 0)
-    || Number(right.cardsCount || 0) - Number(left.cardsCount || 0)
-    || Number(right.position || 0) - Number(left.position || 0)
-  ));
-  const leader = sortedRows[0] || null;
-  const me = rows.find((row) => Number(row.seatNo) === Number(mySeatNo)) || null;
-  const closest = rows.slice().sort((left, right) => Number(right.position || 0) - Number(left.position || 0))[0] || null;
-  const myGap = leader && me ? Math.max(0, Number(leader.score || 0) - Number(me.score || 0)) : 0;
-  const rewardTargetText = stopScores || projectedScores
-    ? projectedScorerText
-    : closest
-      ? `${closest.name}님이 결승선에 가장 가깝습니다.`
-      : "아직 보상 후보가 없습니다.";
-  const items = [
-    {
-      label: "현재 보상",
-      value: finalEggRound ? `${currentEgg ?? "-"}점 마지막 알` : `${currentEgg ?? "-"}점 알`,
-      detail: finalEggRound ? "이번 알을 누군가 가져가면 게임 종료 압력이 생깁니다." : `남은 알 카드 ${eggDeckCount}장입니다.`,
-      tone: finalEggRound ? "border-amber-200 bg-amber-50 text-amber-900" : "border-amber-100 bg-white text-amber-800",
-    },
-    {
-      label: "선두",
-      value: leader ? `${leader.name} ${leader.score}점` : "점수 대기",
-      detail: me ? `내 격차 ${myGap}점 · 알 카드 수 ${me.cardsCount}장` : "점수판이 오면 격차를 계산합니다.",
-      tone: "border-emerald-100 bg-emerald-50 text-emerald-800",
-    },
-    {
-      label: "스택 영향",
-      value: activeStackOrderText,
-      detail: `이번 이동 대상: ${activeMovingText}`,
-      tone: "border-cyan-100 bg-cyan-50 text-cyan-800",
-    },
-    {
-      label: "다음 득점",
-      value: rewardTargetText,
-      detail: "맨 위 거북이가 알을 받는 구조를 보드 위에서 먼저 읽게 합니다.",
-      tone: stopScores || projectedScores ? "border-rose-100 bg-rose-50 text-rose-800" : "border-slate-100 bg-slate-50 text-slate-700",
-    },
-  ];
-
-  return (
-    <section data-smoke="mahe-reward-pressure-panel" className="mb-4 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)]">
-        <div className="min-h-[176px]">
-          <MaheRewardPressureArt
-            rows={rows}
-            trackSize={trackSize}
-            currentEgg={currentEgg}
-            activeSeatNo={activeSeatNo}
-            mySeatNo={mySeatNo}
-          />
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <div className="text-[11px] font-black text-emerald-700">알 보상 압력</div>
-              <h3 className="text-base font-black text-slate-900">누가 알 보상에 가까운지 확인</h3>
-            </div>
-            <div className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[11px] font-black text-emerald-700">
-              {rows.length}명 트랙
-            </div>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {items.map((item) => (
-              <div key={item.label} data-smoke="mahe-reward-pressure-item" className={`rounded-xl border px-3 py-2.5 ${item.tone}`}>
-                <div className="text-[10px] font-black opacity-70">{item.label}</div>
-                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
 const maheActionRouteTone = {
   ready: { fill: "#f8fafc", stroke: "#64748b", text: "#334155", soft: "#e2e8f0" },
   safe: { fill: "#ecfdf5", stroke: "#059669", text: "#047857", soft: "#bbf7d0" },
@@ -8760,34 +8281,40 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
     { label: "합계", value: String(diceSum || 0) },
     { label: "알", value: `${currentEgg ?? "-"}점` },
   ];
-  const maheFlowItems = [
+  const maheRewardLeader = maheRewardPressureRows.slice().sort((left, right) => (
+    Number(right.score || 0) - Number(left.score || 0)
+    || Number(right.cardsCount || 0) - Number(left.cardsCount || 0)
+    || Number(right.position || 0) - Number(left.position || 0)
+  ))[0] || null;
+  const maheClosestToGoal = maheRewardPressureRows.slice().sort((left, right) => Number(right.position || 0) - Number(left.position || 0))[0] || null;
+  const maheBottomSummaryItems = [
     {
-      label: "단계",
+      key: "turn",
+      label: "차례",
       value: mahePhaseLabel,
       detail: turnMessage,
-      icon: "stage",
-      tone: phase === "FINISHED" ? "done" : canRoll || canChoose ? "active" : "neutral",
+      tone: phase === "FINISHED" ? "border-amber-100 bg-amber-50 text-amber-800" : canRoll || canChoose ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-slate-50 text-slate-700",
     },
     {
-      label: "스택",
-      value: activeStackOrderText,
-      detail: activeIsCarried ? `${playerName(activeSeatNo)}님은 업혀 있어 주사위 개수를 선택받습니다.` : `${playerName(activeSeatNo)}님이 직접 이동합니다.`,
-      icon: "player",
-      tone: activeIsCarried ? "waiting" : "neutral",
-    },
-    {
-      label: "위험도",
+      key: "risk",
+      label: "위험",
       value: riskLabel,
-      detail: diceSum > 7 ? bustReturnText : `멈추면 ${stopSteps || 0}칸 이동 · 다음 위험 눈 ${nextBustRolls.length}/6`,
-      icon: "decision",
-      tone: riskLevel === "bust" || riskLevel === "danger" ? "danger" : riskLevel === "caution" ? "waiting" : "active",
+      detail: diceSum > 7 ? bustReturnText : `멈추면 ${stopSteps || 0}칸 · 실패 눈 ${nextBustRolls.length}/6`,
+      tone: riskLevel === "bust" || riskLevel === "danger" ? "border-rose-100 bg-rose-50 text-rose-800" : riskLevel === "caution" ? "border-amber-100 bg-amber-50 text-amber-800" : "border-cyan-100 bg-cyan-50 text-cyan-800",
     },
     {
-      label: phase === "FINISHED" ? "결과" : "알 카드",
-      value: phase === "FINISHED" && winnerText ? `${winnerText} 승리` : `${currentEgg ?? "-"}점`,
-      detail: phase === "FINISHED" ? `최종 ${winningScore}점입니다.` : `${scoreRecipientText}${finalEggText ? ` · ${finalEggText}` : ""}`,
-      icon: phase === "FINISHED" ? "win" : "score",
-      tone: phase === "FINISHED" ? "done" : stopScores || projectedScores ? "active" : "neutral",
+      key: "egg",
+      label: "알",
+      value: `${currentEgg ?? "-"}점`,
+      detail: `${eggDeck.length}장 남음${stopScores || projectedScores ? ` · ${scoreRecipientText}` : ""}${finalEggText ? ` · ${finalEggText}` : ""}`,
+      tone: stopScores || projectedScores || finalEggRound ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-white text-slate-700",
+    },
+    {
+      key: "leader",
+      label: "선두",
+      value: maheRewardLeader ? `${maheRewardLeader.name} ${maheRewardLeader.score}점` : "대기",
+      detail: maheClosestToGoal ? `결승선에 가까운 말: ${maheClosestToGoal.name} · ${maheClosestToGoal.position}/${trackSize}` : "점수판이 도착하면 선두와 결승선 거리가 표시됩니다.",
+      tone: "border-emerald-100 bg-emerald-50 text-emerald-800",
     },
   ];
   const startActive = activePosition === 0;
@@ -8922,6 +8449,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
   };
 
   return (
+    <>
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div id="mahe-board-panel" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -8936,63 +8464,20 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
             {variantName}
           </div>
         </div>
-        <GameFlowMeter
-          title="마헤 주사위 흐름"
-          detail="차례, 업기 스택, 주사위 위험도, 알 카드 보상 가능성을 같은 흐름으로 확인합니다."
-          items={maheFlowItems}
-          tone={phase === "FINISHED" ? "amber" : canRoll || canChoose ? "emerald" : "slate"}
-          className="mb-4"
-          smoke="mahe-flow-meter"
-        />
-        <MaheRewardPressurePanel
-          rows={maheRewardPressureRows}
-          trackSize={trackSize}
-          currentEgg={currentEgg}
-          eggDeckCount={eggDeck.length}
-          finalEggRound={finalEggRound}
-          activeSeatNo={activeSeatNo}
-          mySeatNo={mySeatNo}
-          activeStackOrderText={activeStackOrderText}
-          activeMovingText={activeMovingText}
-          projectedScorerText={scoreRecipientText}
-          stopScores={stopScores}
-          projectedScores={projectedScores}
-        />
-        <MaheRiskCompassPanel
-          phase={phase}
-          canRoll={canRoll}
-          canChoose={canChoose}
-          dice={dice}
-          diceSum={diceSum}
-          diceRollsLeft={diceRollsLeft}
-          safeRemaining={safeRemaining}
-          nextSafeRolls={nextSafeRolls}
-          nextBustRolls={nextBustRolls}
-          stopSteps={stopSteps}
-          stopScores={stopScores}
-          projectedSteps={projectedSteps}
-          projectedDestination={projectedDestination}
-          riskLevel={riskLevel}
-          scoreRecipientText={scoreRecipientText}
-          bustReturnText={bustReturnText}
-          finalEggText={finalEggText}
-        />
-        <div className="mb-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-3 shadow-sm" role="status" aria-live="polite" aria-atomic="true">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-2xl bg-emerald-600 p-2 text-white shadow-sm">
+        <div className="mb-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2.5" role="status" aria-live="polite" aria-atomic="true">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-xl bg-emerald-600 p-2 text-white shadow-sm">
               <Dices className="h-4 w-4" />
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-black text-emerald-700">지금 할 일</div>
-              <div className="mt-0.5 text-sm font-black leading-relaxed text-slate-900">{maheTurnGuidance}</div>
-              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                {maheQuickFacts.map((item) => (
-                  <div key={item.label} className="rounded-xl bg-white/80 px-2.5 py-2">
-                    <div className="text-[10px] font-bold text-slate-400">{item.label}</div>
-                    <div className="truncate text-[11px] font-black text-slate-700">{item.value}</div>
-                  </div>
-                ))}
-              </div>
+            <div className="min-w-0 flex-1 text-sm font-black leading-relaxed text-slate-900">
+              {maheTurnGuidance}
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-1.5">
+              {maheQuickFacts.slice(2).map((item) => (
+                <span key={item.label} className="rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-black text-slate-600">
+                  {item.label} {item.value}
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -9250,6 +8735,22 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
         </div>
       </aside>
     </div>
+    <section data-smoke="mahe-bottom-summary" className="rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-black text-slate-900">마헤 흐름 요약</div>
+        <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">하단 참고</div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {maheBottomSummaryItems.map((item) => (
+          <div key={item.key} className={`rounded-xl border px-3 py-2 ${item.tone}`} data-smoke="mahe-bottom-summary-item" data-summary-key={item.key}>
+            <div className="text-[10px] font-black opacity-70">{item.label}</div>
+            <div className="mt-0.5 truncate text-sm font-black">{item.value}</div>
+            <div className="mt-0.5 line-clamp-1 text-[10px] font-bold opacity-70">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+    </>
   );
 };
 
@@ -20660,7 +20161,7 @@ export const TabletopGame = ({ game }) => {
   const realtimeRoomRef = useRef(null);
 
   const fetchVariants = async (seq = lobbyLoadSeqRef.current) => {
-    const nextVariants = await tabletopGameAdapter.fetchVariants(game);
+    const nextVariants = visibleTabletopVariants(game, await tabletopGameAdapter.fetchVariants(game));
     if (!isLatestLobbyLoad(seq)) return;
     setVariants(nextVariants);
     if (nextVariants.length) {
@@ -20672,7 +20173,7 @@ export const TabletopGame = ({ game }) => {
   };
 
   const fetchRooms = async (seq = lobbyLoadSeqRef.current) => {
-    const nextRooms = await tabletopGameAdapter.fetchRooms(game);
+    const nextRooms = visibleTabletopRooms(game, await tabletopGameAdapter.fetchRooms(game));
     if (!isLatestLobbyLoad(seq)) return;
     setRooms(nextRooms);
   };
@@ -20706,7 +20207,7 @@ export const TabletopGame = ({ game }) => {
   };
 
   const fetchMyRooms = async () => {
-    return tabletopGameAdapter.fetchMyRooms(game);
+    return visibleTabletopRooms(game, await tabletopGameAdapter.fetchMyRooms(game));
   };
 
   const resumeTitleStorageKey = config.storageKey.replace(/_id$/, "_title");
@@ -21187,13 +20688,6 @@ export const TabletopGame = ({ game }) => {
                 </Link>
               </div>
               <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">{config.title}</h1>
-              <span
-                className="mt-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                title={config.description}
-                aria-label={`${config.title} 설명: ${config.description}`}
-              >
-                <CircleHelp className="h-4 w-4" />
-              </span>
             </div>
             <div className="w-full" data-smoke="tabletop-route-artwork">
               <TabletopGameArtwork type={config.board} compact className="h-36 w-full" />
@@ -21256,13 +20750,6 @@ export const TabletopGame = ({ game }) => {
                   </span>
                   <span className="text-[11px] font-black text-slate-500">
                     {get(selectedVariant, "min_players", "minPlayers", 0)}~{get(selectedVariant, "max_players", "maxPlayers", 0)}명
-                  </span>
-                  <span
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200"
-                    title={`${get(selectedVariant, "summary", "summary", "")}${game === "mafia" ? ` ${mafiaCountGuideText}` : ""}`}
-                    aria-label={`${variantDisplayName(selectedVariant)} 규칙 설명`}
-                  >
-                    <CircleHelp className="h-3.5 w-3.5" />
                   </span>
                 </div>
               )}
@@ -21348,13 +20835,6 @@ export const TabletopGame = ({ game }) => {
                             {statusLabels[listedStatus] || listedStatus || "대기 중"}
                           </span>
                           {alreadyInListedRoom && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">참가 중</span>}
-                          <span
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200"
-                            title={roomHelpText}
-                            aria-label={`${room.title} 설명: ${roomHelpText}`}
-                          >
-                            <CircleHelp className="h-3.5 w-3.5" />
-                          </span>
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-black">
                           <span className="rounded-full bg-white px-2 py-1 text-slate-600">{listedVariantGroupLabel}</span>
@@ -21398,13 +20878,6 @@ export const TabletopGame = ({ game }) => {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="break-words text-xl font-black text-slate-900">{selectedRoom.title}</div>
-                  <span
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                    title={`${config.description} ${variantSummaryOf(selectedRoom) || get(selectedRoomVariant, "summary", "summary", "")} ${startRuleHint}`}
-                    aria-label={`${config.title} 방 설명`}
-                  >
-                    <CircleHelp className="h-3.5 w-3.5" />
-                  </span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black">
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">방 코드 {codeOf(selectedRoom)}</span>
@@ -21500,13 +20973,6 @@ export const TabletopGame = ({ game }) => {
                           {get(selectedSettingsVariant, "min_players", "minPlayers", 0)}~{get(selectedSettingsVariant, "max_players", "maxPlayers", 0)}명
                         </span>
                       </div>
-                      <span
-                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                        title={`${get(selectedSettingsVariant, "summary", "summary", "")}${game === "mafia" ? ` ${mafiaCountGuideText}` : ""}`}
-                        aria-label={`${variantDisplayName(selectedSettingsVariant)} 규칙 설명`}
-                      >
-                        <CircleHelp className="h-3.5 w-3.5" />
-                      </span>
                     </div>
                     {players.length < Number(get(selectedSettingsVariant, "min_players", "minPlayers", 0)) && (
                       <div className="mt-1 text-amber-700">
@@ -21534,8 +21000,10 @@ export const TabletopGame = ({ game }) => {
             )}
           </div>
 
-          {gameState && <MobileGameJumpNav game={game} gameState={gameState} />}
-          <div className="tabletop-board-shell relative" aria-busy={actionBusy ? "true" : "false"}>
+          {gameState && (
+            <>
+              <MobileGameJumpNav game={game} gameState={gameState} />
+              <div className="tabletop-board-shell relative" aria-busy={actionBusy ? "true" : "false"}>
             {actionBusy && gameState && (
               <div className="absolute inset-0 z-40 flex items-start justify-center rounded-[1.5rem] bg-white/55 p-4 backdrop-blur-[1px]">
                 <div className="sticky top-4 rounded-full border border-sky-100 bg-white px-4 py-2 text-xs font-black text-sky-700 shadow-lg" role="status" aria-live="polite" aria-atomic="true">
@@ -21559,11 +21027,7 @@ export const TabletopGame = ({ game }) => {
               <MafiaBoard gameState={gameState} players={players} mySeatNo={mySeatNo} isHost={isHost} onAction={sendAction} />
             ) : game === "poker" && gameState ? (
               <PokerBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
-            ) : (
-              <div className="grid gap-4">
-                <PlayersPanel game={game} gameState={gameState} players={players} selectedRoom={selectedRoom} status={status} mySeatNo={mySeatNo} />
-              </div>
-            )}
+            ) : null}
 
             {(game === "catan" || game === "blokus" || game === "mahe" || game === "dalmuti") && gameState && (
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -21573,7 +21037,9 @@ export const TabletopGame = ({ game }) => {
                 </aside>
               </div>
             )}
-          </div>
+              </div>
+            </>
+          )}
         </section>
       )}
     </div>
@@ -21626,213 +21092,17 @@ const tabletopPlayerPanelWinners = (gameState) => {
   return winners;
 };
 
-const tabletopPlayerPanelNodeStatus = ({ active, host, mine, ready, status, winner }) => {
-  if (winner) return { label: "승리", fill: "#059669", stroke: "#a7f3d0", text: "#ecfdf5" };
-  if (active) return { label: "차례", fill: "#f59e0b", stroke: "#fde68a", text: "#1f2937" };
-  if (mine) return { label: "나", fill: "#0284c7", stroke: "#bae6fd", text: "#f0f9ff" };
-  if (status === "WAITING" && host) return { label: "방장", fill: "#7c3aed", stroke: "#ddd6fe", text: "#f5f3ff" };
-  if (status === "WAITING") {
-    return ready
-      ? { label: "준비", fill: "#10b981", stroke: "#bbf7d0", text: "#ecfdf5" }
-      : { label: "대기", fill: "#64748b", stroke: "#cbd5e1", text: "#f8fafc" };
-  }
-  return host
-    ? { label: "방장", fill: "#334155", stroke: "#cbd5e1", text: "#f8fafc" }
-    : { label: "참가", fill: "#475569", stroke: "#cbd5e1", text: "#f8fafc" };
-};
-
-const TabletopPlayersPanelArt = ({ game, gameState, players, selectedRoom, status, mySeatNo, activeSeatNo, winnerSeatNos }) => {
-  const safePlayers = Array.isArray(players) ? players.slice(0, 12) : [];
-  const hostId = hostMemberIdOf(selectedRoom);
-  const nodes = safePlayers.map((player, index) => {
-    const pid = memberIdOf(player);
-    const seatNo = seatNoOf(player);
-    const host = pid === hostId;
-    const active = activeSeatNo === seatNo;
-    const mine = Number(mySeatNo) === seatNo;
-    const winner = winnerSeatNos.has(seatNo);
-    const ready = host || isReady(player);
-    const nodeStatus = tabletopPlayerPanelNodeStatus({ active, host, mine, ready, status, winner });
-    const name = String(player.nickname || `좌석 ${seatNo || index + 1}`);
-    return {
-      key: pid || seatNo || index,
-      x: 36 + (index % 6) * 58,
-      y: index < 6 ? 52 : 106,
-      name: name.length > 5 ? `${name.slice(0, 5)}…` : name,
-      seatNo,
-      score: tabletopPlayerPanelScore(game, gameState, seatNo),
-      status: nodeStatus,
-    };
-  });
-  const rowGroups = [nodes.slice(0, 6), nodes.slice(6, 12)].filter((row) => row.length > 1);
-
-  return (
-    <svg
-      viewBox="0 0 360 132"
-      className="mb-3 h-[132px] w-full rounded-2xl bg-slate-950"
-      role="img"
-      aria-label="참가자 상태 지도"
-      data-smoke="tabletop-players-art"
-      data-player-count={safePlayers.length}
-      focusable="false"
-    >
-      <rect x="0" y="0" width="360" height="132" rx="22" fill="#020617" />
-      <rect x="14" y="16" width="332" height="100" rx="20" fill="#0f172a" stroke="#1e293b" strokeWidth="2" />
-      <path d="M28 80C74 30 118 112 172 64s90-10 158 18" fill="none" stroke="#334155" strokeWidth="12" strokeLinecap="round" opacity=".52" />
-      <path d="M28 80C74 30 118 112 172 64s90-10 158 18" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5 7" opacity=".72" />
-      <text x="26" y="31" fontSize="10" fontWeight="900" fill="#bfdbfe">참가자 상태 지도</text>
-      <text x="334" y="31" textAnchor="end" fontSize="10" fontWeight="900" fill="#e2e8f0">{status === "WAITING" ? "준비 확인" : "차례 확인"}</text>
-      {rowGroups.map((row, rowIndex) => (
-        <path
-          key={`row-${rowIndex}`}
-          d={row.map((node, index) => `${index ? "L" : "M"}${node.x} ${node.y}`).join(" ")}
-          fill="none"
-          stroke="#e2e8f0"
-          strokeWidth="2"
-          strokeLinecap="round"
-          opacity=".26"
-        />
-      ))}
-      {nodes.map((node) => (
-        <g key={node.key} data-smoke="tabletop-players-art-node" data-seat-no={node.seatNo || ""}>
-          <circle cx={node.x} cy={node.y} r="18" fill={node.status.fill} stroke={node.status.stroke} strokeWidth="4" />
-          <circle cx={node.x} cy={node.y} r="24" fill="none" stroke={node.status.stroke} strokeWidth="1.5" opacity=".45" />
-          <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="9" fontWeight="900" fill={node.status.text}>{node.status.label}</text>
-          <text x={node.x} y={node.y + 34} textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#e2e8f0">{node.name}</text>
-          {node.score && (
-            <text x={node.x} y={node.y - 28} textAnchor="middle" fontSize="8" fontWeight="900" fill="#bae6fd">{node.score}</text>
-          )}
-        </g>
-      ))}
-      {!nodes.length && (
-        <text x="180" y="72" textAnchor="middle" fontSize="12" fontWeight="900" fill="#cbd5e1">참가자 정보를 기다리는 중입니다</text>
-      )}
-    </svg>
-  );
-};
-
-const tabletopPlayersInsightToneClasses = {
-  active: "border-amber-200 bg-amber-50 text-amber-900",
-  done: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  mine: "border-sky-200 bg-sky-50 text-sky-800",
-  waiting: "border-slate-200 bg-slate-50 text-slate-700",
-};
-
-const buildTabletopPlayersInsightItems = ({ game, gameState, players, selectedRoom, status, phaseLabel, activeSeatNo, winnerSeatNos, mySeatNo }) => {
-  const safePlayers = Array.isArray(players) ? players : [];
-  const hostId = hostMemberIdOf(selectedRoom);
-  const readyCount = safePlayers.filter((player) => memberIdOf(player) === hostId || isReady(player)).length;
-  const hostPlayer = safePlayers.find((player) => memberIdOf(player) === hostId);
-  const winnerNames = [...(winnerSeatNos || new Set())]
-    .map((seatNo) => tabletopPlayerName(safePlayers, seatNo))
-    .filter(Boolean);
-  const activeName = activeSeatNo ? tabletopPlayerName(safePlayers, activeSeatNo) : "";
-  const mySeat = Number(mySeatNo || 0);
-  const myPlayer = safePlayers.find((player) => seatNoOf(player) === mySeat);
-  const myScore = mySeat ? tabletopPlayerPanelScore(game, gameState, mySeat) : "";
-  const playerCountText = `${safePlayers.length || 0}명`;
-  const readyValue = status === "WAITING" ? `${readyCount}/${safePlayers.length || 0}` : phaseLabel || "진행 중";
-
-  return [
-    {
-      key: "flow",
-      icon: status === "WAITING" ? "state" : "turn",
-      label: status === "WAITING" ? "준비 흐름" : "현재 흐름",
-      value: readyValue,
-      detail: status === "WAITING" ? "방장 포함 준비 상태를 같은 패널에서 확인합니다." : `${phaseLabel || "현재 단계"} 기준으로 참가자 상태를 읽습니다.`,
-      tone: status === "WAITING" ? "waiting" : "active",
-    },
-    {
-      key: "actor",
-      icon: winnerNames.length ? "win" : "turn",
-      label: winnerNames.length ? "승자" : "차례/주체",
-      value: winnerNames.length ? winnerNames.join(", ") : activeName || "대기 중",
-      detail: winnerNames.length ? "정산된 승자는 지도와 카드에도 함께 표시됩니다." : activeName ? "지금 행동하거나 관찰해야 할 플레이어입니다." : "상태가 도착하면 행동 주체가 표시됩니다.",
-      tone: winnerNames.length ? "done" : activeName ? "active" : "waiting",
-    },
-    {
-      key: "mine",
-      icon: "player",
-      label: "내 좌석",
-      value: mySeat ? `${mySeat}번${myPlayer?.nickname ? ` · ${myPlayer.nickname}` : ""}` : "입장 확인",
-      detail: mySeat ? (myScore ? `${myScore} · 내 카드에서 하늘색으로 표시됩니다.` : "내 카드가 하늘색으로 표시됩니다.") : "방 입장 후 내 좌석과 상태가 표시됩니다.",
-      tone: mySeat ? "mine" : "waiting",
-    },
-    {
-      key: "table",
-      icon: "signal",
-      label: "참가자",
-      value: playerCountText,
-      detail: hostPlayer?.nickname ? `방장 ${hostPlayer.nickname} · 준비 ${readyCount}/${safePlayers.length || 0}` : `준비 ${readyCount}/${safePlayers.length || 0}`,
-      tone: winnerNames.length ? "done" : "waiting",
-    },
-  ];
-};
-
-const TabletopPlayersInsightRail = ({ items = [] }) => {
-  const visibleItems = Array.isArray(items) ? items.filter(Boolean).slice(0, 4) : [];
-  if (!visibleItems.length) return null;
-
-  return (
-    <div className="mb-3 rounded-2xl border border-slate-100 bg-slate-50 p-2" data-smoke="tabletop-players-insight-rail">
-      <div className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-black text-slate-500">
-        <GameUxGlyph type="signal" className="h-3.5 w-3.5 text-primary-600" />
-        상태 요약
-      </div>
-      <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
-        {visibleItems.map((item) => {
-          const tone = tabletopPlayersInsightToneClasses[item.tone] || tabletopPlayersInsightToneClasses.waiting;
-          return (
-            <div key={item.key} className={`min-h-[92px] rounded-xl border px-3 py-2 ${tone}`} data-smoke="tabletop-players-insight-item" data-insight-key={item.key}>
-              <div className="flex items-center gap-1.5 text-[10px] font-black opacity-75">
-                <GameUxGlyph type={item.icon || "state"} className="h-3 w-3" />
-                {item.label}
-              </div>
-              <div className="mt-1 truncate text-sm font-black leading-tight">{item.value}</div>
-              <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo }) => {
   const activeSeatNo = tabletopTurnSeatForSound(game, gameState);
-  const phaseLabel = tabletopPhaseLabel(game, gameState, status);
   const winnerSeatNos = tabletopPlayerPanelWinners(gameState);
-  const readyCount = players.filter((player) => memberIdOf(player) === hostMemberIdOf(selectedRoom) || isReady(player)).length;
-  const insightItems = buildTabletopPlayersInsightItems({ game, gameState, players, selectedRoom, status, phaseLabel, activeSeatNo, winnerSeatNos, mySeatNo });
-  const panelStatusText = status === "WAITING"
-    ? `준비 ${readyCount}/${players.length}`
-    : activeSeatNo
-      ? `현재 ${tabletopPlayerName(players, activeSeatNo)}`
-      : phaseLabel;
 
   return (
     <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg" data-smoke="tabletop-players-panel">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-black text-slate-900">
-          <GameUxGlyph type="player" className="h-4 w-4 text-primary-600" />
-          플레이어
-        </div>
-        <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500" data-smoke="tabletop-players-summary">
-          {panelStatusText}
-        </div>
+      <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+        <GameUxGlyph type="player" className="h-4 w-4 text-primary-600" />
+        플레이어
       </div>
-      <TabletopPlayersPanelArt
-        game={game}
-        gameState={gameState}
-        players={players}
-        selectedRoom={selectedRoom}
-        status={status}
-        mySeatNo={mySeatNo}
-        activeSeatNo={activeSeatNo}
-        winnerSeatNos={winnerSeatNos}
-      />
-      <TabletopPlayersInsightRail items={insightItems} />
-      <div className="space-y-2">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
         {players.map((player) => {
           const pid = memberIdOf(player);
           const seatNo = seatNoOf(player);
@@ -21848,50 +21118,32 @@ const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo
               : mine
                 ? "border-sky-200 bg-sky-50"
                 : "border-slate-100 bg-slate-50";
+          const tags = [
+            winner ? { key: "winner", label: "승리", className: "bg-emerald-600 text-white" } : null,
+            active && !winner ? { key: "active", label: "현재 차례", className: "bg-amber-100 text-amber-800" } : null,
+            mine && !winner ? { key: "mine", label: "내 좌석", className: "bg-sky-100 text-sky-700" } : null,
+          ].filter(Boolean);
           return (
             <div key={pid || seatNo} className={`rounded-xl border px-3 py-2 ${cardTone}`} data-smoke="tabletop-player-card">
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-black text-slate-900">{player.nickname}</div>
-                    <div className="text-[11px] font-bold text-slate-500">
+                    <div className="truncate text-[11px] font-bold text-slate-500">
                       좌석 {seatNo || "-"}{host ? " · 방장" : ""}{scoreText ? ` · ${scoreText}` : ""}
                     </div>
                   </div>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  {winner && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-black text-white" data-smoke="tabletop-player-winner">
-                      <GameUxGlyph type="win" className="h-3 w-3" />
-                      승리
-                    </span>
-                  )}
-                  {active && !winner && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-800" data-smoke="tabletop-player-active">
-                      <GameUxGlyph type="turn" className="h-3 w-3" />
-                      현재 차례
-                    </span>
-                  )}
-                  {mine && !winner && !active && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-1 text-[10px] font-black text-sky-700" data-smoke="tabletop-player-me">
-                      <GameUxGlyph type="state" className="h-3 w-3" />
-                      내 좌석
-                    </span>
-                  )}
-                  {status === "WAITING" && !host && (
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${isReady(player) ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {isReady(player) ? "준비" : "대기"}
-                    </span>
-                  )}
-                  {host && !winner && !active && !mine && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">
-                      <Crown className="h-3.5 w-3.5" />
-                      방장
-                    </span>
-                  )}
-                </div>
+                {!!tags.length && (
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {tags.map((tag) => (
+                      <span key={tag.key} className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black ${tag.className}`} data-smoke={`tabletop-player-${tag.key}`}>
+                        {tag.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
