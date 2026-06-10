@@ -13,6 +13,8 @@ import {
     Bot,
     Pause,
     Play,
+    Clock3,
+    Search,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { formatNumber, formatRelativeTime, stripHtmlTags } from "../../utils/helpers.js";
@@ -72,6 +74,67 @@ const prefetchHomeRoute = (routeKey) => {
     loader().catch(() => prefetchedHomeRoutes.delete(routeKey));
 };
 
+const HOME_RESUME_SOURCES = [
+    { key: "poker_last_room_id", titleKey: "poker_last_room_title", title: "포커", to: "/app/poker", type: "room" },
+    { key: "las_vegas_last_room_id", titleKey: "las_vegas_last_room_title", title: "Las Vegas", to: "/app/games/las-vegas", type: "room" },
+    { key: "no_thanks_last_room_id", titleKey: "no_thanks_last_room_title", title: "No Thanks", to: "/app/games/no-thanks", type: "room" },
+    { key: "catan_last_room_id", titleKey: "catan_last_room_title", title: "카탄", to: "/app/games/catan", type: "room" },
+    { key: "blokus_last_room_id", titleKey: "blokus_last_room_title", title: "블로커스", to: "/app/games/blokus", type: "room" },
+    { key: "mahe_last_room_id", titleKey: "mahe_last_room_title", title: "마헤", to: "/app/games/mahe", type: "room" },
+    { key: "dalmuti_last_room_id", titleKey: "dalmuti_last_room_title", title: "달무티", to: "/app/games/dalmuti", type: "room" },
+    { key: "six_nimmt_last_room_id", titleKey: "six_nimmt_last_room_title", title: "6 nimmt!", to: "/app/games/six-nimmt", type: "room" },
+    { key: "telestrations_last_room_id", titleKey: "telestrations_last_room_title", title: "텔레스트레이션", to: "/app/games/telestrations", type: "room" },
+    { key: "mafia_last_room_id", titleKey: "mafia_last_room_title", title: "마피아", to: "/app/games/mafia", type: "room" },
+    { key: "citadels_last_room_id", titleKey: "citadels_last_room_title", title: "시티델", to: "/app/games/citadels", type: "room" },
+    { key: "good_etc_rpg_save_v1", title: "Good_ETC RPG", to: "/app/games/video/rpg", type: "progress" },
+];
+
+const HOME_QUICK_COMMANDS = [
+    { title: "사용자게시판", hint: "새 글과 커뮤니티", to: "/app/boards/FREE_BOARD", prefetch: "boards" },
+    { title: "게임 허브", hint: "보드게임과 비디오게임", to: "/app/games", prefetch: "games" },
+    { title: "포커", hint: "방 입장형 카드 게임", to: "/app/poker", prefetch: "games" },
+    { title: "주변 찾기", hint: "시설 검색", to: "/app/facility", prefetch: "facility" },
+    { title: "투자 분석", hint: "지역·시설 분석", to: "/app/invest", prefetch: "invest" },
+    { title: "최신 게시글", hint: "최근 커뮤니티 글", to: "/app/boards/FREE_BOARD", prefetch: "boards" },
+];
+
+const readHomeStorage = (key) => {
+    if (typeof window === "undefined") return "";
+    try {
+        return window.localStorage.getItem(key) || "";
+    } catch {
+        return "";
+    }
+};
+
+const summarizeProgressSave = (rawValue) => {
+    try {
+        const parsed = JSON.parse(rawValue);
+        const level = parsed?.level || parsed?.player?.level;
+        const chapter = parsed?.chapter || parsed?.currentChapter;
+        if (level) return `Lv.${level} 저장됨`;
+        if (chapter) return `${chapter} 진행 중`;
+    } catch {
+        // 저장 포맷은 게임 쪽 소유이므로 홈에서는 실패 시 일반 문구만 표시한다.
+    }
+    return "저장된 진행";
+};
+
+const readHomeResumeEntries = () => {
+    return HOME_RESUME_SOURCES.map((source) => {
+        const rawValue = readHomeStorage(source.key);
+        if (!rawValue) return null;
+        const roomTitle = source.titleKey ? readHomeStorage(source.titleKey).trim() : "";
+        return {
+            key: source.key,
+            title: source.title,
+            to: source.to,
+            type: source.type,
+            detail: source.type === "progress" ? summarizeProgressSave(rawValue) : roomTitle || "최근 방",
+        };
+    }).filter(Boolean).slice(0, 4);
+};
+
 export const Home = () => {
     const { user } = useAuth();
     const initialDashboardRef = useRef(homeAdapter.peekCachedDashboard({ user }));
@@ -90,6 +153,8 @@ export const Home = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
     const [adsConsent, setAdsConsent] = useState(readStoredAdsConsent);
+    const [resumeEntries, setResumeEntries] = useState(readHomeResumeEntries);
+    const [quickQuery, setQuickQuery] = useState("");
 
     const impressionSentRef = useRef(new Set());
     const dashboardAbortRef = useRef(null);
@@ -120,6 +185,25 @@ export const Home = () => {
         const fromBanner = heroBanners.find((banner) => isAdsenseBanner(banner) && banner?.adsenseClient)?.adsenseClient;
         return fromBanner || import.meta.env.VITE_ADSENSE_CLIENT || "";
     }, [heroBanners]);
+
+    const quickMenuItems = useMemo(() => {
+        const items = [
+            { to: "/app/boards/FREE_BOARD", icon: MessageSquare, title: "사용자게시판", color: "blue", prefetch: "boards" },
+            { to: "/app/facility", icon: Car, title: "주변 찾기", color: "sky", prefetch: "facility" },
+            { to: "/app/games", icon: Dices, title: "게임 허브", color: "amber", prefetch: "games" },
+            { to: "/app/invest", icon: Bot, title: "투자 분석", color: "blue", prefetch: "invest" },
+        ];
+        if (!resumeEntries.length) return items;
+        return [items[2], items[0], items[1], items[3]];
+    }, [resumeEntries.length]);
+
+    const quickSearchResults = useMemo(() => {
+        const query = quickQuery.trim().toLowerCase();
+        if (!query) return [];
+        return HOME_QUICK_COMMANDS.filter((item) => {
+            return `${item.title} ${item.hint}`.toLowerCase().includes(query);
+        }).slice(0, 4);
+    }, [quickQuery]);
 
     const handleNext = () => {
         if (bannerCount <= 1) return;
@@ -175,6 +259,18 @@ export const Home = () => {
         handleVisibilityChange();
         document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const refreshResumeEntries = () => setResumeEntries(readHomeResumeEntries());
+        refreshResumeEntries();
+        window.addEventListener("storage", refreshResumeEntries);
+        window.addEventListener("focus", refreshResumeEntries);
+        return () => {
+            window.removeEventListener("storage", refreshResumeEntries);
+            window.removeEventListener("focus", refreshResumeEntries);
+        };
     }, []);
 
     useEffect(() => {
@@ -395,21 +491,31 @@ export const Home = () => {
     const statValue = (value) => (statsPending || statsUnavailable) ? "-" : formatNumber(value || 0);
 
     return (
-        <div className="space-y-10 animate-fade-in pb-10">
+        <div className="space-y-8 animate-fade-in pb-10 sm:space-y-9 lg:space-y-10">
             <section
                 className="max-w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm"
                 aria-label="홈 통계 요약"
                 aria-busy={statsPending}
             >
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                    <HeaderStat label="전체 회원" value={statValue(stats.summary?.totalMembers)} />
-                    <HeaderStat label="전체 게시글" value={statValue(stats.summary?.totalBoards)} />
-                    <HeaderStat
-                        label="오늘 방문자"
-                        value={statValue(stats.summary?.todayVisitors)}
-                        trend={!statsUnavailable && stats.compare ? { isGrowth: changeRate >= 0, label: toPercentLabel(changeRate) } : null}
-                    />
-                    <HeaderStat label="활성 사용자" value={statValue(stats.summary?.activeMembers)} />
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                        <HeaderStat label="전체 회원" value={statValue(stats.summary?.totalMembers)} />
+                        <HeaderStat label="전체 게시글" value={statValue(stats.summary?.totalBoards)} />
+                        <HeaderStat
+                            label="오늘 방문자"
+                            value={statValue(stats.summary?.todayVisitors)}
+                            trend={!statsUnavailable && stats.compare ? { isGrowth: changeRate >= 0, label: toPercentLabel(changeRate) } : null}
+                        />
+                        <HeaderStat label="활성 사용자" value={statValue(stats.summary?.activeMembers)} />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black" aria-label="홈 빠른 상태">
+                        <Link to="/app/games" className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700 hover:bg-amber-100">
+                            {resumeEntries.length ? `이어하기 ${resumeEntries.length}` : "게임 바로 시작"}
+                        </Link>
+                        <Link to="/app/boards/FREE_BOARD" className="rounded-full bg-primary-50 px-3 py-1.5 text-primary-700 hover:bg-primary-100">
+                            최신 글 {recentBoards.length || "-"}
+                        </Link>
+                    </div>
                 </div>
                 {statsPending ? (
                     <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500" role="status" aria-live="polite">
@@ -431,9 +537,11 @@ export const Home = () => {
                 ) : null}
             </section>
 
+            <HomeResumeStrip entries={resumeEntries} />
+
             <section
                 ref={bannerSectionRef}
-                className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white shadow-2xl shadow-slate-200/70"
+                className="relative overflow-hidden rounded-[1.5rem] border border-slate-200/70 bg-white shadow-xl shadow-slate-200/60 sm:rounded-[2rem]"
                 aria-label="홈 배너"
                 aria-roledescription="carousel"
                 aria-busy={bannersPending}
@@ -483,13 +591,13 @@ export const Home = () => {
                     </div>
                 ) : null}
                 {bannersPending ? (
-                    <div className="min-h-[240px] bg-gradient-to-br from-slate-900 to-primary-700 p-8 text-white sm:min-h-[280px] sm:p-10" data-home-banner-loading="true" role="status" aria-live="polite" aria-label="운영 배너를 불러오는 중입니다.">
+                    <div className="min-h-[160px] bg-gradient-to-br from-slate-900 to-primary-700 p-4 text-white sm:min-h-[220px] sm:p-7 lg:min-h-[240px]" data-home-banner-loading="true" role="status" aria-live="polite" aria-label="운영 배너를 불러오는 중입니다.">
                         <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1 text-xs font-bold text-white backdrop-blur-md">
                             <Sparkles className="h-3.5 w-3.5 text-amber-300" />
                             운영 배너 불러오는 중
                         </div>
-                        <div className="mt-8 max-w-2xl space-y-4">
-                            <div className="h-9 w-3/4 rounded-2xl bg-white/20" />
+                        <div className="mt-5 max-w-2xl space-y-3 sm:mt-7">
+                            <div className="h-7 w-3/4 rounded-2xl bg-white/20 sm:h-9" />
                             <div className="h-4 w-full rounded-full bg-white/15" />
                             <div className="h-4 w-2/3 rounded-full bg-white/15" />
                         </div>
@@ -528,7 +636,7 @@ export const Home = () => {
 
                                     return (
                                         <div
-                                            className={`relative min-h-[240px] p-8 sm:min-h-[280px] sm:p-10 ${adsense ? "bg-white text-slate-900" : "text-white"} ${!adsense && !hasImageBackground ? "bg-gradient-to-br from-primary-600 to-primary-400" : ""}`}
+                                            className={`relative min-h-[160px] p-4 sm:min-h-[220px] sm:p-7 lg:min-h-[240px] ${adsense ? "bg-white text-slate-900" : "text-white"} ${!adsense && !hasImageBackground ? "bg-gradient-to-br from-primary-600 to-primary-400" : ""}`}
                                             style={contentBannerStyle}
                                         >
                                             <div className="relative z-10">
@@ -538,10 +646,10 @@ export const Home = () => {
                                                 </div>
 
                                                 {adsense ? (
-                                                    <div className="mt-4">
-                                                        <h1 className="text-xl font-black tracking-tight text-slate-900 sm:text-3xl">{banner.title || "광고"}</h1>
+                                                    <div className="mt-3">
+                                                        <h1 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">{banner.title || "광고"}</h1>
                                                         {banner.description ? (
-                                                            <p className="mt-2 max-w-3xl text-sm font-medium text-slate-600 sm:text-base">{banner.description}</p>
+                                                            <p className="mt-2 line-clamp-2 max-w-3xl text-sm font-medium text-slate-600">{banner.description}</p>
                                                         ) : null}
                                                         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
                                                             {adsConsent === null ? (
@@ -562,11 +670,11 @@ export const Home = () => {
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">{banner.title}</h1>
-                                                        <p className="mt-3 max-w-2xl text-base font-medium leading-relaxed text-white/90 sm:text-lg">
+                                                        <h1 className="mt-3 line-clamp-2 text-2xl font-black tracking-tight sm:text-4xl lg:text-5xl">{banner.title}</h1>
+                                                        <p className="mt-2 line-clamp-2 max-w-2xl text-sm font-medium leading-relaxed text-white/90 sm:text-base">
                                                             {banner.description}
                                                         </p>
-                                                        <div className="mt-6 flex flex-wrap items-center gap-3">
+                                                        <div className="mt-4 flex flex-wrap items-center gap-3">
                                                             {banner.linkUrl && banner.linkTarget === "EXTERNAL" ? (
                                                                 <a
                                                                     href={banner.linkUrl}
@@ -604,10 +712,10 @@ export const Home = () => {
                 )}
 
                 {bannerCount > 1 && (
-                    <div className="absolute inset-x-6 bottom-6 z-10 flex flex-wrap items-center justify-between gap-3 sm:inset-x-10 sm:bottom-10">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white/95 px-3 py-2 backdrop-blur sm:px-5">
                         <button
                             type="button"
-                            className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/90 px-3 py-2 text-xs font-black text-slate-700 shadow-lg backdrop-blur transition hover:bg-white"
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
                             onClick={() => setIsBannerPaused((prev) => !prev)}
                             aria-pressed={isBannerPaused}
                             aria-label={isBannerPaused ? "배너 자동 전환 재생" : "배너 자동 전환 일시정지"}
@@ -618,7 +726,7 @@ export const Home = () => {
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/90 text-slate-700 shadow-lg backdrop-blur transition hover:bg-white"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 sm:h-9 sm:w-9"
                                 onClick={() => {
                                     setIsBannerPaused(true);
                                     handlePrev();
@@ -630,7 +738,7 @@ export const Home = () => {
                             </button>
                             <button
                                 type="button"
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/90 text-slate-700 shadow-lg backdrop-blur transition hover:bg-white"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 sm:h-9 sm:w-9"
                                 onClick={() => {
                                     setIsBannerPaused(true);
                                     handleNext();
@@ -646,7 +754,7 @@ export const Home = () => {
                                 <button
                                     key={banner.id}
                                     type="button"
-                                    className={`h-2.5 rounded-full transition-all ${idx === bannerIndex ? "w-8 bg-primary-500" : "w-2.5 bg-slate-400/70"}`}
+                                    className={`h-2.5 rounded-full transition-all ${idx === bannerIndex ? "w-8 bg-primary-500" : "w-2.5 bg-slate-300"}`}
                                     onClick={() => {
                                         setIsBannerPaused(true);
                                         setIsTransitioning(true);
@@ -661,25 +769,29 @@ export const Home = () => {
                 )}
             </section>
 
-            <section className="space-y-6" aria-labelledby="home-quick-menu-heading">
+            <section className="space-y-4" aria-labelledby="home-quick-menu-heading">
                 <div className="flex items-end justify-between px-2">
                     <div className="space-y-1">
-                        <h2 id="home-quick-menu-heading" className="flex items-center gap-2 text-2xl font-black tracking-tight text-slate-900">주요 서비스</h2>
+                        <h2 id="home-quick-menu-heading" className="flex items-center gap-2 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">주요 서비스</h2>
                         <p className="text-sm font-medium text-slate-400">주요 기능을 바로 실행하세요.</p>
                     </div>
                 </div>
-                <div className="grid grid-cols-4 gap-2 sm:gap-4 lg:grid-cols-4">
-                    <QuickMenuLink to="/app/boards/FREE_BOARD" icon={MessageSquare} title="사용자게시판" color="blue" prefetch="boards" />
-                    <QuickMenuLink to="/app/facility" icon={Car} title="주변 찾기" color="sky" prefetch="facility" />
-                    <QuickMenuLink to="/app/games" icon={Dices} title="게임 허브" color="amber" prefetch="games" />
-                    <QuickMenuLink to="/app/invest" icon={Bot} title="투자 분석" color="blue" prefetch="invest" />
+                <HomeQuickSearch
+                    query={quickQuery}
+                    results={quickSearchResults}
+                    onQueryChange={setQuickQuery}
+                />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4">
+                    {quickMenuItems.map((item) => (
+                        <QuickMenuLink key={item.to} {...item} />
+                    ))}
                 </div>
             </section>
 
-            <section className="space-y-6" aria-labelledby="home-boards-heading" aria-busy={boardsPending}>
+            <section className="space-y-4" aria-labelledby="home-boards-heading" aria-busy={boardsPending}>
                 <div className="flex items-end justify-between px-2">
                     <div className="space-y-1">
-                        <h2 id="home-boards-heading" className="text-2xl font-black tracking-tight text-slate-900">최신 게시글</h2>
+                        <h2 id="home-boards-heading" className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">최신 게시글</h2>
                         <p className="text-sm font-medium text-slate-400">커뮤니티의 새 글을 빠르게 확인하세요.</p>
                     </div>
                     <Link
@@ -694,16 +806,16 @@ export const Home = () => {
                     </Link>
                 </div>
                 {boardsPending ? (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" data-home-boards-loading="true" role="status" aria-live="polite" aria-label="최신 게시글을 불러오는 중입니다.">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3" data-home-boards-loading="true" role="status" aria-live="polite" aria-label="최신 게시글을 불러오는 중입니다.">
                         {[0, 1, 2].map((item) => (
-                            <div key={item} className="card bg-white p-7">
-                                <div className="mb-4 h-5 w-32 rounded-lg bg-slate-100" />
-                                <div className="mb-3 h-6 w-3/4 rounded-xl bg-slate-100" />
+                            <div key={item} className="card bg-white p-4 sm:p-5">
+                                <div className="mb-3 h-4 w-28 rounded-lg bg-slate-100" />
+                                <div className="mb-3 h-5 w-3/4 rounded-xl bg-slate-100" />
                                 <div className="space-y-2">
                                     <div className="h-4 w-full rounded-full bg-slate-100" />
                                     <div className="h-4 w-2/3 rounded-full bg-slate-100" />
                                 </div>
-                                <div className="mt-6 border-t border-slate-50 pt-5">
+                                <div className="mt-4 border-t border-slate-50 pt-3">
                                     <div className="h-4 w-20 rounded-full bg-slate-100" />
                                 </div>
                             </div>
@@ -728,20 +840,20 @@ export const Home = () => {
                         </div>
                     </div>
                 ) : recentBoards.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {recentBoards.map((board, idx) => {
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        {recentBoards.map((board) => {
                             const boardTimeLabel = toBoardTimeLabel(board.createdAt);
                             return (
                                 <Link
                                     key={board.id}
                                     to={`/app/boards/${board.kind}/${board.id}`}
-                                    className="card group bg-white p-7"
+                                    className="card group bg-white p-4 sm:p-5"
                                     onPointerEnter={prefetchBoardDetailRoute}
                                     onFocus={prefetchBoardDetailRoute}
                                     onTouchStart={prefetchBoardDetailRoute}
                                     aria-label={`최신 게시글 ${board.title || "제목 없음"} 자세히 보기`}
                                 >
-                                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                                    <div className="mb-3 flex flex-wrap items-center gap-2">
                                         <span className="rounded-lg bg-primary-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary-600">
                                             {board.kindLabel || "게시글"}
                                         </span>
@@ -754,11 +866,11 @@ export const Home = () => {
                                             </>
                                         ) : null}
                                     </div>
-                                    <h3 className="mb-3 line-clamp-1 text-lg font-bold text-slate-900 transition-colors group-hover:text-primary-600">{board.title}</h3>
-                                    <p className="mb-6 line-clamp-2 text-sm font-medium leading-relaxed text-slate-500">
+                                    <h3 className="mb-2 line-clamp-1 text-base font-bold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-lg">{board.title}</h3>
+                                    <p className="mb-4 line-clamp-1 text-sm font-medium leading-relaxed text-slate-500 sm:line-clamp-2">
                                         {stripHtmlTags(board.contents)}
                                     </p>
-                                    <div className="flex items-center justify-between border-t border-slate-50 pt-5">
+                                    <div className="flex items-center justify-between border-t border-slate-50 pt-3">
                                         <div className="flex items-center gap-3 text-[11px] font-bold text-slate-400">
                                             <span className="flex items-center gap-1.5"><Eye className="h-3.5 w-3.5 text-slate-300" /> {formatNumber(board.viewCount)}</span>
                                         </div>
@@ -793,6 +905,96 @@ export const Home = () => {
             ) : null}
 
             <PrivacyPolicyFooter />
+        </div>
+    );
+};
+
+const HomeResumeStrip = ({ entries }) => {
+    if (!entries.length) return null;
+
+    return (
+        <section className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3 shadow-sm sm:p-4" aria-label="최근 이어하기" data-smoke="home-resume-strip">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-amber-600 shadow-sm">
+                        <Clock3 className="h-4 w-4" />
+                    </span>
+                    <div>
+                        <h2 className="text-sm font-black text-slate-900">최근 이어하기</h2>
+                        <p className="text-xs font-bold text-slate-500">진행 중인 방과 저장된 게임만 표시합니다.</p>
+                    </div>
+                </div>
+                <Link to="/app/games" className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-amber-700 shadow-sm hover:text-amber-800">
+                    전체 게임
+                </Link>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {entries.map((entry) => (
+                    <Link
+                        key={entry.key}
+                        to={entry.to}
+                        className="group flex min-w-0 items-center justify-between gap-3 rounded-xl border border-white bg-white/90 px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md"
+                    >
+                        <span className="min-w-0">
+                            <span className="block truncate text-sm font-black text-slate-900">{entry.title}</span>
+                            <span className="block truncate text-xs font-bold text-slate-500">{entry.detail}</span>
+                        </span>
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-black text-amber-700 group-hover:bg-amber-200">
+                            이어하기
+                        </span>
+                    </Link>
+                ))}
+            </div>
+        </section>
+    );
+};
+
+const HomeQuickSearch = ({ query, results, onQueryChange }) => {
+    const hasQuery = query.trim().length > 0;
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-smoke="home-quick-search">
+            <label className="sr-only" htmlFor="home-quick-search">빠른 이동 검색</label>
+            <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                <input
+                    id="home-quick-search"
+                    type="search"
+                    value={query}
+                    onChange={(event) => onQueryChange(event.target.value)}
+                    placeholder="게임, 게시판, 주변 찾기 검색"
+                    className="min-w-0 flex-1 bg-transparent text-sm font-bold text-slate-800 outline-none placeholder:text-slate-400"
+                    autoComplete="off"
+                />
+            </div>
+            {hasQuery ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4" role="list" aria-label="빠른 이동 검색 결과">
+                    {results.length ? results.map((item) => {
+                        const handlePrefetch = () => {
+                            if (item.prefetch) prefetchHomeRoute(item.prefetch);
+                        };
+                        return (
+                            <Link
+                                key={`${item.to}-${item.title}`}
+                                to={item.to}
+                                className="rounded-xl bg-slate-50 px-3 py-2 text-left transition hover:bg-primary-50"
+                                onPointerEnter={handlePrefetch}
+                                onFocus={handlePrefetch}
+                                onTouchStart={handlePrefetch}
+                                aria-label={`${item.title} 바로 이동`}
+                                role="listitem"
+                            >
+                                <span className="block text-sm font-black text-slate-900">{item.title}</span>
+                                <span className="block text-xs font-bold text-slate-500">{item.hint}</span>
+                            </Link>
+                        );
+                    }) : (
+                        <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500" role="status">
+                            일치하는 바로가기가 없습니다.
+                        </div>
+                    )}
+                </div>
+            ) : null}
         </div>
     );
 };
@@ -838,16 +1040,16 @@ const PrivacyPolicyFooter = () => {
     ];
 
     return (
-        <footer className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-xs text-slate-500 shadow-sm sm:px-5" aria-labelledby="home-footer-info-heading">
+        <footer className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-[11px] text-slate-500 shadow-sm sm:px-4" aria-labelledby="home-footer-info-heading">
             <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <h2 id="home-footer-info-heading" className="text-sm font-black text-slate-800">사업자 정보 및 개인정보처리방침</h2>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 font-black text-slate-600">시행일 2026.06.03</span>
+                    <h2 id="home-footer-info-heading" className="text-xs font-black text-slate-800 sm:text-sm">사업자 정보 및 개인정보처리방침</h2>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-black text-slate-600">시행일 2026.06.03</span>
                 </div>
-                <p className="font-medium leading-relaxed">
+                <p className="font-medium leading-snug">
                     전자상거래 등에서의 소비자보호에 관한 법률 및 개인정보 보호법에 따라 CTFMON 운영자 정보와 개인정보 처리 기준을 고지합니다.
                 </p>
-                <dl className="flex flex-wrap gap-x-3 gap-y-1 leading-relaxed">
+                <dl className="flex flex-wrap gap-x-3 gap-y-1 leading-snug">
                     {businessInfo.map(([label, value]) => (
                         <div key={label} className="inline-flex min-w-0 items-baseline gap-1">
                             <dt className="shrink-0 font-black text-slate-700">{label}</dt>
@@ -855,25 +1057,25 @@ const PrivacyPolicyFooter = () => {
                         </div>
                     ))}
                 </dl>
-                <p className="font-bold leading-relaxed text-amber-700">
+                <p className="font-bold leading-snug text-amber-700">
                     사업자등록번호, 통신판매업신고번호, 전화번호는 등록 완료 후 갱신하며, 유료 상품 또는 결제 기능 제공 시 거래조건·청약철회·환불·분쟁처리·구매안전서비스 적용 여부를 별도 고지합니다.
                 </p>
             </div>
 
-            <details className="mt-3 rounded-xl bg-slate-50 px-3 py-2">
-                <summary className="cursor-pointer text-sm font-black text-slate-700">개인정보처리방침 상세 내용 보기</summary>
-                <p className="mt-3 font-medium leading-relaxed">
+            <details className="mt-2 rounded-xl bg-slate-50 px-3 py-2">
+                <summary className="cursor-pointer text-xs font-black text-slate-700 sm:text-sm">개인정보처리방침 상세 내용 보기</summary>
+                <p className="mt-3 font-medium leading-snug">
                     CTFMON은 개인정보 보호법 등 관계 법령에 따라 이용자의 개인정보를 필요한 범위에서만 처리하며, 처리 목적이 달성된 정보는 지체 없이 파기합니다.
                 </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {privacyItems.map((item) => (
-                        <section key={item.title} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <section key={item.title} className="rounded-xl border border-slate-200 bg-white p-2.5">
                             <h3 className="font-black text-slate-700">{item.title}</h3>
-                            <p className="mt-1 leading-relaxed">{item.body}</p>
+                            <p className="mt-1 leading-snug">{item.body}</p>
                         </section>
                     ))}
                 </div>
-                <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 leading-relaxed">
+                <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2.5 leading-snug">
                     개인정보 보호 관련 문의, 권리 행사, 불만 처리는 사이트 내 문의 기능 또는 관리자 연락 채널로 접수할 수 있습니다. 방침 변경 시 변경 내용과 시행일을 서비스 화면에 공지합니다.
                 </div>
             </details>
@@ -914,21 +1116,18 @@ const QuickMenuLink = ({ to, icon: Icon, title, color, prefetch }) => {
     return (
         <Link
             to={to}
-            className="group flex flex-col items-center gap-1.5 rounded-[1.5rem] p-2"
+            className="group flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 sm:min-h-[132px]"
             onPointerEnter={handlePrefetch}
             onFocus={handlePrefetch}
             onTouchStart={handlePrefetch}
             aria-label={`${title} 바로가기`}
         >
-            <div className={`flex aspect-square w-full items-center justify-center rounded-[1.5rem] border border-slate-200 bg-white shadow-lg transition-all duration-500 group-hover:-translate-y-1 group-hover:scale-105 group-hover:shadow-xl group-active:scale-95 ${colors[color]}`}>
-                <Icon className="h-10 w-10 sm:h-20 sm:w-20 lg:h-24 lg:w-24" />
+            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-md transition-all duration-300 group-hover:scale-105 sm:h-16 sm:w-16 lg:h-20 lg:w-20 ${colors[color]}`}>
+                <Icon className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" />
             </div>
-            <span className="text-center text-[14px] font-bold leading-tight text-slate-600 transition-colors group-hover:text-primary-600 sm:text-[18px] lg:text-[20px]">{title}</span>
+            <span className="text-center text-sm font-bold leading-tight text-slate-600 transition-colors group-hover:text-primary-600 sm:text-base">{title}</span>
         </Link>
     );
 };
 
 export default Home;
-
-
-

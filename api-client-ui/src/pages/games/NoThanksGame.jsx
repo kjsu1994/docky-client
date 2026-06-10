@@ -173,7 +173,7 @@ const buildNoThanksLobbyRoomDecisionItems = ({
     {
       key: "seat",
       label: "인원",
-      value: `${safePlayers}/${safeMaxPlayers}명`,
+      value: `${safePlayers}/${safeMinPlayers}명`,
       detail: safePlayers < safeMinPlayers
         ? `시작까지 ${safeMinPlayers - safePlayers}명이 더 필요합니다.`
         : openSeats > 0
@@ -1262,6 +1262,17 @@ const NoThanksScoreLensPanel = ({ currentCard, potChips, myChips, myCards, roomS
         </div>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        <div className="col-span-2 sm:col-span-4">
+          <NoThanksScoreLensArt
+            currentCard={currentCard}
+            currentScore={currentScore}
+            nextScore={nextScore}
+            potChips={potChips}
+            netDelta={netDelta}
+            connectsRun={connectsRun}
+            myChips={myChips}
+          />
+        </div>
         {guideItems.map((item) => (
           <div key={item.label} data-smoke="no-thanks-score-lens-item" className={`min-h-[58px] rounded-xl border px-2.5 py-1.5 sm:min-h-[72px] sm:px-3 sm:py-2 ${item.tone}`}>
             <div className="truncate text-[10px] font-black opacity-70">{item.label}</div>
@@ -2361,6 +2372,118 @@ const NoThanksActionAvailabilityPanel = ({
   );
 };
 
+const NoThanksPlayerStateArt = ({ nickname, chips, cardCount, score, runLabel, isCurrent, isWinner }) => {
+  const safeChips = Math.max(0, Number(chips) || 0);
+  const safeCardCount = Math.max(0, Number(cardCount) || 0);
+  const safeScore = Number.isFinite(Number(score)) ? Number(score) : 0;
+  const nodes = [
+    { key: "chips", label: "칩 압력", value: `${safeChips}개`, x: 60, y: 68, fill: safeChips <= 2 ? "#fb7185" : "#f59e0b" },
+    { key: "cards", label: "카드 흐름", value: safeCardCount ? `${safeCardCount}장` : "카드 없음", x: 160, y: 68, fill: "#38bdf8" },
+    { key: "score", label: "점수 압력", value: `${safeScore}점`, x: 260, y: 68, fill: safeScore <= 20 ? "#22c55e" : "#f97316" },
+    { key: "turn", label: "차례", value: isCurrent ? "현재" : isWinner ? "우승" : "대기", x: 360, y: 68, fill: isCurrent ? "#0f172a" : "#94a3b8" },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 420 142"
+      role="img"
+      aria-label={`${nickname || "플레이어"} 노땡스 상태 요약`}
+      className="h-auto w-full"
+      data-smoke="no-thanks-player-state-art"
+    >
+      <rect x="8" y="8" width="404" height="126" rx="24" fill="#fff7ed" stroke="#fed7aa" strokeWidth="2" />
+      <path d="M40 104C92 56 136 112 190 78s93-36 150 18" fill="none" stroke="#fdba74" strokeWidth="9" strokeLinecap="round" opacity="0.32" />
+      <text x="26" y="34" fill="#9a3412" fontSize="12" fontWeight="900">{nickname || "플레이어"}</text>
+      <text x="394" y="34" textAnchor="end" fill="#64748b" fontSize="10" fontWeight="900">{runLabel || "카드 없음"}</text>
+      {nodes.map((node) => (
+        <g key={node.key} data-smoke="no-thanks-player-state-node" data-state-key={node.key}>
+          <circle cx={node.x} cy={node.y} r="25" fill={node.fill} opacity="0.95" />
+          <circle cx={node.x} cy={node.y} r="13" fill="#ffffff" opacity="0.96" />
+          <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#0f172a" fontSize="9" fontWeight="900">{node.value}</text>
+          <text x={node.x} y="114" textAnchor="middle" fill="#334155" fontSize="10" fontWeight="900">{node.label}</text>
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+const NoThanksPlayerStateCard = ({ player, isCurrent, isWinner, isMe }) => {
+  const cards = Array.isArray(player?.cards) ? player.cards.map(Number).filter(Number.isFinite).sort((a, b) => a - b) : [];
+  const chips = parseIntSafe(player?.chips, 0);
+  const cardScore = scoreNoThanksCards(cards);
+  const serverScore = Number(player?.score);
+  const finalScore = Number.isFinite(serverScore) ? serverScore : cardScore - chips;
+  const runs = summarizeNoThanksRuns(cards);
+  const memberId = playerIdOf(player);
+  const nickname = player?.nickname || (memberId ? `플레이어 ${memberId}` : "플레이어");
+  const chipPressure = chips <= 0 ? "칩 없음" : chips <= 2 ? "높음" : chips <= 5 ? "주의" : "여유";
+  const scorePressure = finalScore <= 20 ? "낮음" : finalScore <= 35 ? "중간" : "높음";
+  const metrics = [
+    {
+      label: "칩 압력",
+      value: `${chipPressure} · ${chips}개`,
+      detail: chips <= 0 ? "넘기기 불가, 받기 압박이 큽니다." : "남은 칩으로 패스 여지를 봅니다.",
+      icon: "coin",
+    },
+    {
+      label: "카드 흐름",
+      value: runs.label,
+      detail: cards.length ? `연속 묶음 ${runs.runCount}개 · 최장 ${runs.longestRun}장` : "아직 받은 카드가 없습니다.",
+      icon: "stage",
+    },
+    {
+      label: "점수 압력",
+      value: `${finalScore}점 · ${scorePressure}`,
+      detail: `카드 ${cardScore}점에서 칩 ${chips}개를 차감합니다.`,
+      icon: "score",
+    },
+    {
+      label: "차례 상태",
+      value: isCurrent ? "현재 차례" : isWinner ? "우승 기준" : isMe ? "내 상태" : "관찰",
+      detail: isCurrent ? "지금 받기/넘기기 선택 대상입니다." : "다음 공개 카드와 칩 이동을 확인합니다.",
+      icon: "turn",
+    },
+  ];
+
+  return (
+    <section
+      className={`rounded-[1.4rem] border bg-white p-3 shadow-sm ${isCurrent ? "border-sky-200 ring-2 ring-sky-100" : isWinner ? "border-emerald-200" : "border-slate-200"}`}
+      data-smoke="no-thanks-player-state-card"
+      data-player-current={isCurrent ? "true" : "false"}
+      data-player-me={isMe ? "true" : "false"}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-black text-slate-950">{nickname}</div>
+          <div className="text-[11px] font-bold text-slate-500">{isMe ? "내 상태" : isCurrent ? "현재 차례" : isWinner ? "우승 기준" : "상태 요약"}</div>
+        </div>
+        <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-black text-orange-700">점수 {finalScore}점</span>
+      </div>
+      <NoThanksPlayerStateArt
+        nickname={nickname}
+        chips={chips}
+        cardCount={cards.length}
+        score={finalScore}
+        runLabel={runs.label}
+        isCurrent={isCurrent}
+        isWinner={isWinner}
+      />
+      <div className="grid gap-2 sm:grid-cols-2">
+        {metrics.map((item) => (
+          <div key={item.label} className="rounded-xl bg-slate-50 px-3 py-2" data-smoke="no-thanks-player-state-item">
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500">
+              <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
+              {item.label}
+            </div>
+            <div className="mt-0.5 truncate text-xs font-black text-slate-900">{item.value}</div>
+            <div className="mt-0.5 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-500">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 const noThanksActionRouteTone = (state) => ({
   ready: "border-emerald-100 bg-emerald-50 text-emerald-900",
   active: "border-amber-100 bg-amber-50 text-amber-900",
@@ -2629,6 +2752,7 @@ const NoThanksJoinCodePanel = ({ joinCode, setJoinCode, joinByCode }) => {
       data-smoke="no-thanks-join-code-panel"
     >
       <div className="p-3">
+        <NoThanksJoinCodeArt joinCode={joinCode} className="mb-3 h-28 w-full" />
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-black text-slate-900">
             <GameUxGlyph type="signal" className="h-4 w-4 text-orange-600" />
@@ -2675,6 +2799,7 @@ export const NoThanksGame = () => {
   const [secondsLeft, setSecondsLeft] = useState(null);
   const [actionFeedback, setActionFeedback] = useState(initialNoThanksActionFeedback);
   const [chipAnimations, setChipAnimations] = useState([]);
+  const [rematching, setRematching] = useState(false);
   const [createForm, setCreateForm] = useState({ title: "", startChipCount: "11", turnTimeSeconds: "15" });
   const [settingsForm, setSettingsForm] = useState({ startChipCount: "11", turnTimeSeconds: "15" });
 
@@ -2773,22 +2898,36 @@ export const NoThanksGame = () => {
     const startChipCount = parseIntSafe(selectedRoom.startChipCount, 11);
     const turnTimeSeconds = parseIntSafe(selectedRoom.turnTimeSeconds, 15);
     const enoughPlayers = roomPlayersForReadiness.length >= minPlayers;
+    const withinMaxPlayers = maxPlayers <= 0 || roomPlayersForReadiness.length <= maxPlayers;
     const guestsReady = !guests.length || readyGuestCount === guests.length;
-    const startSignalReady = enoughPlayers && guestsReady;
+    const startSignalReady = roomStatusNormalized === "WAITING" && enoughPlayers && withinMaxPlayers && guestsReady;
     const playerProgress = minPlayers > 0 ? (roomPlayersForReadiness.length / minPlayers) * 100 : 100;
     const guestProgress = guests.length > 0 ? (readyGuestCount / guests.length) * 100 : 100;
+    const waitingReason = roomStatusNormalized !== "WAITING"
+      ? "대기 상태에서만 시작할 수 있습니다."
+      : !enoughPlayers
+        ? `${Math.max(0, minPlayers - roomPlayersForReadiness.length)}명이 더 필요합니다.`
+        : !withinMaxPlayers
+          ? `현재 인원이 정원 ${maxPlayers}명을 초과했습니다.`
+          : !guestsReady
+            ? "아직 준비하지 않은 게스트가 있습니다."
+            : "시작 가능";
     return {
       canStart: Boolean(isHost && startSignalReady),
       statusText: isHost
-        ? (startSignalReady ? "방장 시작 가능" : "시작 조건 확인 중")
-        : (startSignalReady ? "방장 시작 대기" : "준비 조건 확인 중"),
+        ? (startSignalReady ? "방장 시작 가능" : waitingReason)
+        : (startSignalReady ? "방장 시작 대기" : waitingReason),
       items: [
         {
           label: "인원 조건",
           value: `${roomPlayersForReadiness.length}/${maxPlayers || "-"}명`,
-          detail: enoughPlayers ? `최소 ${minPlayers}명 조건을 충족했습니다.` : `${Math.max(0, minPlayers - roomPlayersForReadiness.length)}명이 더 필요합니다.`,
+          detail: !enoughPlayers
+            ? `${Math.max(0, minPlayers - roomPlayersForReadiness.length)}명이 더 필요합니다.`
+            : withinMaxPlayers
+              ? `최소 ${minPlayers}명 조건을 충족했습니다.`
+              : `정원 ${maxPlayers}명을 초과했습니다.`,
           icon: "player",
-          tone: enoughPlayers ? "done" : "waiting",
+          tone: enoughPlayers && withinMaxPlayers ? "done" : "waiting",
           progress: playerProgress,
         },
         {
@@ -2818,7 +2957,9 @@ export const NoThanksGame = () => {
       ],
       ruleHint: "노땡스는 최소 인원과 게스트 준비가 맞으면 방장이 시작합니다. 시작 후 카드, 칩, 점수 계산은 기존 서버 상태를 그대로 따릅니다.",
     };
-  }, [hostMemberId, isHost, players, readyMemberIds, selectedRoom]);
+  }, [hostMemberId, isHost, players, readyMemberIds, roomStatusNormalized, selectedRoom]);
+  const canStart = Boolean(startReadiness?.canStart);
+  const startStatusText = startReadiness?.statusText || "시작 대기";
   const winnerNickname = winnerMemberId ? players.find((player) => playerIdOf(player) === winnerMemberId)?.nickname || `플레이어 ${winnerMemberId}` : null;
   const sortedPlayers = [...players].sort((a, b) => {
     const aScore = a?.score ?? Number.MAX_SAFE_INTEGER;
@@ -3280,6 +3421,10 @@ export const NoThanksGame = () => {
 
   const startGame = async () => {
     if (!selectedRoom) return;
+    if (!canStart) {
+      notifyError(startStatusText);
+      return;
+    }
     try {
       await noThanksGameAdapter.startGame(roomIdOf(selectedRoom));
     } catch (error) {
@@ -3302,6 +3447,7 @@ export const NoThanksGame = () => {
 
   const rematchGame = async () => {
     if (!selectedRoom) return;
+    setRematching(true);
     try {
       const room = await noThanksGameAdapter.rematch(roomIdOf(selectedRoom));
       setSelectedRoom(room);
@@ -3309,6 +3455,8 @@ export const NoThanksGame = () => {
       notifySuccess("방이 다시 열렸습니다.");
     } catch (error) {
       notifyError(noThanksGameErrorMessage(error, "방 다시 열기 실패"));
+    } finally {
+      setRematching(false);
     }
   };
 
@@ -3450,6 +3598,18 @@ export const NoThanksGame = () => {
               </div>
               <button type="submit" className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white">노땡스 방 만들기</button>
             </div>
+            <NoThanksSetupPreviewPanel createForm={createForm} rooms={rooms} />
+            <GameStartReadinessPanel
+              title="노땡스 방 만들기 셋업"
+              detail="방 생성과 코드 입장 전에 입력값이 어떤 의미인지 핵심만 확인합니다."
+              statusText={lobbySetup.statusText}
+              items={lobbySetup.items}
+              ruleHint={lobbySetup.ruleHint}
+              canStart={Boolean(String(createForm.title || "").trim() || String(joinCode || "").trim())}
+              smoke="no-thanks-room-setup-panel"
+              itemSmoke="no-thanks-room-setup-item"
+              className="mt-4"
+            />
           </form>
 
           <section className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
@@ -3461,6 +3621,10 @@ export const NoThanksGame = () => {
               joinCode={joinCode}
               setJoinCode={setJoinCode}
               joinByCode={joinByCode}
+            />
+            <NoThanksLobbyDirectorPanel
+              rooms={rooms}
+              onJoin={joinRoom}
             />
             <div className="mt-4 space-y-2.5">
               {!rooms.length && (
@@ -3479,6 +3643,17 @@ export const NoThanksGame = () => {
                 const readiness = noThanksLobbyRoomReadiness(room);
                 const actionSignal = noThanksLobbyRoomActionSignal(room);
                 const hostPlayer = players.find((player) => playerIdOf(player) === Number(room.hostMemberId || 0));
+                const decisionItems = buildNoThanksLobbyRoomDecisionItems({
+                  room,
+                  playersCount,
+                  minPlayers,
+                  maxPlayers,
+                  status,
+                  roomFull,
+                  joinable,
+                  readiness,
+                  actionSignal,
+                });
                 return (
                   <div
                     key={roomId}
@@ -3489,7 +3664,19 @@ export const NoThanksGame = () => {
                     data-member-count={playersCount}
                     data-max-players={maxPlayers || ""}
                   >
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_132px] lg:items-center">
+                    <div className="grid gap-3 lg:grid-cols-[132px_minmax(0,1fr)_132px] lg:items-center">
+                      <NoThanksLobbyRoomCardArt
+                        status={status}
+                        playersCount={playersCount}
+                        minPlayers={minPlayers}
+                        maxPlayers={maxPlayers}
+                        startChipCount={room.startChipCount}
+                        turnTimeSeconds={room.turnTimeSeconds}
+                        readiness={readiness}
+                        joinable={joinable}
+                        roomFull={roomFull}
+                        className="h-24 w-full"
+                      />
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="break-words text-sm font-black text-slate-900">{room.title}</div>
@@ -3523,6 +3710,7 @@ export const NoThanksGame = () => {
                         {roomFull ? "가득 참" : status !== "WAITING" ? "진행 중" : "입장"}
                       </button>
                     </div>
+                    <NoThanksLobbyRoomDecisionRail items={decisionItems} />
                   </div>
                 );
               })}
@@ -3546,12 +3734,23 @@ export const NoThanksGame = () => {
                   게임 목록
                 </Link>
                 {isHost && roomStatus === "PLAYING" && <button className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700" onClick={forceFinishGame}>강제 종료</button>}
-                {roomStatus === "WAITING" && !isHost && (
+                {roomStatus === "WAITING" && (
                   <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>
+                    <span className="sr-only">준비 토글</span>
                     {readyMemberIds.has(myMemberId) ? "준비 취소" : "준비하기"}
                   </button>
                 )}
-                {isHost && roomStatus === "WAITING" && <button className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white" onClick={startGame}>시작</button>}
+                {isHost && roomStatus === "WAITING" && (
+                  <button
+                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={startGame}
+                    disabled={!canStart}
+                    aria-label={canStart ? `${selectedRoom.title} 게임 시작` : `${selectedRoom.title} 시작 대기: ${startStatusText}`}
+                    title={canStart ? "게임 시작" : startStatusText}
+                  >
+                    {canStart ? "시작" : "시작 대기"}
+                  </button>
+                )}
                 <button className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" onClick={leaveRoom}>퇴장</button>
               </div>
             </div>
@@ -3576,6 +3775,92 @@ export const NoThanksGame = () => {
               </div>
             )}
           </div>
+
+          <GameStartReadinessPanel
+            title="노땡스 시작 준비"
+            detail="방장이 눌러야 하는 시작 버튼이 실제로 언제 활성화되는지 핵심 조건만 확인합니다."
+            statusText={startStatusText}
+            items={startReadiness?.items || []}
+            ruleHint={startReadiness?.ruleHint}
+            canStart={canStart}
+            smoke="no-thanks-start-readiness-panel"
+            itemSmoke="no-thanks-start-readiness-item"
+          />
+
+          <NoThanksSessionRoutePanel
+            roomStatus={roomStatus}
+            isHost={isHost}
+            startReadiness={startReadiness}
+            selectedRoom={selectedRoom}
+            players={players}
+            readyMemberIds={readyMemberIds}
+            rematching={rematching}
+          />
+
+          <NoThanksTurnRailPanel
+            players={players}
+            selectedRoom={selectedRoom}
+            gameState={gameState}
+            myMemberId={myMemberId}
+            readyMemberIds={readyMemberIds}
+            roomStatus={roomStatus}
+            winnerMemberId={winnerMemberId}
+            winnerNickname={winnerNickname}
+            currentCard={currentCard}
+            potChips={potChips}
+            deckRemaining={deckRemaining}
+            myPlayer={myPlayer}
+          />
+
+          <NoThanksProgressDigestPanel
+            gameState={gameState}
+            players={players}
+            roomStatus={roomStatus}
+            currentCard={currentCard}
+            potChips={potChips}
+            deckRemaining={deckRemaining}
+            turnMemberId={turnMemberId}
+            winnerMemberId={winnerMemberId}
+            winnerNickname={winnerNickname}
+            sortedPlayers={sortedPlayers}
+          />
+
+          <NoThanksDecisionPanel
+            gameState={gameState}
+            players={players}
+            sortedPlayers={sortedPlayers}
+            myPlayer={myPlayer}
+            roomStatus={roomStatus}
+            isMyTurn={isMyTurn}
+            winnerMemberId={winnerMemberId}
+            winnerNickname={winnerNickname}
+          />
+
+          <div className="rounded-[1.6rem] bg-slate-950 p-3 shadow-lg">
+            <NoThanksActionRoutePanel
+              roomStatus={roomStatus}
+              isMyTurn={isMyTurn}
+              myChips={myChips}
+              currentCard={currentCard}
+              potChips={potChips}
+              myCards={myPlayer?.cards}
+              deckRemaining={deckRemaining}
+              turnName={turnMemberId ? noThanksPlayerName(players, turnMemberId) : "-"}
+            />
+          </div>
+
+          <NoThanksSessionActionPanel
+            selectedRoom={selectedRoom}
+            gameState={gameState}
+            sortedPlayers={sortedPlayers}
+            isHost={isHost}
+            isFinished={roomStatus === "FINISHED"}
+            winnerMemberId={winnerMemberId}
+            winnerNickname={winnerNickname}
+            onRefresh={refreshSelectedSession}
+            onRematch={rematchGame}
+            onLeave={leaveRoom}
+          />
 
           <GameFeedbackTicker
             title="행동 피드백"
@@ -3667,6 +3952,23 @@ export const NoThanksGame = () => {
                   </div>
                 </div>
               </div>
+
+              {!!sortedPlayers.length && (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {sortedPlayers.map((player, index) => {
+                    const memberId = playerIdOf(player);
+                    return (
+                      <NoThanksPlayerStateCard
+                        key={memberId || `no-thanks-player-${index}`}
+                        player={player}
+                        isCurrent={memberId > 0 && memberId === Number(turnMemberId || 0)}
+                        isWinner={memberId > 0 && memberId === Number(winnerMemberId || 0)}
+                        isMe={memberId > 0 && memberId === Number(myMemberId || 0)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
 
               <GameRoomPlayersPanel
                 players={players}

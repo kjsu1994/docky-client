@@ -9,7 +9,8 @@ import UserAvatar from "../../common/UserAvatar.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
-import { GameActionCueBar, GameFeedbackTicker, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
+import { GameActionCueBar, GameChatEmptyState, GameFeedbackTicker, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
+import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 import {
     buildLasVegasActionPayload,
     getLasVegasChatRoomId,
@@ -195,7 +196,7 @@ const buildLasVegasLobbyRoomDecisionItems = ({
         {
             key: "seat",
             label: "인원",
-            value: `${safePlayers}/${safeMaxPlayers}명`,
+            value: `${safePlayers}/${safeMinPlayers}명`,
             detail: safePlayers < safeMinPlayers
                 ? `시작까지 ${safeMinPlayers - safePlayers}명이 더 필요합니다.`
                 : openSeats > 0
@@ -2916,6 +2917,7 @@ const LasVegasJoinCodePanel = ({ joinCode, setJoinCode, loading, joinRoomByCode 
             data-smoke="las-vegas-join-code-panel"
         >
             <div className="p-3">
+                <LasVegasJoinCodeArt joinCode={joinCode} className="mb-3 h-28 w-full" />
                 <div className="min-w-0">
                     <div className="flex items-center gap-2 text-sm font-black text-amber-100">
                         <GameUxGlyph type="signal" className="h-4 w-4 text-amber-300" />
@@ -3005,8 +3007,9 @@ export const LasVegasGame = () => {
         return clearPageGuideContext;
     }, [isFinished, isPlaying, selectedRoom, state]);
 
-    const isHost = selectedRoom && myMemberId &&
-        Number(selectedRoom.hostMemberId) === Number(myMemberId);
+    const hostMemberId = Number(selectedRoom?.hostMemberId || 0);
+    const isHost = Boolean(selectedRoom && myMemberId &&
+        hostMemberId === Number(myMemberId));
     const myTurn = state && myMemberId &&
         Number(state.turnMemberId) === Number(myMemberId);
     const canRoll = !isFinished && myTurn && (!state?.currentRoll || state.currentRoll.length === 0);
@@ -3026,6 +3029,124 @@ export const LasVegasGame = () => {
     const livePlayers = Array.isArray(state?.players) ? state.players : [];
     const roomPlayers = Array.isArray(selectedRoom?.players) ? selectedRoom.players : [];
     const players = livePlayers.length > 0 ? livePlayers : roomPlayers;
+    const readyMemberIds = useMemo(() => extractReadyMemberIds(players), [players]);
+    const lobbySetup = useMemo(() => {
+        const title = String(createForm.title || "").trim();
+        const roundCount = toPlainInt(createForm.roundCount, 4);
+        const turnTimeSeconds = toPlainInt(createForm.turnTimeSeconds, 50);
+        const code = String(joinCode || "").trim().toUpperCase();
+        const waitingRoomCount = Array.isArray(rooms) ? rooms.filter((room) => String(room?.roomStatus || "WAITING").toUpperCase() === "WAITING").length : 0;
+        return {
+            statusText: code ? "코드 입장 준비" : "호스트 설정 준비",
+            items: [
+                {
+                    label: "테이블 간판",
+                    value: title ? "제목 입력됨" : "자동 제목 가능",
+                    detail: title || "제목이 비어 있어도 기본 라스베가스 테이블 이름으로 만들 수 있습니다.",
+                    icon: "state",
+                    tone: title ? "done" : "waiting",
+                    progress: title ? Math.min(100, Math.max(18, (title.length / 24) * 100)) : 8,
+                },
+                {
+                    label: "라운드",
+                    value: `${roundCount}회`,
+                    detail: "라운드가 많을수록 누적 수익과 역전 타이밍을 더 오래 봅니다.",
+                    icon: "stage",
+                    tone: roundCount >= 3 ? "active" : "waiting",
+                    progress: (roundCount / 10) * 100,
+                },
+                {
+                    label: "턴 시간",
+                    value: `${turnTimeSeconds}초`,
+                    detail: "각 차례의 주사위 굴림과 카지노 배팅 판단 시간입니다.",
+                    icon: "turn",
+                    tone: turnTimeSeconds >= 20 ? "done" : "waiting",
+                    progress: (turnTimeSeconds / 180) * 100,
+                },
+                {
+                    label: "코드 입장",
+                    value: code ? "코드 입력됨" : `${waitingRoomCount}개 대기방`,
+                    detail: code ? `${code} 코드로 바로 테이블을 찾습니다.` : "코드가 없으면 대기방 카드에서 입장할 수 있습니다.",
+                    icon: "signal",
+                    tone: code ? "done" : waitingRoomCount ? "active" : "waiting",
+                    progress: code ? Math.min(100, Math.max(24, (code.length / 8) * 100)) : 8,
+                },
+            ],
+            ruleHint: "이 셋업 패널은 입력값 설명만 담당합니다. 방 생성, 코드 입장, 주사위/카지노/정산 규칙은 기존 서버 로직을 그대로 따릅니다.",
+        };
+    }, [createForm.roundCount, createForm.title, createForm.turnTimeSeconds, joinCode, rooms]);
+    const startReadiness = useMemo(() => {
+        if (!selectedRoom) return null;
+        const roomPlayersForReadiness = Array.isArray(players) ? players : [];
+        const guests = roomPlayersForReadiness.filter((player) => Number(getLasVegasPlayerId(player) || 0) !== hostMemberId);
+        const readyGuestCount = guests.filter((player) => readyMemberIds.has(Number(getLasVegasPlayerId(player) || 0))).length;
+        const minPlayers = toPlainInt(selectedRoom.minPlayers, 2);
+        const maxPlayers = toPlainInt(selectedRoom.maxPlayers, 6);
+        const roundCount = toPlainInt(selectedRoom.roundCount, 4);
+        const turnTimeSeconds = toPlainInt(selectedRoom.turnTimeSeconds, 30);
+        const enoughPlayers = roomPlayersForReadiness.length >= minPlayers;
+        const withinMaxPlayers = maxPlayers <= 0 || roomPlayersForReadiness.length <= maxPlayers;
+        const guestsReady = !guests.length || readyGuestCount === guests.length;
+        const startSignalReady = isWaiting && enoughPlayers && withinMaxPlayers && guestsReady;
+        const playerProgress = minPlayers > 0 ? (roomPlayersForReadiness.length / minPlayers) * 100 : 100;
+        const guestProgress = guests.length > 0 ? (readyGuestCount / guests.length) * 100 : 100;
+        const waitingReason = !isWaiting
+            ? "대기 상태에서만 시작할 수 있습니다."
+            : !enoughPlayers
+                ? `${Math.max(0, minPlayers - roomPlayersForReadiness.length)}명이 더 필요합니다.`
+                : !withinMaxPlayers
+                    ? `현재 인원이 정원 ${maxPlayers}명을 초과했습니다.`
+                    : !guestsReady
+                        ? "아직 준비하지 않은 게스트가 있습니다."
+                        : "시작 가능";
+        return {
+            canStart: Boolean(isHost && startSignalReady),
+            statusText: isHost
+                ? (startSignalReady ? "방장 시작 가능" : waitingReason)
+                : (startSignalReady ? "방장 시작 대기" : waitingReason),
+            items: [
+                {
+                    label: "인원 조건",
+                    value: `${roomPlayersForReadiness.length}/${maxPlayers || "-"}명`,
+                    detail: !enoughPlayers
+                        ? `${Math.max(0, minPlayers - roomPlayersForReadiness.length)}명이 더 필요합니다.`
+                        : withinMaxPlayers
+                            ? `최소 ${minPlayers}명 조건을 충족했습니다.`
+                            : `정원 ${maxPlayers}명을 초과했습니다.`,
+                    icon: "player",
+                    tone: enoughPlayers && withinMaxPlayers ? "done" : "waiting",
+                    progress: playerProgress,
+                },
+                {
+                    label: "게스트 준비",
+                    value: guests.length ? `${readyGuestCount}/${guests.length}명 준비` : "게스트 없음",
+                    detail: guests.length
+                        ? (guestsReady ? "게스트 준비가 완료되었습니다." : "아직 준비하지 않은 게스트가 있습니다.")
+                        : "초대 또는 코드 입장으로 최소 인원을 채웁니다.",
+                    icon: "turn",
+                    tone: guests.length ? (guestsReady ? "done" : "waiting") : "neutral",
+                    progress: guestProgress,
+                },
+                {
+                    label: "시작 권한",
+                    value: isHost ? (startSignalReady ? "시작 가능" : "방장 대기") : "방장 전용",
+                    detail: isHost ? "방장만 현재 방을 시작할 수 있습니다." : "모든 조건이 맞으면 방장이 시작합니다.",
+                    icon: "signal",
+                    tone: isHost && startSignalReady ? "done" : startSignalReady ? "active" : "waiting",
+                },
+                {
+                    label: "규칙 설정",
+                    value: `라운드 ${roundCount}회`,
+                    detail: `턴 ${turnTimeSeconds}초 · 카지노 선택 전 주사위 결과 확인`,
+                    icon: "stage",
+                    tone: "active",
+                },
+            ],
+            ruleHint: "라스베가스는 인원 조건과 게스트 준비가 맞으면 방장이 시작합니다. 시작 후에는 주사위 굴림, 카지노 배팅, 라운드 정산이 서버 규칙대로 진행됩니다.",
+        };
+    }, [hostMemberId, isHost, isWaiting, players, readyMemberIds, selectedRoom]);
+    const canStart = Boolean(startReadiness?.canStart);
+    const startStatusText = startReadiness?.statusText || "시작 대기";
     const winnerMemberId = state?.winnerMemberId || null;
     const winnerNickname = winnerMemberId
         ? players.find((player) => Number(player.memberId) === Number(winnerMemberId))?.nickname || `플레이어 ${winnerMemberId}`
@@ -3634,6 +3755,10 @@ export const LasVegasGame = () => {
             notifyError("한 판 더 하기로 대기 상태를 만든 뒤 시작할 수 있습니다.");
             return;
         }
+        if (!canStart) {
+            notifyError(startStatusText);
+            return;
+        }
         const roomId = normalizeRoomId(selectedRoom);
         try {
             await lasVegasGameAdapter.startGame(roomId);
@@ -3738,6 +3863,9 @@ export const LasVegasGame = () => {
                         게임 목록
                     </Link>
                 </div>
+                <div className="mb-4" data-smoke="las-vegas-route-artwork">
+                    <TabletopGameArtwork type="dice" compact className="h-32 w-full" />
+                </div>
                 <form className="grid grid-cols-1 gap-3 md:grid-cols-4" onSubmit={createRoom}>
                     <input
                         className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300"
@@ -3763,6 +3891,18 @@ export const LasVegasGame = () => {
                         {creating ? "생성 중..." : "방 만들기"}
                     </button>
                 </form>
+                <LasVegasSetupPreviewPanel createForm={createForm} rooms={rooms} />
+                <GameStartReadinessPanel
+                    title="라스베가스 방 만들기 셋업"
+                    detail="방 생성과 코드 입장 전에 입력값이 어떤 의미인지 핵심만 확인합니다."
+                    statusText={lobbySetup.statusText}
+                    items={lobbySetup.items}
+                    ruleHint={lobbySetup.ruleHint}
+                    canStart={Boolean(String(createForm.title || "").trim() || String(joinCode || "").trim())}
+                    smoke="las-vegas-room-setup-panel"
+                    itemSmoke="las-vegas-room-setup-item"
+                    className="mt-4"
+                />
                 </section>
             )}
 
@@ -3772,6 +3912,11 @@ export const LasVegasGame = () => {
                         <Users className="h-5 w-5" />
                         대기 중인 방
                     </h2>
+                    <LasVegasLobbyDirectorPanel
+                        rooms={rooms}
+                        loading={loading}
+                        onJoin={joinRoom}
+                    />
                     <LasVegasJoinCodePanel
                         joinCode={joinCode}
                         setJoinCode={setJoinCode}
@@ -3780,35 +3925,31 @@ export const LasVegasGame = () => {
                     />
                     <div className="space-y-2.5">
                         {!rooms.length && (
-                            <div
-                                className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3"
-                                data-smoke="las-vegas-lobby-empty-state"
-                            >
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="text-sm font-bold text-slate-500">
-                                        {loading ? "테이블 목록을 불러오는 중입니다." : "대기 중인 테이블이 없습니다."}
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-3 text-xs font-black text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-900 hover:text-white disabled:opacity-50"
-                                        disabled={loading}
-                                        onClick={() => fetchRooms().catch(() => {})}
-                                    >
-                                        <RefreshCw className="h-3.5 w-3.5" />
-                                        새로고침
-                                    </button>
-                                </div>
-                            </div>
+                            <LasVegasLobbyEmptyState loading={loading} onRefresh={() => fetchRooms().catch(() => {})} />
                         )}
                         {rooms.map((room) => {
                             const roomId = normalizeRoomId(room);
                             const players = lasVegasLobbyPlayers(room);
                             const playersCount = toPlainInt(room.memberCount, players.length);
                             const maxPlayers = toPlainInt(room.maxPlayers, 6);
+                            const minPlayers = toPlainInt(room.minPlayers, 2);
                             const status = String(room.roomStatus || "WAITING").toUpperCase();
                             const roomFull = maxPlayers > 0 && playersCount >= maxPlayers;
                             const joinable = status === "WAITING" && !roomFull;
                             const joinDisabled = loading || !joinable;
+                            const readiness = lasVegasLobbyRoomReadiness(room);
+                            const actionSignal = lasVegasLobbyRoomActionSignal(room);
+                            const decisionItems = buildLasVegasLobbyRoomDecisionItems({
+                                room,
+                                playersCount,
+                                minPlayers,
+                                maxPlayers,
+                                status,
+                                roomFull,
+                                joinable,
+                                readiness,
+                                actionSignal,
+                            });
                             return (
                                 <div
                                     key={roomId}
@@ -3819,7 +3960,19 @@ export const LasVegasGame = () => {
                                     data-member-count={playersCount}
                                     data-max-players={maxPlayers || ""}
                                 >
-                                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_132px] lg:items-center">
+                                    <div className="grid gap-3 lg:grid-cols-[132px_minmax(0,1fr)_132px] lg:items-center">
+                                        <LasVegasLobbyRoomCardArt
+                                            status={status}
+                                            playersCount={playersCount}
+                                            minPlayers={minPlayers}
+                                            maxPlayers={maxPlayers}
+                                            roundCount={room.roundCount}
+                                            turnTimeSeconds={room.turnTimeSeconds}
+                                            readiness={readiness}
+                                            joinable={joinable}
+                                            roomFull={roomFull}
+                                            className="h-24 w-full"
+                                        />
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <div className="break-words text-sm font-black text-slate-900">{room.title}</div>
@@ -3848,6 +4001,7 @@ export const LasVegasGame = () => {
                                             {roomFull ? "가득 참" : status !== "WAITING" ? "진행 중" : "입장"}
                                         </button>
                                     </div>
+                                    <LasVegasLobbyRoomDecisionRail items={decisionItems} />
                                 </div>
                             );
                         })}
@@ -3867,14 +4021,20 @@ export const LasVegasGame = () => {
                                 <Link to="/app/games" className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
                                     게임 목록
                                 </Link>
-                                {isWaiting && !isHost && (
+                                {isWaiting && (
                                     <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>
                                         준비하기
                                     </button>
                                 )}
                                 {isHost && isWaiting && (
-                                    <button className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white" onClick={startGame}>
-                                        시작
+                                    <button
+                                        className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                        onClick={startGame}
+                                        disabled={!canStart || loading}
+                                        aria-label={canStart ? `${selectedRoom.title} 게임 시작` : `${selectedRoom.title} 시작 대기: ${startStatusText}`}
+                                        title={canStart ? "게임 시작" : startStatusText}
+                                    >
+                                        {canStart ? "시작" : "시작 대기"}
                                     </button>
                                 )}
                                 {isHost && isPlaying && (
@@ -3907,6 +4067,88 @@ export const LasVegasGame = () => {
                                 <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white md:col-span-2" onClick={updateSettings}>방 설정 저장</button>
                             </div>
                         )}
+                    </div>
+
+                    <GameStartReadinessPanel
+                        title="라스베가스 시작 준비"
+                        detail="방장이 눌러야 하는 시작 버튼이 실제로 언제 활성화되는지 핵심 조건만 확인합니다."
+                        statusText={startStatusText}
+                        items={startReadiness?.items || []}
+                        ruleHint={startReadiness?.ruleHint}
+                        canStart={canStart}
+                        smoke="las-vegas-start-readiness-panel"
+                        itemSmoke="las-vegas-start-readiness-item"
+                    />
+
+                    <LasVegasSessionRoutePanel
+                        roomStatus={roomStatus}
+                        isHost={isHost}
+                        startReadiness={startReadiness}
+                        selectedRoom={selectedRoom}
+                        players={players}
+                        readyMemberIds={readyMemberIds}
+                        forceFinishing={forceFinishing}
+                        rematching={rematching}
+                    />
+
+                    <LasVegasTurnRailPanel
+                        players={players}
+                        selectedRoom={selectedRoom}
+                        state={state}
+                        myMemberId={myMemberId}
+                        readyMemberIds={readyMemberIds}
+                        roomStatus={roomStatus}
+                        winnerMemberId={winnerMemberId}
+                        winnerNickname={winnerNickname}
+                        lastPlacedText={lastPlacedText}
+                    />
+
+                    <LasVegasProgressDigestPanel
+                        state={state}
+                        players={players}
+                        roomStatus={roomStatus}
+                        lastPlacedText={lastPlacedText}
+                        winnerMemberId={winnerMemberId}
+                        winnerNickname={winnerNickname}
+                        currentRollCountByFace={currentRollCountByFace}
+                    />
+
+                    <LasVegasDecisionPanel
+                        state={state}
+                        players={players}
+                        myMemberId={myMemberId}
+                        currentRollCountByFace={currentRollCountByFace}
+                        canRoll={canRoll}
+                        canBet={canBet}
+                        isFinished={isFinished}
+                        lastPlacedText={lastPlacedText}
+                        winnerMemberId={winnerMemberId}
+                    />
+
+                    <div className="rounded-[1.6rem] bg-slate-950 p-3 shadow-lg">
+                        <LasVegasActionRoutePanel
+                            roomStatus={roomStatus}
+                            myTurn={myTurn}
+                            canRoll={canRoll}
+                            canBet={canBet}
+                            currentRollCountByFace={currentRollCountByFace}
+                            roundNo={state?.roundNo || 0}
+                            roundCount={state?.roundCount || selectedRoom?.roundCount || 0}
+                            casinoCount={Array.isArray(state?.casinos) ? state.casinos.length : 6}
+                            lastPlacedText={lastPlacedText}
+                            turnName={currentTurnMemberId ? lasVegasPlayerName(players, currentTurnMemberId) : "-"}
+                        />
+                        <LasVegasRollStandbyPanel
+                            roomStatus={roomStatus}
+                            myTurn={myTurn}
+                            canRoll={canRoll}
+                            canBet={canBet}
+                            roundNo={state?.roundNo || 0}
+                            roundCount={state?.roundCount || selectedRoom?.roundCount || 0}
+                            turnName={currentTurnMemberId ? lasVegasPlayerName(players, currentTurnMemberId) : "-"}
+                            casinoCount={Array.isArray(state?.casinos) ? state.casinos.length : 6}
+                            lastPlacedText={lastPlacedText}
+                        />
                     </div>
 
                     <LasVegasSessionActionPanel
@@ -4045,9 +4287,13 @@ export const LasVegasGame = () => {
                             </div>
                             <div ref={chatScrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-2xl bg-slate-50 p-3 text-xs sm:h-[320px] xl:h-[420px]">
                                 {!chatMessages.length && (
-                                    <div className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-500">
-                                        아직 채팅 내역이 없습니다.
-                                    </div>
+                                    <GameChatEmptyState
+                                        game="las-vegas"
+                                        title="아직 채팅 내역이 없습니다"
+                                        detail="주사위 굴림, 카지노 배팅, 정산 흐름을 짧게 남기면 같은 테이블의 판단을 맞출 수 있습니다."
+                                        prompts={["첫 인사", "배팅 방향", "준비 확인"]}
+                                        tone="amber"
+                                    />
                                 )}
                                 {chatMessages.map((msg) => {
                                     const normalized = normalizeMessage(msg);
