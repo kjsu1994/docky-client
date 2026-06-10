@@ -1,3 +1,5 @@
+import { getBoardGameRuleGuide } from "./boardGameRules.js";
+
 const section = (title, items) => ({ title, items });
 
 const objectParticle = (word) => {
@@ -37,10 +39,11 @@ const boardGuide = {
     ],
 };
 
-const gameRoomGuide = (gameName, playItems) => ({
+const gameRoomGuide = (gameName, playItems, ruleItems = []) => ({
     title: gameName,
-    summary: `${gameName}${objectParticle(gameName)} 온라인 방 방식으로 플레이하는 화면입니다.`,
+    summary: `${gameName}${objectParticle(gameName)} 온라인 방 방식으로 플레이하는 화면입니다. 첫 섹션에서 공식 룰의 핵심 흐름을 먼저 확인할 수 있습니다.`,
     sections: [
+        ...(ruleItems.length ? [section("공식 룰 핵심", ruleItems)] : []),
         section("방과 입장", roomFlow),
         section("게임 중", playItems),
     ],
@@ -467,7 +470,29 @@ const fallbackGuide = {
     ],
 };
 
-export const getPageGuide = (pathname) => {
+const boardGameGuideRoutes = {
+    "/app/poker": "poker",
+    "/app/plinko": "poker",
+    "/app/games/las-vegas": "las-vegas",
+    "/app/games/no-thanks": "no-thanks",
+    "/app/games/catan": "catan",
+    "/app/games/blokus": "blokus",
+    "/app/games/mahe": "mahe",
+    "/app/games/dalmuti": "dalmuti",
+    "/app/games/six-nimmt": "six-nimmt",
+    "/app/games/telestrations": "telestrations",
+    "/app/games/mafia": "mafia",
+    "/app/games/citadels": "citadels",
+};
+
+export const getPageGuide = (pathname, context = {}) => {
     const path = pathname || "/";
+    const boardGame = boardGameGuideRoutes[path];
+    if (boardGame) {
+        return getBoardGameRuleGuide({
+            ...context,
+            game: boardGame,
+        });
+    }
     return guides.find((guide) => guide.test(path)) || fallbackGuide;
 };

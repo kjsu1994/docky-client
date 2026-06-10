@@ -6,9 +6,10 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 import { CasinoEmptyLaneArt, CasinoTableSign, DiceCountBadge, DiceFace, MoneyCard } from "../../common/LasVegasVisuals.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
+import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
-import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
+import { GameActionCueBar, GameFeedbackTicker, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
 import {
     buildLasVegasActionPayload,
     getLasVegasChatRoomId,
@@ -23,6 +24,22 @@ const ROOM_STORAGE_KEY = "las_vegas_last_room_id";
 const ROOM_TITLE_STORAGE_KEY = "las_vegas_last_room_title";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
 const LAS_VEGAS_SOUND_VOLUME_MULTIPLIER = 8;
+
+const initialLasVegasActionFeedback = () => ({
+    status: "idle",
+    label: "전송 대기",
+    message: "행동 전송 대기",
+    detail: "주사위를 굴리거나 카지노를 선택하면 전송 상태가 표시됩니다.",
+});
+const lasVegasActionLabel = (actionType, casinoNo = null) => (
+    actionType === "ROLL_DICE" ? "주사위 굴리기" : `카지노 ${casinoNo || "-"} 배팅`
+);
+const lasVegasFeedbackStatusLabel = (status) => ({
+    idle: "대기",
+    pending: "전송 중",
+    done: "전송 완료",
+    error: "전송 실패",
+}[status] || "대기");
 
 const normalizeRoomId = getLasVegasRoomId;
 const normalizeChatRoomId = getLasVegasChatRoomId;
@@ -982,7 +999,7 @@ const LasVegasSettlementLedgerArt = ({ ledger }) => {
         >
             <rect x="10" y="10" width="400" height="190" rx="24" fill="#082f49" />
             <path d="M32 154H390M32 122H390M32 90H390" stroke="#e0f2fe" strokeWidth="2" opacity=".1" />
-            <text x="28" y="34" fontSize="12" fontWeight="900" fill="#fef3c7">정산 렌즈</text>
+            <text x="28" y="34" fontSize="12" fontWeight="900" fill="#fef3c7">정산 요약</text>
             <text x="300" y="34" fontSize="10" fontWeight="900" fill="#bae6fd">동점 제거 후 단독 선두</text>
 
             {leaderboard.map((player, index) => {
@@ -1068,7 +1085,7 @@ const LasVegasSettlementLedgerPanel = ({ state, players, winnerMemberId }) => {
                         <div className="min-w-0">
                             <div className="flex items-center gap-2 text-sm font-black text-slate-950">
                                 <GameUxGlyph type="score" className="h-4 w-4 text-sky-600" />
-                                라스베가스 정산 렌즈
+                                라스베가스 정산 요약
                             </div>
                             <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">
                                 카지노별 머니카드, 동점 제거, 플레이어 총 보유금을 같은 화면에 묶어 왜 앞서거나 뒤처지는지 확인합니다.
@@ -1211,7 +1228,7 @@ const LasVegasCasinoPressureArt = ({ rows, bestCasinoNo, maxMoney }) => {
             viewBox="0 0 420 190"
             className="h-full min-h-[190px] w-full"
             role="img"
-            aria-label="라스베가스 카지노 압력 렌즈"
+            aria-label="라스베가스 카지노 보상 요약"
             data-smoke="las-vegas-casino-pressure-art"
         >
             <rect width="420" height="190" rx="24" fill="#0f172a" />
@@ -1297,35 +1314,35 @@ const LasVegasCasinoPressurePanel = ({ state, currentRollCountByFace, myMemberId
     ];
 
     return (
-        <section className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-sm" data-smoke="las-vegas-casino-pressure-panel">
-            <div className="grid gap-0 lg:grid-cols-[minmax(0,.95fr)_minmax(0,1.05fr)]">
-                <div className="bg-slate-950 p-3">
+        <section className="mt-2 rounded-xl border border-amber-100 bg-white px-3 py-2 shadow-sm sm:mt-3 sm:rounded-2xl" data-smoke="las-vegas-casino-pressure-panel">
+            <div className="space-y-2">
+                <div className="hidden">
                     <LasVegasCasinoPressureArt rows={rows} bestCasinoNo={bestRow?.casinoNo} maxMoney={maxMoney} />
                 </div>
-                <div className="p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="p-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                            <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+                            <div className="flex items-center gap-1.5 text-xs font-black text-slate-950 sm:text-sm">
                                 <GameUxGlyph type="score" className="h-4 w-4 text-amber-600" />
-                                카지노 압력 렌즈
+                                카지노 보상 요약
                             </div>
-                            <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
-                                보상 규모, 이번 굴림, 내 주사위 추가 수, 동점 위험을 한 장의 판단 흐름으로 묶습니다.
+                            <div className="mt-0.5 line-clamp-1 text-[11px] font-bold text-slate-500">
+                                보상 규모, 이번 굴림, 내 주사위 추가 수, 동점 위험만 압축해서 봅니다.
                             </div>
                         </div>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-black ${canBet ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${canBet ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                             {canBet ? "배팅 판단" : "굴림 대기"}
                         </span>
                     </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                         {items.map((item) => (
-                            <div key={item.key} className={`min-h-[98px] rounded-xl border px-3 py-2 ${item.tone}`} data-smoke="las-vegas-casino-pressure-item">
+                            <div key={item.key} className={`min-h-[58px] rounded-xl border px-2.5 py-1.5 sm:min-h-[72px] sm:px-3 sm:py-2 ${item.tone}`} data-smoke="las-vegas-casino-pressure-item">
                                 <div className="flex items-center gap-1.5 text-[10px] font-black opacity-70">
-                                    <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
-                                    {item.label}
+                                    <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate">{item.label}</span>
                                 </div>
-                                <div className="mt-1 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
-                                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed opacity-70">{item.detail}</div>
+                                <div className="mt-0.5 truncate text-xs font-black leading-snug sm:text-sm">{item.value}</div>
+                                <div className="mt-0.5 hidden text-[10px] font-bold leading-snug opacity-70 sm:line-clamp-1 sm:block">{item.detail}</div>
                             </div>
                         ))}
                     </div>
@@ -1671,7 +1688,7 @@ const LasVegasDecisionPanel = ({ state, players, myMemberId, currentRollCountByF
                 <div className="flex min-w-0 items-start gap-3">
                     <GameUxGlyph type="decision" className="mt-0.5 h-10 w-10 shrink-0 text-amber-500" />
                     <div className="min-w-0">
-                        <div className="text-sm font-black text-slate-900">판단 보조</div>
+                        <div className="text-sm font-black text-slate-900">현재 라운드 요약</div>
                         <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">{statusText}</div>
                     </div>
                 </div>
@@ -1992,7 +2009,7 @@ const LasVegasSessionActionPanel = ({ selectedRoom, state, players, isHost, isFi
                     </div>
                     <h2 className="mt-2 text-lg font-black text-slate-950">라스베가스 종료 세션 플랜</h2>
                     <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">
-                        정산 렌즈에서 누가 왜 이겼는지 확인한 뒤, 같은 방 재대결이나 게임 목록 이동까지 한 번에 결정합니다.
+                        정산 요약에서 누가 왜 이겼는지 확인한 뒤, 같은 방 재대결이나 게임 목록 이동까지 한 번에 결정합니다.
                     </p>
                     <div className="mt-4 grid gap-2 sm:grid-cols-2">
                         {actionItems.map((item) => (
@@ -2958,6 +2975,7 @@ export const LasVegasGame = () => {
         turnTimeSeconds: "50",
     });
     const [hotCasinoNo, setHotCasinoNo] = useState(null);
+    const [actionFeedback, setActionFeedback] = useState(initialLasVegasActionFeedback);
 
     const stompRef = useRef(null);
     const stompInitRef = useRef(null);
@@ -2978,6 +2996,14 @@ export const LasVegasGame = () => {
     const isWaiting = normalizedRoomStatus === "WAITING";
     const isPlaying = normalizedRoomStatus === "PLAYING";
     const isFinished = normalizedRoomStatus === "FINISHED";
+
+    useEffect(() => {
+        setPageGuideContext({
+            game: "las-vegas",
+            context: selectedRoom ? (state || isPlaying || isFinished ? "play" : "waiting-room") : "lobby",
+        });
+        return clearPageGuideContext;
+    }, [isFinished, isPlaying, selectedRoom, state]);
 
     const isHost = selectedRoom && myMemberId &&
         Number(selectedRoom.hostMemberId) === Number(myMemberId);
@@ -3018,6 +3044,74 @@ export const LasVegasGame = () => {
     const lastPlacedText = lastPlacedCasinoNo
         ? `${lastPlacedPlayer?.nickname || `플레이어 ${lastPlacedMemberId}`}님이 ${casinoName[lastPlacedCasinoNo] || `${lastPlacedCasinoNo}번`}에 주사위 ${lastPlacedDiceCount}개를 배팅했습니다.`
         : "";
+    const actionFeedbackTone = actionFeedback.status === "error"
+        ? "error"
+        : actionFeedback.status === "pending"
+            ? "pending"
+            : actionFeedback.status === "done"
+                ? "done"
+                : "idle";
+    const actionFeedbackItems = useMemo(() => {
+        const turnText = isFinished
+            ? "게임 종료"
+            : myTurn
+                ? "내 차례"
+                : currentTurnMemberId
+                    ? `${currentRollPlayerName} 차례`
+                    : "차례 대기";
+        const roundText = `${state?.roundNo || 0}/${state?.roundCount || selectedRoom?.roundCount || 0}`;
+        const rollText = currentRoll.length ? `공개 주사위 ${currentRoll.length}개` : "굴림 대기";
+        return [
+            {
+                key: "send",
+                label: "전송 상태",
+                value: lasVegasFeedbackStatusLabel(actionFeedback.status),
+                detail: actionFeedback.label,
+                icon: actionFeedback.status === "error" ? "recent" : "signal",
+                tone: actionFeedbackTone,
+            },
+            {
+                key: "recent",
+                label: "최근 행동",
+                value: actionFeedback.message,
+                detail: actionFeedback.detail,
+                icon: "decision",
+                tone: actionFeedback.status === "error" ? "error" : actionFeedback.status === "done" ? "done" : "neutral",
+            },
+            {
+                key: "turn",
+                label: "차례",
+                value: turnText,
+                detail: lasVegasRoomStatusLabel(roomStatus),
+                icon: "turn",
+                tone: myTurn ? "pending" : isFinished ? "done" : "neutral",
+            },
+            {
+                key: "round",
+                label: "라운드",
+                value: roundText,
+                detail: lastPlacedText || rollText,
+                icon: "stage",
+                tone: isFinished ? "done" : currentRoll.length ? "pending" : "neutral",
+            },
+        ];
+    }, [
+        actionFeedback.detail,
+        actionFeedback.label,
+        actionFeedback.message,
+        actionFeedback.status,
+        actionFeedbackTone,
+        currentRoll.length,
+        currentRollPlayerName,
+        currentTurnMemberId,
+        isFinished,
+        lastPlacedText,
+        myTurn,
+        roomStatus,
+        selectedRoom?.roundCount,
+        state?.roundCount,
+        state?.roundNo,
+    ]);
 
     const ensureSocket = async () => {
         if (stompRef.current) return stompRef.current;
@@ -3446,9 +3540,22 @@ export const LasVegasGame = () => {
         if (!selectedRoom || !myMemberId) return;
         const roomId = normalizeRoomId(selectedRoom);
         if (!roomId) return;
+        const actionLabel = lasVegasActionLabel(actionType, casinoNo);
+        setActionFeedback({
+            status: "pending",
+            label: actionLabel,
+            message: `${actionLabel} 전송 중`,
+            detail: "실시간 연결을 확인하고 게임 서버로 선택을 보내는 중입니다.",
+        });
         const client = await ensureSocket();
         if (!client?.connected) {
             notifyError("실시간 연결이 아직 준비되지 않았습니다.");
+            setActionFeedback({
+                status: "error",
+                label: actionLabel,
+                message: `${actionLabel} 실패`,
+                detail: "실시간 연결이 준비되지 않았습니다. 잠시 뒤 다시 시도하세요.",
+            });
             return;
         }
         playActionSound(actionType);
@@ -3458,8 +3565,20 @@ export const LasVegasGame = () => {
                 body: JSON.stringify(buildLasVegasActionPayload({ actionType, casinoNo })),
                 headers: { "content-type": "application/json" },
             });
+            setActionFeedback({
+                status: "done",
+                label: actionLabel,
+                message: `${actionLabel} 전송 완료`,
+                detail: "서버가 실시간 상태를 다시 보내면 주사위와 카지노 보드에 반영됩니다.",
+            });
         } catch {
             notifyError("행동 전송에 실패했습니다.");
+            setActionFeedback({
+                status: "error",
+                label: actionLabel,
+                message: `${actionLabel} 실패`,
+                detail: "전송 중 오류가 발생했습니다. 연결 상태를 확인하고 다시 시도하세요.",
+            });
         }
     };
 
@@ -3802,6 +3921,14 @@ export const LasVegasGame = () => {
                         onRefresh={refreshSelectedSession}
                         onRematch={rematchGame}
                         onLeave={leaveRoom}
+                    />
+
+                    <GameFeedbackTicker
+                        title="행동 피드백"
+                        detail={actionFeedback.detail}
+                        items={actionFeedbackItems}
+                        tone={actionFeedbackTone}
+                        smoke="las-vegas-action-feedback"
                     />
 
                     <div className={`grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] ${myTurn ? "rounded-[1.8rem] bg-sky-100/70 p-3 ring-2 ring-sky-300/70" : ""}`}>

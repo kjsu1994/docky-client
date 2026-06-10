@@ -39,6 +39,7 @@ import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
+import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameUxGlyph, PlayingCardArt, playingCardSuitLabel } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 
@@ -214,8 +215,8 @@ const gameConfigs = {
         items: ["방 규칙에서 시작 칩과 블라인드가 다른 빠른판, 표준, 딥스택을 고릅니다.", "정해진 핸드 수가 끝나거나 한 명만 칩이 남으면 가장 많은 칩을 가진 사람이 승리합니다."],
       },
       {
-        title: "초보자 보조",
-        items: ["내 차례에는 현재 족보, 기준 카드, 콜 금액, 팟 오즈, 추천 판단을 같이 표시합니다.", "5장 드로우에서는 유지할 카드와 교체 후보를 표시해 족보를 몰라도 선택할 수 있게 돕습니다."],
+        title: "화면에서 볼 것",
+        items: ["내 차례에는 현재 족보, 콜 금액, 팟 오즈, 활성화된 액션 버튼을 먼저 확인합니다.", "5장 드로우에서는 교체할 카드를 직접 고르고, 선택 수와 제출 버튼 상태만 보면 됩니다."],
       },
     ],
   },
@@ -5030,7 +5031,7 @@ const buildTabletopLobbyDirectorPlan = ({ rooms = [], variants = [], game, myMem
     {
       key: "choice",
       icon: "decision",
-      label: "추천 판단",
+      label: "선택 기준",
       value: recommended ? recommended.title : "방 만들기",
       detail: recommended ? `${recommended.variantName} 기준으로 가장 빠른 진입 후보입니다.` : `${game ? "현재 게임" : "보드게임"}은 직접 방을 열면 첫 선택이 분명합니다.`,
       progress: recommended ? recommended.score : 25,
@@ -7250,7 +7251,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
         <section className="scroll-mt-24 space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-sm font-black text-slate-900">하단 분석</div>
+              <div className="text-sm font-black text-slate-900">핵심 요약</div>
               <div className="mt-0.5 text-xs font-bold text-slate-500">보드와 조각을 본 뒤 필요한 판단만 압축해서 확인합니다.</div>
             </div>
             <div className={`rounded-full px-3 py-1 text-[11px] font-black ${colorBgSoft[currentColor] || "bg-slate-50"} ${colorText[currentColor] || "text-slate-600"}`}>
@@ -12767,7 +12768,7 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
         <section className="scroll-mt-24 space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-sm font-black text-slate-900">하단 분석</div>
+              <div className="text-sm font-black text-slate-900">핵심 요약</div>
               <div className="mt-0.5 text-xs font-bold text-slate-500">보드와 액션을 본 뒤 승점, 차례, 선택 대상만 압축해서 확인합니다.</div>
             </div>
             <div className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">
@@ -15266,7 +15267,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
         <section className="scroll-mt-24 space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:rounded-[1.5rem] sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-sm font-black text-slate-900">하단 분석</div>
+              <div className="text-sm font-black text-slate-900">핵심 요약</div>
               <div className="mt-0.5 text-xs font-bold text-slate-500">보드와 손패를 본 뒤 필요한 판단만 압축해서 확인합니다.</div>
             </div>
             <div className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">
@@ -18131,7 +18132,7 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
               <div className="h-full rounded-full bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-300 transition-all" style={{ width: `${progressPercent}%` }} />
             </div>
             <GameFlowMeter
-              title="마피아 진행 판독"
+              title="마피아 진행 요약"
               detail="단계, 남은 시간, 내 역할 행동, 생존 균형을 한 번에 확인합니다."
               items={mafiaFlowItems}
               tone="dark"
@@ -19003,189 +19004,6 @@ const PokerCommunityStandbyPanel = ({ isFiveCardDraw = false, maxDrawCards = 3, 
   );
 };
 
-const PokerDecisionLensArt = ({
-  handInfo,
-  myCards = [],
-  communityCards = [],
-  pot = 0,
-  callAmount = 0,
-  myTurn = false,
-  phaseLabel = "",
-  isFinished = false,
-}) => {
-  const strength = Math.max(0, Math.min(8, Number(handInfo?.category || 0)));
-  const strengthWidth = 34 + strength * 15;
-  const potPressure = callAmount > 0 ? Math.min(1, callAmount / Math.max(1, pot + callAmount)) : 0;
-  const pressureWidth = Math.round(124 * potPressure);
-  const visibleCards = [...myCards, ...communityCards].filter((card) => pokerCardValue(card)).slice(0, 7);
-  const cardSlots = Array.from({ length: 7 }, (_, index) => visibleCards[index]);
-
-  return (
-    <svg
-      viewBox="0 0 360 190"
-      role="img"
-      aria-label="포커 핸드 강도, 팟 압력, 액션 상태를 요약한 판단 렌즈"
-      className="h-full min-h-[190px] w-full"
-      data-smoke="poker-decision-lens-art"
-    >
-      <rect x="10" y="10" width="340" height="170" rx="22" fill="#082f2a" />
-      <rect x="26" y="28" width="308" height="118" rx="22" fill="#064e3b" stroke="#34d399" strokeWidth="4" />
-      <path d="M52 108c34 28 126 34 196 6 36-14 58-11 78 0" fill="none" stroke="#10b981" strokeWidth="4" opacity=".55" />
-      <circle cx="286" cy="72" r="26" fill="#fbbf24" stroke="#92400e" strokeWidth="5" />
-      <circle cx="304" cy="88" r="24" fill="#fde68a" stroke="#92400e" strokeWidth="5" />
-      <text x="295" y="82" textAnchor="middle" fontSize="11" fontWeight="900" fill="#78350f">POT</text>
-      <text x="295" y="105" textAnchor="middle" fontSize="17" fontWeight="900" fill="#78350f">{pot}</text>
-
-      {cardSlots.map((card, index) => {
-        const x = 42 + index * 31;
-        const rank = card ? pokerCardRank(card) : "";
-        const suit = card ? pokerCardSuit(card) : "";
-        const red = ["HEARTS", "DIAMONDS"].includes(suit);
-        return (
-          <g key={`${rank}-${suit}-${index}`} transform={`translate(${x} ${index % 2 ? 61 : 55}) rotate(${index - 3})`}>
-            <rect width="28" height="42" rx="6" fill={card ? "#f8fafc" : "#134e4a"} stroke={card ? "#e2e8f0" : "#2dd4bf"} strokeWidth="2" />
-            {card ? (
-              <>
-                <text x="14" y="18" textAnchor="middle" fontSize="11" fontWeight="900" fill={red ? "#be123c" : "#0f172a"}>{rank}</text>
-                <circle cx="14" cy="28" r="4" fill={red ? "#be123c" : "#0f172a"} />
-              </>
-            ) : (
-              <path d="M8 14h12M8 22h12M8 30h12" stroke="#5eead4" strokeWidth="2" strokeLinecap="round" />
-            )}
-          </g>
-        );
-      })}
-
-      <rect x="36" y="155" width="156" height="10" rx="5" fill="#134e4a" />
-      <rect x="36" y="155" width={strengthWidth} height="10" rx="5" fill={strength >= 4 ? "#fbbf24" : strength >= 1 ? "#38bdf8" : "#94a3b8"} />
-      <text x="36" y="151" fontSize="10" fontWeight="900" fill="#d1fae5">핸드 강도 {handInfo?.label || "대기"}</text>
-
-      <rect x="210" y="155" width="124" height="10" rx="5" fill="#134e4a" />
-      <rect x="210" y="155" width={pressureWidth} height="10" rx="5" fill={callAmount > 0 ? "#fb7185" : "#34d399"} />
-      <text x="210" y="151" fontSize="10" fontWeight="900" fill="#d1fae5">콜 압력 {callAmount}칩</text>
-
-      <text x="28" y="25" fontSize="10" fontWeight="900" fill="#a7f3d0">포커 판단 렌즈</text>
-      <text x="184" y="25" textAnchor="middle" fontSize="10" fontWeight="900" fill="#ecfeff">{phaseLabel}</text>
-      <text x="334" y="25" textAnchor="end" fontSize="10" fontWeight="900" fill={isFinished ? "#fde68a" : myTurn ? "#86efac" : "#cbd5e1"}>
-        {isFinished ? "정산" : myTurn ? "내 차례" : "관찰"}
-      </text>
-    </svg>
-  );
-};
-
-const PokerDecisionLensPanel = ({
-  handInfo,
-  myCards,
-  communityCards,
-  phase,
-  phaseLabel,
-  myTurn,
-  isFiveCardDraw,
-  pot,
-  lastPot,
-  callAmount,
-  potOddsText,
-  advice,
-  drawHelp,
-  drawSelection,
-  maxDrawCards,
-  activePlayerName,
-  resultMessage,
-}) => {
-  const isFinished = phase === "HAND_FINISHED" || phase === "FINISHED";
-  const visibleCardCount = myCards.length + communityCards.length;
-  const handValue = handInfo.ready ? `${handInfo.label}${handInfo.summary ? ` · ${handInfo.summary}` : ""}` : handInfo.summary;
-  const drawValue = isFiveCardDraw && phase === "DRAW" ? `${drawSelection.length}/${maxDrawCards}장` : `${visibleCardCount}장 정보`;
-  const actionValue = isFinished ? "정산 확인" : myTurn ? (callAmount > 0 ? `콜 ${callAmount}` : "체크 가능") : `${activePlayerName} 차례`;
-  const potValue = `${pot || lastPot || 0}칩`;
-  const guidance = (() => {
-    if (isFinished) return resultMessage || "핸드가 끝났습니다. 승리 사유와 팟 정산을 확인하세요.";
-    if (isFiveCardDraw && phase === "DRAW") return drawHelp.message || "교체할 카드를 고르고 현재 족보 유지 여부를 비교하세요.";
-    if (myTurn && callAmount > 0) return `콜 비용이 팟 대비 ${potOddsText}입니다. 내 족보 강도와 다음 카드 가능성을 같이 보세요.`;
-    if (myTurn) return "무료 체크 또는 공격적인 베팅 중 현재 족보와 팟 크기를 기준으로 고르세요.";
-    return "상대 행동을 기다리며 팟 압력과 내 족보 변화를 관찰하세요.";
-  })();
-  const tiles = [
-    {
-      key: "hand",
-      icon: "decision",
-      label: "내 족보",
-      value: handValue,
-      detail: handInfo.ready ? `강도 ${handInfo.category}/8 · 공개 정보 ${visibleCardCount}장` : "공용 카드가 더 열리면 족보 강도가 확정됩니다.",
-      tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    },
-    {
-      key: "pot",
-      icon: "score",
-      label: "팟 압력",
-      value: potValue,
-      detail: callAmount > 0 ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : "콜 비용이 없으면 다음 카드를 무료로 볼 수 있는지 확인합니다.",
-      tone: "border-amber-200 bg-amber-50 text-amber-900",
-    },
-    {
-      key: "action",
-      icon: "turn",
-      label: "다음 액션",
-      value: actionValue,
-      detail: myTurn ? advice : `${activePlayerName}의 베팅 크기와 폴드 여부를 기다립니다.`,
-      tone: "border-sky-200 bg-sky-50 text-sky-900",
-    },
-    {
-      key: "draw",
-      icon: isFinished ? "win" : "stage",
-      label: isFinished ? "승리 사유" : isFiveCardDraw ? "교체 판단" : "공개 카드",
-      value: isFinished ? "결과 읽기" : drawValue,
-      detail: isFinished ? (resultMessage || "서버 결과 또는 로컬 비교 설명을 표시합니다.") : isFiveCardDraw ? drawHelp.message : `${communityCards.length}/5장 공개 · ${phaseLabel}`,
-      tone: "border-rose-200 bg-rose-50 text-rose-900",
-    },
-  ];
-
-  return (
-    <section className="mt-4 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-lg" data-smoke="poker-decision-lens-panel">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_1fr]">
-        <div className="bg-emerald-950">
-          <PokerDecisionLensArt
-            handInfo={handInfo}
-            myCards={myCards}
-            communityCards={communityCards}
-            pot={pot || lastPot || 0}
-            callAmount={callAmount}
-            myTurn={myTurn}
-            phaseLabel={phaseLabel}
-            isFinished={isFinished}
-          />
-        </div>
-        <div className="min-w-0 p-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 text-sm font-black text-slate-950">
-                <GameUxGlyph type="decision" className="h-4 w-4 text-emerald-600" />
-                포커 판단 렌즈
-              </div>
-              <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">{guidance}</p>
-            </div>
-            <span className={`inline-flex shrink-0 rounded-full px-3 py-1 text-[11px] font-black ${myTurn ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
-              {isFinished ? "정산" : myTurn ? "내 판단" : "상대 차례"}
-            </span>
-          </div>
-          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {tiles.map((tile) => (
-              <div key={tile.key} className={`min-h-[112px] rounded-xl border px-3 py-2 ${tile.tone}`} data-smoke="poker-decision-lens-item">
-                <div className="flex items-center gap-2 text-[11px] font-black">
-                  <GameUxGlyph type={tile.icon} className="h-3.5 w-3.5" />
-                  {tile.label}
-                </div>
-                <div className="mt-2 truncate text-sm font-black">{tile.value}</div>
-                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{tile.detail}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
 const pokerActionRouteTone = {
   fold: { fill: "#fff1f2", stroke: "#e11d48", text: "#be123c", soft: "#fecdd3" },
   call: { fill: "#ecfdf5", stroke: "#059669", text: "#047857", soft: "#bbf7d0" },
@@ -19460,7 +19278,6 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
   const handInfo = evaluatePokerHand(isFiveCardDraw ? myCards : [...myCards, ...communityCards]);
   const drawHelp = isFiveCardDraw ? drawPokerAdvice(myCards) : { message: "", suggestedIds: [] };
   const myCardKey = myCards.map(pokerCardId).join("|");
-  const advice = roughPokerAdvice(myCards, communityCards, callAmount, pot, { isFiveCardDraw });
   const winnerName = winnerSeatNo ? pokerPlayerName(roomPlayers, pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === winnerSeatNo) || {}) : "";
   const resultTitle = get(gameState, "result_title", "resultTitle", "");
   const resultDetail = get(gameState, "result_detail", "resultDetail", "");
@@ -19476,42 +19293,8 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
   const resultHeading = resultTitle || (phase === "FINISHED" ? (winnerName ? `${winnerName} 최종 승리` : "최종 결과") : phase === "HAND_FINISHED" ? "핸드 결과" : "");
   const canUse = (action) => myTurn && (!availableActions.length || availableActions.includes(action));
   const send = (actionType, extra = {}) => onAction({ actionType, ...extra });
-  const tableLabel = isFiveCardDraw ? "Five-card Draw" : "Limit Texas Hold'em";
   const holeCardSlots = isFiveCardDraw ? 5 : 2;
   const canSubmitDraw = myTurn && phase === "DRAW" && drawSelection.length <= maxDrawCards;
-  const activePlayerName = activeSeatNo
-    ? pokerPlayerName(roomPlayers, pokerPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === activeSeatNo) || { seatNo: activeSeatNo })
-    : "-";
-  const pokerFlowItems = [
-    {
-      label: "핸드",
-      value: `${handNo || "-"} / ${maxHands || "-"}`,
-      detail: phaseLabel,
-      icon: "stage",
-      tone: phase === "FINISHED" ? "done" : "neutral",
-    },
-    {
-      label: "팟",
-      value: `${pot || lastPot || 0}칩`,
-      detail: callAmount > 0 ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : "체크 가능 여부 확인",
-      icon: "score",
-      tone: callAmount > 0 ? "waiting" : "neutral",
-    },
-    {
-      label: "순번",
-      value: myTurn ? "내 차례" : activePlayerName,
-      detail: myTurn ? "아래 액션 선택 가능" : "상대 행동 대기",
-      icon: "turn",
-      tone: myTurn ? "active" : "neutral",
-    },
-    {
-      label: phase === "DRAW" ? "교체 판단" : "족보 판단",
-      value: phase === "DRAW" ? `${drawSelection.length}/${maxDrawCards}장 선택` : handInfo.ready ? handInfo.label : phaseLabel,
-      detail: phase === "DRAW" ? drawHelp.message : (phase === "HAND_FINISHED" || phase === "FINISHED") ? resultMessage || "정산 결과 확인" : advice,
-      icon: (phase === "HAND_FINISHED" || phase === "FINISHED") ? "win" : "decision",
-      tone: phase === "HAND_FINISHED" || phase === "FINISHED" ? "done" : myTurn ? "active" : "neutral",
-    },
-  ];
 
   useEffect(() => {
     setDrawSelection([]);
@@ -19533,8 +19316,8 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
         <section id="poker-table-panel" className="scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-emerald-900 bg-zinc-950 p-3 text-white shadow-2xl sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-300">{tableLabel}</div>
-              <h2 className="mt-1 text-xl font-black">핸드 {handNo}/{maxHands || "-"}</h2>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-300">{isFiveCardDraw ? "Five-card Draw" : "Texas Hold'em"}</div>
+              <h2 className="mt-1 text-xl font-black">포커 테이블</h2>
               <div className="mt-1 text-xs font-bold text-emerald-100/80">
                 {phaseLabel} · {isFiveCardDraw ? `앤티 ${ante} · 베팅 단위 ${bigBlind}` : `블라인드 ${smallBlind}/${bigBlind}`}
               </div>
@@ -19551,36 +19334,7 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
             </div>
           </div>
 
-          <GameFlowMeter
-            title="포커 핸드 판독"
-            detail="핸드 진행, 팟 압박, 현재 순번, 족보 판단을 한 번에 확인합니다."
-            items={pokerFlowItems}
-            tone="dark"
-            smoke="poker-flow-meter"
-            className="mt-4"
-          />
-
-          <PokerDecisionLensPanel
-            handInfo={handInfo}
-            myCards={myCards}
-            communityCards={communityCards}
-            phase={phase}
-            phaseLabel={phaseLabel}
-            myTurn={myTurn}
-            isFiveCardDraw={isFiveCardDraw}
-            pot={pot}
-            lastPot={lastPot}
-            callAmount={callAmount}
-            potOddsText={potOddsText}
-            advice={advice}
-            drawHelp={drawHelp}
-            drawSelection={drawSelection}
-            maxDrawCards={maxDrawCards}
-            activePlayerName={activePlayerName}
-            resultMessage={resultMessage}
-          />
-
-          <div className="relative mt-5 rounded-[2rem] border border-amber-200/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-emerald-950 p-4 shadow-inner">
+          <div className="relative mt-4 rounded-[2rem] border border-amber-200/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-emerald-950 p-4 shadow-inner">
             <div className="flex min-h-28 flex-wrap items-center justify-center gap-2">
               {isFiveCardDraw ? (
                 <PokerCommunityStandbyPanel
@@ -19670,9 +19424,9 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
                 <div className="text-[10px] opacity-70">내 족보</div>
                 <div>{handInfo.ready ? `${handInfo.label}${handInfo.summary ? ` · ${handInfo.summary}` : ""}` : handInfo.summary}</div>
               </div>
-              <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black leading-relaxed text-emerald-700">
-                <div className="text-[10px] opacity-70">추천 판단</div>
-                <div>{advice}</div>
+              <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-black leading-relaxed text-slate-700">
+                <div className="text-[10px] opacity-70">현재 비용</div>
+                <div>{phase === "DRAW" ? `교체 ${drawSelection.length}/${maxDrawCards}장 선택` : callAmount > 0 ? `콜 ${callAmount}칩 · 팟오즈 ${potOddsText}` : `팟 ${pot || lastPot || 0}칩`}</div>
               </div>
             </div>
           </div>
@@ -19752,9 +19506,14 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
 
       <aside id="poker-players-panel" className="scroll-mt-24 space-y-4">
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
-          <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
-            <CircleDollarSign className="h-4 w-4 text-emerald-600" />
-            칩 현황
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+              <CircleDollarSign className="h-4 w-4 text-emerald-600" />
+              칩 현황
+            </div>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600">
+              핸드 {handNo || "-"} / {maxHands || "-"}
+            </span>
           </div>
           <div className="space-y-2">
             {pokerPlayers.map((player) => {
@@ -19953,6 +19712,19 @@ export const TabletopGame = ({ game }) => {
   const selectedVariant = useMemo(() => variants.find((variant) => variant.code === createForm.variantCode) || variants[0], [variants, createForm.variantCode]);
   const selectedSettingsVariant = useMemo(() => variants.find((variant) => variant.code === settingsForm.variantCode), [variants, settingsForm.variantCode]);
   const selectedRoomVariant = useMemo(() => variantForRoom(selectedRoom, variants), [selectedRoom, variants]);
+  useEffect(() => {
+    const stateVariantCode = get(gameState, "variant_code", "variantCode", "");
+    const stateMode = get(gameState, "mode", "mode", "");
+    const roomVariantCode = selectedRoom ? variantCodeOf(selectedRoom) : "";
+    setPageGuideContext({
+      game,
+      variantCode: stateVariantCode || stateMode || roomVariantCode || createForm.variantCode || selectedVariant?.code || "BASE",
+      mode: stateMode,
+      variant: selectedRoom ? selectedRoomVariant : selectedVariant,
+      context: selectedRoom ? (gameState || status === "PLAYING" ? "play" : "waiting-room") : "lobby",
+    });
+    return clearPageGuideContext;
+  }, [createForm.variantCode, game, gameState, selectedRoom, selectedRoomVariant, selectedVariant, status]);
   useGameSound({
     myTurn: Boolean(status === "PLAYING" && mySeatNo && soundTurnSeatNo === mySeatNo),
     actionSignal: soundActionSignal,

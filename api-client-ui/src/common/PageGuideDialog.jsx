@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { BookOpen, X } from "lucide-react";
 import { trapFocus } from "../utils/focusTrap.js";
+import { getPageGuideContext } from "./pageGuideContext.js";
 
 export const PageGuideDialog = ({ dialogId, pathname, onClose, triggerRef }) => {
     const [guide, setGuide] = useState(null);
@@ -17,7 +18,7 @@ export const PageGuideDialog = ({ dialogId, pathname, onClose, triggerRef }) => 
         setGuideError("");
         try {
             const module = await import("./pageGuides.js");
-            setGuide(module.getPageGuide(pathname));
+            setGuide(module.getPageGuide(pathname, getPageGuideContext()));
         } catch {
             setGuideError("페이지 설명을 불러오지 못했습니다.");
         } finally {

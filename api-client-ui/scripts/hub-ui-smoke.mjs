@@ -422,13 +422,8 @@ function assertStaticVideoGameRoomDesign() {
         "GameHubAdvisorCompassArt",
         "buildGameCardBriefItems",
         "GameCardBriefPanel",
-        "GameManualExperiencePanel",
-        "buildGameManualReadinessItems",
-        "GameManualReadinessPanel",
-        "GameManualReadinessArt",
-        "buildGameManualActionPrimerItems",
-        "GameManualActionPrimerPanel",
-        "GameManualActionPrimerArt",
+        "getBoardGameRuleGuide",
+        "boardGameManual",
         "추천 선택",
         "첫 판단 포인트",
         "결과 이해",
@@ -1039,8 +1034,8 @@ async function inspectGamesHub(ws, viewport) {
     if (await clickByAriaLabel(ws, "카탄 설명서 열기") !== "clicked") {
         throw new Error(`games-hub ${viewport.name}: catan manual button missing`);
     }
-    await waitForText(ws, "처음 시작 순서");
-    await waitForText(ws, "초보 팁");
+    await waitForText(ws, "공식 룰 핵심");
+    await waitForText(ws, "자원");
     await waitForText(ws, "설명서는 입문 안내입니다.");
     if (await clickByAriaLabel(ws, "설명서 닫기") !== "clicked") {
         throw new Error(`games-hub ${viewport.name}: manual close button missing`);

@@ -1,408 +1,28 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, BookOpen, CircleHelp, Dices, Sparkles, X } from "lucide-react";
 import { GameUxGlyph, PlayingCardArt } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork, tabletopGameArtProfiles } from "./TabletopGameArtwork.jsx";
 import { VideoGameArtwork, videoGameArtProfiles } from "./VideoGameArtwork.jsx";
-
-const sharedRoomStartSteps = [
-  "카드의 입장하기를 누른 뒤 방 만들기 또는 방 코드 입장을 선택합니다.",
-  "방장은 방 제목과 규칙을 고르고, 참가자는 입장 후 준비하기를 누릅니다.",
-  "인원 조건과 준비 상태가 맞으면 방장이 게임 시작을 눌러 본게임으로 들어갑니다.",
-  "게임 화면에 들어간 뒤에도 방 코드, 참가자, 준비 상태, 다시 하기 흐름은 같은 방식으로 유지됩니다.",
-];
-
-const gameManuals = {
-  poker: {
-    subtitle: "텍사스 홀덤과 5장 드로우 포커를 고를 수 있는 칩 세션입니다. 혼자 시작하면 AI 봇이 자동으로 참여합니다.",
-    tags: ["1~8인", "5장 드로우", "족보 보조"],
-    sections: [
-      {
-        title: "처음 시작 순서",
-        items: [
-          "방을 만들 때 텍사스 홀덤 칩 프리셋 또는 5장 드로우 포커를 고릅니다.",
-          "혼자 시작하면 AI 봇 3명이 자동으로 채워지고, 2명 이상이면 참가자끼리 바로 시작합니다.",
-          "내 차례에는 폴드, 체크/콜, 레이즈, 올인을 선택합니다.",
-        ],
-      },
-      {
-        title: "목표",
-        items: [
-          "홀덤은 홀카드 2장과 커뮤니티 카드 5장 중 가장 강한 5장 족보로 팟을 가져갑니다.",
-          "5장 드로우는 손패 5장을 받은 뒤 한 번 최대 3장까지 교체하고 족보를 비교합니다.",
-          "정해진 핸드 수가 끝나거나 한 명만 칩이 남으면 가장 많은 칩을 가진 플레이어가 승리합니다.",
-        ],
-      },
-      {
-        title: "초보 팁",
-        items: [
-          "액션 패널의 현재 족보, 콜 금액, 팟오즈를 먼저 보고, 비용이 큰 약한 패는 폴드해도 됩니다.",
-          "5장 드로우에서는 추천 교체 카드가 표시됩니다. 페어 이상은 유지하고 낮은 카드를 바꾸는 식으로 판단하세요.",
-        ],
-      },
-    ],
-  },
-  lasVegas: {
-    subtitle: "주사위를 카지노에 배팅해 머니 카드를 가져오는 실시간 보드게임입니다. 동점이 가장 큰 변수입니다.",
-    tags: ["2~6인", "주사위 배팅", "동점 탈락"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "여러 라운드 동안 카지노에서 머니 카드를 모아 최종 보유금이 가장 많은 플레이어가 승리합니다.",
-          "각 카지노에는 라운드마다 머니 카드가 깔리며, 높은 금액 카드일수록 경쟁이 치열합니다.",
-        ],
-      },
-      {
-        title: "차례 진행",
-        items: [
-          "내 차례에는 남은 주사위를 모두 굴립니다. 나온 눈 중 하나를 고르면 그 눈의 주사위를 전부 같은 번호 카지노에 배치합니다.",
-          "한 번 카지노에 놓은 주사위는 그 라운드에 다시 굴릴 수 없습니다.",
-          "현재 굴림과 직전 배팅 위치는 모든 참가자가 함께 볼 수 있어 상대의 선택을 보고 다음 배팅을 판단할 수 있습니다.",
-        ],
-      },
-      {
-        title: "정산과 승리",
-        items: [
-          "라운드가 끝나면 카지노별로 주사위 개수를 비교합니다.",
-          "같은 카지노에서 같은 개수로 동점인 플레이어들은 해당 카지노 보상 경쟁에서 모두 빠집니다.",
-          "남은 플레이어가 많은 주사위 순서대로 큰 금액 카드부터 가져가며, 한 명만 배팅한 카지노는 그 플레이어가 해당 카지노의 머니 카드를 모두 가져갑니다.",
-        ],
-      },
-      {
-        title: "초보 팁",
-        items: [
-          "큰돈 카지노에 주사위를 많이 놓는 것보다, 상대와 동점이 되지 않는 안전한 배팅이 더 좋을 때가 많습니다.",
-          "상대가 이미 같은 개수로 놓은 카지노는 내가 들어가면 둘 다 탈락할 수 있으니 직전 배팅 표시와 카지노별 주사위 수를 먼저 확인하세요.",
-        ],
-      },
-    ],
-  },
-  noThanks: {
-    subtitle: "카드를 피할지, 칩을 받고 가져갈지 결정하는 낮은 점수 경쟁 카드게임입니다.",
-    tags: ["3~6인", "카드 선택", "낮은 점수"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "게임 종료 시 카드 점수에서 남은 칩을 뺀 최종 점수가 가장 낮은 플레이어가 승리합니다.",
-          "높은 숫자 카드는 부담이지만, 칩이 많이 쌓였거나 내 연속 카드에 붙는 숫자라면 가져갈 가치가 있습니다.",
-        ],
-      },
-      {
-        title: "차례 진행",
-        items: [
-          "3부터 35까지의 카드 중 일부를 제거한 뒤 남은 카드가 한 장씩 공개됩니다.",
-          "내 차례에는 칩 1개를 내고 카드를 넘기거나, 공개 카드와 그 위에 쌓인 칩을 모두 가져갑니다.",
-          "칩이 없으면 더 이상 넘길 수 없으므로 공개 카드를 가져가야 합니다.",
-        ],
-      },
-      {
-        title: "점수 계산",
-        items: [
-          "가져간 카드 숫자는 기본적으로 점수가 됩니다.",
-          "연속된 숫자 카드 묶음은 가장 작은 숫자 하나만 점수로 계산합니다. 예를 들어 8, 9, 10을 모두 가지고 있으면 8점만 더합니다.",
-          "남은 칩은 최종 점수에서 1개당 1점씩 빼므로, 칩을 모아 두면 높은 카드를 상쇄할 수 있습니다.",
-        ],
-      },
-      {
-        title: "초보 팁",
-        items: [
-          "내가 이미 가진 숫자와 이어지는 카드는 생각보다 싸게 처리할 수 있습니다.",
-          "초반부터 칩을 모두 쓰면 강제로 카드를 가져가게 되므로, 적어도 몇 개는 방어용으로 남겨두는 편이 안전합니다.",
-        ],
-      },
-    ],
-  },
-  sixNimmt: {
-    subtitle: "1~104 카드 중 한 장을 동시에 고르고, 네 행에 붙이거나 행을 가져가며 벌점을 피하는 카드게임입니다.",
-    tags: ["2~10인", "동시 선택", "벌점 예측"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "카드에 표시된 벌점을 최대한 적게 가져가는 것이 목표입니다.",
-          "누군가 총 66벌점 이상이 되면 게임이 끝나고, 총 벌점이 가장 낮은 플레이어가 승리합니다.",
-        ],
-      },
-      {
-        title: "카드 배치",
-        items: [
-          "모든 플레이어가 손패에서 카드 1장을 고르면 낮은 숫자부터 차례대로 처리됩니다.",
-          "카드는 자기보다 작은 끝 카드 중 가장 숫자가 큰 행에 붙습니다.",
-          "붙일 행이 없으면 직접 한 행을 가져가고, 내 카드가 새 행의 시작 카드가 됩니다.",
-        ],
-      },
-      {
-        title: "벌점",
-        items: [
-          "카드를 붙이면 여섯 번째 카드가 되는 행은 기존 5장을 가져가 벌점이 됩니다.",
-          "화면에서 선택한 카드의 예상 행과 예상 벌점을 먼저 보여주므로, 벌점을 비교하고 제출하면 됩니다.",
-        ],
-      },
-    ],
-  },
-  telestrations: {
-    subtitle: "문장과 그림을 번갈아 넘기고 마지막에 전체 변화를 순서대로 공개하는 파티 게임입니다.",
-    tags: ["3~8인", "그림 릴레이", "리플레이"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "정답을 맞히는 게임이 아니라, 문장과 그림이 어떻게 바뀌는지 함께 보는 파티 게임입니다.",
-          "마지막 공개에서 각 책자의 시작 문장, 그림, 추측 문장을 순서대로 넘겨 보며 흐름을 확인합니다.",
-        ],
-      },
-      {
-        title: "진행",
-        items: [
-          "처음에는 각자 비밀 시작 문장을 적습니다.",
-          "다음 단계부터는 이전 사람의 문장을 보고 그림을 그리거나, 이전 사람의 그림을 보고 문장을 추측합니다.",
-          "모두 제출해야 다음 단계로 넘어가므로, 화면의 제출 완료 상태를 확인하면 됩니다.",
-        ],
-      },
-      {
-        title: "데이터",
-        items: [
-          "공개 리플레이 중에는 문장과 그림을 볼 수 있습니다.",
-          "호스트가 종료하면 게임 데이터가 삭제되고 같은 방은 다시 준비 상태로 쓸 수 있습니다.",
-        ],
-      },
-    ],
-  },
-  mafia: {
-    subtitle: "사회자 TTS가 밤과 낮을 진행하고, 마피아·경찰·의사 조합을 고를 수 있는 파티 추리 게임입니다.",
-    tags: ["5~12인", "사회자 TTS", "역할 조합"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "역할 조합",
-        items: [
-          "방 설정에서 경찰+의사, 경찰만, 의사만, 특수직 없음 중 하나를 고릅니다.",
-          "마피아 수는 5~6명 1명, 7~9명 2명, 10~12명 3명으로 자동 배정됩니다.",
-          "나머지는 선택한 특수직과 시민으로 채워집니다.",
-        ],
-      },
-      {
-        title: "진행",
-        items: [
-          "역할 확인 후 밤에는 마피아, 경찰, 의사가 순서대로 행동합니다.",
-          "아침에는 밤 결과를 확인하고, 낮 토론 뒤 투표로 한 명을 처형할 수 있습니다.",
-          "마피아가 모두 제거되면 시민팀 승리, 마피아 수가 시민팀과 같거나 많아지면 마피아 승리입니다.",
-        ],
-      },
-      {
-        title: "초보 보조",
-        items: [
-          "현재 단계, 남은 시간, 내 역할의 할 일만 크게 표시됩니다.",
-          "사회자 음성은 브라우저 정책상 게임 화면에서 소리 켜기를 한 번 눌러야 시작됩니다.",
-        ],
-      },
-    ],
-  },
-  catan: {
-    subtitle: "자원을 생산하고 도로, 마을, 도시를 확장해 목표 승점을 먼저 달성하는 전략 보드게임입니다.",
-    tags: ["3~6인", "자원 생산", "건설 전략"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "기본판은 보통 10승점을 먼저 달성하면 승리합니다. 5~6인 확장은 추가 인원 흐름을 적용합니다.",
-          "마을, 도시, 최장 교역로, 최대 기사력, 개발 카드가 승점의 주요 원천입니다.",
-        ],
-      },
-      {
-        title: "기본 흐름",
-        items: [
-          "초기 배치에서 마을과 도로를 놓아 첫 생산 기반을 만듭니다.",
-          "차례가 되면 주사위를 굴리고, 나온 숫자 타일에 인접한 마을과 도시가 자원을 생산합니다.",
-          "자원으로 도로, 마을, 도시, 개발 카드를 만들고 필요한 경우 은행, 항구, 다른 플레이어와 거래합니다.",
-          "7이 나오면 손패가 많은 플레이어는 자원을 버리고, 도적을 옮겨 원하는 플레이어의 자원을 빼앗을 수 있습니다.",
-        ],
-      },
-      {
-        title: "제공 규칙",
-        items: [
-          "현재 로비에서는 서버에서 실제 진행 가능한 기본판과 5~6인 확장만 노출합니다.",
-          "5~6인 방에서는 추가 인원과 보드 확장, 카타니안 보조 턴 흐름이 적용됩니다.",
-        ],
-      },
-      {
-        title: "초보 팁",
-        items: [
-          "숫자 6과 8은 자주 나오므로 중요하지만, 한 자원에만 몰리면 건설이 막힐 수 있습니다. 흙, 나무, 밀, 양, 철을 균형 있게 확보하세요.",
-          "항구 근처에 자리 잡으면 부족한 자원을 교환하기 쉬워집니다.",
-          "마을을 빨리 늘리면 생산 지점이 많아지고, 도시는 같은 타일에서 더 많은 자원을 줍니다.",
-        ],
-      },
-    ],
-  },
-  blokus: {
-    subtitle: "내 색 조각을 최대한 많이 놓되, 내 조각끼리는 모서리로만 이어야 하는 배치 퍼즐형 보드게임입니다.",
-    tags: ["2~4인", "도형 배치", "코너 연결"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "내 조각을 보드에 많이 놓아 남은 칸 수를 최소화하는 것이 목표입니다.",
-          "게임 종료 후 남은 조각 칸은 감점이 되고, 모든 조각을 다 놓으면 보너스를 받을 수 있습니다.",
-        ],
-      },
-      {
-        title: "배치 규칙",
-        items: [
-          "첫 조각은 내 시작 모서리를 반드시 덮어야 합니다.",
-          "이후 내 새 조각은 이미 놓인 내 조각과 꼭짓점으로는 닿아야 하지만, 변으로 맞닿으면 안 됩니다.",
-          "상대 조각과는 변으로 닿아도 괜찮습니다. 막는 과정에서 상대 조각 옆을 적극적으로 활용하세요.",
-          "조각은 회전과 뒤집기를 바꿔 볼 수 있고, 보드에서 미리보기 색상과 놓기 버튼 안내로 합법 위치를 확인할 수 있습니다.",
-        ],
-      },
-      {
-        title: "변형 규칙",
-        items: [
-          "듀오는 2인 전용 작은 보드에서 진행되어 초반부터 접촉이 빠릅니다.",
-          "팀전이나 2색 플레이에서는 색상별 점수와 팀 합산을 확인하며 공간을 나눠 써야 합니다.",
-          "놓을 수 있는 조각이 없을 때만 패스할 수 있으며, 서버가 최종 배치 가능 여부를 판정합니다.",
-        ],
-      },
-      {
-        title: "초보 팁",
-        items: [
-          "큰 조각은 후반에 놓기 어렵습니다. 초반에 넓게 뻗어 나가며 큰 조각을 먼저 처리하세요.",
-          "내 조각의 새 모서리를 많이 남겨야 다음 선택지가 늘어납니다.",
-          "상대가 들어오지 못하게 막는 것보다, 내 조각이 계속 뻗을 길을 확보하는 것이 보통 더 중요합니다.",
-        ],
-      },
-    ],
-  },
-  mahe: {
-    subtitle: "거북이를 움직여 섬을 돌고 알 카드를 모으는 주사위 경주 게임입니다.",
-    tags: ["2~7인", "거북이 경주", "위험 선택"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "트랙을 한 바퀴 넘어갈 때 공개된 알 카드를 얻고, 게임 종료 시 알 카드 점수 합계가 가장 높은 플레이어가 승리합니다.",
-          "동점이면 더 많은 알 카드를 가진 플레이어가 앞섭니다.",
-        ],
-      },
-      {
-        title: "차례 진행",
-        items: [
-          "내 차례에는 주사위를 1개부터 최대 3개까지 굴릴 수 있습니다.",
-          "멈추면 주사위 합계에 굴린 주사위 개수를 곱한 칸 수만큼 이동합니다.",
-          "합계가 7을 넘으면 실패가 되어 이번 이동을 잃고, 움직이던 거북이 묶음이 시작점으로 돌아갑니다.",
-        ],
-      },
-      {
-        title: "업고 가기와 득점",
-        items: [
-          "거북이가 같은 칸에 서면 위로 올라탄 거북이까지 함께 이동합니다.",
-          "업힌 상태에서는 위에 있는 거북이가 주사위 개수를 고르는 흐름이 생길 수 있습니다.",
-          "한 바퀴를 넘어 득점하면 이동 묶음의 맨 위 거북이가 현재 알 카드를 가져갑니다.",
-          "마지막 7점 알이 획득되면 게임이 끝납니다.",
-        ],
-      },
-      {
-        title: "초보 팁",
-        items: [
-          "합계 7을 넘지 않는 것이 핵심입니다. 이미 합이 5 이상이면 추가 굴림 위험이 큽니다.",
-          "한 번 더 굴리면 더 멀리 가지만, 실패하면 시작점으로 돌아갑니다. 화면의 실패 확률 안내를 보고 결정하세요.",
-          "남의 거북이 위에 타면 이동을 공짜로 얻을 수 있으니, 무조건 앞서가기보다 업히는 위치도 노려보세요.",
-        ],
-      },
-    ],
-  },
-  dalmuti: {
-    subtitle: "같은 숫자의 카드를 묶어 내며 손패를 먼저 비우고, 다음 손의 계급을 올리는 클라이밍 카드게임입니다.",
-    tags: ["4~8인", "계급 카드", "세금과 혁명"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "한 손에서 카드를 빨리 비울수록 다음 손의 계급이 높아지고 점수를 얻습니다.",
-          "누적 점수가 높은 플레이어가 좋은 흐름을 가져가며, 대 달무티는 다음 손에서 가장 유리한 위치로 시작합니다.",
-        ],
-      },
-      {
-        title: "카드 내기 규칙",
-        items: [
-          "카드는 같은 숫자를 같은 장수로 묶어 냅니다. 예를 들어 8 두 장 위에는 더 강한 숫자 두 장만 낼 수 있습니다.",
-          "숫자가 낮을수록 강합니다. 1은 대 달무티로 가장 강하고, 큰 숫자일수록 약합니다.",
-          "광대는 와일드로 다른 숫자 묶음을 채울 수 있지만, 광대만 내면 가장 약한 묶음으로 취급됩니다.",
-          "낼 수 없거나 전략적으로 쉬고 싶으면 패스할 수 있고, 모두가 패스하면 마지막으로 카드를 낸 사람이 새 묶음을 시작합니다.",
-        ],
-      },
-      {
-        title: "계급, 세금, 혁명",
-        items: [
-          "이전 손의 순위에 따라 대 달무티, 소 달무티, 상인, 농노 계급이 정해집니다.",
-          "세금 단계에서는 농노 쪽의 좋은 카드가 달무티 쪽으로 넘어가고, 달무티 쪽은 정해진 장수만큼 돌려줄 카드를 선택합니다.",
-          "광대 2장을 가진 플레이어는 혁명을 선언할 수 있습니다. 혁명이 선언되면 세금 흐름이 바뀌거나 계급 순서가 뒤집힐 수 있습니다.",
-          "방장이 선택한 첫 손 혁명 규칙이나 덱 조정 규칙은 대기방의 규칙 선택에 따라 적용됩니다.",
-        ],
-      },
-      {
-        title: "초보 팁",
-        items: [
-          "처음 시작할 때는 같은 숫자가 많이 모인 묶음을 기준으로 손패를 정리하세요.",
-          "강한 낮은 숫자는 중요한 순간에 남겨두면 주도권을 되찾기 좋습니다.",
-          "카드를 빨리 털어야 다음 손 계급이 좋아지므로, 너무 아끼기보다 낼 수 있을 때 손패를 줄이는 판단이 중요합니다.",
-        ],
-      },
-    ],
-  },
-  citadels: {
-    subtitle: "비밀 캐릭터를 선택하고 구역을 건설해 가장 가치 있는 도시를 완성하는 카드 기반 보드게임입니다.",
-    tags: ["2~7인", "비밀 역할", "도시 건설"],
-    sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
-      {
-        title: "목표",
-        items: [
-          "금화와 구역 카드를 관리해 도시를 건설하고, 게임 종료 시 가장 높은 점수를 얻는 것이 목표입니다.",
-          "누군가 8번째 구역을 건설하면 현재 라운드까지만 진행한 뒤 점수를 계산합니다.",
-        ],
-      },
-      {
-        title: "라운드 흐름",
-        items: [
-          "왕관을 가진 플레이어부터 비밀리에 캐릭터를 고릅니다.",
-          "암살자부터 장군까지 번호 순서대로 캐릭터가 호출되고, 해당 캐릭터를 가진 플레이어가 차례를 진행합니다.",
-          "차례에는 금화 2개를 받거나 구역 카드를 뽑아 1장을 보관한 뒤, 가능한 경우 구역을 건설합니다.",
-        ],
-      },
-      {
-        title: "캐릭터 능력",
-        items: [
-          "암살자는 한 캐릭터를 쉬게 하고, 도둑은 지정한 캐릭터가 호출될 때 금화를 훔칩니다.",
-          "마술사는 손패를 교환하거나 교체하고, 왕·주교·상인·장군은 자기 색 구역에서 추가 수입을 얻습니다.",
-          "건축가는 더 많은 카드를 받고 최대 3개까지 건설할 수 있으며, 장군은 상대 구역 하나를 파괴할 수 있습니다.",
-        ],
-      },
-    ],
-  },
-};
+import { getBoardGameRuleGuide } from "../../common/boardGameRules.js";
 
 const videoGameManuals = {
   arena: {
     subtitle: "Good_ETC의 LAN Arena를 홈페이지 방 입장 흐름으로 옮기는 실시간 액션 게임입니다.",
     tags: ["1~8인", "실시간 액션", "모바일 조작"],
     sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
       {
-        title: "이식 방향",
+        title: "게임 핵심",
         items: [
-          "방과 참가자 정보는 DB에 저장하고, 본게임 입력과 프레임 상태는 STOMP 실시간 채널을 사용합니다.",
-          "키보드 이동/공격 외에 모바일용 방향 패드와 액션 버튼을 함께 제공합니다.",
+          "실시간 아레나에서 이동, 회피, 발사를 반복하며 끝까지 살아남거나 더 많은 점수를 얻는 액션 게임입니다.",
+          "키보드와 모바일 터치 조작을 모두 지원하며, 방 단위로 참가자 입력과 프레임 상태를 동기화합니다.",
+        ],
+      },
+      {
+        title: "조작",
+        items: [
+          "이동 패드와 액션 버튼으로 이동, 조준, 공격을 실행합니다.",
+          "모바일에서는 조작 패널을 게임 화면 위쪽 바깥에 두어 캔버스를 가리지 않도록 했습니다.",
         ],
       },
     ],
@@ -411,12 +31,18 @@ const videoGameManuals = {
     subtitle: "각도와 파워를 조절해 상대를 맞히는 Good_ETC 포트리스 게임입니다.",
     tags: ["1~2인", "턴제 포격", "모바일 조준"],
     sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
       {
-        title: "이식 방향",
+        title: "게임 핵심",
         items: [
-          "방장은 방을 만들고 참가자는 코드로 입장한 뒤 준비 상태를 맞춥니다.",
-          "모바일에서는 이동, 각도, 파워, 발사를 큰 터치 컨트롤로 제공합니다.",
+          "차례마다 위치와 지형을 보고 각도, 파워를 조절해 상대를 맞히는 턴제 포격 게임입니다.",
+          "바람과 거리 감각이 핵심이므로 첫 발은 보정용으로 쓰고 이후 탄도를 조정하면 됩니다.",
+        ],
+      },
+      {
+        title: "조작",
+        items: [
+          "이동, 각도 조절, 파워 충전, 발사를 큰 터치 컨트롤로 제공합니다.",
+          "발사 전에는 내 위치와 상대 위치가 모두 보이는 상태에서 조준값을 정합니다.",
         ],
       },
     ],
@@ -425,12 +51,18 @@ const videoGameManuals = {
     subtitle: "웨이브를 막고 타워를 배치하는 Good_ETC 협동 디펜스 게임입니다.",
     tags: ["1~4인", "타워 디펜스", "협동"],
     sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
       {
-        title: "이식 방향",
+        title: "게임 핵심",
         items: [
-          "방 상태와 참가자는 DB에 남기고, 웨이브/타워/스킬 상태는 실시간 채널로 동기화합니다.",
-          "모바일에서는 타일 선택, 건설, 업그레이드, 스킬 버튼을 하단 조작대로 제공합니다.",
+          "웨이브로 몰려오는 적을 타워 배치, 업그레이드, 스킬 사용으로 막는 협동 디펜스 게임입니다.",
+          "초반에는 길목을 막는 기본 타워를 우선 만들고, 이후 적 속성에 맞춰 화력을 보강합니다.",
+        ],
+      },
+      {
+        title: "조작",
+        items: [
+          "타일 선택, 건설, 업그레이드, 스킬 버튼을 모바일에서도 바로 누를 수 있게 제공합니다.",
+          "웨이브 상태와 자원 수치를 보고 다음 건설 위치를 결정합니다.",
         ],
       },
     ],
@@ -439,12 +71,18 @@ const videoGameManuals = {
     subtitle: "Good_ETC의 카트, 폭탄, 스네이크, 코인 파티 게임을 같은 방 흐름으로 실행합니다.",
     tags: ["1~8인", "파티 액션", "터치 조작"],
     sections: [
-      { title: "처음 시작 순서", items: sharedRoomStartSteps },
       {
-        title: "이식 방향",
+        title: "게임 핵심",
         items: [
-          "게임별 규칙은 Good_ETC 구현을 기준으로 유지하고, 방 입장/준비/시작 흐름은 홈페이지 보드게임과 맞춥니다.",
-          "모바일에서는 방향 패드와 게임별 액션 버튼을 고정 조작대로 제공합니다.",
+          "카트는 주행과 아이템, 폭탄은 설치와 회피, 스네이크는 성장과 충돌 회피, 코인은 제한 시간 수집이 핵심입니다.",
+          "각 게임은 짧은 라운드 안에서 점수, 생존, 수집량처럼 화면에 표시되는 조건으로 결과가 갈립니다.",
+        ],
+      },
+      {
+        title: "조작",
+        items: [
+          "방향 패드와 게임별 액션 버튼을 사용합니다.",
+          "모바일에서는 게임 화면을 가리지 않도록 조작과 정보 패널을 화면 바깥쪽에 분리했습니다.",
         ],
       },
     ],
@@ -454,14 +92,14 @@ const videoGameManuals = {
     tags: ["1인", "솔로 RPG", "localStorage"],
     sections: [
       {
-        title: "처음 시작 순서",
+        title: "게임 핵심",
         items: [
-          "혼자 플레이용 방을 만들고 게임 시작을 누르면 내 진행 상태를 불러옵니다.",
-          "저장은 브라우저 localStorage를 우선 사용하며, 계정 단위 저장은 추후 DB 저장 API로 확장합니다.",
+          "탐험, 전투, 상호작용을 혼자 진행하는 Good_ETC 솔로 RPG입니다.",
+          "진행 저장은 브라우저 localStorage를 우선 사용하므로 같은 브라우저에서 이어 할 수 있습니다.",
         ],
       },
       {
-        title: "모바일",
+        title: "조작",
         items: [
           "이동 방향, 상호작용, 메뉴 열기를 터치 버튼으로 제공합니다.",
           "화면 크기에 맞춰 조작대와 로그 패널이 겹치지 않도록 분리합니다.",
@@ -469,6 +107,15 @@ const videoGameManuals = {
       },
     ],
   },
+};
+
+const boardGameManual = (game, tags = [], options = {}) => {
+  const ruleGuide = getBoardGameRuleGuide({ game, ...options });
+  return {
+    subtitle: ruleGuide.summary,
+    tags,
+    sections: ruleGuide.sections,
+  };
 };
 
 const boardGames = [
@@ -484,7 +131,7 @@ const boardGames = [
     preview: "poker",
     resumeStorageKey: "poker_last_room_id",
     highlights: ["AI 봇", "족보 보조", "5장 드로우"],
-    manual: gameManuals.poker,
+    manual: boardGameManual("poker", ["1~8인", "홀덤", "5장 드로우"]),
     featured: true,
   },
   {
@@ -499,7 +146,7 @@ const boardGames = [
     preview: "dice",
     resumeStorageKey: "las_vegas_last_room_id",
     highlights: ["실시간 방", "주사위 배팅"],
-    manual: gameManuals.lasVegas,
+    manual: boardGameManual("las-vegas", ["2~6인", "주사위 배팅", "동점 탈락"]),
     featured: false,
   },
   {
@@ -514,7 +161,7 @@ const boardGames = [
     preview: "cards",
     resumeStorageKey: "no_thanks_last_room_id",
     highlights: ["실시간 방", "카드 선택"],
-    manual: gameManuals.noThanks,
+    manual: boardGameManual("no-thanks", ["3~6인", "낮은 점수", "칩 관리"]),
     featured: false,
   },
   {
@@ -529,7 +176,7 @@ const boardGames = [
     preview: "catan",
     resumeStorageKey: "catan_last_room_id",
     highlights: ["기본판", "5~6인", "공식 확장"],
-    manual: gameManuals.catan,
+    manual: boardGameManual("catan", ["3~6인", "자원 생산", "건설 전략"]),
     featured: true,
   },
   {
@@ -544,7 +191,7 @@ const boardGames = [
     preview: "blokus",
     resumeStorageKey: "blokus_last_room_id",
     highlights: ["본게임", "듀오", "팀전"],
-    manual: gameManuals.blokus,
+    manual: boardGameManual("blokus", ["2~4인", "도형 배치", "코너 연결"]),
     featured: true,
   },
   {
@@ -559,7 +206,7 @@ const boardGames = [
     preview: "mahe",
     resumeStorageKey: "mahe_last_room_id",
     highlights: ["본게임", "업고 가기", "확률 안내"],
-    manual: gameManuals.mahe,
+    manual: boardGameManual("mahe", ["2~7인", "거북이 경주", "위험 선택"]),
     featured: true,
   },
   {
@@ -574,7 +221,7 @@ const boardGames = [
     preview: "dalmuti",
     resumeStorageKey: "dalmuti_last_room_id",
     highlights: ["본게임", "세금", "혁명"],
-    manual: gameManuals.dalmuti,
+    manual: boardGameManual("dalmuti", ["4~8인", "계급 카드", "세금과 혁명"]),
     featured: true,
   },
   {
@@ -589,7 +236,7 @@ const boardGames = [
     preview: "six-nimmt",
     resumeStorageKey: "six_nimmt_last_room_id",
     highlights: ["동시 선택", "벌점 예측", "66벌점 종료"],
-    manual: gameManuals.sixNimmt,
+    manual: boardGameManual("six-nimmt", ["2~10인", "동시 선택", "벌점 관리"]),
     featured: true,
   },
   {
@@ -604,7 +251,7 @@ const boardGames = [
     preview: "telestrations",
     resumeStorageKey: "telestrations_last_room_id",
     highlights: ["동시 제출", "캔버스", "리플레이"],
-    manual: gameManuals.telestrations,
+    manual: boardGameManual("telestrations", ["3~8인", "그림 릴레이", "리플레이"]),
     featured: true,
   },
   {
@@ -619,7 +266,7 @@ const boardGames = [
     preview: "mafia",
     resumeStorageKey: "mafia_last_room_id",
     highlights: ["사회자 TTS", "경찰/의사 선택", "투표"],
-    manual: gameManuals.mafia,
+    manual: boardGameManual("mafia", ["5~12인", "비밀 역할", "팀 추리"]),
     featured: true,
   },
   {
@@ -634,7 +281,7 @@ const boardGames = [
     preview: "citadels",
     resumeStorageKey: "citadels_last_room_id",
     highlights: ["공식 기본판", "비밀 캐릭터", "8구역 종료"],
-    manual: gameManuals.citadels,
+    manual: boardGameManual("citadels", ["2~7인", "비밀 캐릭터", "도시 건설"]),
     featured: true,
   },
 ];
@@ -3115,7 +2762,7 @@ const buildGameManualReadinessItems = (game) => {
   const isVideo = Boolean(videoGameArtProfiles[game.preview]);
   const minPlayers = Number(game.minPlayers || 1);
   const maxPlayers = Number(game.maxPlayers || minPlayers);
-  const firstSection = game.manual?.sections?.[0]?.title || "처음 시작 순서";
+  const firstSection = game.manual?.sections?.[0]?.title || "공식 룰 핵심";
   const goalSection = game.manual?.sections?.find((section) => /목표|승리|정산|점수/.test(section.title))?.title || "목표 확인";
 
   return [
@@ -3332,7 +2979,7 @@ const GameManualActionPrimerPanel = ({ game }) => {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-500">
                 <GameUxGlyph type="turn" className="h-3.5 w-3.5 text-primary-600" />
-                첫 액션 프라이머
+                첫 액션 요약
               </div>
               <h3 className="mt-2 text-base font-black text-slate-950 sm:text-lg">방에 들어가면 무엇을 먼저 누르는가</h3>
             </div>
@@ -3341,138 +2988,6 @@ const GameManualActionPrimerPanel = ({ game }) => {
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {items.map((item) => (
               <div key={item.key} className="min-h-[108px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="game-manual-action-item" data-action-key={item.key}>
-                <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400">
-                  <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 text-primary-600" />
-                  {item.label}
-                </div>
-                <div className="mt-1 line-clamp-2 text-sm font-black leading-snug text-slate-950">{item.value}</div>
-                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-slate-600">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const buildGameManualOutcomeItems = (game) => {
-  const experience = gameExperienceProfiles[game.preview] || {
-    genre: game.mode,
-    focus: "현재 상태와 가능한 행동 확인",
-    pace: game.players,
-    feel: "방 흐름을 유지하는 플레이",
-  };
-  const isVideo = Boolean(videoGameArtProfiles[game.preview]);
-  const goalSection = findManualSection(game, [/목표/, /승리/, /정산/, /점수/, /벌점/]);
-  const flowSection = findManualSection(game, [/차례/, /진행/, /기본 흐름/, /배치/, /카드/, /역할/]);
-  const supportSection = findManualSection(game, [/초보/, /팁/, /보조/, /데이터/, /확장/]);
-  const goalItems = goalSection?.items || [];
-  const flowItems = flowSection?.items || [];
-  const supportItems = supportSection?.items || [];
-  const goalText = goalItems[0] || game.manual?.subtitle || "최종 목표와 종료 조건을 먼저 확인합니다.";
-  const basisText = goalItems[1] || goalItems[0] || experience.focus;
-  const liveSignalText = flowItems[0] || supportItems[0] || experience.focus;
-  const reviewText = isVideo
-    ? "결과 패널에서 승자, 상태, 세션 이후 행동을 다시 확인합니다."
-    : "종료 화면에서 누가 왜 이겼는지와 다음 행동을 확인합니다.";
-
-  return [
-    {
-      key: "condition",
-      icon: "signal",
-      label: "승리 조건",
-      value: goalText,
-      detail: `${goalSection?.title || "목표"} 섹션의 첫 기준`,
-    },
-    {
-      key: "basis",
-      icon: "decision",
-      label: "판정 근거",
-      value: basisText,
-      detail: isVideo ? "점수, 상태, 미션 결과를 같은 패널에서 봅니다." : "점수, 보상, 벌점, 팀 조건 중 핵심 근거를 봅니다.",
-    },
-    {
-      key: "signal",
-      icon: isVideo ? "input" : "turn",
-      label: "플레이 중 신호",
-      value: liveSignalText,
-      detail: `${flowSection?.title || "진행"} 흐름에서 결과로 이어지는 정보를 확인합니다.`,
-    },
-    {
-      key: "review",
-      icon: "stage",
-      label: "결과 확인 위치",
-      value: isVideo ? "결과 패널" : "종료 화면",
-      detail: reviewText,
-    },
-  ];
-};
-
-const GameManualOutcomePrimerArt = ({ game, items }) => {
-  const isVideo = Boolean(videoGameArtProfiles[game.preview]);
-  const nodeColors = ["#10b981", "#0ea5e9", "#f59e0b", "#f43f5e"];
-  const nodes = items.map((item, index) => ({
-    ...item,
-    x: 54 + index * 92,
-    y: index % 2 === 0 ? 72 : 116,
-    fill: nodeColors[index] || "#64748b",
-  }));
-
-  return (
-    <svg
-      viewBox="0 0 360 188"
-      role="img"
-      aria-label={`${game.title} 결과 판단 프라이머`}
-      className="h-full min-h-[188px] w-full"
-      data-smoke="game-manual-outcome-art"
-    >
-      <rect x="10" y="10" width="340" height="168" rx="22" fill="#0f172a" />
-      <rect x="24" y="30" width="312" height="132" rx="18" fill={isVideo ? "#ecfeff" : "#fff7ed"} />
-      <path d="M54 72 C88 36 126 128 146 116 S218 72 238 72 S298 136 330 116" fill="none" stroke={isVideo ? "#bae6fd" : "#fde68a"} strokeWidth="12" strokeLinecap="round" />
-      <path d="M54 72 C88 36 126 128 146 116 S218 72 238 72 S298 136 330 116" fill="none" stroke={isVideo ? "#0e7490" : "#92400e"} strokeWidth="3" strokeLinecap="round" />
-      <text x="34" y="25" fontSize="10" fontWeight="900" fill="#bfdbfe">결과 판단</text>
-      <text x="326" y="25" textAnchor="end" fontSize="10" fontWeight="900" fill="#e2e8f0">{game.mode}</text>
-      {nodes.map((node, index) => (
-        <g key={node.key} data-smoke="game-manual-outcome-node">
-          <circle cx={node.x} cy={node.y} r="22" fill={node.fill} stroke="#ffffff" strokeWidth="5" />
-          <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="10" fontWeight="900" fill="#ffffff">{index + 1}</text>
-          <text x={node.x} y={node.y + (index % 2 === 0 ? 38 : -32)} textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#0f172a">{node.label}</text>
-        </g>
-      ))}
-      <rect x="58" y="146" width="244" height="13" rx="7" fill="#f8fafc" opacity=".95" />
-      <text x="180" y="156" textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#0f172a">목표 → 근거 → 플레이 신호 → 결과 확인</text>
-    </svg>
-  );
-};
-
-const GameManualOutcomePrimerPanel = ({ game }) => {
-  const items = buildGameManualOutcomeItems(game);
-
-  return (
-    <section
-      className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-      data-smoke="game-manual-outcome-panel"
-      data-outcome-game={game.preview}
-    >
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,340px)_1fr]">
-        <div className="bg-slate-950 p-3">
-          <GameManualOutcomePrimerArt game={game} items={items} />
-        </div>
-        <div className="p-3 sm:p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-500">
-                <GameUxGlyph type="decision" className="h-3.5 w-3.5 text-primary-600" />
-                결과 판단 프라이머
-              </div>
-              <h3 className="mt-2 text-base font-black text-slate-950 sm:text-lg">이 게임은 어떤 근거로 끝나는가</h3>
-            </div>
-            <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-black text-white">승패 근거</span>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {items.map((item) => (
-              <div key={item.key} className="min-h-[108px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="game-manual-outcome-item" data-outcome-key={item.key}>
                 <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400">
                   <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 text-primary-600" />
                   {item.label}
@@ -3569,7 +3084,6 @@ const GameManualModal = ({ game, onClose }) => {
           </div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-          <GameManualOutcomePrimerPanel game={game} />
           <div className="grid gap-3 sm:grid-cols-2">
             {game.manual.sections.map((section, sectionIndex) => (
               <section

@@ -100,8 +100,8 @@ function assertNoThanksRealtimeSource() {
         ['data-smoke="no-thanks-session-route-item"', "mark selected-room session button-route items"],
         ["노땡스 세션 버튼 루트", "render selected-room session button-route title in Korean"],
         ["실제 버튼 안내", "render selected-room session button-route helper copy in Korean"],
-        ["노땡스 점수 렌즈", "render the score lens title in Korean"],
-        ["노땡스 정산 렌즈", "render the settlement ledger title in Korean"],
+        ["노땡스 점수 요약", "render the score summary title in Korean"],
+        ["노땡스 정산 요약", "render the settlement ledger summary title in Korean"],
         ["누가 왜 이겼는지 정산합니다", "render the finished-game winner explanation in Korean"],
         ["노땡스는 최소 인원", "render the No Thanks rule hint in Korean"],
         ['smoke="no-thanks-flow-meter"', "mark the card-flow meter for runtime coverage"],
@@ -163,27 +163,15 @@ function assertNoThanksRealtimeSource() {
         ["생성 전 노땡스 브리핑", "render the create-room No Thanks briefing title in Korean"],
         ["시작 칩", "render the create-room chip pressure copy in Korean"],
         ['data-smoke="no-thanks-lobby-room-card"', "mark the enhanced lobby room card"],
-        ['data-smoke="no-thanks-lobby-room-card-art"', "mark the enhanced lobby room card SVG artwork"],
-        ['data-smoke="no-thanks-lobby-room-card-node"', "mark enhanced lobby room card SVG nodes"],
-        ['data-smoke="no-thanks-lobby-room-card-seat"', "mark enhanced lobby room card seat markers"],
         ['data-smoke="no-thanks-lobby-empty-state"', "mark the empty No Thanks lobby state"],
         ['data-smoke="no-thanks-lobby-empty-art"', "mark the empty No Thanks lobby SVG artwork"],
         ['data-smoke="no-thanks-lobby-empty-node"', "mark empty No Thanks lobby SVG nodes"],
         ['data-smoke="no-thanks-lobby-empty-item"', "mark empty No Thanks lobby guidance cards"],
         ['data-smoke="no-thanks-lobby-empty-refresh"', "mark empty No Thanks lobby refresh action"],
         ['data-joinable={joinable ? "true" : "false"}', "expose enhanced lobby room joinable state"],
-        ['data-smoke="no-thanks-lobby-room-decision-rail"', "mark lobby decision guidance rail"],
-        ['data-smoke="no-thanks-lobby-room-decision-item"', "mark lobby decision guidance items"],
-        ["data-decision-key={item.key}", "expose stable lobby decision item keys"],
-        ["입장 판단", "render lobby decision access copy in Korean"],
-        ["규칙", "render lobby decision rule copy in Korean"],
-        ['data-smoke="no-thanks-lobby-room-readiness"', "mark lobby readiness guidance"],
-        ['data-smoke="no-thanks-lobby-room-action-signal"', "mark lobby action guidance"],
-        ['data-smoke="no-thanks-lobby-room-slot"', "mark lobby seat fill bars"],
         ['data-smoke="no-thanks-lobby-room-primary"', "mark lobby primary action"],
         ["TabletopGameArtwork", "render local tabletop artwork inside the standalone route"],
         ['data-smoke="no-thanks-route-artwork"', "mark the route artwork"],
-        ['data-smoke="no-thanks-room-artwork"', "mark the selected-room artwork"],
         ["NoThanksJoinCodePanel", "render the standalone No Thanks join-code bridge"],
         ["NoThanksJoinCodeArt", "render the No Thanks join-code bridge through local SVG artwork"],
         ['data-smoke="no-thanks-join-code-panel"', "mark the No Thanks join-code panel"],
@@ -789,37 +777,16 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
         const card = document.querySelector('[data-smoke="no-thanks-lobby-room-card"]');
         return {
             cards: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-card"]').length,
-            art: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-card-art"]').length,
-            nodes: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-card-node"]').length,
-            cardSeats: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-card-seat"]').length,
             stateCards: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-card"][data-room-status][data-joinable]').length,
-            decisionRails: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-decision-rail"]').length,
-            decisionItems: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-decision-item"]').length,
-            decisionKeys: Array.from(document.querySelectorAll('[data-smoke="no-thanks-lobby-room-decision-item"]')).map((item) => item.dataset.decisionKey),
-            readiness: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-readiness"]').length,
-            action: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-action-signal"]').length,
-            slots: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-slot"]').length,
             primary: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-primary"]').length,
             text: card?.innerText || "",
         };
     })()`);
     if (
         lobbyRoomSnapshot.cards < 1
-        || lobbyRoomSnapshot.art < 1
-        || lobbyRoomSnapshot.nodes < 4
-        || lobbyRoomSnapshot.cardSeats < 1
         || lobbyRoomSnapshot.stateCards < lobbyRoomSnapshot.cards
-        || lobbyRoomSnapshot.decisionRails < lobbyRoomSnapshot.cards
-        || lobbyRoomSnapshot.decisionItems < lobbyRoomSnapshot.cards * 4
-        || !["access", "seat", "ready", "rule"].every((key) => lobbyRoomSnapshot.decisionKeys.includes(key))
-        || lobbyRoomSnapshot.readiness < 1
-        || lobbyRoomSnapshot.action < 1
-        || lobbyRoomSnapshot.slots < 1
         || lobbyRoomSnapshot.primary < 1
-        || !lobbyRoomSnapshot.text.includes("입장 판단")
-        || !lobbyRoomSnapshot.text.includes("규칙")
         || !lobbyRoomSnapshot.text.includes("인원 1/2")
-        || !lobbyRoomSnapshot.text.includes("합류 추천")
     ) {
         throw new Error(`no-thanks-ui-smoke: enhanced lobby room card missing guidance ${JSON.stringify(lobbyRoomSnapshot)}`);
     }
@@ -830,7 +797,6 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
         await setInputValue(cdp, sessionId, "input[placeholder='제한 시간(초)']", "20");
         await clickButtonByText(cdp, sessionId, "노땡스 방 만들기");
         await waitForText(cdp, sessionId, "방 코드 NT2026");
-        await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-room-artwork"] [data-smoke="tabletop-game-artwork"]'))`, "no thanks selected room artwork rendered");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="no-thanks"]'))`, "no thanks chat empty state rendered");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-art"][data-chat-game="no-thanks"]'))`, "no thanks chat empty SVG rendered");
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="game-chat-empty-state"][data-chat-game="no-thanks"] [data-smoke="game-chat-empty-node"]').length >= 4`, "no thanks chat empty SVG nodes rendered");
@@ -899,7 +865,7 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
         await waitFor(cdp, sessionId, `/카드 턴 레일|현재 차례|좌석/.test(document.querySelector('[data-smoke="no-thanks-turn-rail-panel"]')?.textContent || "")`, "no thanks turn rail copy rendered");
         await waitForText(cdp, sessionId, "상태");
         await waitForText(cdp, sessionId, "대기");
-        await waitForText(cdp, sessionId, "판단 보조");
+        await waitForText(cdp, sessionId, "현재 선택 요약");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-progress-digest-panel"]'))`, "no thanks progress digest rendered");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-progress-digest-art"]'))`, "no thanks progress digest SVG rendered");
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-progress-digest-node"]').length >= 4`, "no thanks progress digest nodes rendered");
@@ -1060,7 +1026,7 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-settlement-ledger-art"]'))`, "no thanks settlement ledger SVG rendered");
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-settlement-player-node"]').length >= 3`, "no thanks settlement player nodes rendered");
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-settlement-ledger-item"]').length >= 4`, "no thanks settlement ledger items rendered");
-        await waitFor(cdp, sessionId, `/노땡스 정산 렌즈|누가 왜 이겼는지|카드 묶음|칩 차감/.test(document.querySelector('[data-smoke="no-thanks-settlement-ledger-panel"]')?.textContent || "")`, "no thanks settlement copy rendered");
+        await waitFor(cdp, sessionId, `/노땡스 정산 요약|누가 왜 이겼는지|카드 묶음|칩 차감/.test(document.querySelector('[data-smoke="no-thanks-settlement-ledger-panel"]')?.textContent || "")`, "no thanks settlement copy rendered");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-session-action-panel"]'))`, "no thanks finished-session action panel rendered");
         await waitFor(cdp, sessionId, `document.querySelector('[data-smoke="no-thanks-session-action-panel"]')?.getAttribute("data-session-status") === "FINISHED"`, "no thanks finished-session status rendered");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-session-action-art"]'))`, "no thanks finished-session SVG rendered");

@@ -1672,3 +1672,95 @@ button:hover {
     width: min(260px, calc(100vw - 24px));
   }
 }
+
+@media (max-width: 760px) {
+  body.ctfmon-embedded {
+    --embedded-mobile-panel-height: 154px;
+  }
+
+  body.ctfmon-embedded .arena-shell {
+    padding-top: var(--embedded-mobile-panel-height);
+  }
+
+  body.ctfmon-embedded #gameCanvas {
+    top: var(--embedded-mobile-panel-height) !important;
+    bottom: 0 !important;
+    height: calc(100% - var(--embedded-mobile-panel-height)) !important;
+  }
+
+  body.ctfmon-embedded .fortress-panel,
+  body.ctfmon-embedded .defense-panel,
+  body.ctfmon-embedded .party-panel {
+    top: 6px !important;
+    right: 8px !important;
+    bottom: auto !important;
+    left: 8px !important;
+    width: auto !important;
+    max-height: 52px !important;
+    overflow: auto !important;
+    padding: 8px !important;
+    opacity: 0.98;
+  }
+
+  body.ctfmon-embedded .hud-right,
+  body.ctfmon-embedded .fortress-message,
+  body.ctfmon-embedded .defense-stats,
+  body.ctfmon-embedded .party-score {
+    top: 64px !important;
+    right: 8px !important;
+    bottom: auto !important;
+    left: 8px !important;
+    width: auto !important;
+    max-height: 46px !important;
+    overflow: auto !important;
+    padding: 8px !important;
+    opacity: 0.98;
+  }
+
+  body.ctfmon-embedded .defense-toolbar,
+  body.ctfmon-embedded .party-toolbar {
+    top: 116px !important;
+    right: 8px !important;
+    bottom: auto !important;
+    left: 8px !important;
+    width: auto !important;
+    max-height: 32px !important;
+    overflow: auto !important;
+    transform: none !important;
+    opacity: 0.98;
+  }
+
+  body.ctfmon-embedded .defense-toolbar-body {
+    max-height: 32px !important;
+  }
+
+  body.ctfmon-embedded .fortress-readout,
+  body.ctfmon-embedded .defense-config,
+  body.ctfmon-embedded .party-help {
+    margin-top: 4px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  body.ctfmon-embedded {
+    --embedded-mobile-panel-height: 168px;
+  }
+
+  body.ctfmon-embedded .fortress-panel,
+  body.ctfmon-embedded .defense-panel,
+  body.ctfmon-embedded .party-panel {
+    max-height: 58px !important;
+  }
+
+  body.ctfmon-embedded .hud-right,
+  body.ctfmon-embedded .fortress-message,
+  body.ctfmon-embedded .defense-stats,
+  body.ctfmon-embedded .party-score {
+    top: 72px !important;
+  }
+
+  body.ctfmon-embedded .defense-toolbar,
+  body.ctfmon-embedded .party-toolbar {
+    top: 130px !important;
+  }
+}

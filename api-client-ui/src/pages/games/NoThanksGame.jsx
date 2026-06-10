@@ -21,7 +21,8 @@ import { useGameSound } from "../../hooks/useGameSound.js";
 import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { NoThanksCardFace, NoThanksChipToken } from "../../common/NoThanksVisuals.jsx";
-import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
+import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
+import { GameActionCueBar, GameChatEmptyState, GameFeedbackTicker, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
@@ -977,12 +978,12 @@ const NoThanksSettlementLedgerArt = ({ ledger }) => {
       viewBox="0 0 420 248"
       className="h-full min-h-[210px] w-full"
       role="img"
-      aria-label={`노땡스 정산 렌즈, ${ledger.winner.nickname} 승리`}
+      aria-label={`노땡스 정산 요약, ${ledger.winner.nickname} 승리`}
       data-smoke="no-thanks-settlement-ledger-art"
     >
       <rect width="420" height="248" rx="28" fill="#0f172a" />
       <path d="M28 206h364M44 166h332M58 126h304M74 86h272" stroke="#f8fafc" strokeWidth="2" opacity=".07" />
-      <text x="28" y="31" fontSize="12" fontWeight="900" fill="#fed7aa">노땡스 정산 렌즈</text>
+      <text x="28" y="31" fontSize="12" fontWeight="900" fill="#fed7aa">노땡스 정산 요약</text>
       <text x="392" y="31" textAnchor="end" fontSize="11" fontWeight="900" fill="#cbd5e1">낮은 점수 우선</text>
       <g transform="translate(28 48)">
         <rect x="0" y="0" width="130" height="38" rx="18" fill="#fffbeb" stroke="#f59e0b" strokeWidth="3" />
@@ -1160,7 +1161,7 @@ const NoThanksScoreLensArt = ({
       viewBox="0 0 360 220"
       className="h-full min-h-[150px] w-full"
       role="img"
-      aria-label={`노 땡스 점수 렌즈, 현재 카드 ${currentCard ?? "대기"}, ${label}`}
+      aria-label={`노 땡스 점수 요약, 현재 카드 ${currentCard ?? "대기"}, ${label}`}
       data-smoke="no-thanks-score-lens-art"
     >
       <defs>
@@ -1242,7 +1243,7 @@ const NoThanksScoreLensPanel = ({ currentCard, potChips, myChips, myCards, roomS
       tone: netDelta == null ? "border-slate-100 bg-white text-slate-600" : netDelta <= 2 ? "border-emerald-100 bg-emerald-50 text-emerald-800" : netDelta >= 8 ? "border-rose-100 bg-rose-50 text-rose-800" : "border-orange-100 bg-orange-50 text-orange-800",
     },
     {
-      label: "추천 판단",
+      label: "핵심 선택",
       value: recommendation,
       detail: isMyTurn ? "내 차례 기준으로 수령 부담과 칩 여유를 함께 본 판단입니다." : "다른 플레이어 차례라도 다음 내 선택을 준비할 수 있습니다.",
       tone: Number(myChips || 0) <= 1 ? "border-rose-100 bg-rose-50 text-rose-800" : "border-cyan-100 bg-cyan-50 text-cyan-800",
@@ -1250,39 +1251,24 @@ const NoThanksScoreLensPanel = ({ currentCard, potChips, myChips, myCards, roomS
   ];
 
   return (
-    <section data-smoke="no-thanks-score-lens-panel" className="mt-3 rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-emerald-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.78fr)_minmax(0,1fr)]">
-        <div className="min-h-[170px]">
-          <NoThanksScoreLensArt
-            currentCard={currentCard}
-            currentScore={currentScore}
-            nextScore={nextScore}
-            potChips={potChips}
-            netDelta={netDelta}
-            connectsRun={connectsRun}
-            myChips={myChips}
-          />
-        </div>
+    <section data-smoke="no-thanks-score-lens-panel" className="mt-2 rounded-xl border border-orange-100 bg-white px-3 py-2 shadow-sm sm:mt-3 sm:rounded-2xl">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] font-black text-orange-700">노땡스 점수 렌즈</div>
-              <h3 className="text-base font-black text-slate-900">가져가기 순점수 판단</h3>
-            </div>
-            <div className={`rounded-full border px-3 py-1 text-[11px] font-black ${netDelta != null && netDelta <= 2 ? "border-emerald-100 bg-emerald-50 text-emerald-700" : netDelta != null && netDelta >= 8 ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-600"}`}>
-              {recommendation}
-            </div>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {guideItems.map((item) => (
-              <div key={item.label} data-smoke="no-thanks-score-lens-item" className={`rounded-xl border px-3 py-2.5 ${item.tone}`}>
-                <div className="text-[10px] font-black opacity-70">{item.label}</div>
-                <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
-              </div>
-            ))}
-          </div>
+          <div className="text-xs font-black text-orange-700">노땡스 점수 요약</div>
+          <p className="mt-0.5 line-clamp-1 text-[11px] font-bold text-slate-500">카드 점수, 칩 보정, 가져갈 때의 순점수만 압축해서 봅니다.</p>
         </div>
+        <div className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${netDelta != null && netDelta <= 2 ? "border-emerald-100 bg-emerald-50 text-emerald-700" : netDelta != null && netDelta >= 8 ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
+          {recommendation}
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        {guideItems.map((item) => (
+          <div key={item.label} data-smoke="no-thanks-score-lens-item" className={`min-h-[58px] rounded-xl border px-2.5 py-1.5 sm:min-h-[72px] sm:px-3 sm:py-2 ${item.tone}`}>
+            <div className="truncate text-[10px] font-black opacity-70">{item.label}</div>
+            <div className="mt-0.5 truncate text-xs font-black leading-snug sm:text-sm">{item.value}</div>
+            <div className="mt-0.5 hidden text-[10px] font-bold leading-snug opacity-80 sm:line-clamp-1 sm:block">{item.detail}</div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -1657,7 +1643,7 @@ const NoThanksDecisionPanel = ({ gameState, players, sortedPlayers, myPlayer, ro
         <div className="flex min-w-0 items-start gap-3">
           <GameUxGlyph type="decision" className="mt-0.5 h-10 w-10 shrink-0 text-amber-500" />
           <div className="min-w-0">
-            <div className="text-sm font-black text-slate-900">판단 보조</div>
+            <div className="text-sm font-black text-slate-900">현재 선택 요약</div>
             <div className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
               {roomStatus === "PLAYING" ? `${turnName}님의 차례 · 현재 카드 ${currentCard ?? "-"}` : "대기 중 · 게임 시작 후 카드 선택 판단을 표시합니다."}
             </div>
@@ -2721,6 +2707,14 @@ export const NoThanksGame = () => {
   const chatRoomId = chatRoomIdOf(gameState) || chatRoomIdOf(selectedRoom);
   const myPlayer = players.find((player) => playerIdOf(player) === myMemberId) || null;
   const myChips = parseIntSafe(myPlayer?.chips, 0);
+  useEffect(() => {
+    const normalizedStatus = String(roomStatus || "WAITING").toUpperCase();
+    setPageGuideContext({
+      game: "no-thanks",
+      context: selectedRoom ? (gameState || normalizedStatus === "PLAYING" || normalizedStatus === "FINISHED" ? "play" : "waiting-room") : "lobby",
+    });
+    return clearPageGuideContext;
+  }, [gameState, roomStatus, selectedRoom]);
   const readyMemberIds = useMemo(() => new Set(players.filter(isReadyPlayer).map(playerIdOf)), [players]);
   const hostNickname = players.find((player) => playerIdOf(player) === hostMemberId)?.nickname || "-";
   const lobbySetup = useMemo(() => {
@@ -3582,6 +3576,14 @@ export const NoThanksGame = () => {
               </div>
             )}
           </div>
+
+          <GameFeedbackTicker
+            title="행동 피드백"
+            detail={actionFeedback.detail}
+            items={actionFeedbackItems}
+            tone={actionFeedbackTone}
+            smoke="no-thanks-action-feedback"
+          />
 
           <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <div className="space-y-4">

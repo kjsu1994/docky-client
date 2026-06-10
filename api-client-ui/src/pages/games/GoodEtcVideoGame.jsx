@@ -2487,7 +2487,7 @@ const VideoGameControlIntentArt = ({ intents, activeControlKey, bridgeReady }) =
       viewBox="0 0 360 220"
       className="h-full min-h-[190px] w-full"
       role="img"
-      aria-label="비디오게임 조작 의도 렌즈"
+      aria-label="비디오게임 조작 요약"
       data-smoke="video-game-control-intent-art"
     >
       <rect x="8" y="8" width="344" height="204" rx="26" fill="#0f172a" />
@@ -2512,7 +2512,7 @@ const VideoGameControlIntentArt = ({ intents, activeControlKey, bridgeReady }) =
           </g>
         );
       })}
-      <text x="28" y="32" fontSize="11" fontWeight="900" fill="#bae6fd">조작 의도 렌즈</text>
+      <text x="28" y="32" fontSize="11" fontWeight="900" fill="#bae6fd">조작 요약</text>
       <text x="332" y="32" textAnchor="end" fontSize="10" fontWeight="900" fill="#cbd5e1">{nodes.length}개 입력</text>
     </svg>
   );
@@ -2532,33 +2532,33 @@ const VideoGameControlIntentPanel = ({
   const bridgeReady = status === "PLAYING" && Boolean(gameFrameSrc);
 
   return (
-    <section className="mt-3 overflow-hidden rounded-2xl border border-cyan-300/20 bg-white/95 text-slate-900 shadow-sm" data-smoke="video-game-control-intent-panel">
-      <div className="grid gap-0 xl:grid-cols-[minmax(220px,.95fr)_minmax(0,1fr)]">
-        <div className="bg-slate-950 p-2">
+    <section className="mt-2 rounded-xl border border-cyan-300/20 bg-white/95 px-3 py-2 text-slate-900 shadow-sm sm:mt-3 sm:rounded-2xl" data-smoke="video-game-control-intent-panel">
+      <div className="space-y-2">
+        <div className="hidden">
           <VideoGameControlIntentArt intents={intents} activeControlKey={pressedControl} bridgeReady={bridgeReady} />
         </div>
-        <div className="p-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="p-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-[11px] font-black text-cyan-700">Good_ETC 입력 해석</div>
-              <h3 className="text-sm font-black text-slate-950">버튼이 어떤 플레이 판단으로 이어지는지 확인합니다</h3>
+              <h3 className="line-clamp-1 text-sm font-black text-slate-950">버튼별 역할만 압축해서 확인합니다</h3>
             </div>
-            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${bridgeReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${bridgeReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
               {bridgeReady ? "전달 가능" : "시작 후 전달"}
             </span>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             {intents.slice(0, 4).map((intent) => {
               const tone = videoControlIntentTone[intent.tone] || videoControlIntentTone.slate;
               const active = intent.key === pressedControl;
               return (
-                <div key={intent.key} className={`min-h-[96px] rounded-xl border px-3 py-2 ${tone.soft} ${active ? "ring-2 ring-cyan-300" : ""}`} data-smoke="video-game-control-intent-item">
+                <div key={intent.key} className={`min-h-[58px] rounded-xl border px-2.5 py-1.5 sm:min-h-[72px] sm:px-3 sm:py-2 ${tone.soft} ${active ? "ring-2 ring-cyan-300" : ""}`} data-smoke="video-game-control-intent-item">
                   <div className="flex items-center gap-1.5 text-[10px] font-black opacity-70">
-                    <GameUxGlyph type={intent.icon} className="h-3.5 w-3.5" />
-                    {intent.label}
+                    <GameUxGlyph type={intent.icon} className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{intent.label}</span>
                   </div>
-                  <div className="mt-1 text-sm font-black leading-snug">{intent.value}</div>
-                  <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{intent.detail}</div>
+                  <div className="mt-0.5 truncate text-xs font-black leading-snug sm:text-sm">{intent.value}</div>
+                  <div className="mt-0.5 hidden text-[10px] font-bold leading-snug opacity-80 sm:line-clamp-1 sm:block">{intent.detail}</div>
                 </div>
               );
             })}
@@ -2696,7 +2696,7 @@ const VideoGameInputRoutePanel = ({
 
   return (
     <section
-      className="mt-3 overflow-hidden rounded-2xl border border-cyan-300/20 bg-white/95 text-slate-900"
+      className="mt-2 rounded-xl border border-cyan-300/20 bg-white/95 px-3 py-2 text-slate-900 sm:mt-3 sm:rounded-2xl"
       data-smoke="video-game-input-route-panel"
       data-stage-status={status || ""}
       data-bridge-ready={bridgeReady ? "true" : "false"}
@@ -2704,31 +2704,31 @@ const VideoGameInputRoutePanel = ({
       data-action-count={(actionControls.length ? actionControls : profile.controls).length}
       data-pressed-control={pressedControl || ""}
     >
-      <div className="grid gap-0 xl:grid-cols-[minmax(220px,.95fr)_minmax(0,1fr)]">
-        <div className="bg-slate-950 p-2">
+      <div className="space-y-2">
+        <div className="hidden">
           <VideoGameInputRouteArt items={items} status={status} bridgeReady={bridgeReady} />
         </div>
-        <div className="p-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="p-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-[11px] font-black text-cyan-700">Good_ETC 입력 흐름</div>
               <h3 className="text-sm font-black text-slate-950">버튼을 누르기 전 순서를 먼저 잡습니다</h3>
             </div>
-            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${bridgeReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${bridgeReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
               {bridgeReady ? "iframe 전달 가능" : "입력 대기"}
             </span>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             {items.map((item) => {
               const tone = videoGameInputRouteTone[item.state] || videoGameInputRouteTone.waiting;
               return (
-                <div key={item.key} className={`min-h-[96px] rounded-xl border px-3 py-2 ${tone.card}`} data-smoke="video-game-input-route-item" data-route-key={item.key} data-route-state={item.state}>
+                <div key={item.key} className={`min-h-[58px] rounded-xl border px-2.5 py-1.5 sm:min-h-[72px] sm:px-3 sm:py-2 ${tone.card}`} data-smoke="video-game-input-route-item" data-route-key={item.key} data-route-state={item.state}>
                   <div className="flex items-center gap-1.5 text-[10px] font-black opacity-70">
-                    <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
-                    {item.label}
+                    <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{item.label}</span>
                   </div>
-                  <div className="mt-1 text-sm font-black leading-snug">{item.value}</div>
-                  <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+                  <div className="mt-0.5 truncate text-xs font-black leading-snug sm:text-sm">{item.value}</div>
+                  <div className="mt-0.5 hidden text-[10px] font-bold leading-snug opacity-80 sm:line-clamp-1 sm:block">{item.detail}</div>
                 </div>
               );
             })}
@@ -4815,6 +4815,18 @@ export const GoodEtcVideoGame = () => {
               </>
             )}
 
+            <VideoGameMobileControlPanel
+              profile={profile}
+              directionControls={directionControls}
+              actionControls={actionControls}
+              pressedControl={pressedControl}
+              pressedControlLabel={pressedControlLabel}
+              status={status}
+              gameFrameSrc={gameFrameSrc}
+              onControl={sendTouchControl}
+              className="xl:hidden"
+            />
+
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-lg" data-smoke="video-game-stage-shell">
               <div className="min-w-0 bg-slate-950">
                 {gameFrameSrc ? (
@@ -4822,7 +4834,7 @@ export const GoodEtcVideoGame = () => {
                     ref={iframeRef}
                     title={`${profile.title} game`}
                     src={gameFrameSrc}
-                    className="h-[76vh] min-h-[460px] w-full bg-slate-950 md:min-h-[620px] xl:h-[84vh]"
+                    className="h-[70vh] min-h-[360px] w-full bg-slate-950 sm:min-h-[460px] md:min-h-[620px] xl:h-[84vh]"
                     allow="fullscreen; gamepad"
                   />
                 ) : (
@@ -4843,20 +4855,6 @@ export const GoodEtcVideoGame = () => {
               </div>
             </section>
           </main>
-
-          <aside className="space-y-4">
-            <VideoGameMobileControlPanel
-              profile={profile}
-              directionControls={directionControls}
-              actionControls={actionControls}
-              pressedControl={pressedControl}
-              pressedControlLabel={pressedControlLabel}
-              status={status}
-              gameFrameSrc={gameFrameSrc}
-              onControl={sendTouchControl}
-              className="xl:hidden"
-            />
-          </aside>
         </div>
       )}
     </div>

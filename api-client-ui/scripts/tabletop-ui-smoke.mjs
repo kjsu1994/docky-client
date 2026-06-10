@@ -612,15 +612,13 @@ function assertTabletopRealtimeSource() {
     ["마피아 결과 해설", "labels the Mafia result explanation panel in Korean"],
     ["누가 왜 이겼는지", "explains who won and why in Mafia finished state"],
     ["생존 균형", "shows the final Mafia survival balance"],
-    ['smoke="poker-flow-meter"', "marks the Poker board flow meter"],
     ["PlayingCardArt", "renders poker cards through the reusable SVG playing-card asset"],
     ["playingCardSuitLabel", "labels selectable poker cards by accessible suit names"],
     ['smoke="poker-card-art"', "marks reusable poker card art for runtime smoke coverage"],
-    ["PokerDecisionLensPanel", "renders Poker action guidance from loaded hand and pot state"],
-    ["PokerDecisionLensArt", "renders Poker hand and pot pressure through reusable SVG artwork"],
-    ['data-smoke="poker-decision-lens-panel"', "marks the Poker decision lens panel"],
-    ['data-smoke="poker-decision-lens-art"', "marks reusable Poker decision lens SVG artwork"],
-    ['data-smoke="poker-decision-lens-item"', "marks Poker decision lens guidance items"],
+    ['id="poker-table-panel"', "keeps the Poker table section addressable from the compact rail"],
+    ['id="poker-action-panel"', "keeps the Poker action section addressable from the compact rail"],
+    ["현재 비용", "shows the current Poker call cost in the action panel"],
+    ['핸드 {handNo || "-"} / {maxHands || "-"}', "moves the Poker hand counter into the chip status panel"],
     ["buildPokerActionRouteItems", "derives Poker button-route guidance from loaded action state"],
     ["PokerActionRoutePanel", "renders Poker action route guidance near the real action buttons"],
     ["PokerActionRouteArt", "renders Poker action route through local SVG artwork"],
@@ -959,7 +957,7 @@ function assertCitadelsExperienceSource() {
     'data-smoke="citadels-player-state-map-item"',
     'GameUxGlyph type="turn"',
     'GameUxGlyph type="decision"',
-    "시티델 정산 렌즈",
+    "시티델 정산 요약",
     "생성 전 궁정 브리핑",
     "궁정 셋업",
     "참가자 도시 지도",
@@ -2797,15 +2795,13 @@ async function runRoomFlowSmoke(ws, game) {
   }
   if (game === "poker") {
     await waitForText(ws, "내 족보");
-    await waitForText(ws, "추천 판단");
+    await waitForText(ws, "현재 비용");
+    await waitForText(ws, "핸드");
     await waitForText(ws, "승리 사유");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-result-explanation"]'))`, "poker result explanation rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-flow-meter"]'))`, "poker flow meter rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "poker flow meter items rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-decision-lens-panel"]'))`, "poker decision lens panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-decision-lens-art"]'))`, "poker decision lens SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-decision-lens-item"]').length >= 4`, "poker decision lens items rendered");
-    await waitForExpression(ws, `/포커 판단 렌즈|내 족보|팟 압력/.test(document.querySelector('[data-smoke="poker-decision-lens-panel"]')?.textContent || "")`, "poker decision lens guidance copy rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('#poker-table-panel'))`, "poker table panel rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('#poker-action-panel'))`, "poker action panel rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('#poker-players-panel'))`, "poker chip/player status panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-showdown-breakdown-panel"]'))`, "poker showdown breakdown panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-showdown-trace-art"]'))`, "poker showdown trace SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-showdown-breakdown-item"]').length >= 2`, "poker showdown breakdown items rendered");

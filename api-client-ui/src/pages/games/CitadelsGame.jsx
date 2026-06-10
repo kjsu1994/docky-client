@@ -17,6 +17,7 @@ import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
+import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 
@@ -1001,7 +1002,7 @@ const CitadelsSettlementLedgerArt = ({ ledger }) => {
       <rect x="10" y="12" width="400" height="216" rx="24" fill="#0f172a" />
       <rect x="22" y="24" width="376" height="192" rx="20" fill="#fff7ed" />
       <rect x="34" y="36" width="352" height="40" rx="16" fill="#fef3c7" />
-      <text x="48" y="61" fontSize="13" fontWeight="900" fill="#92400e">정산 렌즈</text>
+      <text x="48" y="61" fontSize="13" fontWeight="900" fill="#92400e">정산 요약</text>
       <text x="370" y="61" textAnchor="end" fontSize="13" fontWeight="900" fill="#0f172a">{ledger?.winner?.score || 0}점</text>
       <path d="M52 190 C98 150 128 102 180 122 S256 182 348 96" fill="none" stroke="#fed7aa" strokeWidth="14" strokeLinecap="round" />
       <path d="M52 190 C98 150 128 102 180 122 S256 182 348 96" fill="none" stroke="#92400e" strokeWidth="3" strokeLinecap="round" />
@@ -1044,7 +1045,7 @@ const CitadelsSettlementLedgerPanel = ({
       <div className="grid gap-3 xl:grid-cols-[minmax(0,380px)_1fr]">
         <CitadelsSettlementLedgerArt ledger={ledger} />
         <div className="min-w-0">
-          <div className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">시티델 정산 렌즈</div>
+          <div className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">시티델 정산 요약</div>
           <h2 className="mt-2 text-lg font-black text-slate-950">누가 왜 이겼는지</h2>
           <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">
             서버 최종 점수를 기준으로 승자, 2위와의 격차, 구역 기본점수, 보너스, 색상 완성 여부를 한 화면에 묶어 보여줍니다.
@@ -1883,7 +1884,7 @@ const CitadelsEconomyLensArt = ({
     <svg
       viewBox="0 0 360 180"
       role="img"
-      aria-label="시티델 금화, 손패, 도시 완성도를 요약한 경제 렌즈"
+      aria-label="시티델 금화, 손패, 도시 완성도 요약"
       className="h-full min-h-[180px] w-full"
       data-smoke="citadels-economy-lens-art"
     >
@@ -1934,7 +1935,7 @@ const CitadelsEconomyLensArt = ({
         />
       ))}
 
-      <text x="26" y="20" fontSize="10" fontWeight="900" fill="#fde68a">경제 렌즈</text>
+      <text x="26" y="20" fontSize="10" fontWeight="900" fill="#fde68a">경제 요약</text>
       <text x="135" y="23" fontSize="10" fontWeight="900" fill="#bfdbfe">{bestCardName}</text>
       <text x="260" y="23" fontSize="10" fontWeight="900" fill="#fecaca">색상 {missingText}</text>
       <text x="271" y="166" fontSize="10" fontWeight="900" fill="#f8fafc">수입 {incomeText}</text>
@@ -2186,7 +2187,7 @@ const CitadelsEconomyLensPanel = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-sm font-black text-slate-950">
                 <GameUxGlyph type="coin" className="h-4 w-4 text-amber-600" />
-                시티델 경제 렌즈
+                시티델 경제 요약
               </div>
               <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">{guidance}</p>
             </div>
@@ -4363,6 +4364,25 @@ export const CitadelsGame = () => {
       ruleHint: "시티델은 최소 인원, 게스트 준비, 방장 시작 권한이 맞을 때 시작합니다. 시작 후 캐릭터 선택, 건설, 점수 계산은 기존 서버 규칙을 그대로 따릅니다.",
     };
   }, [canStart, enoughPlayers, everyGuestReady, guestPlayers.length, isHost, maxPlayers, minPlayers, players.length, readyGuestCount, selectedRoom, withinMaxPlayers]);
+  const selectedGuideVariant = useMemo(() => {
+    const code = selectedRoom?.variantCode || createForm.variantCode || "BASE";
+    return variants.find((variant) => variant.code === code) || {
+      code,
+      displayName: selectedRoom?.variantName || "기본판",
+      minPlayers: selectedRoom?.minPlayers,
+      maxPlayers: selectedRoom?.maxPlayers,
+    };
+  }, [createForm.variantCode, selectedRoom, variants]);
+
+  useEffect(() => {
+    setPageGuideContext({
+      game: GAME_CODE,
+      variantCode: get(gameState, "variant_code", "variantCode", "") || selectedGuideVariant?.code || "BASE",
+      variant: selectedGuideVariant,
+      context: selectedRoom ? (gameState || status === "PLAYING" || status === "FINISHED" ? "play" : "waiting-room") : "lobby",
+    });
+    return clearPageGuideContext;
+  }, [gameState, selectedGuideVariant, selectedRoom, status]);
 
   const phase = get(gameState, "phase", "phase", "");
   const activeSeatNo = Number(get(gameState, "active_seat_no", "activeSeatNo", 0));

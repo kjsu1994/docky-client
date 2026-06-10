@@ -609,28 +609,22 @@ export const GameFlowMeter = ({
   const colors = flowMeterTones[tone] || flowMeterTones.slate;
 
   return (
-    <section className={`relative overflow-hidden rounded-2xl border p-3 shadow-sm ${colors.shell} ${className}`} data-smoke={smoke}>
-      <div className={`pointer-events-none absolute inset-x-3 top-14 hidden ${colors.rail} md:block`} aria-hidden="true">
-        <svg viewBox="0 0 520 42" className="h-10 w-full" focusable="false">
-          <path d="M18 21h484" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="2 12" />
-          <path d="M18 21c64-22 114-22 164 0s100 22 164 0 104-22 156 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity=".55" />
-        </svg>
-      </div>
-      <div className="relative flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <section className={`relative overflow-hidden rounded-xl border px-2.5 py-2 shadow-sm sm:rounded-2xl sm:px-3 sm:py-2.5 ${colors.shell} ${className}`} data-smoke={smoke}>
+      <div className="relative flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-sm font-black">
+          <div className="flex items-center gap-1.5 text-xs font-black sm:text-sm">
             <GameUxGlyph type="signal" className="h-4 w-4" />
             {title}
           </div>
-          {detail && <div className={`mt-1 line-clamp-2 text-xs font-bold leading-relaxed ${colors.text}`}>{detail}</div>}
+          {detail && <div className={`mt-0.5 hidden text-xs font-bold leading-relaxed sm:line-clamp-1 sm:block ${colors.text}`}>{detail}</div>}
         </div>
       </div>
       {!!visibleItems.length && (
-        <div className="relative mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="relative mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
           {visibleItems.map((item, index) => {
             const chipTone = flowMeterItemTones[item.tone] || (tone === "dark" ? flowMeterItemTones.dark : flowMeterItemTones.neutral);
             return (
-              <div key={`${item.label}-${item.value}-${index}`} className={`min-h-[84px] rounded-xl border px-3 py-2 ${chipTone}`} data-smoke="game-flow-meter-item">
+              <div key={`${item.label}-${item.value}-${index}`} className={`min-h-[54px] rounded-xl border px-2.5 py-1.5 sm:min-h-[68px] sm:px-3 sm:py-2 ${chipTone}`} data-smoke="game-flow-meter-item">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-black opacity-75">
                     <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-lg ${colors.node}`}>
@@ -640,8 +634,8 @@ export const GameFlowMeter = ({
                   </div>
                   <span className="text-[10px] font-black opacity-55">{index + 1}</span>
                 </div>
-                <div className="mt-1 truncate text-sm font-black leading-tight">{item.value}</div>
-                {item.detail && <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-70">{item.detail}</div>}
+                <div className="mt-0.5 truncate text-xs font-black leading-tight sm:mt-1 sm:text-sm">{item.value}</div>
+                {item.detail && <div className="mt-0.5 hidden text-[10px] font-bold leading-relaxed opacity-70 sm:line-clamp-1 sm:block">{item.detail}</div>}
               </div>
             );
           })}
