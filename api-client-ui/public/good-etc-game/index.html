@@ -113,6 +113,14 @@
     <script>
       (() => {
         const params = new URLSearchParams(window.location.search);
+        if (params.get("embedded") === "ctfmon") {
+          document.documentElement.classList.add("ctfmon-embedded");
+          document.body.classList.add("ctfmon-embedded");
+        }
+        if (params.get("training") === "1") {
+          document.documentElement.classList.add("ctfmon-training");
+          document.body.classList.add("ctfmon-training");
+        }
         const version = encodeURIComponent(
           params.get("v") || "20260601storage",
         );

@@ -6244,358 +6244,6 @@ const defaultBlokusBoardCellSize = () => {
   return window.innerWidth < 480 ? 16 : 24;
 };
 
-const blokusPlacementLensProfiles = {
-  legal: { label: "배치 가능", color: "#059669", wash: "#d1fae5", textClass: "text-emerald-700" },
-  warning: { label: "선택 필요", color: "#d97706", wash: "#fef3c7", textClass: "text-amber-700" },
-  blocked: { label: "배치 불가", color: "#e11d48", wash: "#ffe4e6", textClass: "text-rose-700" },
-  idle: { label: "대기", color: "#64748b", wash: "#f1f5f9", textClass: "text-slate-600" },
-};
-
-const BlokusPlacementLensArt = ({ cells = 0, legal = false, blocked = false, firstPiece = false, color = "BLUE", className = "" }) => {
-  const profile = legal
-    ? blokusPlacementLensProfiles.legal
-    : blocked
-      ? blokusPlacementLensProfiles.blocked
-      : blokusPlacementLensProfiles.warning;
-  const safeCells = Math.max(1, Math.min(7, Number(cells) || 1));
-  const palette = blokusPiecePalette[color] || blokusPiecePalette.BLUE;
-
-  return (
-    <svg
-      data-smoke="blokus-placement-lens-art"
-      viewBox="0 0 320 180"
-      className={`h-auto w-full ${className}`}
-      role="img"
-      aria-label={`블로커스 배치 렌즈 ${profile.label}`}
-      focusable="false"
-    >
-      <rect x="8" y="8" width="304" height="164" rx="28" fill="#f8fafc" stroke={profile.color} strokeWidth="3" />
-      <path d="M28 128c42-34 83-39 124-14 42 25 88 22 138-20v48H28Z" fill={profile.wash} opacity="0.92" />
-      <g transform="translate(38 34)">
-        <rect x="0" y="0" width="116" height="116" rx="20" fill="#ffffff" stroke="#cbd5e1" strokeWidth="3" />
-        {Array.from({ length: 5 }).map((_, row) => (
-          Array.from({ length: 5 }).map((__, col) => (
-            <rect key={`${row}-${col}`} x={14 + col * 18} y={14 + row * 18} width="14" height="14" rx="3" fill={col === 0 && row === 0 && firstPiece ? "#fbbf24" : "#e2e8f0"} opacity={col === 0 && row === 0 && firstPiece ? 0.9 : 0.75} />
-          ))
-        ))}
-        {Array.from({ length: safeCells }).map((_, index) => {
-          const coords = [
-            [50, 50],
-            [68, 50],
-            [50, 68],
-            [32, 50],
-            [50, 32],
-            [68, 68],
-            [32, 68],
-          ][index] || [50, 50];
-          return (
-            <rect
-              key={index}
-              x={coords[0]}
-              y={coords[1]}
-              width="16"
-              height="16"
-              rx="4"
-              fill={legal ? palette.fill : blocked ? "#fb7185" : palette.shine}
-              stroke={legal ? palette.stroke : blocked ? "#be123c" : palette.fill}
-              strokeWidth="2"
-            />
-          );
-        })}
-      </g>
-      <g transform="translate(174 38)">
-        <rect x="0" y="0" width="118" height="34" rx="17" fill="#ffffff" stroke={profile.color} strokeWidth="2" />
-        <text x="59" y="22" textAnchor="middle" fontSize="13" fontWeight="900" fill={profile.color}>{profile.label}</text>
-        <path d="M16 62h76" stroke="#cbd5e1" strokeWidth="9" strokeLinecap="round" />
-        <path d="M16 62h46" stroke={profile.color} strokeWidth="9" strokeLinecap="round" />
-        <circle cx="16" cy="62" r="15" fill="#ffffff" stroke={firstPiece ? "#f59e0b" : "#64748b"} strokeWidth="4" />
-        <circle cx="62" cy="62" r="15" fill="#ffffff" stroke={legal ? "#059669" : "#64748b"} strokeWidth="4" />
-        <circle cx="92" cy="62" r="15" fill="#ffffff" stroke={blocked ? "#e11d48" : "#64748b"} strokeWidth="4" />
-        <text x="16" y="90" textAnchor="middle" fontSize="9" fontWeight="900" fill="#64748b">시작</text>
-        <text x="62" y="90" textAnchor="middle" fontSize="9" fontWeight="900" fill="#64748b">모서리</text>
-        <text x="92" y="90" textAnchor="middle" fontSize="9" fontWeight="900" fill="#64748b">차단</text>
-      </g>
-    </svg>
-  );
-};
-
-const BlokusPlacementGuidePanel = ({
-  selectedPiece = null,
-  currentColor = "",
-  myTurn = false,
-  canPass = false,
-  anchorCell = null,
-  placementStatus = { legal: false, reason: "" },
-  selectedPieceLegalCount = 0,
-  totalLegalPlacementCount = 0,
-  remainingSquares = 0,
-  firstPiece = false,
-  placementSignals = {},
-}) => {
-  const selectedPieceSize = Number(selectedPiece?.size || selectedPiece?.cells?.length || 0);
-  const hasAnchor = Boolean(anchorCell);
-  const blocked = hasAnchor && !placementStatus.legal;
-  const profile = placementStatus.legal
-    ? blokusPlacementLensProfiles.legal
-    : blocked || canPass
-      ? blokusPlacementLensProfiles.blocked
-      : selectedPiece
-        ? blokusPlacementLensProfiles.warning
-        : blokusPlacementLensProfiles.idle;
-  const coordinateLabel = anchorCell ? `${anchorCell.x + 1}열 ${anchorCell.y + 1}행` : "위치 미선택";
-  const mainDetail = !myTurn
-    ? "현재 차례가 아니므로 보드 상태와 다음 후보만 확인합니다."
-    : canPass
-      ? "남은 모든 조각이 막혀 패스가 가능한 상태입니다."
-      : !selectedPiece
-        ? "먼저 남은 조각 중 하나를 선택하세요."
-        : hasAnchor
-          ? placementStatus.legal
-            ? "선택 위치는 서버 규칙상 배치 가능한 후보입니다."
-            : `${placementStatus.reason || "규칙 위반"} 때문에 이 위치에는 둘 수 없습니다.`
-          : "보드 칸을 누르면 시작점/모서리/변 접촉 조건을 즉시 판정합니다.";
-  const signalItems = [
-    {
-      label: "선택 조각",
-      value: selectedPiece?.name || "미선택",
-      detail: selectedPiece ? `${selectedPieceSize}칸 · 가능 위치 ${Number(selectedPieceLegalCount).toLocaleString("ko-KR")}곳` : "오른쪽 조각 목록에서 선택",
-      tone: selectedPiece ? "text-slate-900" : "text-amber-700",
-    },
-    {
-      label: "선택 위치",
-      value: coordinateLabel,
-      detail: hasAnchor ? (placementStatus.reason || "배치 후보") : "보드 칸을 선택하면 미리보기가 고정됩니다.",
-      tone: placementStatus.legal ? "text-emerald-700" : blocked ? "text-rose-700" : "text-slate-700",
-    },
-    {
-      label: firstPiece ? "첫 조각 규칙" : "접촉 규칙",
-      value: firstPiece ? (placementSignals.coversStart ? "시작점 충족" : "시작점 필요") : (placementSignals.cornerContact ? "모서리 접촉" : "모서리 필요"),
-      detail: firstPiece ? "첫 조각은 시작점이나 시작 모서리를 덮어야 합니다." : "같은 색과 변은 닿지 않고 모서리만 닿아야 합니다.",
-      tone: firstPiece ? (placementSignals.coversStart ? "text-emerald-700" : "text-amber-700") : placementSignals.cornerContact ? "text-emerald-700" : "text-amber-700",
-    },
-    {
-      label: "차단 원인",
-      value: placementSignals.overlap ? "겹침" : placementSignals.sideContact ? "변 접촉" : placementSignals.outOfBounds ? "보드 밖" : canPass ? "모두 막힘" : "없음",
-      detail: `전체 가능 위치 ${Number(totalLegalPlacementCount).toLocaleString("ko-KR")}곳 · 남은 칸 ${Number(remainingSquares).toLocaleString("ko-KR")}칸`,
-      tone: placementSignals.overlap || placementSignals.sideContact || placementSignals.outOfBounds || canPass ? "text-rose-700" : "text-slate-700",
-    },
-  ];
-
-  return (
-    <section data-smoke="blokus-placement-guide-panel" className="mb-3 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
-      <div className="grid gap-3 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <BlokusPlacementLensArt
-          cells={selectedPieceSize || 1}
-          legal={Boolean(placementStatus.legal)}
-          blocked={blocked || canPass}
-          firstPiece={firstPiece}
-          color={currentColor || "BLUE"}
-        />
-        <div>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <div className="text-xs font-black text-emerald-700">배치 판정</div>
-              <div className="mt-1 text-lg font-black text-slate-950">{profile.label}</div>
-              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{mainDetail}</div>
-            </div>
-            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${profile.textClass}`} style={{ backgroundColor: profile.wash }}>
-              {currentColor ? blokusColorLabels[currentColor] || currentColor : "색 대기"}
-            </span>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {signalItems.map((item) => (
-              <div key={item.label} data-smoke="blokus-placement-guide-item" className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
-                <div className={`mt-0.5 text-sm font-black ${item.tone}`}>{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const BlokusTerritoryPressureArt = ({
-  currentColor = "BLUE",
-  remainingSquares = 0,
-  remainingPieceCount = 0,
-  selectedLegalCount = 0,
-  bestLegalCount = 0,
-  blockedPieceCount = 0,
-  canPass = false,
-  className = "",
-}) => {
-  const palette = blokusPiecePalette[currentColor] || blokusPiecePalette.BLUE;
-  const safeRemainingSquares = Math.max(0, Number(remainingSquares) || 0);
-  const safeRemainingPieceCount = Math.max(0, Number(remainingPieceCount) || 0);
-  const safeSelectedLegalCount = Math.max(0, Number(selectedLegalCount) || 0);
-  const safeBestLegalCount = Math.max(0, Number(bestLegalCount) || 0);
-  const safeBlockedPieceCount = Math.max(0, Number(blockedPieceCount) || 0);
-  const remainingRatio = Math.min(1, safeRemainingSquares / 89);
-  const bestRatio = Math.min(1, safeBestLegalCount / 24);
-  const selectedRatio = Math.min(1, safeSelectedLegalCount / Math.max(safeBestLegalCount, 1));
-  const blockedRatio = safeRemainingPieceCount ? Math.min(1, safeBlockedPieceCount / safeRemainingPieceCount) : 0;
-
-  return (
-    <svg
-      data-smoke="blokus-territory-pressure-art"
-      viewBox="0 0 340 210"
-      className={`h-auto w-full ${className}`}
-      role="img"
-      aria-label="블로쿠스 영토 압박 요약"
-      focusable="false"
-    >
-      <rect x="8" y="8" width="324" height="194" rx="28" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="2" />
-      <path d="M24 158c42-30 77-37 114-18 43 22 83 18 152-29v57H24Z" fill={canPass ? "#fef3c7" : "#dcfce7"} opacity="0.88" />
-      <g transform="translate(28 28)">
-        <rect x="0" y="0" width="118" height="118" rx="22" fill="#ffffff" stroke="#dbeafe" strokeWidth="3" />
-        {Array.from({ length: 5 }).map((_, row) => (
-          Array.from({ length: 5 }).map((__, col) => {
-            const index = row * 5 + col;
-            const active = index < Math.ceil(25 * remainingRatio);
-            const blocked = index < Math.ceil(25 * blockedRatio);
-            return (
-              <rect
-                key={`${row}-${col}`}
-                x={14 + col * 18}
-                y={14 + row * 18}
-                width="14"
-                height="14"
-                rx="3"
-                fill={blocked ? "#fb7185" : active ? palette.fill : "#e2e8f0"}
-                stroke={active ? palette.stroke : "#cbd5e1"}
-                strokeWidth="1.5"
-                opacity={active || blocked ? 0.92 : 0.7}
-              />
-            );
-          })
-        ))}
-        <circle cx="94" cy="18" r="13" fill="#ffffff" stroke={canPass ? "#f59e0b" : "#10b981"} strokeWidth="4" />
-      </g>
-      <g transform="translate(164 35)">
-        <rect x="0" y="0" width="144" height="34" rx="17" fill="#ffffff" stroke={canPass ? "#f59e0b" : palette.stroke} strokeWidth="2.5" />
-        <text x="72" y="22" textAnchor="middle" fontSize="13" fontWeight="900" fill={canPass ? "#b45309" : palette.stroke}>
-          {canPass ? "패스 압박" : "배치 압박"}
-        </text>
-        <g transform="translate(8 55)">
-          <path d="M0 0h116" stroke="#e2e8f0" strokeWidth="12" strokeLinecap="round" />
-          <path d={`M0 0h${Math.max(10, 116 * bestRatio)}`} stroke="#10b981" strokeWidth="12" strokeLinecap="round" />
-          <circle cx={Math.max(10, 116 * selectedRatio)} cy="0" r="13" fill="#ffffff" stroke={palette.stroke} strokeWidth="4" />
-          <text x="0" y="29" fontSize="10" fontWeight="900" fill="#64748b">선택</text>
-          <text x="116" y="29" textAnchor="end" fontSize="10" fontWeight="900" fill="#64748b">최고 후보</text>
-        </g>
-        <g transform="translate(8 116)">
-          <path d="M0 0h116" stroke="#e2e8f0" strokeWidth="10" strokeLinecap="round" />
-          <path d={`M0 0h${Math.max(0, 116 * blockedRatio)}`} stroke="#fb7185" strokeWidth="10" strokeLinecap="round" />
-          <text x="0" y="28" fontSize="10" fontWeight="900" fill="#64748b">막힌 조각</text>
-          <text x="116" y="28" textAnchor="end" fontSize="10" fontWeight="900" fill="#64748b">{safeBlockedPieceCount}/{safeRemainingPieceCount}</text>
-        </g>
-      </g>
-    </svg>
-  );
-};
-
-const BlokusTerritoryPressurePanel = ({
-  currentColor = "",
-  selectedPiece = null,
-  selectedPieceLegalCount = 0,
-  totalLegalPlacementCount = 0,
-  remainingSquares = 0,
-  remainingPieceCount = 0,
-  blockedPieceCount = 0,
-  bestPieceEntry = null,
-  currentScoreDetail = null,
-  canPass = false,
-  myTurn = false,
-  phase = "PLAYING",
-}) => {
-  const colorLabel = currentColor ? blokusColorLabels[currentColor] || currentColor : "대기";
-  const selectedPieceName = selectedPiece?.name || "선택 없음";
-  const selectedPieceSize = Number(selectedPiece?.size || selectedPiece?.cells?.length || 0);
-  const bestPieceName = bestPieceEntry?.piece?.name || bestPieceEntry?.pieceCode || "후보 없음";
-  const bestLegalCount = Number(bestPieceEntry?.legalCount || 0);
-  const remainingScore = Number(currentScoreDetail?.score ?? -Number(remainingSquares || 0));
-  const statusLabel = phase === "FINISHED"
-    ? "결과 확정"
-    : canPass
-      ? "패스 가능"
-      : Number(totalLegalPlacementCount) > 0
-        ? "배치 후보 확보"
-        : "후보 없음";
-  const statusDetail = phase === "FINISHED"
-    ? "최종 점수는 남은 칸과 완주 보너스 기준으로 표시됩니다."
-    : canPass
-      ? "남은 모든 조각의 가능 위치가 0곳이라 패스가 가능한 상태입니다."
-      : myTurn
-        ? "선택 조각과 최고 후보를 비교해 지금 놓을 조각을 고르세요."
-        : "상대 턴에도 남은 칸과 막힌 조각을 보며 다음 압박을 예측할 수 있습니다.";
-  const pressureItems = [
-    {
-      label: "남은 칸",
-      value: `${Number(remainingSquares).toLocaleString("ko-KR")}칸`,
-      detail: `남은 조각 ${Number(remainingPieceCount).toLocaleString("ko-KR")}개가 점수 압박의 기준입니다.`,
-      tone: "text-slate-800",
-    },
-    {
-      label: "가능 위치",
-      value: `${Number(totalLegalPlacementCount).toLocaleString("ko-KR")}곳`,
-      detail: `선택 조각은 ${Number(selectedPieceLegalCount).toLocaleString("ko-KR")}곳, 최고 후보는 ${bestLegalCount.toLocaleString("ko-KR")}곳입니다.`,
-      tone: Number(totalLegalPlacementCount) > 0 ? "text-emerald-700" : "text-rose-700",
-    },
-    {
-      label: "최고 후보",
-      value: bestPieceName,
-      detail: bestLegalCount > 0 ? `${bestLegalCount.toLocaleString("ko-KR")}곳에 놓을 수 있어 현재 가장 열려 있습니다.` : "현재 열려 있는 후보 조각이 없습니다.",
-      tone: bestLegalCount > 0 ? "text-emerald-700" : "text-rose-700",
-    },
-    {
-      label: "막힌 조각",
-      value: `${Number(blockedPieceCount).toLocaleString("ko-KR")}개`,
-      detail: `${colorLabel} 현재 점수 기준 ${remainingScore.toLocaleString("ko-KR")}점, 선택 조각 크기 ${selectedPieceSize || 0}칸입니다.`,
-      tone: Number(blockedPieceCount) > 0 ? "text-amber-700" : "text-slate-700",
-    },
-  ];
-
-  return (
-    <section data-smoke="blokus-territory-pressure-panel" className="mb-3 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
-      <div className="grid gap-3 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <BlokusTerritoryPressureArt
-          currentColor={currentColor || "BLUE"}
-          remainingSquares={remainingSquares}
-          remainingPieceCount={remainingPieceCount}
-          selectedLegalCount={selectedPieceLegalCount}
-          bestLegalCount={bestLegalCount}
-          blockedPieceCount={blockedPieceCount}
-          canPass={canPass}
-        />
-        <div>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <div className="text-xs font-black text-sky-700">영토 압박</div>
-              <div className="mt-1 text-lg font-black text-slate-950">{statusLabel}</div>
-              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{statusDetail}</div>
-            </div>
-            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${colorText[currentColor] || "text-slate-600"} ${colorBgSoft[currentColor] || "bg-slate-50"}`}>
-              {colorLabel} · {selectedPieceName}
-            </span>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {pressureItems.map((item) => (
-              <div key={item.label} data-smoke="blokus-territory-pressure-item" className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
-                <div className={`mt-0.5 truncate text-sm font-black ${item.tone}`}>{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
 const blokusActionRouteTone = {
   ready: { fill: "#ecfdf5", stroke: "#059669", text: "#047857", soft: "#bbf7d0" },
   active: { fill: "#eff6ff", stroke: "#2563eb", text: "#1d4ed8", soft: "#bfdbfe" },
@@ -7228,34 +6876,48 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
     { label: "가능", value: `${totalLegalPlacementCount.toLocaleString("ko-KR")}곳` },
     { label: "선택", value: anchorCell ? `${anchorCell.x + 1}, ${anchorCell.y + 1}` : "없음" },
   ];
-  const blokusFlowItems = [
+  const blokusBestPieceName = blokusBestPieceEntry?.piece?.name || blokusBestPieceEntry?.pieceCode || "후보 없음";
+  const blokusBestLegalCount = Number(blokusBestPieceEntry?.legalCount || 0);
+  const blokusPlacementRuleText = currentColorFirstPiece
+    ? placementSignals.coversStart ? "시작점 충족" : "첫 조각은 시작점 필요"
+    : placementSignals.cornerContact ? "모서리 접촉" : "모서리 필요";
+  const blokusBlockedReason = placementSignals.overlap
+    ? "겹침"
+    : placementSignals.sideContact
+      ? "변 접촉"
+      : placementSignals.outOfBounds
+        ? "보드 밖"
+        : canPass
+          ? "모두 막힘"
+          : "차단 없음";
+  const blokusBottomSummaryItems = [
     {
-      label: "단계",
-      value: phase === "FINISHED" ? "게임 종료" : "조각 배치",
+      key: "turn",
+      label: "차례",
+      value: phase === "FINISHED" ? "게임 종료" : currentColorState?.label || currentColor || "-",
       detail: currentTurnLabel,
-      icon: "stage",
-      tone: phase === "FINISHED" ? "done" : myTurn ? "active" : "neutral",
+      tone: myTurn ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-slate-50 text-slate-700",
     },
     {
-      label: "색/차례",
-      value: currentColorState?.label || currentColor || "-",
-      detail: currentColorShared ? `${playerName(currentSeatNo)}님이 공유 색을 조종합니다.` : `${playerName(currentSeatNo)}님의 차례입니다.`,
-      icon: "turn",
-      tone: myTurn ? "active" : "neutral",
+      key: "piece",
+      label: "선택 조각",
+      value: selectedPiece?.name || "미선택",
+      detail: selectedPiece ? `${selectedPieceSize}칸 · 가능 ${selectedPieceLegalCount.toLocaleString("ko-KR")}곳` : "조각 목록에서 선택",
+      tone: selectedPiece ? "border-sky-100 bg-sky-50 text-sky-800" : "border-amber-100 bg-amber-50 text-amber-800",
     },
     {
-      label: "배치 가능",
-      value: `${totalLegalPlacementCount.toLocaleString("ko-KR")}곳`,
-      detail: selectedPiece ? `${selectedPiece.name} 가능 위치 ${selectedPieceLegalCount.toLocaleString("ko-KR")}곳 · 남은 칸 ${remainingSquares}칸` : `남은 조각 ${remainingPieceCodes.length}개`,
-      icon: "decision",
-      tone: canPass ? "danger" : totalLegalPlacementCount > 0 ? "active" : "waiting",
+      key: "placement",
+      label: "배치 판정",
+      value: placementStatus.legal ? "배치 가능" : anchorCell ? placementStatus.reason || "배치 불가" : "위치 미선택",
+      detail: anchorCell ? blokusBlockedReason : blokusPlacementRuleText,
+      tone: placementStatus.legal ? "border-emerald-100 bg-emerald-50 text-emerald-800" : anchorCell ? "border-rose-100 bg-rose-50 text-rose-800" : "border-slate-100 bg-white text-slate-700",
     },
     {
-      label: phase === "FINISHED" ? "결과" : "선택 근거",
-      value: phase === "FINISHED" && winnerText ? `${winnerText} 승리` : anchorCell ? `${anchorCell.x + 1}, ${anchorCell.y + 1}` : "보드 선택 대기",
-      detail: blokusTurnGuidance,
-      icon: phase === "FINISHED" ? "win" : "recent",
-      tone: phase === "FINISHED" ? "done" : placementStatus.legal ? "active" : "neutral",
+      key: "pressure",
+      label: "남은 압박",
+      value: `${remainingSquares.toLocaleString("ko-KR")}칸`,
+      detail: `전체 ${totalLegalPlacementCount.toLocaleString("ko-KR")}곳 · 막힌 조각 ${blokusBlockedPieceCount}개 · 최고 ${blokusBestPieceName} ${blokusBestLegalCount.toLocaleString("ko-KR")}곳`,
+      tone: canPass ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-slate-50 text-slate-700",
     },
   ];
   const placeButtonEnabled = myTurn && Boolean(anchorCell) && Boolean(placementStatus.legal);
@@ -7329,6 +6991,7 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="space-y-4">
       <div id="blokus-board-panel" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm font-black text-slate-900">
@@ -7364,41 +7027,6 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
             </div>
           )}
         </div>
-        <GameFlowMeter
-          title="블로커스 배치 흐름"
-          detail="현재 색, 선택 조각, 합법 배치 수, 확정 근거를 한 줄 흐름으로 확인합니다."
-          items={blokusFlowItems}
-          tone={phase === "FINISHED" ? "amber" : myTurn ? "emerald" : "slate"}
-          className="mb-3"
-          smoke="blokus-flow-meter"
-        />
-        <BlokusPlacementGuidePanel
-          selectedPiece={selectedPiece}
-          currentColor={currentColor}
-          myTurn={myTurn}
-          canPass={canPass}
-          anchorCell={anchorCell}
-          placementStatus={placementStatus}
-          selectedPieceLegalCount={selectedPieceLegalCount}
-          totalLegalPlacementCount={totalLegalPlacementCount}
-          remainingSquares={remainingSquares}
-          firstPiece={currentColorFirstPiece}
-          placementSignals={placementSignals}
-        />
-        <BlokusTerritoryPressurePanel
-          currentColor={currentColor}
-          selectedPiece={selectedPiece}
-          selectedPieceLegalCount={selectedPieceLegalCount}
-          totalLegalPlacementCount={totalLegalPlacementCount}
-          remainingSquares={remainingSquares}
-          remainingPieceCount={remainingPieceCodes.length}
-          blockedPieceCount={blokusBlockedPieceCount}
-          bestPieceEntry={blokusBestPieceEntry}
-          currentScoreDetail={currentBlokusScoreDetail}
-          canPass={canPass}
-          myTurn={myTurn}
-          phase={phase}
-        />
         <div className="mb-3 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 p-3 shadow-sm" role="status" aria-live="polite" aria-atomic="true">
           <div className="flex items-start gap-3">
             <div className={`mt-0.5 rounded-2xl p-2 text-white shadow-sm ${colorClasses[currentColor] || "bg-slate-700"}`}>
@@ -7617,6 +7245,28 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
             </button>
           )}
         </div>
+      </div>
+
+        <section className="scroll-mt-24 space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-black text-slate-900">하단 분석</div>
+              <div className="mt-0.5 text-xs font-bold text-slate-500">보드와 조각을 본 뒤 필요한 판단만 압축해서 확인합니다.</div>
+            </div>
+            <div className={`rounded-full px-3 py-1 text-[11px] font-black ${colorBgSoft[currentColor] || "bg-slate-50"} ${colorText[currentColor] || "text-slate-600"}`}>
+              {currentTurnLabel}
+            </div>
+          </div>
+          <div data-smoke="blokus-bottom-summary" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {blokusBottomSummaryItems.map((item) => (
+              <div key={item.key} data-smoke="blokus-bottom-summary-item" data-summary-key={item.key} className={`rounded-xl border px-3 py-2 ${item.tone}`}>
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 truncate text-sm font-black">{item.value}</div>
+                <div className="mt-0.5 line-clamp-1 text-[10px] font-bold opacity-70">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
 
       <aside className="space-y-4">
@@ -12506,20 +12156,6 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               {!!lastRoll && <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">최근 {lastRoll}</span>}
             </div>
           </div>
-          <GameFlowMeter
-            title="카탄 라운드 흐름"
-            detail="승점 목표, 현재 차례, 선택 대상, 최근 주사위 근거를 같은 흐름으로 확인합니다."
-            items={catanFlowItems}
-            tone={phase === "FINISHED" ? "amber" : myTurn ? "emerald" : "slate"}
-            className="mb-3"
-            smoke="catan-flow-meter"
-          />
-          <CatanVictoryTrackPanel
-            rows={catanVictoryTrackRows}
-            target={winningPoints}
-            phase={phase}
-            mySeatNo={mySeatNo}
-          />
           <div className="mb-3 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-sky-50 p-3 shadow-sm" role="status" aria-live="polite" aria-atomic="true">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 rounded-2xl bg-amber-600 p-2 text-white shadow-sm">
@@ -13127,6 +12763,38 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
           })}
         </div>
       </div>
+
+        <section className="scroll-mt-24 space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-black text-slate-900">하단 분석</div>
+              <div className="mt-0.5 text-xs font-bold text-slate-500">보드와 액션을 본 뒤 승점, 차례, 선택 대상만 압축해서 확인합니다.</div>
+            </div>
+            <div className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">
+              목표 {winningPoints}점
+            </div>
+          </div>
+          <div data-smoke="catan-flow-meter" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {catanFlowItems.map((item) => (
+              <div key={item.label} data-smoke="catan-flow-summary-item" className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className="mt-0.5 truncate text-sm font-black text-slate-900">{item.value}</div>
+                <div className="mt-0.5 line-clamp-1 text-[10px] font-bold text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <details className="rounded-xl border border-slate-100 bg-slate-50">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-black text-slate-700">승점 상세</summary>
+            <div className="px-3 pb-3">
+              <CatanVictoryTrackPanel
+                rows={catanVictoryTrackRows}
+                target={winningPoints}
+                phase={phase}
+                mySeatNo={mySeatNo}
+              />
+            </div>
+          </details>
+        </section>
 
       <aside className="space-y-4">
         <div id="catan-action-panel" className="catan-action-panel scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
@@ -15472,7 +15140,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
     {
       label: "내 예측",
       value: mySelected ? "제출 완료" : selectedPreview ? selectedPreview.label : needsRowChoice ? "행 선택 필요" : "카드 선택",
-      detail: selectedPreview?.penalty ? `${selectedPreview.penalty}벌점 위험` : selectedPreview?.possibleRows?.length > 1 ? "행 직접 선택 가능" : "선택 전 미리보기",
+      detail: selectedPreview?.penalty ? `${selectedPreview.penalty}벌점 위험` : selectedPreview ? "공식 규칙상 가장 가까운 행에 자동 배치" : "선택 전 미리보기",
       icon: "decision",
       tone: selectedPreview?.penalty ? "danger" : mySelected ? "done" : "neutral",
     },

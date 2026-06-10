@@ -31,6 +31,172 @@ input {
   font: inherit;
 }
 
+body.ctfmon-embedded .hud-left,
+body.ctfmon-embedded .hud-bottom,
+body.ctfmon-embedded .net-info,
+body.ctfmon-embedded .party-touch,
+body.ctfmon-embedded .fortress-help {
+  display: none !important;
+}
+
+body.ctfmon-embedded .hud-toggle,
+body.ctfmon-embedded .net-info-toggle,
+body.ctfmon-embedded .defense-help-toggle,
+body.ctfmon-embedded .defense-toolbar-toggle,
+body.ctfmon-embedded .party-help-toggle,
+body.ctfmon-embedded .rpg-panel-toggle {
+  display: none !important;
+}
+
+body.ctfmon-embedded .defense-help,
+body.ctfmon-embedded .party-help,
+body.ctfmon-embedded .rpg-bottom {
+  display: none !important;
+}
+
+body.ctfmon-embedded .defense-panel .connect-form,
+body.ctfmon-embedded .party-panel .connect-form {
+  display: none !important;
+}
+
+body.ctfmon-embedded .fortress-panel,
+body.ctfmon-embedded .defense-panel,
+body.ctfmon-embedded .party-panel {
+  top: 12px;
+  left: 12px;
+  max-height: calc(100vh - 24px);
+}
+
+body.ctfmon-embedded .fortress-panel.collapsed,
+body.ctfmon-embedded .defense-panel.collapsed,
+body.ctfmon-embedded .party-panel.collapsed {
+  width: min(330px, calc(100vw - 24px));
+  height: auto;
+  overflow: auto;
+  padding: 12px;
+}
+
+body.ctfmon-embedded .fortress-panel.collapsed .fortress-brand,
+body.ctfmon-embedded .defense-panel.collapsed .brand,
+body.ctfmon-embedded .party-panel.collapsed .brand {
+  justify-content: flex-start;
+}
+
+body.ctfmon-embedded .defense-panel.collapsed .brand > div,
+body.ctfmon-embedded .defense-panel.collapsed .brand-mark,
+body.ctfmon-embedded .party-panel.collapsed .brand > div,
+body.ctfmon-embedded .party-panel.collapsed .brand-mark {
+  display: revert !important;
+}
+
+body.ctfmon-embedded .fortress-panel.collapsed .fortress-brand > div,
+body.ctfmon-embedded .fortress-panel.collapsed .fortress-readout,
+body.ctfmon-embedded .fortress-panel.collapsed .fortress-buttons,
+body.ctfmon-embedded .fortress-panel.collapsed .fortress-items,
+body.ctfmon-embedded .fortress-panel.collapsed .fortress-weapons,
+body.ctfmon-embedded .defense-panel.collapsed .defense-config {
+  display: grid !important;
+}
+
+body.ctfmon-embedded .defense-toolbar.is-collapsed .defense-toolbar-body {
+  display: grid !important;
+}
+
+body.ctfmon-embedded .hud-right,
+body.ctfmon-embedded .fortress-message,
+body.ctfmon-embedded .defense-stats,
+body.ctfmon-embedded .party-score {
+  top: auto !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  width: min(320px, calc(100vw - 24px)) !important;
+  max-height: min(20vh, 150px) !important;
+  overflow: auto !important;
+  padding: 10px !important;
+  opacity: 0.86;
+}
+
+body.ctfmon-embedded .hud-right:hover,
+body.ctfmon-embedded .fortress-message:hover,
+body.ctfmon-embedded .defense-stats:hover,
+body.ctfmon-embedded .party-score:hover,
+body.ctfmon-embedded .fortress-panel:hover,
+body.ctfmon-embedded .defense-panel:hover,
+body.ctfmon-embedded .party-panel:hover,
+body.ctfmon-embedded .defense-toolbar:hover,
+body.ctfmon-embedded .party-toolbar:hover {
+  opacity: 1;
+}
+
+body.ctfmon-embedded .hud-right h2,
+body.ctfmon-embedded .fortress-message h2,
+body.ctfmon-embedded .defense-stats h2,
+body.ctfmon-embedded .party-score h2 {
+  margin-bottom: 6px !important;
+  font-size: 0.82rem !important;
+}
+
+body.ctfmon-embedded .hud-right ol,
+body.ctfmon-embedded .defense-players,
+body.ctfmon-embedded .party-score ol {
+  max-height: 88px;
+  overflow: auto;
+}
+
+body.ctfmon-embedded .fortress-panel,
+body.ctfmon-embedded .defense-panel,
+body.ctfmon-embedded .party-panel {
+  top: auto !important;
+  left: 12px !important;
+  bottom: 12px !important;
+  width: min(330px, calc(100vw - 24px)) !important;
+  max-height: min(24vh, 190px) !important;
+  overflow: auto !important;
+  padding: 10px !important;
+  opacity: 0.86;
+}
+
+body.ctfmon-embedded .fortress-readout,
+body.ctfmon-embedded .defense-config,
+body.ctfmon-embedded .party-help {
+  margin-top: 6px !important;
+}
+
+body.ctfmon-embedded .fortress-buttons,
+body.ctfmon-embedded .fortress-items,
+body.ctfmon-embedded .fortress-weapons,
+body.ctfmon-embedded .defense-speed {
+  gap: 6px !important;
+}
+
+body.ctfmon-embedded .fortress-buttons button,
+body.ctfmon-embedded .fortress-items button,
+body.ctfmon-embedded .fortress-weapons button,
+body.ctfmon-embedded .defense-speed button {
+  min-height: 32px !important;
+  padding: 6px !important;
+  font-size: 0.72rem !important;
+}
+
+body.ctfmon-embedded .defense-toolbar,
+body.ctfmon-embedded .party-toolbar {
+  bottom: 12px !important;
+  max-height: min(22vh, 170px) !important;
+  opacity: 0.9;
+}
+
+body.ctfmon-embedded .defense-toolbar {
+  width: clamp(280px, calc(100vw - 420px), 620px) !important;
+}
+
+body.ctfmon-embedded .party-toolbar {
+  width: clamp(260px, calc(100vw - 420px), 560px) !important;
+}
+
+body.ctfmon-embedded .defense-toolbar-body {
+  max-height: calc(min(22vh, 170px) - 42px) !important;
+}
+
 .arena-shell {
   position: relative;
   width: 100vw;

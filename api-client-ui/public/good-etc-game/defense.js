@@ -3,6 +3,7 @@
   const siteBridge = window.goodEtcSiteBridge;
   const siteMode = Boolean(siteBridge?.enabled);
   const siteHost = Boolean(siteBridge?.isHost);
+  const trainingMode = params.get("training") === "1";
   const isSolo = ["solo", "local"].includes(params.get("mode") || "") || (siteMode && siteHost);
   const assetVersion = params.get("v") || "20260601storage";
   const storage = window.goodEtcStorage || localStorage;
@@ -323,7 +324,7 @@
 
   function createInitialState() {
     const sitePlayers =
-      siteMode && siteHost
+      siteMode && siteHost && !trainingMode
         ? siteBridge.playerRecords().map((record) => ({
             id: record.id,
             name: record.name,
@@ -813,13 +814,13 @@
   }
 
   function startSolo() {
-    clientId = siteMode ? siteBridge.myClientId : "local";
+    clientId = siteMode && !trainingMode ? siteBridge.myClientId : "local";
     state = createInitialState();
     const me = state.players.find((player) => player.id === clientId) || state.players[0];
-    me.name = siteMode ? me.name : cleanName(ui.name.value);
+    me.name = siteMode && !trainingMode ? me.name : cleanName(ui.name.value);
     storage.setItem("defense_name", me.name);
-    setStatus(siteMode ? "사이트 방장" : "혼자하기", true);
-    setCenter(siteMode ? "사이트 방 웨이브 디펜스가 시작되었습니다." : "타워를 배치하고 웨이브를 시작하세요.");
+    setStatus(trainingMode ? "훈련장" : siteMode ? "사이트 방장" : "혼자하기", true);
+    setCenter(trainingMode ? "훈련장 웨이브 디펜스가 시작되었습니다." : siteMode ? "사이트 방 웨이브 디펜스가 시작되었습니다." : "타워를 배치하고 웨이브를 시작하세요.");
     renderHud();
     broadcastSiteDefenseState(true);
   }
@@ -3101,8 +3102,8 @@
   renderMapOptions();
   if (isSolo) {
     ui.serverUrl.disabled = true;
-    ui.serverUrl.value = siteMode ? "CTFMON 사이트 방" : ui.serverUrl.value;
-    ui.connect.textContent = siteMode ? "사이트 방장" : "혼자 시작";
+    ui.serverUrl.value = trainingMode ? "훈련장: 로컬 진행" : siteMode ? "CTFMON 사이트 방" : ui.serverUrl.value;
+    ui.connect.textContent = trainingMode ? "훈련 시작" : siteMode ? "사이트 방장" : "혼자 시작";
     ui.disconnect.style.display = "none";
     startSolo();
   } else {

@@ -6,6 +6,8 @@
   const siteBridge = window.goodEtcSiteBridge;
   const siteMode = Boolean(siteBridge?.enabled);
   const siteHost = Boolean(siteBridge?.isHost);
+  const trainingMode = params.get("training") === "1";
+  const soloHostMode = trainingMode || params.get("soloHost") === "1";
   const mode = params.get("mode") === "multi" ? "multi" : "local";
   const requestedRole = params.get("role");
   const role =
@@ -260,6 +262,7 @@
   let latestShareUrl = "";
   let netInfoCopyTimer = 0;
   let siteLastBroadcast = 0;
+  let botActionAt = 0;
   const camera = { x: 0, y: 0, scale: 1 };
 
   function weaponConfig(key) {
@@ -296,10 +299,12 @@
   }
 
   function createInitialState() {
-    const sitePlayers = siteMode ? siteBridge.playerRecords() : [];
+    const allSitePlayers = siteMode ? siteBridge.playerRecords() : [];
+    const sitePlayers = siteMode && !soloHostMode ? allSitePlayers : [];
+    const soloPlayer = soloHostMode ? allSitePlayers[0] : null;
     const players = [
-      createPlayer(sitePlayers[0]?.name || "P1", sitePlayers[0]?.color || "#53e2a8", 420, 45, 8, 82),
-      createPlayer(sitePlayers[1]?.name || "P2", sitePlayers[1]?.color || "#ffbc54", 4780, 135, 98, 172),
+      createPlayer(soloPlayer?.name || sitePlayers[0]?.name || "P1", soloPlayer?.color || sitePlayers[0]?.color || "#53e2a8", 420, 45, 8, 82),
+      createPlayer(soloHostMode ? "AI 포트리스" : sitePlayers[1]?.name || "P2", soloHostMode ? "#ffbc54" : sitePlayers[1]?.color || "#ffbc54", 4780, 135, 98, 172, soloHostMode),
     ];
     const terrain = buildTerrain();
     placePlayers(players, terrain);
@@ -322,7 +327,7 @@
     });
   }
 
-  function createPlayer(name, color, x, angle, minAngle, maxAngle) {
+  function createPlayer(name, color, x, angle, minAngle, maxAngle, bot = false) {
     return {
       name,
       color,
@@ -341,6 +346,7 @@
       activeItem: "",
       items: { repair: 1, shield: 1, power: 1 },
       connected: true,
+      bot,
     };
   }
 
@@ -428,12 +434,14 @@
       !hasProjectiles() &&
       !state.turnDelayAt &&
       !state.turnLocked &&
+      !currentPlayer()?.bot &&
       (mode === "local" || mySlot === state.turn)
     );
   }
 
   function resetLocalGame() {
     state = createInitialState();
+    botActionAt = 0;
   }
 
   function action(type, payload = {}) {
@@ -643,6 +651,7 @@
     state.turn = state.turn === 0 ? 1 : 0;
     state.turnCount = (state.turnCount || 1) + 1;
     currentPlayer().moveLeft = moveBudgetMax;
+    botActionAt = 0;
     state.wind = randomWind();
     if (
       state.turnCount % 2 === 0 &&
@@ -662,6 +671,7 @@
     if (state.turnDelayAt && performance.now() >= state.turnDelayAt) {
       nextTurn();
     }
+    maybeRunLocalBotTurn(performance.now());
     updateProjectiles(dt);
     state.players.forEach((player) => {
       player.fallFlash = Math.max(0, (player.fallFlash || 0) - dt);
@@ -670,6 +680,54 @@
       state.explosion.age += dt;
       if (state.explosion.age > 0.55) state.explosion = null;
     }
+  }
+
+  function maybeRunLocalBotTurn(now) {
+    const player = currentPlayer();
+    if (!player?.bot || state.gameOver || hasProjectiles() || state.turnDelayAt || state.turnLocked) return;
+    if (!botActionAt) {
+      botActionAt = now + 850 + Math.random() * 750;
+      state.status = `${player.name} 조준 중...`;
+      return;
+    }
+    if (now < botActionAt) return;
+    botActionAt = 0;
+    runLocalBotAction();
+    syncUi();
+    broadcastSiteFortressState(true);
+  }
+
+  function runLocalBotAction() {
+    const player = currentPlayer();
+    if (!player?.bot) return;
+    const targetIndex = state.turn === 0 ? 1 : 0;
+    const target = state.players[targetIndex];
+    if (!target || target.health <= 0) {
+      finishTurnSoon();
+      return;
+    }
+    if (player.health <= 45 && player.items?.repair > 0 && Math.random() < 0.45) {
+      useItem("repair");
+      return;
+    }
+    if (player.items?.power > 0 && Math.random() < 0.35) {
+      player.activeItem = "power";
+    }
+    if ((player.moveLeft || 0) >= moveCost && Math.random() < 0.22) {
+      const awayFromEdge = player.x > world.width * 0.5 ? -1 : 1;
+      movePlayer(awayFromEdge * moveCost);
+    }
+    const dx = target.x - player.x;
+    const distanceX = Math.abs(dx);
+    const baseAngle = dx >= 0 ? 35 : 145;
+    const angleNoise = (Math.random() - 0.5) * 16;
+    player.angle = clamp(baseAngle + angleNoise, player.minAngle, player.maxAngle);
+    const windCompensation = Number(state.wind || 0) * (dx >= 0 ? -1 : 1) * 2.4;
+    const power = clamp(64 + distanceX / 36 + windCompensation + (Math.random() - 0.5) * 14, powerMin, powerMax);
+    player.power = clamp(Math.round(power / powerStep) * powerStep, powerMin, powerMax);
+    const weaponPool = player.activeItem === "power" ? ["standard", "impact", "burst"] : weaponOrder;
+    selectWeapon(weaponPool[Math.floor(Math.random() * weaponPool.length)] || defaultWeapon);
+    fire();
   }
 
   function updateProjectiles(dt) {
@@ -1206,8 +1264,9 @@
       window.innerWidth <= 560 ? 0.58 : window.innerWidth <= 900 ? 0.7 : 0.86;
     const viewWidth = window.innerWidth / camera.scale;
     const viewHeight = window.innerHeight / camera.scale;
+    const embedded = document.body.classList.contains("ctfmon-embedded");
     const panelReserve =
-      window.innerWidth > 900 && !ui.panel.classList.contains("collapsed")
+      !embedded && window.innerWidth > 900 && !ui.panel.classList.contains("collapsed")
         ? 380
         : 0;
     const desiredScreenX = panelReserve

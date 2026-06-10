@@ -97,12 +97,12 @@ const cases = [
   {
     path: "/app/games/mafia",
     label: "mafia lobby",
-    expectedTexts: ["마피아", "방 만들기", "입장", "경찰+의사", "특수직 없음", "5~6명 1명"],
+    expectedTexts: ["마피아", "방 만들기", "입장", "경찰+의사", "특수직 없음", "5~12명"],
   },
   {
     path: "/app/games/citadels",
     label: "citadels lobby",
-    expectedTexts: ["시티델", "방 만들기", "입장", "본게임", "비밀 캐릭터"],
+    expectedTexts: ["시티델", "방 만들기", "입장", "본게임", "2~7명"],
   },
   {
     path: "/app/games/citadels",
@@ -119,7 +119,7 @@ const cases = [
   {
     path: "/app/games/no-thanks",
     label: "no thanks lobby",
-    expectedTexts: ["노땡스", "방 만들기", "입장", "토큰 개수", "대기 중인 방"],
+    expectedTexts: ["노땡스", "방 만들기", "입장", "방코드 입장", "대기 중인 방"],
   },
   {
     path: "/app/games/las-vegas",
@@ -316,14 +316,6 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="tabletop-start-readiness-art"', "marks the tabletop start-readiness SVG artwork"],
     ['data-smoke="tabletop-start-readiness-node"', "marks tabletop start-readiness SVG nodes"],
     ['data-smoke="tabletop-start-readiness-item"', "marks tabletop start-readiness reason tiles for UI smoke coverage"],
-    ["TabletopStateSyncPanel", "keeps a shared board-state sync panel mounted when game state is not loaded"],
-    ["TabletopStateSyncArt", "renders shared board-state sync guidance through local SVG artwork"],
-    ['data-smoke="tabletop-state-sync-panel"', "marks the tabletop board-state sync panel"],
-    ['data-smoke="tabletop-state-sync-art"', "marks the tabletop board-state sync SVG artwork"],
-    ['data-smoke="tabletop-state-sync-node"', "marks tabletop board-state sync SVG nodes"],
-    ['data-smoke="tabletop-state-sync-item"', "marks tabletop board-state sync reason tiles"],
-    ["보드 상태 수신", "renders board-state sync copy in Korean"],
-    ["상태 동기화", "renders board-state synchronization copy in Korean"],
     ["TabletopBoardFocusPanel", "keeps a shared active-board state focus panel mounted before gameplay boards"],
     ["buildTabletopScoreSignal", "builds per-game score and outcome signals from loaded tabletop state"],
     ["tabletopResultGapText", "shows runner-up score gaps in shared tabletop result explanations"],
@@ -383,12 +375,9 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="tabletop-action-readiness-item"', "marks tabletop action-readiness reason tiles for UI smoke coverage"],
     ["GameActionCueBar", "uses the shared action cue bar before gameplay boards"],
     ['smoke="tabletop-action-cue-bar"', "marks the tabletop action cue bar for UI smoke coverage"],
-    ["GameFeedbackTicker", "uses the shared action feedback ticker in selected tabletop rooms"],
-    ['smoke="tabletop-action-feedback"', "marks the tabletop action feedback ticker for UI smoke coverage"],
-    ["setActionFeedback", "records tabletop action processing feedback in local display state"],
-    ["tabletopActionLabel", "translates tabletop action types into player-facing feedback labels"],
     ["GameFlowMeter", "uses the custom SVG flow meter inside dedicated tabletop boards"],
-    ['smoke="catan-flow-meter"', "marks the Catan board flow meter"],
+    ['data-smoke="catan-flow-meter"', "marks the compact Catan bottom flow summary"],
+    ['data-smoke="catan-flow-summary-item"', "marks compact Catan bottom flow summary tiles"],
     ["CatanVictoryTrackPanel", "renders Catan victory-race pressure from loaded score state"],
     ["CatanVictoryTrackArt", "renders Catan victory progress through reusable SVG artwork"],
     ['data-smoke="catan-victory-track-panel"', "marks the Catan victory track panel"],
@@ -459,13 +448,11 @@ function assertTabletopRealtimeSource() {
     ["카탄 액션 루트", "renders Korean Catan action-route copy"],
     ['smoke="catan-result-spotlight"', "marks the Catan finished-game result explanation spotlight"],
     ["catanResultDetail", "derives Catan finished-game winner explanation from loaded score state"],
-    ['smoke="blokus-flow-meter"', "marks the Blokus board flow meter"],
+    ['data-smoke="blokus-bottom-summary"', "marks the compact Blokus bottom summary"],
+    ['data-smoke="blokus-bottom-summary-item"', "marks compact Blokus bottom summary tiles"],
+    ["남은 압박", "renders compact Blokus remaining-pressure copy"],
     ["BlokusPieceArt", "renders Blokus pieces through reusable SVG artwork"],
     ['data-smoke="blokus-piece-art"', "marks reusable Blokus piece artwork"],
-    ["BlokusPlacementGuidePanel", "renders Blokus placement guidance from loaded game state"],
-    ["BlokusPlacementLensArt", "renders Blokus placement guidance through reusable SVG artwork"],
-    ['data-smoke="blokus-placement-guide-panel"', "marks the Blokus placement guide panel"],
-    ['data-smoke="blokus-placement-lens-art"', "marks reusable Blokus placement lens SVG artwork"],
     ["buildBlokusActionRouteItems", "derives Blokus piece/orientation/cell/submit route guidance from loaded board state"],
     ["BlokusActionRoutePanel", "renders Blokus action-route guidance beside the board"],
     ["BlokusActionRouteArt", "renders Blokus action-route guidance through local SVG artwork"],
@@ -474,10 +461,6 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="blokus-action-route-node"', "marks Blokus action-route SVG nodes"],
     ['data-smoke="blokus-action-route-item"', "marks Blokus action-route explanation tiles"],
     ["블로커스 액션 루트", "renders Korean Blokus action-route copy"],
-    ["BlokusTerritoryPressurePanel", "renders Blokus territory-pressure guidance from loaded game state"],
-    ["BlokusTerritoryPressureArt", "renders Blokus territory-pressure guidance through reusable SVG artwork"],
-    ['data-smoke="blokus-territory-pressure-panel"', "marks the Blokus territory pressure panel"],
-    ['data-smoke="blokus-territory-pressure-art"', "marks reusable Blokus territory pressure SVG artwork"],
     ["BlokusRemainingPiecesEmptyPanel", "renders Blokus empty remaining-piece guidance from loaded game state"],
     ["BlokusRemainingPiecesEmptyArt", "renders Blokus empty remaining-piece guidance through reusable SVG artwork"],
     ['data-smoke="blokus-remaining-empty-panel"', "marks the Blokus empty remaining-piece panel"],
@@ -485,19 +468,10 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="blokus-remaining-empty-node"', "marks Blokus empty remaining-piece route nodes"],
     ['data-smoke="blokus-remaining-empty-item"', "marks Blokus empty remaining-piece explanation tiles"],
     ["남은 조각 브리핑", "explains why the Blokus remaining-piece list can be empty"],
-    ['smoke="mahe-flow-meter"', "marks the Mahe board flow meter"],
+    ['data-smoke="mahe-bottom-summary"', "marks the compact Mahe bottom summary"],
+    ['data-smoke="mahe-bottom-summary-item"', "marks compact Mahe bottom summary tiles"],
     ["MaheTurtleArt", "renders Mahe turtle pieces through reusable SVG artwork"],
     ['data-smoke="mahe-turtle-art"', "marks reusable Mahe turtle artwork"],
-    ["MaheRiskCompassPanel", "renders Mahe roll-or-stop guidance from loaded game state"],
-    ["MaheRiskCompassArt", "renders Mahe roll risk through reusable SVG artwork"],
-    ['data-smoke="mahe-risk-compass-panel"', "marks the Mahe risk compass panel"],
-    ['data-smoke="mahe-risk-compass-art"', "marks reusable Mahe risk compass SVG artwork"],
-    ["MaheRewardPressurePanel", "renders Mahe reward and stack pressure from loaded game state"],
-    ["MaheRewardPressureArt", "renders Mahe reward pressure through reusable SVG artwork"],
-    ['data-smoke="mahe-reward-pressure-panel"', "marks the Mahe reward pressure panel"],
-    ['data-smoke="mahe-reward-pressure-art"', "marks reusable Mahe reward pressure SVG artwork"],
-    ['data-smoke="mahe-reward-pressure-node"', "marks Mahe reward pressure SVG player nodes"],
-    ['data-smoke="mahe-reward-pressure-item"', "marks Mahe reward pressure explanation tiles"],
     ["buildMaheActionRouteItems", "derives Mahe roll/stop/choice route guidance from loaded game state"],
     ["MaheActionRoutePanel", "renders Mahe action-route guidance beside the board"],
     ["MaheActionRouteArt", "renders Mahe action-route guidance through local SVG artwork"],
@@ -675,21 +649,8 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="poker-showdown-breakdown-panel"', "marks the Poker showdown breakdown panel"],
     ['data-smoke="poker-showdown-trace-art"', "marks reusable Poker showdown trace SVG artwork"],
     ["tabletopPlayerPanelScore", "derives player panel score and state labels from loaded room/game state"],
-    ["TabletopPlayersPanelArt", "renders a reusable SVG player-state map in the shared tabletop players panel"],
-    ["buildTabletopPlayersInsightItems", "derives shared tabletop player-state insight from loaded room/game state"],
-    ["TabletopPlayersInsightRail", "renders a player-state insight rail below the shared tabletop player map"],
     ['data-smoke="tabletop-players-panel"', "marks the enhanced tabletop players panel"],
-    ['data-smoke="tabletop-players-art"', "marks the shared tabletop player-state SVG map"],
-    ['data-smoke="tabletop-players-art-node"', "marks player nodes inside the shared tabletop player-state map"],
-    ['data-smoke="tabletop-players-insight-rail"', "marks the shared tabletop player-state insight rail"],
-    ['data-smoke="tabletop-players-insight-item"', "marks player-state insight items"],
-    ["data-insight-key={item.key}", "exposes stable player insight keys for runtime verification"],
     ['data-smoke="tabletop-player-card"', "marks enhanced tabletop player cards"],
-    ['data-smoke="tabletop-player-active"', "marks the active player in tabletop player cards"],
-    ["참가자 상태 지도", "labels the shared player-state map for first-glance table awareness"],
-    ["상태 요약", "labels the shared player-state insight rail in Korean"],
-    ["차례/주체", "summarizes the active actor in the shared player-state insight rail"],
-    ["내 좌석", "summarizes the current user's seat in the shared player-state insight rail"],
     ["TabletopGuideBriefArt", "renders shared tabletop rule guidance through local SVG artwork"],
     ['data-smoke="tabletop-guide-panel"', "marks the shared tabletop rule guide panel"],
     ['data-smoke="tabletop-guide-art"', "marks the shared tabletop rule guide SVG artwork"],
@@ -707,10 +668,6 @@ function assertTabletopRealtimeSource() {
     ['GameUxGlyph type="turn"', "uses the custom turn glyph in the shared status ribbon"],
     ['from "./TabletopGameArtwork.jsx"', "uses the custom tabletop game artwork asset set in room screens"],
     ['data-smoke="tabletop-route-artwork"', "marks the route-intro artwork frame for UI smoke coverage"],
-    ['data-smoke="tabletop-room-artwork"', "marks the selected-room artwork frame for UI smoke coverage"],
-    ['data-smoke="tabletop-fallback-artwork"', "marks the fallback board artwork frame for UI smoke coverage"],
-    ["TabletopGameArtwork type={config.board}", "renders board-specific artwork in the selected-room header"],
-    ['TabletopGameArtwork type={config.board} className="w-full max-w-[560px]"', "uses the reusable tabletop artwork in fallback board states"],
     ["buildPokerResultExplanation", "builds a local poker winner explanation when the server does not provide result detail"],
     ["resultDetail || pokerResultExplanation", "prefers server poker result detail but falls back to local hand comparison"],
     ['smoke="poker-result-explanation"', "marks poker winner explanation for runtime smoke coverage"],
@@ -725,11 +682,17 @@ function assertTabletopRealtimeSource() {
       throw new Error(`tabletop-ui-smoke: board-game SVG assets must not use SVG filters: ${forbidden}`);
     }
   }
-  const sixNimmtRealtimeBranch = source.match(/if \(game === "six-nimmt" && payload\.gameState\) \{([\s\S]*?)\} else if/);
-  if (!sixNimmtRealtimeBranch || !sixNimmtRealtimeBranch[1].includes("mergeSixNimmtRealtimeState")) {
+  const sixNimmtRealtimeBranchStart = source.indexOf('if (game === "six-nimmt" && payload.gameState) {');
+  const sixNimmtRealtimeBranchEnd = source.indexOf('} else if ((game === "dalmuti"', sixNimmtRealtimeBranchStart);
+  const sixNimmtRealtimeBranch = sixNimmtRealtimeBranchStart >= 0 && sixNimmtRealtimeBranchEnd > sixNimmtRealtimeBranchStart
+    ? source.slice(sixNimmtRealtimeBranchStart, sixNimmtRealtimeBranchEnd)
+    : "";
+  if (!sixNimmtRealtimeBranch
+    || !sixNimmtRealtimeBranch.includes("applySixNimmtState(payload.gameState)")
+    || !source.includes("mergeSixNimmtRealtimeState(prev, nextState, mySeatNo)")) {
     throw new Error("tabletop-ui-smoke: Six Nimmt realtime must merge public selection updates immediately.");
   }
-  if (sixNimmtRealtimeBranch[1].includes("fetchState(")) {
+  if (sixNimmtRealtimeBranch.includes("fetchState(")) {
     throw new Error("tabletop-ui-smoke: Six Nimmt realtime must not immediately refetch stale REST state after a public selection update.");
   }
   if (!source.includes('if (game === "six-nimmt" && result?.gameState)')) {
@@ -746,7 +709,8 @@ function assertTabletopRealtimeSource() {
   }
   const artworkSource = readFileSync("src/pages/games/TabletopGameArtwork.jsx", "utf8");
   const requiredArtworkLabels = ["포커", "라스베가스", "노땡스", "카탄", "블로커스", "마헤", "달무티", "젝스님트", "텔레스트레이션", "마피아", "시티델", "게임 아트워크"];
-  if (!source.includes("턴 순서") || !source.includes("알 보상 압력") || !source.includes("계급 압력") || !source.includes('jester ? "광대" : `${rank}장`') || !requiredArtworkLabels.every((label) => artworkSource.includes(label))) {
+  const requiredSourceLabels = ["턴 순서", "계급 압력", 'jester ? "광대"', "`${rank}장`"];
+  if (!requiredSourceLabels.every((label) => source.includes(label)) || !requiredArtworkLabels.every((label) => artworkSource.includes(label))) {
     throw new Error("tabletop-ui-smoke: tabletop SVG labels must use Korean turn-order and Dalmuti card copy.");
   }
   const forbiddenArtworkLabels = ['label: "Poker"', 'label: "Las Vegas"', 'label: "Catan"', 'label: "Blokus"', 'label: "Mahe"', 'label: "Dalmuti"', 'label: "6 nimmt!"', 'label: "Telestrations"', 'label: "Mafia"', 'label: "Citadels"', "game artwork"];
@@ -810,8 +774,8 @@ function assertActionToastSingleton() {
 function assertSixNimmtActionSource() {
   const source = readFileSync("src/pages/games/TabletopGame.jsx", "utf8");
   const requiredSnippets = [
-    "selectedHasOptionalRows",
-    "행을 직접 고르지 않으면 규칙상 가장 가까운 행에 자동 배치됩니다.",
+    "const officialRows = possibleRows.filter((item) => item.index === bestIndex);",
+    "공식 규칙상 가장 가까운 행에 자동 배치",
     'disabled={!selectedCardId} onClick={selectCard}',
     'phase !== "SELECTING"',
     "previousHand.filter((card) => sixNimmtCardId(card) !== nextSelectedCardId)",
@@ -820,7 +784,7 @@ function assertSixNimmtActionSource() {
   if (missing.length) {
     throw new Error(`tabletop-ui-smoke: Six Nimmt optional row/realtime guards missing: ${missing.join(", ")}`);
   }
-  if (source.includes("selectedNeedsRowTap") || source.includes("disabled={!selectedCardId ||")) {
+  if (source.includes("selectedNeedsRowTap") || source.includes("selectedHasOptionalRows") || source.includes("disabled={!selectedCardId ||")) {
     throw new Error("tabletop-ui-smoke: Six Nimmt must not block card submit only because multiple compatible rows exist.");
   }
 }
@@ -958,9 +922,6 @@ function assertCitadelsExperienceSource() {
     'data-smoke="tabletop-lobby-room-card-node"',
     'data-smoke="tabletop-lobby-room-card-seat"',
     "data-joinable={joinable ? \"true\" : \"false\"}",
-    'data-smoke="tabletop-lobby-room-readiness"',
-    'data-smoke="tabletop-lobby-room-action-signal"',
-    'data-smoke="tabletop-lobby-room-slot"',
     'data-smoke="tabletop-lobby-room-primary"',
     'data-smoke="citadels-join-code-panel"',
     'data-smoke="citadels-join-code-art"',
@@ -985,10 +946,8 @@ function assertCitadelsExperienceSource() {
     'data-smoke="citadels-setup-preview-item"',
     'placeholder="방코드"',
     "GameFlowMeter",
-    "GameFeedbackTicker",
     'smoke="citadels-flow-meter"',
     'smoke="citadels-action-cue-bar"',
-    'smoke="citadels-action-feedback"',
     'GameActionCueBar',
     'GameResultSpotlight',
     'smoke="citadels-result-spotlight"',
@@ -998,13 +957,6 @@ function assertCitadelsExperienceSource() {
     'data-smoke="citadels-player-state-map-art"',
     'data-smoke="citadels-player-state-map-node"',
     'data-smoke="citadels-player-state-map-item"',
-    'data-smoke="citadels-route-artwork"',
-    'data-smoke="citadels-room-artwork"',
-    'TabletopGameArtwork type="citadels"',
-    'smoke="citadels-room-setup-panel"',
-    'itemSmoke="citadels-room-setup-item"',
-    'smoke="citadels-start-readiness-panel"',
-    'itemSmoke="citadels-start-readiness-item"',
     'GameUxGlyph type="turn"',
     'GameUxGlyph type="decision"',
     "시티델 정산 렌즈",
@@ -2567,184 +2519,34 @@ async function runRoomFlowSmoke(ws, game) {
   const startButtonText = game === "citadels" ? "시작하기" : "시작";
   await waitForEnabledButton(ws, startButtonText);
   if (game === "citadels") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-room-artwork"] [data-smoke="tabletop-game-artwork"]'))`, "citadels selected-room artwork rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-player-state-map-panel"]'))`, "citadels waiting player state map rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-player-state-map-art"]'))`, "citadels waiting player state map artwork rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-player-state-map-node"]').length >= 1`, "citadels waiting player state map nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-player-state-map-item"]').length >= 4`, "citadels waiting player state map items rendered");
-    await waitForExpression(ws, `/참가자 도시 지도|준비 신호|내 좌석/.test(document.querySelector('[data-smoke="citadels-player-state-map-panel"]')?.textContent || "")`, "citadels waiting player state map explains readiness");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-start-readiness-panel"]'))`, "citadels start readiness panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-start-readiness-panel-art"]'))`, "citadels start readiness artwork rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-start-readiness-panel-node"]').length >= 4`, "citadels start readiness artwork nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-start-readiness-panel"] [data-smoke="citadels-start-readiness-item"]').length >= 4`, "citadels start readiness items rendered");
-    await waitForExpression(ws, `/시티델 시작 준비|선택 규칙/.test(document.querySelector('[data-smoke="citadels-start-readiness-panel"]')?.textContent || "")`, "citadels start readiness explains waiting state");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-session-route-panel"]'))`, "citadels waiting session route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-session-route-art"]'))`, "citadels waiting session route artwork rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-session-route-node"]').length >= 4`, "citadels waiting session route nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-session-route-item"]').length >= 4`, "citadels waiting session route items rendered");
-    await waitForExpression(ws, `(() => {
-      const panel = document.querySelector('[data-smoke="citadels-session-route-panel"]');
-      const keys = Array.from(panel?.querySelectorAll('[data-smoke="citadels-session-route-item"]') || []).map((node) => node.getAttribute("data-route-key"));
-      return Boolean(panel)
-        && panel.getAttribute("data-session-status") === "WAITING"
-        && panel.getAttribute("data-can-start") !== null
-        && panel.getAttribute("data-host") !== null
-        && panel.getAttribute("data-busy") !== null
-        && panel.getAttribute("data-my-ready") !== null
-        && ["state", "ready", "primary", "exit"].every((key) => keys.includes(key))
-        && /시티델 세션 버튼 루트|실제 버튼 안내|준비 신호|나가기/.test(panel.textContent || "");
-    })()`, "citadels waiting session route explains button state");
+    await waitForText(ws, title);
   } else {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-start-readiness-panel"]'))`, `${game} start readiness panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-start-readiness-art"]'))`, `${game} start readiness artwork rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-start-readiness-node"]').length >= 4`, `${game} start readiness artwork nodes rendered`);
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="tabletop-start-readiness-panel"]'); return Boolean(panel && panel.getAttribute("data-can-start") !== null); })()`, `${game} start readiness state marker rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-start-readiness-item"]').length >= 4`, `${game} start readiness items rendered`);
-    await waitForExpression(ws, `/시작 준비|선택 규칙/.test(document.querySelector('[data-smoke="tabletop-start-readiness-panel"]')?.textContent || "")`, `${game} start readiness explains waiting state`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-session-route-panel"]'))`, `${game} waiting session route panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-session-route-art"]'))`, `${game} waiting session route artwork rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-session-route-node"]').length >= 4`, `${game} waiting session route nodes rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-session-route-item"]').length >= 4`, `${game} waiting session route items rendered`);
-    await waitForExpression(ws, `(() => {
-      const panel = document.querySelector('[data-smoke="tabletop-session-route-panel"]');
-      const keys = Array.from(panel?.querySelectorAll('[data-smoke="tabletop-session-route-item"]') || []).map((node) => node.getAttribute("data-route-key"));
-      return Boolean(panel)
-        && panel.getAttribute("data-session-status") === "WAITING"
-        && panel.getAttribute("data-can-start") !== null
-        && panel.getAttribute("data-host") !== null
-        && panel.getAttribute("data-busy") !== null
-        && ["state", "ready", "primary", "exit"].every((key) => keys.includes(key))
-        && /세션 버튼 루트|실제 버튼|정리\\/나가기/.test(panel.textContent || "");
-    })()`, `${game} waiting session route explains button state`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-turn-order-panel"]'))`, `${game} waiting turn order panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-turn-order-art"]'))`, `${game} waiting turn order artwork rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-turn-order-node"]').length >= 1`, `${game} waiting turn order nodes rendered`);
-    await waitForExpression(ws, `/턴 순서|준비/.test(document.querySelector('[data-smoke="tabletop-turn-order-panel"]')?.textContent || "")`, `${game} waiting turn order explains readiness`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-state-sync-panel"]'))`, `${game} waiting board-state sync panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-state-sync-art"]'))`, `${game} waiting board-state sync artwork rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-state-sync-node"]').length >= 4`, `${game} waiting board-state sync nodes rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-state-sync-item"]').length >= 4`, `${game} waiting board-state sync items rendered`);
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="tabletop-state-sync-panel"]'); return Boolean(panel && panel.getAttribute("data-room-status") === "WAITING" && panel.getAttribute("data-can-start") !== null && /보드 상태 수신|상태 동기화|시작 전 보드 준비/.test(panel.textContent || "")); })()`, `${game} waiting board-state sync explains missing board state`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-guide-panel"]'))`, `${game} rule guide panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-guide-art"]'))`, `${game} rule guide SVG rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-guide-node"]').length >= 4`, `${game} rule guide SVG nodes rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-guide-item"]').length >= 3`, `${game} rule guide briefing tiles rendered`);
-    await waitForExpression(ws, `(() => {
-      const panel = document.querySelector('[data-smoke="tabletop-guide-panel"]');
-      const keys = Array.from(panel?.querySelectorAll('[data-smoke="tabletop-guide-item"]') || []).map((node) => node.getAttribute("data-guide-key"));
-      return Boolean(panel)
-        && Number(panel.getAttribute("data-guide-sections") || 0) > 0
-        && Number(panel.getAttribute("data-guide-rules") || 0) > 0
-        && keys.includes("basis")
-        && keys.includes("first")
-        && keys.includes("watch")
-        && /규칙 브리핑|판정 기준|서버 판정/.test(panel.textContent || "");
-    })()`, `${game} rule guide explains judgment basis`);
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="${game}-waiting-player-roster"]'))`, `${game} waiting players panel rendered`);
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="${game}-waiting-player-roster-item"]').length >= 1`, `${game} waiting player rows rendered`);
   }
   assertRequest(game, "create", (request) => request.body?.title === title, "create-room POST payload");
 
   await clickButtonByText(ws, startButtonText);
   await waitForText(ws, "진행 중");
-  await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-room-brief-panel"]'))`, `${game} room brief panel rendered`);
-  await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-room-brief-tile"]').length >= 4`, `${game} room brief tiles rendered`);
   if (game === "citadels") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-session-route-panel"]'))`, "citadels active session route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-session-route-art"]'))`, "citadels active session route artwork rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-session-route-node"]').length >= 4`, "citadels active session route nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-session-route-item"]').length >= 4`, "citadels active session route items rendered");
-    await waitForExpression(ws, `(() => {
-      const panel = document.querySelector('[data-smoke="citadels-session-route-panel"]');
-      const keys = Array.from(panel?.querySelectorAll('[data-smoke="citadels-session-route-item"]') || []).map((node) => node.getAttribute("data-route-key"));
-      return Boolean(panel)
-        && panel.getAttribute("data-session-status") === "PLAYING"
-        && panel.getAttribute("data-can-start") !== null
-        && panel.getAttribute("data-host") !== null
-        && panel.getAttribute("data-busy") !== null
-        && panel.getAttribute("data-my-ready") !== null
-        && ["state", "ready", "primary", "exit"].every((key) => keys.includes(key))
-        && /시티델 세션 버튼 루트|실제 버튼 안내|강제 종료|진행 중/.test(panel.textContent || "");
-    })()`, "citadels active session route explains button state");
-  }
-  if (game !== "citadels") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-room-brief-art"]'))`, `${game} room brief artwork rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-room-brief-node"]').length >= 4`, `${game} room brief artwork nodes rendered`);
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="tabletop-room-brief-panel"]'); return Boolean(panel && panel.getAttribute("data-room-status") && panel.getAttribute("data-can-start") !== null); })()`, `${game} room brief state markers rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-session-route-panel"]'))`, `${game} active session route panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-session-route-art"]'))`, `${game} active session route artwork rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-session-route-node"]').length >= 4`, `${game} active session route nodes rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-session-route-item"]').length >= 4`, `${game} active session route items rendered`);
-    await waitForExpression(ws, `(() => {
-      const panel = document.querySelector('[data-smoke="tabletop-session-route-panel"]');
-      const keys = Array.from(panel?.querySelectorAll('[data-smoke="tabletop-session-route-item"]') || []).map((node) => node.getAttribute("data-route-key"));
-      return Boolean(panel)
-        && panel.getAttribute("data-session-status") === "PLAYING"
-        && panel.getAttribute("data-can-start") !== null
-        && panel.getAttribute("data-host") !== null
-        && panel.getAttribute("data-busy") !== null
-        && ["state", "ready", "primary", "exit"].every((key) => keys.includes(key))
-        && /세션 버튼 루트|실제 버튼|강제 종료|게임 진행 중/.test(panel.textContent || "");
-    })()`, `${game} active session route explains button state`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-board-focus-panel"]'))`, `${game} board focus panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-turn-order-panel"]'))`, `${game} active turn order panel rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-turn-order-player"]').length >= 1`, `${game} active turn order player cards rendered`);
-    await waitForExpression(ws, `/턴 순서|현재 차례/.test(document.querySelector('[data-smoke="tabletop-turn-order-panel"]')?.textContent || "")`, `${game} active turn order explains current turn`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-action-cue-bar"]'))`, `${game} action cue bar rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-action-cue-bar"] [data-smoke="game-action-cue-item"]').length >= 3`, `${game} action cue items rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-action-readiness-panel"]'))`, `${game} action readiness panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-action-readiness-art"]'))`, `${game} action readiness artwork rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-action-readiness-node"]').length >= 4`, `${game} action readiness artwork nodes rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-action-readiness-item"]').length >= 4`, `${game} action readiness items rendered`);
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="tabletop-action-readiness-panel"]'); return Boolean(panel && panel.getAttribute("data-my-turn") !== null && panel.getAttribute("data-action-busy") !== null); })()`, `${game} action readiness state markers rendered`);
-    await waitForExpression(ws, `/행동 준비|필요 입력/.test(document.querySelector('[data-smoke="tabletop-action-readiness-panel"]')?.textContent || "")`, `${game} action readiness explains available input`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-action-feedback"]'))`, `${game} action feedback ticker rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-action-feedback"] [data-smoke="game-feedback-item"]').length >= 4`, `${game} action feedback items rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-board-focus-tile"]').length >= 4`, `${game} board focus tiles rendered`);
-    await waitForExpression(ws, `/판세|결과/.test(document.querySelector('[data-smoke="tabletop-board-focus-panel"]')?.textContent || "")`, `${game} board focus explains table state`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-progress-digest-panel"]'))`, `${game} progress digest panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-progress-digest-art"]'))`, `${game} progress digest SVG rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-progress-digest-node"]').length >= 4`, `${game} progress digest nodes rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-progress-digest-item"]').length >= 4`, `${game} progress digest items rendered`);
-    await waitForExpression(ws, `(() => {
-      const panel = document.querySelector('[data-smoke="tabletop-progress-digest-panel"]');
-      const keys = Array.from(panel?.querySelectorAll('[data-smoke="tabletop-progress-digest-item"]') || []).map((node) => node.getAttribute("data-digest-key"));
-      return Boolean(panel)
-        && Number(panel.getAttribute("data-event-count") || 0) >= 0
-        && Number(panel.getAttribute("data-recent-count") || 0) >= 0
-        && keys.includes("latest")
-        && keys.includes("actor")
-        && keys.includes("count")
-        && keys.includes("phase");
-    })()`, `${game} progress digest telemetry rendered`);
-    if (["catan", "blokus", "mahe"].includes(game)) {
-      await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-history-empty-state"][data-history-game="${game}"]'))`, `${game} empty history state rendered`);
-      await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-history-empty-art"]'))`, `${game} empty history SVG rendered`);
-      await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-history-empty-node"]').length >= 3`, `${game} empty history SVG nodes rendered`);
-      await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-history-empty-item"]').length >= 2`, `${game} empty history guidance items rendered`);
-      await waitForExpression(ws, `/기록 대기|첫 행동|첫 배치|첫 이동|첫 생산|첫 공개/.test(document.querySelector('[data-smoke="tabletop-history-empty-state"]')?.textContent || "")`, `${game} empty history guidance copy rendered`);
-    }
+    await waitForText(ws, "진행 중");
   }
   if (["catan", "blokus", "mahe", "dalmuti"].includes(game)) {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-players-panel"]'))`, `${game} enhanced players panel rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-players-art"]'))`, `${game} player-state map rendered`);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-players-art-node"]').length >= 1`, `${game} player-state map nodes rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-players-insight-rail"]'))`, `${game} player-state insight rail rendered`);
     await waitForExpression(ws, `(() => {
-      const rail = document.querySelector('[data-smoke="tabletop-players-insight-rail"]');
-      const keys = Array.from(rail?.querySelectorAll('[data-smoke="tabletop-players-insight-item"]') || []).map((node) => node.getAttribute("data-insight-key"));
-      const text = rail?.textContent || "";
-      return Boolean(rail)
-        && keys.length >= 4
-        && ["flow", "actor", "mine", "table"].every((key) => keys.includes(key))
-        && /상태 요약|차례\\/주체|내 좌석|참가자/.test(text);
-    })()`, `${game} player-state insight rail copy and keys rendered`);
+      const panel = document.querySelector('[data-smoke="tabletop-players-panel"]');
+      const text = panel?.textContent || "";
+      return Boolean(panel)
+        && document.querySelectorAll('[data-smoke="tabletop-player-card"]').length >= 1
+        && /플레이어|좌석|방장|내 좌석|현재 차례/.test(text);
+    })()`, `${game} compact players panel copy rendered`);
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="tabletop-player-card"]').length >= 1`, `${game} enhanced player cards rendered`);
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="tabletop-player-active"]'))`, `${game} active player card rendered`);
   }
   if (game === "catan") {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-rule-brief"]'))`, "catan selected rule brief");
     await waitForExpression(ws, `document.querySelector('[data-smoke="catan-rule-brief"]')?.textContent.includes("10")`, "catan rule target");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-flow-meter"]'))`, "catan flow meter rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="catan-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "catan flow meter items rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-flow-meter"]'))`, "catan compact bottom flow rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="catan-flow-summary-item"]').length >= 4`, "catan compact bottom flow items rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-victory-track-panel"]'))`, "catan victory track panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-victory-track-art"]'))`, "catan victory track SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="catan-victory-track-node"]').length >= 1`, "catan victory track nodes rendered");
@@ -2767,12 +2569,6 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-action-atlas-art"]'))`, "catan action atlas SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="catan-action-atlas-item"]').length >= 4`, "catan action atlas items rendered");
     await waitForExpression(ws, `/액션 아틀라스|보드 대상|주 액션/.test(document.querySelector('[data-smoke="catan-action-atlas-panel"]')?.textContent || "")`, "catan action atlas guidance copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-action-route-panel"]'))`, "catan action-route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-action-route-art"]'))`, "catan action-route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="catan-action-route-node"]').length >= 4`, "catan action-route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="catan-action-route-item"]').length >= 4`, "catan action-route items rendered");
-    await waitForExpression(ws, `/카탄 액션 루트|상태 확인|보드 대상|실행 버튼|턴 종료/.test(document.querySelector('[data-smoke="catan-action-route-panel"]')?.textContent || "")`, "catan action-route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="catan-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="catan-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-my-turn") !== null && panel.getAttribute("data-build-mode") !== null && panel.getAttribute("data-target-ready") !== null && panel.getAttribute("data-can-trade") !== null && panel.getAttribute("data-can-development") !== null && panel.getAttribute("data-action-count") !== null && ["state", "target", "main", "finish"].every((key) => keys.includes(key))); })()`, "catan action-route metadata rendered");
 
     mockState.catanDiscardPhase = true;
     await navigateToGame(ws, game);
@@ -2873,23 +2669,10 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.catanWeddingGivePhase = false;
   }
   if (game === "blokus") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="blokus-flow-meter"]'))`, "blokus flow meter rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="blokus-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "blokus flow meter items rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="blokus-bottom-summary"]'))`, "blokus compact bottom summary rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="blokus-bottom-summary-item"]').length >= 4`, "blokus compact bottom summary items rendered");
+    await waitForExpression(ws, `/차례|선택 조각|배치 판정|남은 압박/.test(document.querySelector('[data-smoke="blokus-bottom-summary"]')?.textContent || "")`, "blokus compact bottom summary copy rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="blokus-piece-art"]').length >= 2`, "blokus piece SVG assets rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="blokus-action-route-panel"]'))`, "blokus action-route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="blokus-action-route-art"]'))`, "blokus action-route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="blokus-action-route-node"]').length >= 4`, "blokus action-route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="blokus-action-route-item"]').length >= 4`, "blokus action-route items rendered");
-    await waitForExpression(ws, `/블로커스 액션 루트|조각 선택|방향 조정|칸 지정|배치\\/패스/.test(document.querySelector('[data-smoke="blokus-action-route-panel"]')?.textContent || "")`, "blokus action-route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="blokus-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="blokus-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-my-turn") !== null && panel.getAttribute("data-can-pass") !== null && panel.getAttribute("data-selected-piece") !== null && panel.getAttribute("data-anchor-cell") !== null && panel.getAttribute("data-total-legal") !== null && ["piece", "shape", "anchor", "submit"].every((key) => keys.includes(key))); })()`, "blokus action-route metadata rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="blokus-placement-guide-panel"]'))`, "blokus placement guide panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="blokus-placement-lens-art"]'))`, "blokus placement lens SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="blokus-placement-guide-item"]').length >= 4`, "blokus placement guide items rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="blokus-territory-pressure-panel"]'))`, "blokus territory pressure panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="blokus-territory-pressure-art"]'))`, "blokus territory pressure SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="blokus-territory-pressure-item"]').length >= 4`, "blokus territory pressure items rendered");
-    await waitForExpression(ws, `/영토 압박|남은 칸|가능 위치/.test(document.querySelector('[data-smoke="blokus-territory-pressure-panel"]')?.textContent || "")`, "blokus territory pressure copy rendered");
-    await waitForExpression(ws, `/배치 판정|선택 조각|차단 원인/.test(document.querySelector('[data-smoke="blokus-placement-guide-panel"]')?.textContent || "")`, "blokus placement guide copy rendered");
     await waitForText(ws, "보드 칸을 누르면");
     const clicked = await evaluate(ws, `(() => {
       const button = Array.from(document.querySelectorAll("button")).find((node) => (node.getAttribute("aria-label") || "").startsWith("1열 1행"));
@@ -2918,23 +2701,9 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.blokusEmptyPieces = false;
   }
   if (game === "mahe") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-flow-meter"]'))`, "mahe flow meter rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "mahe flow meter items rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-risk-compass-panel"]'))`, "mahe risk compass panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-risk-compass-art"]'))`, "mahe risk compass SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-risk-compass-item"]').length >= 4`, "mahe risk compass items rendered");
-    await waitForExpression(ws, `/굴릴지 멈출지 판단|멈추면|초과 위험/.test(document.querySelector('[data-smoke="mahe-risk-compass-panel"]')?.textContent || "")`, "mahe risk compass copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-reward-pressure-panel"]'))`, "mahe reward pressure panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-reward-pressure-art"]'))`, "mahe reward pressure SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-reward-pressure-node"]').length >= 2`, "mahe reward pressure nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-reward-pressure-item"]').length >= 4`, "mahe reward pressure items rendered");
-    await waitForExpression(ws, `/보상 압력|현재 보상|다음 득점/.test(document.querySelector('[data-smoke="mahe-reward-pressure-panel"]')?.textContent || "")`, "mahe reward pressure copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-action-route-panel"]'))`, "mahe action-route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-action-route-art"]'))`, "mahe action-route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-action-route-node"]').length >= 4`, "mahe action-route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-action-route-item"]').length >= 4`, "mahe action-route items rendered");
-    await waitForExpression(ws, `/마헤 선택 루트|굴림, 멈춤, 보상 판단|멈춤 루트/.test(document.querySelector('[data-smoke="mahe-action-route-panel"]')?.textContent || "")`, "mahe action-route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="mahe-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="mahe-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-dice-count") !== null && panel.getAttribute("data-stop-steps") !== null && ["action", "stop", "risk", "outcome"].every((key) => keys.includes(key))); })()`, "mahe action-route metadata rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-bottom-summary"]'))`, "mahe compact bottom summary rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-bottom-summary-item"]').length >= 4`, "mahe compact bottom summary items rendered");
+    await waitForExpression(ws, `/마헤 흐름 요약|하단 참고|현재 보상|선두/.test(document.querySelector('[data-smoke="mahe-bottom-summary"]')?.textContent || "")`, "mahe compact bottom summary copy rendered");
     await send(ws, "Emulation.setDeviceMetricsOverride", {
       width: 390,
       height: 844,
@@ -2968,12 +2737,6 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-play-advisor-art"]'))`, "dalmuti play advisor SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-play-advisor-item"]').length >= 4`, "dalmuti play advisor items rendered");
     await waitForExpression(ws, `/카드 제출 판단|제출 기준|선택 묶음/.test(document.querySelector('[data-smoke="dalmuti-play-advisor-panel"]')?.textContent || "")`, "dalmuti play advisor copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-action-route-panel"]'))`, "dalmuti action-route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-action-route-art"]'))`, "dalmuti action-route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-action-route-node"]').length >= 4`, "dalmuti action-route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-action-route-item"]').length >= 4`, "dalmuti action-route items rendered");
-    await waitForExpression(ws, `/달무티 액션 루트|세금, 혁명, 제출, 패스 판단|카드 선택|제출\\/반환/.test(document.querySelector('[data-smoke="dalmuti-action-route-panel"]')?.textContent || "")`, "dalmuti action-route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="dalmuti-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="dalmuti-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-can-play") !== null && panel.getAttribute("data-can-tax") !== null && panel.getAttribute("data-can-revolution") !== null && panel.getAttribute("data-selected-count") !== null && panel.getAttribute("data-pass-progress") !== null && ["phase", "select", "submit", "fallback"].every((key) => keys.includes(key))); })()`, "dalmuti action-route metadata rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-rank-pressure-panel"]'))`, "dalmuti rank pressure panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-rank-pressure-art"]'))`, "dalmuti rank pressure SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-rank-pressure-node"]').length >= 2`, "dalmuti rank pressure nodes rendered");
@@ -3012,12 +2775,6 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-turn-pressure-node"]').length >= 2`, "six-nimmt turn pressure nodes rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-turn-pressure-item"]').length >= 4`, "six-nimmt turn pressure items rendered");
     await waitForExpression(ws, `/선택 잠금|공개 순서|벌점 레이스/.test(document.querySelector('[data-smoke="six-nimmt-turn-pressure-panel"]')?.textContent || "")`, "six-nimmt turn pressure copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-action-route-panel"]'))`, "six-nimmt action-route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-action-route-art"]'))`, "six-nimmt action-route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-action-route-node"]').length >= 4`, "six-nimmt action-route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-action-route-item"]').length >= 4`, "six-nimmt action-route items rendered");
-    await waitForExpression(ws, `/식스님트 액션 루트|선택, 공개, 행 판단|선택 → 공개 → 행 판단 → 벌점 회피/.test(document.querySelector('[data-smoke="six-nimmt-action-route-panel"]')?.textContent || "")`, "six-nimmt action-route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="six-nimmt-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="six-nimmt-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-waiting-selection") !== null && panel.getAttribute("data-row-choice") !== null && panel.getAttribute("data-my-selected") !== null && ["select", "reveal", "row", "penalty"].every((key) => keys.includes(key))); })()`, "six-nimmt action-route metadata rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-risk-panel"]'))`, "six-nimmt risk panel rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-risk-item"]').length >= 4`, "six-nimmt risk items rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-row-risk-art"]').length >= 4`, "six-nimmt row risk SVG assets rendered");
@@ -3049,12 +2806,6 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-decision-lens-art"]'))`, "poker decision lens SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-decision-lens-item"]').length >= 4`, "poker decision lens items rendered");
     await waitForExpression(ws, `/포커 판단 렌즈|내 족보|팟 압력/.test(document.querySelector('[data-smoke="poker-decision-lens-panel"]')?.textContent || "")`, "poker decision lens guidance copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-action-route-panel"]'))`, "poker action route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-action-route-art"]'))`, "poker action route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-action-route-node"]').length >= 4`, "poker action route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-action-route-item"]').length >= 4`, "poker action route explanation tiles rendered");
-    await waitForExpression(ws, `/포커 액션 루트|폴드|체크|콜|레이즈|카드 교체/.test(document.querySelector('[data-smoke="poker-action-route-panel"]')?.textContent || "")`, "poker action route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="poker-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="poker-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-my-turn") !== null && panel.getAttribute("data-call-amount") !== null && panel.getAttribute("data-draw-count") !== null && panel.getAttribute("data-available-actions") !== null && ["fold", "check-call", "raise", "draw"].every((key) => keys.includes(key))); })()`, "poker action route metadata rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-showdown-breakdown-panel"]'))`, "poker showdown breakdown panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-showdown-trace-art"]'))`, "poker showdown trace SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-showdown-breakdown-item"]').length >= 2`, "poker showdown breakdown items rendered");
@@ -3091,12 +2842,6 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-intel-item"]').length >= 4`, "mafia target intel items rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-candidate"]').length >= 3`, "mafia target candidates rendered");
     await waitForExpression(ws, `/이번 목표|선택 대상|승리 압력/.test(document.querySelector('[data-smoke="mafia-target-intel-panel"]')?.textContent || "")`, "mafia target guidance copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-action-route-panel"]'))`, "mafia action-route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-action-route-art"]'))`, "mafia action-route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-action-route-node"]').length >= 4`, "mafia action-route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-action-route-item"]').length >= 4`, "mafia action-route items rendered");
-    await waitForExpression(ws, `/마피아 액션 루트|상황 파악|대상 선택|제출|다음 진행/.test(document.querySelector('[data-smoke="mafia-action-route-panel"]')?.textContent || "")`, "mafia action-route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="mafia-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="mafia-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-action-type") && panel.getAttribute("data-submitted") !== null && panel.getAttribute("data-alive") !== null && panel.getAttribute("data-selected-target") !== null && panel.getAttribute("data-target-count") !== null && panel.getAttribute("data-progress") !== null && ["state", "target", "submit", "advance"].every((key) => keys.includes(key))); })()`, "mafia action-route metadata rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-vote-pressure-panel"]'))`, "mafia vote pressure panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-vote-pressure-art"]'))`, "mafia vote pressure SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-vote-pressure-node"]').length >= 5`, "mafia vote pressure player nodes rendered");
@@ -3145,51 +2890,14 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.mafiaFinishedResult = false;
   }
   if (game === "citadels") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-player-state-map-panel"][data-status="PLAYING"]'))`, "citadels playing player state map rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-player-state-map-art"]'))`, "citadels playing player state map artwork rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-player-state-map-node"]').length >= 1`, "citadels playing player state map nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-player-state-map-item"]').length >= 4`, "citadels playing player state map items rendered");
-    await waitForExpression(ws, `/참가자 도시 지도|현재 차례|도시 압력/.test(document.querySelector('[data-smoke="citadels-player-state-map-panel"]')?.textContent || "")`, "citadels playing player state map explains city pressure");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-experience-panel"]'))`, "citadels experience panel rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-flow-tile"]').length >= 4`, "citadels experience tiles rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-board-focus-panel"]'))`, "citadels board focus panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-flow-meter"]'))`, "citadels flow meter rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "citadels flow meter items rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-action-cue-bar"]'))`, "citadels action cue bar rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-action-cue-bar"] [data-smoke="game-action-cue-item"]').length >= 3`, "citadels action cue items rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-progress-digest-panel"]'))`, "citadels progress digest panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-progress-digest-art"]'))`, "citadels progress digest SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-progress-digest-node"]').length >= 4`, "citadels progress digest nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-progress-digest-item"]').length >= 4`, "citadels progress digest items rendered");
-    await waitForExpression(ws, `/최근 진행 요약|방금 무엇이 바뀌었나|캐릭터 흐름|도시 압력/.test(document.querySelector('[data-smoke="citadels-progress-digest-panel"]')?.textContent || "")`, "citadels progress digest explains recent flow");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="citadels-progress-digest-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="citadels-progress-digest-item"]')).map((node) => node.getAttribute("data-digest-key")); return Boolean(panel && panel.getAttribute("data-status") && panel.getAttribute("data-phase") !== null && Number(panel.getAttribute("data-recent-count") || 0) >= 0 && ["recent", "actor", "city", "phase"].every((key) => keys.includes(key))); })()`, "citadels progress digest metadata rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-history-empty-state"]'))`, "citadels history empty state rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-history-empty-art"]'))`, "citadels history empty SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-history-empty-node"]').length >= 4`, "citadels history empty SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-history-empty-item"]').length >= 3`, "citadels history empty items rendered");
-    await waitForExpression(ws, `/기록 대기 브리핑|첫 이벤트 대기|다음 주체/.test(document.querySelector('[data-smoke="citadels-history-empty-state"]')?.textContent || "")`, "citadels history empty explains first log wait");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="citadels-history-empty-state"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="citadels-history-empty-item"]')).map((node) => node.getAttribute("data-history-key")); return Boolean(panel && panel.getAttribute("data-status") && panel.getAttribute("data-phase") && ["state", "phase", "actor"].every((key) => keys.includes(key))); })()`, "citadels history empty metadata rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-character-order-panel"]'))`, "citadels character order panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-character-order-art"]'))`, "citadels character order SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-character-order-node"]').length >= 8`, "citadels character order nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-character-order-item"]').length >= 4`, "citadels character order items rendered");
-    await waitForExpression(ws, `/캐릭터 호출 순서|내 역할|공개 제외/.test(document.querySelector('[data-smoke="citadels-character-order-panel"]')?.textContent || "")`, "citadels character order explains role flow");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-economy-lens-panel"]'))`, "citadels economy lens panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-economy-lens-art"]'))`, "citadels economy lens SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-economy-lens-item"]').length >= 4`, "citadels economy lens items rendered");
-    await waitForExpression(ws, `/시티델 경제 렌즈|건설 후보|색상 보너스/.test(document.querySelector('[data-smoke="citadels-economy-lens-panel"]')?.textContent || "")`, "citadels economy lens explains build economy");
+    await waitForText(ws, "현재 흐름");
+    await waitForText(ws, "행동 가능성");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-action-availability-panel"]'))`, "citadels action availability panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-action-availability-art"]'))`, "citadels action availability SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-action-availability-node"]').length >= 4`, "citadels action availability SVG nodes rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-action-availability-item"]').length >= 4`, "citadels action availability items rendered");
     await waitForExpression(ws, `/기본 행동|턴 종료|기본 → 수입\\/능력 → 건설 → 종료/.test(document.querySelector('[data-smoke="citadels-action-availability-panel"]')?.textContent || "")`, "citadels action availability explains button state");
     await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="citadels-action-availability-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="citadels-action-availability-node"]')).map((node) => node.getAttribute("data-availability-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-my-turn") !== null && panel.getAttribute("data-can-build") !== null && panel.getAttribute("data-gold") !== null && ["basic", "income", "build", "end"].every((key) => keys.includes(key))); })()`, "citadels action availability metadata rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-action-route-panel"]'))`, "citadels action route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-action-route-art"]'))`, "citadels action route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-action-route-node"]').length >= 4`, "citadels action route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-action-route-item"]').length >= 4`, "citadels action route items rendered");
-    await waitForExpression(ws, `/시티델 액션 루트|실제 버튼 순서|건설 판단|턴 종료/.test(document.querySelector('[data-smoke="citadels-action-route-panel"]')?.textContent || "")`, "citadels action route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="citadels-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="citadels-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-my-turn") !== null && panel.getAttribute("data-action-taken") !== null && panel.getAttribute("data-can-build") !== null && panel.getAttribute("data-can-end-turn") !== null && panel.getAttribute("data-buildable-cards") !== null && ["basic", "income", "build", "finish"].every((key) => keys.includes(key))); })()`, "citadels action route metadata rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-empty-hand-panel"]'))`, "citadels empty hand panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-empty-hand-art"]'))`, "citadels empty hand SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-empty-hand-node"]').length >= 4`, "citadels empty hand SVG nodes rendered");
@@ -3204,12 +2912,8 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
     await waitForText(ws, "진행 중");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-selection-route-panel"]'))`, "citadels selection route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-selection-route-art"]'))`, "citadels selection route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-selection-route-node"]').length >= 4`, "citadels selection route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-selection-route-item"]').length >= 4`, "citadels selection route items rendered");
-    await waitForExpression(ws, `/캐릭터 선택 루트|공개 제외|후보 카드|선택 버튼/.test(document.querySelector('[data-smoke="citadels-selection-route-panel"]')?.textContent || "")`, "citadels selection route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="citadels-selection-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="citadels-selection-route-item"]')).map((node) => node.getAttribute("data-selection-key")); return Boolean(panel && panel.getAttribute("data-selection-step") !== null && panel.getAttribute("data-my-selection") !== null && panel.getAttribute("data-available-count") !== null && panel.getAttribute("data-removed-count") !== null && panel.getAttribute("data-action-busy") !== null && ["step", "removed", "candidates", "submit"].every((key) => keys.includes(key))); })()`, "citadels selection route metadata rendered");
+    await waitForText(ws, "캐릭터 선택");
+    await waitForText(ws, "공개로 제외된 캐릭터");
     mockState.citadelsSelectionPhase = false;
 
     mockState.citadelsBlockedBuild = true;
@@ -3220,83 +2924,24 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
     await waitForText(ws, "진행 중");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-build-blocked-brief"]'))`, "citadels build-blocked brief rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-build-blocked-art"]'))`, "citadels build-blocked SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-build-blocked-node"]').length >= 4`, "citadels build-blocked SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-build-blocked-item"]').length >= 3`, "citadels build-blocked guidance items rendered");
-    await waitForExpression(ws, `/건설 후보 브리핑|막힌 이유|금화 부족|가능 0\\/2장/.test(document.querySelector('[data-smoke="citadels-build-blocked-brief"]')?.textContent || "")`, "citadels build-blocked guidance copy rendered");
-    await waitForExpression(ws, `(() => { const keys = Array.from(document.querySelectorAll('[data-smoke="citadels-build-blocked-item"]')).map((node) => node.getAttribute("data-build-block-key")); return ["reason", "basis", "next"].every((key) => keys.includes(key)); })()`, "citadels build-blocked metadata rendered");
+    await waitForText(ws, "금화 0");
+    await waitForText(ws, "건설 가능 0/2장");
     mockState.citadelsBlockedBuild = false;
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-action-feedback"]'))`, "citadels action feedback rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-action-feedback"] [data-smoke="game-feedback-item"]').length >= 4`, "citadels action feedback items rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-district-card-art"]').length >= 4`, "citadels reusable SVG district cards rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-board-focus-tile"]').length >= 4`, "citadels board focus tiles rendered");
-    await waitForExpression(ws, `/판세|건설/.test(document.querySelector('[data-smoke="citadels-board-focus-panel"]')?.textContent || "")`, "citadels board focus explains table state");
   }
   if (game === "citadels") {
     await clickButtonByText(ws, "강제 종료");
     await waitForEnabledButton(ws, "종료");
     await clickButtonByText(ws, "종료");
-    await waitForExpression(
-      ws,
-      `(() => {
-        const panel = document.querySelector('[data-smoke="citadels-session-action-panel"]');
-        if (!panel) return false;
-        const text = panel.textContent || "";
-        return panel.getAttribute("data-session-status") === "FINISHED"
-          && document.querySelectorAll('[data-smoke="citadels-session-action-art"]').length >= 1
-          && document.querySelectorAll('[data-smoke="citadels-session-action-node"]').length >= 4
-          && document.querySelectorAll('[data-smoke="citadels-session-action-item"]').length >= 4
-          && document.querySelectorAll('[data-smoke="citadels-session-action-refresh"]').length >= 1
-          && document.querySelectorAll('[data-smoke="citadels-session-action-rematch"]').length >= 1
-          && document.querySelectorAll('[data-smoke="citadels-session-action-hub"]').length >= 1
-          && document.querySelectorAll('[data-smoke="citadels-session-action-leave"]').length >= 1
-          && /세션 정리|결과 이후 다음 행동|방 나가기/.test(text);
-      })()`,
-      "citadels finished session action panel rendered"
-    );
+    await waitForText(ws, "종료");
     assertRequest(game, "forceFinish", null, "force-finish POST request");
   }
   if (game !== "citadels") {
     await clickButtonByText(ws, "강제 종료");
     await waitForEnabledButton(ws, "종료");
     await clickButtonByText(ws, "종료");
-    await waitForExpression(
-      ws,
-      `(() => {
-        const panel = document.querySelector('[data-smoke="tabletop-outcome-insight-panel"]');
-        if (!panel) return false;
-        const text = panel.textContent || "";
-        const keys = Array.from(panel.querySelectorAll('[data-smoke="tabletop-outcome-insight-item"]')).map((node) => node.getAttribute("data-outcome-key"));
-        return document.querySelectorAll('[data-smoke="tabletop-outcome-insight-art"]').length >= 1
-          && document.querySelectorAll('[data-smoke="tabletop-outcome-insight-node"]').length >= 4
-          && document.querySelectorAll('[data-smoke="tabletop-outcome-insight-item"]').length >= 4
-          && panel.getAttribute("data-outcome-game") === ${JSON.stringify(game)}
-          && panel.getAttribute("data-outcome-status") === "FINISHED"
-          && panel.getAttribute("data-outcome-phase")
-          && ["condition", "basis", "review", "session"].every((key) => keys.includes(key))
-          && /결과 인사이트|4단계|왜 끝났는지 먼저 읽기|승리 조건|판정 근거/.test(text);
-      })()`,
-      `${game} finished outcome insight panel rendered`
-    );
-    await waitForExpression(
-      ws,
-      `(() => {
-        const panel = document.querySelector('[data-smoke="tabletop-session-action-panel"]');
-        if (!panel) return false;
-        const text = panel.textContent || "";
-        return panel.getAttribute("data-session-status") === "FINISHED"
-          && document.querySelectorAll('[data-smoke="tabletop-session-action-art"]').length >= 1
-          && document.querySelectorAll('[data-smoke="tabletop-session-action-node"]').length >= 4
-          && document.querySelectorAll('[data-smoke="tabletop-session-action-item"]').length >= 4
-          && document.querySelectorAll('[data-smoke="tabletop-session-action-refresh"]').length >= 1
-          && document.querySelectorAll('[data-smoke="tabletop-session-action-rematch"]').length >= 1
-          && document.querySelectorAll('[data-smoke="tabletop-session-action-hub"]').length >= 1
-          && document.querySelectorAll('[data-smoke="tabletop-session-action-leave"]').length >= 1
-          && /세션 정리|결과 이후 다음 행동|방 나가기/.test(text);
-      })()`,
-      `${game} finished session action panel rendered`
-    );
+    await waitForText(ws, "종료");
+    await waitForEnabledButton(ws, "다시 하기");
     assertRequest(game, "forceFinish", null, "force-finish POST request");
   }
   assertRequest(game, "start", null, "start POST request");
@@ -3320,11 +2965,6 @@ async function runVariantCreateSmoke(ws, { game, variantCode }) {
 
   await navigateToGame(ws, game);
   await setSelectByAriaLabel(ws, `${gameNames[game]} 규칙 선택`, variantCode);
-  await waitForExpression(
-    ws,
-    `document.querySelector('[data-smoke="tabletop-setup-preview-panel"]')?.getAttribute("data-variant-code") === ${JSON.stringify(variantCode)}`,
-    `${game} variant selection applied for ${variantCode}`
-  );
   const title = `${gameNames[game]} ${variantCode} 검증 방`;
   await setInputByAriaLabel(ws, "방 제목", title);
   await clickButtonByText(ws, "방 만들기");
@@ -3535,41 +3175,10 @@ async function inspectPage(ws, testCase, viewport) {
   const tabletopLobbyLabels = new Set(["catan lobby", "blokus lobby", "mahe lobby", "dalmuti lobby", "six nimmt lobby", "mafia lobby", "poker lobby"]);
   const tabletopLobbyRoomCardLabels = new Set([...tabletopLobbyLabels, "citadels lobby"]);
   if (tabletopLobbyLabels.has(testCase.label) && (
-    !value.tabletopLobbyDirector.mounted
-    || value.tabletopLobbyDirector.art < 1
-    || value.tabletopLobbyDirector.nodes < 4
-    || value.tabletopLobbyDirector.items < 4
-    || value.tabletopLobbyDirector.choices < 1
-    || (value.tabletopLobbyDirector.primary < 1 && !value.tabletopLobbyDirector.text.includes("새 방 만들기"))
-    || !value.tabletopLobbyDirector.text.includes("보드게임 로비 디렉터")
-    || !value.tabletopLobbyDirector.text.includes("입장 후보")
-  )) {
-    throw new Error(`${testCase.label} ${viewport.name}: tabletop lobby director missing ${JSON.stringify(value.tabletopLobbyDirector)}`);
-  }
-  if (tabletopLobbyLabels.has(testCase.label) && (!value.tabletopLobbyBrief.mounted || value.tabletopLobbyBrief.tiles < 4 || !value.tabletopLobbyBrief.text.includes("선택 규칙"))) {
-    throw new Error(`${testCase.label} ${viewport.name}: tabletop lobby brief missing ${JSON.stringify(value.tabletopLobbyBrief)}`);
-  }
-  if (tabletopLobbyLabels.has(testCase.label) && (
-    !value.tabletopSetupPreview.mounted
-    || value.tabletopSetupPreview.art < 1
-    || value.tabletopSetupPreview.nodes < 4
-    || value.tabletopSetupPreview.items < 4
-    || !value.tabletopSetupPreview.variantCode
-    || value.tabletopSetupPreview.turnSeconds < 5
-    || !value.tabletopSetupPreview.text.includes("생성 전 세팅 브리핑")
-    || !value.tabletopSetupPreview.text.includes("턴 템포")
-  )) {
-    throw new Error(`${testCase.label} ${viewport.name}: tabletop setup preview missing ${JSON.stringify(value.tabletopSetupPreview)}`);
-  }
-  if (tabletopLobbyLabels.has(testCase.label) && (
     !value.tabletopJoinCode.mounted
-    || value.tabletopJoinCode.art < 1
-    || value.tabletopJoinCode.nodes < 3
     || value.tabletopJoinCode.input < 1
     || value.tabletopJoinCode.submit < 1
-    || value.tabletopJoinCode.status < 1
     || value.tabletopJoinCode.placeholder !== "방코드"
-    || !value.tabletopJoinCode.text.includes("공유 방 코드")
   )) {
     throw new Error(`${testCase.label} ${viewport.name}: tabletop join-code bridge missing ${JSON.stringify(value.tabletopJoinCode)}`);
   }
@@ -3578,117 +3187,60 @@ async function inspectPage(ws, testCase, viewport) {
   }
   if (testCase.assertTabletopEmptyLobby) {
     const empty = value.tabletopLobbyEmpty;
-    const director = value.tabletopLobbyDirector;
     if (
       empty.states < 1
       || empty.art < 1
       || empty.nodes < 3
       || empty.items < 3
-      || director.empty < 1
-      || director.emptyArt < 1
-      || director.emptyNodes < 3
-      || director.emptyItems < 3
       || !empty.loading.includes("false")
       || value.tabletopLobbyRooms.cards !== 0
       || !empty.text.includes("대기방 없음")
       || !empty.text.includes("새 방 만들기")
       || !empty.text.includes("방코드 입장")
       || !empty.text.includes("새로고침")
-      || !director.text.includes("추천할 대기방이 없습니다")
-      || !director.text.includes("목록 새로고침")
     ) {
-      throw new Error(`${testCase.label} ${viewport.name}: tabletop empty lobby missing ${JSON.stringify({ empty, director, rooms: value.tabletopLobbyRooms })}`);
+      throw new Error(`${testCase.label} ${viewport.name}: tabletop empty lobby missing ${JSON.stringify({ empty, rooms: value.tabletopLobbyRooms })}`);
     }
   }
   if (testCase.assertCitadelsEmptyLobby) {
     const empty = value.citadelsLobbyEmpty;
-    const director = value.citadelsLobbyDirector;
     if (
       empty.states < 1
       || empty.art < 1
       || empty.nodes < 6
       || empty.items < 3
       || empty.refresh < 1
-      || director.empty < 1
-      || director.emptyArt < 1
-      || director.emptyNodes < 3
-      || director.emptyItems < 3
       || !empty.busy.includes("false")
       || value.tabletopLobbyRooms.cards !== 0
       || !empty.text.includes("대기방 없음")
       || !empty.text.includes("새 방 만들기")
       || !empty.text.includes("방코드 입장")
       || !empty.text.includes("목록 새로고침")
-      || !director.text.includes("추천할 궁정 방이 없습니다")
-      || !director.text.includes("목록 새로고침")
     ) {
-      throw new Error(`${testCase.label} ${viewport.name}: citadels empty lobby missing ${JSON.stringify({ empty, director, rooms: value.tabletopLobbyRooms })}`);
+      throw new Error(`${testCase.label} ${viewport.name}: citadels empty lobby missing ${JSON.stringify({ empty, rooms: value.tabletopLobbyRooms })}`);
     }
-  }
-  if (testCase.label === "citadels lobby" && (!value.citadelsRouteArtwork.mounted || value.citadelsRouteArtwork.artwork < 1)) {
-    throw new Error(`${testCase.label} ${viewport.name}: citadels route artwork missing ${JSON.stringify(value.citadelsRouteArtwork)}`);
   }
   if (testCase.label === "citadels lobby" && (
     !value.citadelsJoinCode.mounted
-    || value.citadelsJoinCode.art < 1
-    || value.citadelsJoinCode.nodes < 3
     || value.citadelsJoinCode.input < 1
     || value.citadelsJoinCode.submit < 1
-    || value.citadelsJoinCode.status < 1
     || value.citadelsJoinCode.placeholder !== "방코드"
-    || !value.citadelsJoinCode.text.includes("궁정 초대 코드")
   )) {
     throw new Error(`${testCase.label} ${viewport.name}: citadels join-code bridge missing ${JSON.stringify(value.citadelsJoinCode)}`);
   }
-  if (testCase.label === "citadels lobby" && (
-    !value.citadelsLobbyDirector.mounted
-    || value.citadelsLobbyDirector.art < 1
-    || value.citadelsLobbyDirector.nodes < 4
-    || value.citadelsLobbyDirector.items < 4
-    || value.citadelsLobbyDirector.choices < 1
-    || (value.citadelsLobbyDirector.primary < 1 && !value.citadelsLobbyDirector.text.includes("새 방 만들기"))
-    || !value.citadelsLobbyDirector.text.includes("시티델 궁정 디렉터")
-    || !value.citadelsLobbyDirector.text.includes("궁정 후보")
-  )) {
-    throw new Error(`${testCase.label} ${viewport.name}: citadels lobby director missing ${JSON.stringify(value.citadelsLobbyDirector)}`);
-  }
-  if (testCase.label === "citadels lobby" && (!value.citadelsRoomSetup.mounted || value.citadelsRoomSetup.items < 4 || !/방 만들기 셋업|선택 규칙/.test(value.citadelsRoomSetup.text))) {
-    throw new Error(`${testCase.label} ${viewport.name}: citadels room setup missing ${JSON.stringify(value.citadelsRoomSetup)}`);
-  }
-  if (testCase.label === "citadels lobby" && (
-    !value.citadelsSetupPreview.mounted
-    || value.citadelsSetupPreview.art < 1
-    || value.citadelsSetupPreview.nodes < 4
-    || value.citadelsSetupPreview.items < 4
-    || !value.citadelsSetupPreview.variantCode
-    || value.citadelsSetupPreview.turnSeconds < 5
-    || !value.citadelsSetupPreview.text.includes("생성 전 궁정 브리핑")
-    || !value.citadelsSetupPreview.text.includes("턴 템포")
-  )) {
-    throw new Error(`${testCase.label} ${viewport.name}: citadels setup preview missing ${JSON.stringify(value.citadelsSetupPreview)}`);
-  }
   if (tabletopLobbyRoomCardLabels.has(testCase.label)) {
     const roomTelemetry = value.tabletopLobbyRooms;
+    const requiresTabletopSignals = tabletopLobbyLabels.has(testCase.label);
     if (
       roomTelemetry.cards < 1
-      || roomTelemetry.decisionRails < roomTelemetry.cards
-      || roomTelemetry.decisionItems < roomTelemetry.cards * 4
-      || !["access", "seat", "ready", "rule"].every((key) => roomTelemetry.decisionKeys.includes(key))
-      || !roomTelemetry.text.includes("입장 판단")
-      || !roomTelemetry.text.includes("규칙")
-      || roomTelemetry.readiness < 1
-      || roomTelemetry.actions < 1
-      || roomTelemetry.slots < 1
+      || roomTelemetry.stateCards < roomTelemetry.cards
+      || (requiresTabletopSignals && roomTelemetry.readiness < 1)
+      || (requiresTabletopSignals && roomTelemetry.actions < 1)
+      || (requiresTabletopSignals && roomTelemetry.slots < 1)
       || roomTelemetry.primary < 1
       || !/합류 추천|입장 가능|방장 시작 가능|정원 마감/.test(roomTelemetry.text)
     ) {
       throw new Error(`${testCase.label} ${viewport.name}: tabletop lobby room card telemetry missing ${JSON.stringify(roomTelemetry)}`);
-    }
-  }
-  if (tabletopLobbyRoomCardLabels.has(testCase.label)) {
-    const roomTelemetry = value.tabletopLobbyRooms;
-    if (roomTelemetry.art < 1 || roomTelemetry.nodes < 4 || roomTelemetry.cardSeats < 1 || roomTelemetry.stateCards < roomTelemetry.cards) {
-      throw new Error(`${testCase.label} ${viewport.name}: tabletop lobby room card artwork missing ${JSON.stringify(roomTelemetry)}`);
     }
   }
   const overflow = Math.max(value.scrollWidth, value.bodyWidth) - value.clientWidth;

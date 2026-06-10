@@ -4,6 +4,7 @@
   const siteBridge = window.goodEtcSiteBridge;
   const siteMode = Boolean(siteBridge?.enabled);
   const siteHost = Boolean(siteBridge?.isHost);
+  const trainingMode = params.get("training") === "1";
   const isSolo = ["solo", "local"].includes(params.get("mode") || "") || (siteMode && siteHost);
   const assetVersion = params.get("v") || "20260601storage";
   const storage = window.goodEtcStorage || localStorage;
@@ -214,7 +215,7 @@
     };
     placeLocalPlayer(player, 0);
     const sitePlayers =
-      siteMode && siteHost
+      siteMode && siteHost && !trainingMode
         ? siteBridge.playerRecords().map((record, index) => {
             const next = JSON.parse(JSON.stringify(player));
             next.id = record.id;
@@ -228,7 +229,7 @@
             return next;
           })
         : [];
-    const bots = isSolo && !siteMode ? [0, 1, 2].map(createLocalBot) : [];
+    const bots = isSolo && (!siteMode || trainingMode) ? [0, 1, 2].map(createLocalBot) : [];
     const players = sitePlayers.length ? sitePlayers : [player, ...bots];
     return {
       type: "party_state",
@@ -681,13 +682,13 @@
   }
 
   function startSolo() {
-    clientId = siteMode ? siteBridge.myClientId : "local";
+    clientId = siteMode && !trainingMode ? siteBridge.myClientId : "local";
     state = createInitialState();
     const me = state.players.find((player) => player.id === clientId) || state.players[0];
-    me.name = siteMode ? me.name : cleanName(ui.name.value);
+    me.name = siteMode && !trainingMode ? me.name : cleanName(ui.name.value);
     storage.setItem("party_name", me.name);
-    setStatus(siteMode ? "사이트 방장" : "혼자하기", true);
-    setCenter(siteMode ? `${config.name} 방장 시뮬레이션 시작` : `${config.name} 혼자하기`, 1200);
+    setStatus(trainingMode ? "훈련장" : siteMode ? "사이트 방장" : "혼자하기", true);
+    setCenter(trainingMode ? `${config.name} 훈련장` : siteMode ? `${config.name} 방장 시뮬레이션 시작` : `${config.name} 혼자하기`, 1200);
     renderHud();
     broadcastSitePartyState(true);
   }
@@ -4058,8 +4059,8 @@
       : savedServerUrl() || defaultServerUrl();
   if (isSolo) {
     ui.serverUrl.disabled = true;
-    ui.serverUrl.value = siteMode ? "CTFMON 사이트 방" : "혼자하기: 서버 연결 없음";
-    ui.connect.textContent = siteMode ? "사이트 방장" : "혼자 시작";
+    ui.serverUrl.value = trainingMode ? "훈련장: AI 포함" : siteMode ? "CTFMON 사이트 방" : "혼자하기: 서버 연결 없음";
+    ui.connect.textContent = trainingMode ? "훈련 시작" : siteMode ? "사이트 방장" : "혼자 시작";
     ui.disconnect.style.display = "none";
     startSolo();
   } else {

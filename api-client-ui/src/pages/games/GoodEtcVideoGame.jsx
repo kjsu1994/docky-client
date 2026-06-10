@@ -30,7 +30,7 @@ import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
-import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
+import { GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
 import { VideoControlGlyph, VideoGameArtwork, videoGameArtProfiles } from "./VideoGameArtwork.jsx";
 
 const videoGameProfiles = {
@@ -181,6 +181,8 @@ const videoControlLabel = (control) => (typeof control === "string" ? control : 
 const videoControlAccessibleLabel = (control) => videoDirectionLabels[videoControlKey(control)] || videoControlLabel(control);
 
 const roomPlayers = (room) => (Array.isArray(room?.players) ? room.players : []);
+const isVideoTrainingMode = (form) => String(form?.playMode || "").toLowerCase() === "training";
+const isVideoTrainingRoom = (room) => Number(room?.maxPlayers || 0) <= 1;
 
 const videoGamePlayBriefs = {
   arena: {
@@ -2747,6 +2749,8 @@ const VideoGameInputDeck = ({
   status,
   transportLabel,
   gameFrameSrc,
+  onControl,
+  className = "",
 }) => {
   const hasDirections = directionControls.length > 0;
   const fallbackActions = actionControls.length ? actionControls : profile.controls;
@@ -2787,23 +2791,42 @@ const VideoGameInputDeck = ({
       detail: pressedControlLabel ? "누른 버튼을 놓으면 입력 해제가 함께 전달됩니다." : "짧게 누르면 이동/액션 리듬이 더 안정적입니다.",
     },
   ];
+  const handleKeyDown = (event, control) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (event.repeat) return;
+    onControl?.(control, true);
+  };
+  const handleKeyUp = (event, control) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onControl?.(control, false);
+  };
+  const controlHandlers = (control) => ({
+    onPointerDown: () => onControl?.(control, true),
+    onPointerUp: () => onControl?.(control, false),
+    onPointerCancel: () => onControl?.(control, false),
+    onPointerLeave: () => onControl?.(control, false),
+    onKeyDown: (event) => handleKeyDown(event, control),
+    onKeyUp: (event) => handleKeyUp(event, control),
+  });
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-slate-950 p-3 text-white shadow-inner" data-smoke="video-game-input-deck">
-      <div className="flex items-center gap-2 text-sm font-black text-white">
-        <GameUxGlyph type="signal" className="h-4 w-4 text-cyan-200" />
-        입력 덱
+    <section className={`rounded-2xl border border-slate-200 bg-slate-950 p-3 text-white shadow-inner ${className}`} data-smoke="video-game-input-deck">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-black text-white">
+            <GameUxGlyph type="signal" className="h-4 w-4 text-cyan-200" />
+            PC 조작
+          </div>
+          <div className="mt-1 text-xs font-bold leading-relaxed text-slate-300">
+            키보드와 마우스가 기본입니다. 버튼 중심 게임은 아래 명령 버튼으로도 실행할 수 있습니다.
+          </div>
+        </div>
+        <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black ${bridgeReady ? "bg-emerald-400/20 text-emerald-100" : "bg-amber-400/20 text-amber-100"}`}>
+          {bridgeReady ? "프레임 연결" : "시작 대기"}
+        </span>
       </div>
-      <VideoGameInputRoutePanel
-        profile={profile}
-        directionControls={directionControls}
-        actionControls={actionControls}
-        pressedControl={pressedControl}
-        pressedControlLabel={pressedControlLabel}
-        status={status}
-        transportLabel={transportLabel}
-        gameFrameSrc={gameFrameSrc}
-      />
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {tiles.map((tile) => (
           <div key={tile.key} className="min-h-[92px] rounded-xl border border-white/10 bg-white/10 px-3 py-2" data-smoke="video-game-input-tile">
@@ -2816,16 +2839,37 @@ const VideoGameInputDeck = ({
           </div>
         ))}
       </div>
+      <div className="mt-3 rounded-2xl border border-white/10 bg-white/10 p-2" data-smoke="video-game-desktop-command-panel">
+        <div className="mb-2 flex items-center justify-between gap-2 px-1 text-[10px] font-black text-cyan-100/80">
+          <span>명령 버튼</span>
+          <span>{controlStripItems.length}개</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {controlStripItems.map((control) => {
+            const controlKey = videoControlKey(control);
+            const controlLabel = videoControlAccessibleLabel(control);
+            const active = pressedControl === controlKey;
+            return (
+              <button
+                key={controlKey}
+                type="button"
+                className={`flex min-h-10 items-center justify-center gap-2 rounded-xl px-2 py-1.5 text-xs font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-200 ${
+                  active ? "bg-cyan-300 text-slate-950" : "bg-slate-950/60 text-white ring-1 ring-white/10 hover:bg-white/15"
+                }`}
+                aria-label={`${controlLabel} 입력`}
+                aria-pressed={active}
+                data-smoke="video-game-desktop-command-button"
+                data-control={controlKey}
+                {...controlHandlers(control)}
+              >
+                <VideoControlGlyph control={controlKey} active={active} className="h-5 w-5 shrink-0" />
+                <span className="min-w-0 truncate">{controlLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <VideoControlStrip controls={controlStripItems} pressedControl={pressedControl} />
-      <VideoGameControlIntentPanel
-        videoGameCode={videoGameCode}
-        profile={profile}
-        directionControls={directionControls}
-        actionControls={actionControls}
-        pressedControl={pressedControl}
-        status={status}
-        gameFrameSrc={gameFrameSrc}
-      />
     </section>
   );
 };
@@ -2896,6 +2940,7 @@ const VideoGameMobileControlPanel = ({
   status,
   gameFrameSrc,
   onControl,
+  className = "",
 }) => {
   const actionList = actionControls.length ? actionControls : profile.controls;
   const bridgeReady = status === "PLAYING" && Boolean(gameFrameSrc);
@@ -2921,7 +2966,7 @@ const VideoGameMobileControlPanel = ({
   });
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-lg" data-smoke="video-game-mobile-control-panel">
+    <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-lg ${className}`} data-smoke="video-game-mobile-control-panel">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2 text-sm font-black text-slate-900">
@@ -4195,12 +4240,12 @@ export const GoodEtcVideoGame = () => {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [gameState, setGameState] = useState(null);
   const [joinCode, setJoinCode] = useState("");
-  const [createForm, setCreateForm] = useState({ title: "", maxPlayers: "1", turnTimeSeconds: "30" });
+  const [createForm, setCreateForm] = useState({ title: "", maxPlayers: "1", turnTimeSeconds: "30", playMode: "training" });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [pressedControl, setPressedControl] = useState("");
-  const [inputFeedback, setInputFeedback] = useState(initialReadableVideoInputFeedback);
+  const [, setInputFeedback] = useState(initialReadableVideoInputFeedback);
   const stompRef = useRef(null);
   const gameSubRef = useRef(null);
   const signalSubRef = useRef(null);
@@ -4221,6 +4266,7 @@ export const GoodEtcVideoGame = () => {
   const actionControls = profile?.controls?.filter((control) => !["up", "left", "right", "down"].includes(control.control)) || [];
   const transportLabel = gameState?.transport || (status === "PLAYING" ? "stomp" : "대기");
   const allControls = profile?.controls || [];
+  const trainingRoom = selectedRoom ? isVideoTrainingRoom(selectedRoom) : isVideoTrainingMode(createForm);
   const pressedControlLabel = pressedControl
     ? (allControls.find((control) => (typeof control === "string" ? control : control.control) === pressedControl)?.label || pressedControl)
     : "";
@@ -4231,29 +4277,6 @@ export const GoodEtcVideoGame = () => {
       : canStart
         ? "조건이 충족되었습니다. 방장이 시작하면 게임 화면이 열립니다."
         : "대기방 상태입니다. 인원과 준비 상태를 맞추면 시작할 수 있습니다.";
-  const videoCueTone = status === "FINISHED" ? "done" : status === "PLAYING" || canStart ? "active" : "waiting";
-  const videoCueTitle = status === "FINISHED"
-    ? "세션 결과 확인"
-    : status === "PLAYING"
-      ? "Good_ETC 입력 활성"
-      : canStart
-        ? "시작 준비 완료"
-        : "대기방 준비 확인";
-  const videoCueAction = status === "FINISHED"
-    ? "결과 확인"
-    : status === "PLAYING"
-      ? (pressedControlLabel ? `${pressedControlLabel} 입력 중` : "게임 화면 집중")
-      : canStart
-        ? "방장 시작 가능"
-        : readyGuests
-          ? "방장 시작 대기"
-          : "준비 필요";
-  const videoCueItems = [
-    { label: "상태", value: statusLabel[status] || status || "대기", icon: status === "FINISHED" ? "win" : "state", tone: status === "FINISHED" ? "done" : videoCueTone },
-    { label: "행동", value: videoCueAction, icon: "decision", tone: status === "PLAYING" || canStart ? "active" : "neutral" },
-    { label: "입력", value: pressedControlLabel || (status === "PLAYING" ? "프레임 조작" : "입력 대기"), icon: "input", tone: pressedControlLabel ? "active" : "neutral" },
-    { label: "동기화", value: transportLabel, icon: "signal" },
-  ];
   const videoPlayBrief = videoGamePlayBriefs[videoGameCode] || {};
   const videoHudBrief = videoGameStageHudBriefs[videoGameCode] || {};
   const videoResultBreakdown = useMemo(() => buildVideoGameResultBreakdown({
@@ -4268,78 +4291,6 @@ export const GoodEtcVideoGame = () => {
   }), [gameState, players, profile, selectedRoom, transportLabel, videoGameCode, videoHudBrief, videoPlayBrief]);
   const videoResultDetail = videoResultBreakdown.detail;
   const videoResultMetric = videoResultBreakdown.metric;
-  const playerCapacityText = `${players.length}/${selectedRoom?.maxPlayers || profile.maxPlayers}명`;
-  const readinessText = guestPlayers.length ? `게스트 준비 ${readyGuestCount}/${guestPlayers.length}` : "혼자 시작 가능";
-  const videoFlowTone = status === "FINISHED" ? "amber" : status === "PLAYING" ? "emerald" : "slate";
-  const videoFlowItems = [
-    {
-      label: "세션",
-      value: statusLabel[status] || status || "대기",
-      detail: frameStatusText,
-      icon: status === "FINISHED" ? "win" : "state",
-      tone: status === "FINISHED" ? "done" : status === "PLAYING" ? "active" : canStart ? "waiting" : "neutral",
-    },
-    {
-      label: "미션",
-      value: videoPlayBrief.rhythm || profile.title,
-      detail: videoHudBrief.mission || videoPlayBrief.objective || profile.storage,
-      icon: "stage",
-      tone: status === "PLAYING" ? "active" : "neutral",
-    },
-    {
-      label: "입력 브리지",
-      value: pressedControlLabel || (status === "PLAYING" ? "입력 대기" : "대기"),
-      detail: status === "PLAYING"
-        ? (pressedControlLabel ? `${pressedControlLabel} 입력이 Good_ETC 화면으로 전달 중입니다.` : "모바일 버튼 또는 iframe 내부 조작을 준비하세요.")
-        : "게임 시작 후 입력 브리지가 활성화됩니다.",
-      icon: "input",
-      tone: pressedControlLabel ? "active" : status === "PLAYING" ? "waiting" : "neutral",
-    },
-    {
-      label: status === "FINISHED" ? "결과" : "동기화",
-      value: status === "FINISHED" ? "세션 종료" : transportLabel,
-      detail: status === "FINISHED" ? videoResultDetail : `${playerCapacityText} · ${readinessText} · ${transportLabel}`,
-      icon: status === "FINISHED" ? "win" : "signal",
-      tone: status === "FINISHED" ? "done" : "neutral",
-    },
-  ];
-  const inputFeedbackTone = inputFeedback.status === "error"
-    ? "error"
-    : inputFeedback.status === "pending"
-      ? "pending"
-      : inputFeedback.status === "done"
-        ? "done"
-        : "idle";
-  const videoInputFeedbackItems = useMemo(() => [
-    {
-      label: "전달 상태",
-      value: readableVideoInputFeedbackStatusLabel(inputFeedback.status),
-      detail: inputFeedback.label,
-      icon: inputFeedback.status === "error" ? "recent" : "signal",
-      tone: inputFeedbackTone,
-    },
-    {
-      label: "최근 입력",
-      value: inputFeedback.message,
-      detail: inputFeedback.detail,
-      icon: "input",
-      tone: inputFeedback.status === "error" ? "error" : inputFeedback.status === "done" ? "done" : "neutral",
-    },
-    {
-      label: "화면 상태",
-      value: statusLabel[status] || status || "대기",
-      detail: frameStatusText,
-      icon: status === "PLAYING" ? "stage" : "state",
-      tone: status === "PLAYING" ? "done" : "neutral",
-    },
-    {
-      label: "브리지",
-      value: status === "PLAYING" && selectedRoom ? "iframe 준비" : "시작 대기",
-      detail: `${transportLabel} · ${pressedControlLabel || "입력 없음"}`,
-      icon: "signal",
-      tone: status === "PLAYING" && selectedRoom ? "done" : "neutral",
-    },
-  ], [frameStatusText, inputFeedback, inputFeedbackTone, pressedControlLabel, selectedRoom, status, transportLabel]);
   const mySeatNo = useMemo(() => {
     const me = players.find((player) => getVideoGameMemberId(player) === myMemberId);
     return getVideoGameSeatNo(me);
@@ -4347,7 +4298,12 @@ export const GoodEtcVideoGame = () => {
 
   useEffect(() => {
     if (profile) {
-      setCreateForm({ title: "", maxPlayers: String(profile.maxPlayers), turnTimeSeconds: "30" });
+      setCreateForm({
+        title: "",
+        maxPlayers: String(profile.maxPlayers),
+        turnTimeSeconds: "30",
+        playMode: profile.maxPlayers <= 1 ? "training" : "online",
+      });
     }
   }, [profile, videoGameCode]);
 
@@ -4504,8 +4460,11 @@ export const GoodEtcVideoGame = () => {
   };
 
   const createRoom = () => runBusy(async () => {
-    const room = await videoGameAdapter.createRoom(videoGameCode, createForm);
-    notifySuccess("방 생성 완료");
+    const room = await videoGameAdapter.createRoom(videoGameCode, {
+      ...createForm,
+      maxPlayers: isVideoTrainingMode(createForm) ? "1" : createForm.maxPlayers,
+    });
+    notifySuccess(isVideoTrainingMode(createForm) ? "훈련장 생성 완료" : "방 생성 완료");
     await loadLobby();
     await openRoom(room);
   }, "방 생성에 실패했습니다.");
@@ -4573,6 +4532,8 @@ export const GoodEtcVideoGame = () => {
 
   const gameFrameSrc = useMemo(() => {
     if (!selectedRoom || status !== "PLAYING") return "";
+    const frameTrainingRoom = isVideoTrainingRoom(selectedRoom);
+    const frameSoloSimulation = frameTrainingRoom || (isHost && players.length <= 1);
     const framePlayers = players.map((player) => ({
       memberId: getVideoGameMemberId(player),
       seatNo: getVideoGameSeatNo(player),
@@ -4581,10 +4542,13 @@ export const GoodEtcVideoGame = () => {
     }));
     const params = new URLSearchParams({
       game: videoGameCode,
-      mode: videoGameCode === "rpg" || isHost ? "local" : "multi",
+      mode: frameSoloSimulation ? "solo" : videoGameCode === "rpg" || isHost ? "local" : "multi",
       room: roomCode || String(roomId || ""),
       site: "1",
       siteHost: isHost ? "1" : "0",
+      embedded: "ctfmon",
+      training: frameSoloSimulation ? "1" : "0",
+      soloHost: frameSoloSimulation ? "1" : "0",
       memberId: String(myMemberId || ""),
       seatNo: String(mySeatNo || ""),
       hostMemberId: String(selectedRoom.hostMemberId || ""),
@@ -4684,6 +4648,37 @@ export const GoodEtcVideoGame = () => {
                 방 만들기
               </div>
               <div className="mt-3 space-y-3">
+                {profile.maxPlayers > 1 && (
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1" role="radiogroup" aria-label="플레이 모드">
+                    {[
+                      { key: "online", label: "온라인 방", detail: "친구 초대" },
+                      { key: "training", label: "훈련장", detail: "혼자 AI" },
+                    ].map((mode) => {
+                      const active = createForm.playMode === mode.key;
+                      return (
+                        <button
+                          key={mode.key}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          className={`min-h-12 rounded-lg px-3 py-2 text-left transition ${
+                            active ? "bg-slate-950 text-white shadow-sm" : "text-slate-600 hover:bg-white"
+                          }`}
+                          onClick={() => setCreateForm((prev) => ({
+                            ...prev,
+                            playMode: mode.key,
+                            maxPlayers: mode.key === "training" ? "1" : String(Math.max(2, Number(prev.maxPlayers || profile.maxPlayers || 2))),
+                          }))}
+                          data-smoke="video-game-create-mode-button"
+                          data-mode={mode.key}
+                        >
+                          <span className="block text-xs font-black">{mode.label}</span>
+                          <span className={`mt-0.5 block text-[10px] font-bold ${active ? "text-white/65" : "text-slate-400"}`}>{mode.detail}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <input
                   aria-label="방 제목"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
@@ -4695,16 +4690,17 @@ export const GoodEtcVideoGame = () => {
                 <label className="block text-xs font-black text-slate-500">
                   최대 인원
                   <input
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
                     type="number"
-                    min="1"
+                    min={createForm.playMode === "training" ? "1" : "2"}
                     max={profile.maxPlayers}
-                    value={createForm.maxPlayers}
+                    disabled={createForm.playMode === "training" || profile.maxPlayers <= 1}
+                    value={isVideoTrainingMode(createForm) || profile.maxPlayers <= 1 ? "1" : createForm.maxPlayers}
                     onChange={(event) => setCreateForm((prev) => ({ ...prev, maxPlayers: event.target.value }))}
                   />
                 </label>
                 <button type="button" disabled={busy} className="min-h-11 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40" onClick={createRoom}>
-                  방 만들기
+                  {isVideoTrainingMode(createForm) || profile.maxPlayers <= 1 ? "훈련장 만들기" : "방 만들기"}
                 </button>
               </div>
             </section>
@@ -4728,7 +4724,7 @@ export const GoodEtcVideoGame = () => {
           </div>
         </section>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-4">
           <main className="space-y-4">
             <section className={`overflow-hidden rounded-2xl bg-gradient-to-br ${profile.tone} p-[1px] shadow-lg`}>
               <div className="rounded-[calc(1rem-1px)] bg-white p-4">
@@ -4746,6 +4742,11 @@ export const GoodEtcVideoGame = () => {
                   </div>
                   <h2 className="mt-2 break-words text-xl font-black text-slate-900">{selectedRoom.title}</h2>
                   <div className="mt-1 text-sm font-bold text-slate-500">방 코드 {roomCode} · 내 좌석 {mySeatNo || "-"}</div>
+                  {trainingRoom && (
+                    <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700">
+                      훈련장 · 혼자 AI/로컬 진행
+                    </div>
+                  )}
                 </div>
                 <div>
                   <button type="button" className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-black text-slate-700 hover:bg-slate-900 hover:text-white" onClick={copyRoomCode}>
@@ -4814,100 +4815,36 @@ export const GoodEtcVideoGame = () => {
               </>
             )}
 
-            <GameActionCueBar
-              title={videoCueTitle}
-              detail={frameStatusText}
-              items={videoCueItems}
-              tone={videoCueTone}
-              smoke="video-game-action-cue-bar"
-            />
-
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg" data-smoke="video-game-stage-shell">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-                <div className="flex items-center gap-2 text-sm font-black text-slate-900">
-                  <GameUxGlyph type="stage" className="h-4 w-4 text-emerald-600" />
-                  본게임
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-500">
-                    <RadioTower className="h-3.5 w-3.5 text-cyan-600" />
-                    {transportLabel}
-                  </div>
-                  <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black ${status === "PLAYING" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                    <Timer className="h-3.5 w-3.5" />
-                    {statusLabel[status] || status}
-                  </div>
-                </div>
-              </div>
-              <VideoGameStageHud
-                videoGameCode={videoGameCode}
-                profile={profile}
-                status={status}
-                transportLabel={transportLabel}
-                pressedControlLabel={pressedControlLabel}
-                frameStatusText={frameStatusText}
-                gameFrameSrc={gameFrameSrc}
-              />
-              <VideoGameStageGatePanel
-                videoGameCode={videoGameCode}
-                profile={profile}
-                status={status}
-                transportLabel={transportLabel}
-                pressedControlLabel={pressedControlLabel}
-                frameStatusText={frameStatusText}
-                gameFrameSrc={gameFrameSrc}
-                players={players}
-                selectedRoom={selectedRoom}
-              />
-              <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs font-bold leading-relaxed text-slate-600">
-                {frameStatusText}
-              </div>
-              {gameFrameSrc ? (
-                <div className="overflow-hidden bg-slate-950">
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-lg" data-smoke="video-game-stage-shell">
+              <div className="min-w-0 bg-slate-950">
+                {gameFrameSrc ? (
                   <iframe
                     ref={iframeRef}
                     title={`${profile.title} game`}
                     src={gameFrameSrc}
-                    className="h-[72vh] min-h-[520px] w-full bg-slate-950"
+                    className="h-[76vh] min-h-[460px] w-full bg-slate-950 md:min-h-[620px] xl:h-[84vh]"
                     allow="fullscreen; gamepad"
                   />
-                </div>
-              ) : (
-                <VideoGameFrameStandbyPanel
-                  videoGameCode={videoGameCode}
-                  profile={profile}
-                  status={status}
-                  canStart={canStart}
-                  isHost={isHost}
-                  players={players}
-                  selectedRoom={selectedRoom}
-                  roomCode={roomCode}
-                  transportLabel={transportLabel}
-                  frameStatusText={frameStatusText}
-                  videoResultDetail={videoResultDetail}
-                />
-              )}
-              {gameState?.transport && (
-                <div className="m-4 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
-                  방 전송 상태: {gameState.transport} · 저장 정책: {gameState.storagePolicy || profile.storage}
-                </div>
-              )}
+                ) : (
+                  <VideoGameFrameStandbyPanel
+                    videoGameCode={videoGameCode}
+                    profile={profile}
+                    status={status}
+                    canStart={canStart}
+                    isHost={isHost}
+                    players={players}
+                    selectedRoom={selectedRoom}
+                    roomCode={roomCode}
+                    transportLabel={transportLabel}
+                    frameStatusText={frameStatusText}
+                    videoResultDetail={videoResultDetail}
+                  />
+                )}
+              </div>
             </section>
           </main>
 
           <aside className="space-y-4">
-            <VideoGameInputDeck
-              videoGameCode={videoGameCode}
-              profile={profile}
-              directionControls={directionControls}
-              actionControls={actionControls}
-              pressedControl={pressedControl}
-              pressedControlLabel={pressedControlLabel}
-              status={status}
-              transportLabel={transportLabel}
-              gameFrameSrc={gameFrameSrc}
-            />
-
             <VideoGameMobileControlPanel
               profile={profile}
               directionControls={directionControls}
@@ -4917,6 +4854,7 @@ export const GoodEtcVideoGame = () => {
               status={status}
               gameFrameSrc={gameFrameSrc}
               onControl={sendTouchControl}
+              className="xl:hidden"
             />
           </aside>
         </div>

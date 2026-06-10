@@ -24,6 +24,7 @@ const storage = window.goodEtcStorage || localStorage;
 const siteBridge = window.goodEtcSiteBridge;
 const siteMode = Boolean(siteBridge?.enabled);
 const siteHost = Boolean(siteBridge?.isHost);
+const trainingMode = launchParams.get("training") === "1";
 const isLocalArena = ["solo", "local"].includes(launchParams.get("mode") || "") || (siteMode && siteHost);
 const keys = new Set();
 const pointer = { x: 0, y: 0, down: false };
@@ -584,23 +585,15 @@ function arenaPlayerWeaponText(player) {
   return ` · ${spec.label} ${ammo}`;
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 function startLocalArena() {
   if (socket) socket.close();
   socket = null;
-  playerId = siteMode ? siteBridge.myClientId : "local";
+  playerId = siteMode && !trainingMode ? siteBridge.myClientId : "local";
   localArenaIds = { bullet: 1, pickup: 1 };
   const name = cleanName(playerNameInput.value);
   storage.setItem("lan_arena_name", name);
   const sitePlayers =
-    siteMode && siteHost
+    siteMode && siteHost && !trainingMode
       ? siteBridge.playerRecords().map((record, index) => {
           const spawn = [
             [420, 420],
@@ -636,10 +629,10 @@ function startLocalArena() {
     effects: [],
     local: true,
   };
-  setStatus(siteMode ? "사이트 방장" : "훈련장", false);
+  setStatus(trainingMode ? "훈련장" : siteMode ? "사이트 방장" : "훈련장", false);
   setConnectionPanelCollapsed(true);
   setCenterMessage(
-    siteMode ? "LAN 아레나 사이트 방이 시작되었습니다." : "LAN 아레나 훈련장입니다. Shift 회피 대시, 엄폐물, 파워업, 거점을 활용하세요.",
+    trainingMode || !siteMode ? "LAN 아레나 훈련장입니다. Shift 회피 대시, 엄폐물, 파워업, 거점을 활용하세요." : "LAN 아레나 사이트 방이 시작되었습니다.",
   );
   window.setTimeout(() => {
     if (isLocalArena) setCenterMessage("");
@@ -811,7 +804,7 @@ function updateLocalArena(dt, now) {
       updateLocalArenaActor(player, input, dt, now);
       return;
     }
-    if (siteMode && siteHost && !player.bot) {
+    if (siteMode && siteHost && !trainingMode && !player.bot) {
       updateLocalArenaActor(player, siteRemoteInputs.get(player.id) || {}, dt, now);
       return;
     }
@@ -2112,9 +2105,9 @@ window.addEventListener("pointerup", () => {
 
 playerNameInput.value = storage.getItem("lan_arena_name") || "Player";
 if (isLocalArena) {
-  serverUrlInput.value = siteMode ? "CTFMON 사이트 방" : "혼자하기: 서버 연결 없음";
+  serverUrlInput.value = trainingMode ? "훈련장: AI 포함" : siteMode ? "CTFMON 사이트 방" : "혼자하기: 서버 연결 없음";
   serverUrlInput.disabled = true;
-  connectButton.textContent = siteMode ? "사이트 방장" : "훈련 재시작";
+  connectButton.textContent = trainingMode ? "훈련 재시작" : siteMode ? "사이트 방장" : "훈련 재시작";
   disconnectButton.style.display = "none";
 } else {
   serverUrlInput.value = launchParams.has("host")
