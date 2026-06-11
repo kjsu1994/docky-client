@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Dices, Home, LayoutGrid, Menu } from "lucide-react";
+import { Dices, LayoutGrid, Menu, MessageCircle } from "lucide-react";
 import { publishBottomNavVisibility } from "../hooks/useBottomNavVisibility.js";
 
 const shouldRenderBottomNav = () => {
@@ -8,10 +8,11 @@ const shouldRenderBottomNav = () => {
     return window.matchMedia("(max-width: 1023px)").matches;
 };
 
-const NavItem = ({ to, icon: Icon, children }) => {
+const NavItem = ({ to, icon: Icon, end = false, children }) => {
     return (
         <NavLink
             to={to}
+            end={end}
             className={({ isActive }) =>
                 `flex h-full w-full flex-col items-center justify-center gap-1.5 transition-all duration-300 ${
                     isActive
@@ -98,9 +99,9 @@ export const BottomNav = () => {
             } glass`}
         >
             <div className="mx-auto grid h-full max-w-lg grid-cols-4 items-center">
-                <NavItem to="/app" icon={Home}>홈</NavItem>
+                <NavItem to="/app" icon={Dices} end>게임</NavItem>
                 <NavItem to="/app/boards/FREE_BOARD" icon={LayoutGrid}>게시판</NavItem>
-                <NavItem to="/app/games" icon={Dices}>게임</NavItem>
+                <NavItem to="/app/chat" icon={MessageCircle}>채팅</NavItem>
                 <NavItem to="/app/all-menu" icon={Menu}>메뉴</NavItem>
             </div>
         </nav>

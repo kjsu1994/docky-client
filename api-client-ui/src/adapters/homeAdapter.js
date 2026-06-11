@@ -551,6 +551,19 @@ export const fetchHomeDashboard = async ({ user, signal, force = false, onSectio
     return cloneHomeDashboard(dashboard);
 };
 
+export const fetchHomeBanners = async ({ user, signal, limit = 10 } = {}) => {
+    const response = await api.get("/banners", {
+        params: {
+            placement: "HOME_HERO",
+            target: user ? "USER" : "GUEST",
+            limit,
+        },
+        signal,
+        timeout: HOME_BANNERS_TIMEOUT_MILLIS,
+    });
+    return normalizeHomeBanners(response, user?.name || user?.email?.split("@")[0]);
+};
+
 export const peekCachedHomeDashboard = ({ user } = {}) => {
     return getCachedHomeDashboard(getHomeDashboardCacheKey(user));
 };
@@ -602,6 +615,7 @@ export const trackHomeBannerEvent = async (banner, eventType) => {
 
 export const homeAdapter = {
     fetchDashboard: fetchHomeDashboard,
+    fetchBanners: fetchHomeBanners,
     peekCachedDashboard: peekCachedHomeDashboard,
     trackBannerEvent: trackHomeBannerEvent,
 };

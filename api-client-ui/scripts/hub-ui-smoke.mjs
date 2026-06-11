@@ -65,7 +65,7 @@ const allMenuLinks = [
 ];
 const gamesHubTexts = [
     "게임 허브",
-    "게임을 선택하세요",
+    "보드게임",
     "게임 목록",
     "포커",
     "카탄",
@@ -952,19 +952,22 @@ async function inspectGamesHub(ws, viewport) {
     for (const text of gamesHubTexts) {
         await waitForText(ws, text);
     }
+    await waitForSelector(ws, '[data-gamehub-banner="true"]');
     const heroArea = await evaluate(ws, `(() => {
         const showcase = document.querySelector('[data-smoke="game-hub-asset-showcase"]');
         const firstSection = document.querySelector("section");
         return {
             showcaseMounted: Boolean(showcase),
+            bannerCount: document.querySelectorAll('[data-gamehub-banner="true"]').length,
             tabCount: document.querySelectorAll('[role="tablist"][aria-label="게임 종류"] [role="tab"]').length,
             text: firstSection?.innerText || "",
         };
     })()`);
     if (
         heroArea.showcaseMounted ||
+        heroArea.bannerCount < 1 ||
         heroArea.tabCount < 2 ||
-        !heroArea.text.includes("게임을 선택하세요")
+        !heroArea.text.includes("게임 허브")
     ) {
         throw new Error(`games-hub ${viewport.name}: compact game selector missing ${JSON.stringify(heroArea)}`);
     }

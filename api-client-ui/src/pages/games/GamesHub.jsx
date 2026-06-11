@@ -5,6 +5,9 @@ import { GameUxGlyph, PlayingCardArt } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork, tabletopGameArtProfiles } from "./TabletopGameArtwork.jsx";
 import { VideoGameArtwork, videoGameArtProfiles } from "./VideoGameArtwork.jsx";
 import { getBoardGameRuleGuide } from "../../common/boardGameRules.js";
+import { BusinessPrivacyFooter } from "../../components/BusinessPrivacyFooter.jsx";
+import { useAuth } from "../../contexts/AuthContext.jsx";
+import { homeAdapter } from "../../adapters/homeAdapter.js";
 
 const videoGameManuals = {
   arena: {
@@ -3003,6 +3006,176 @@ const GameManualActionPrimerPanel = ({ game }) => {
   );
 };
 
+const isGameHubBannerRequestCanceled = (error) => {
+  return error?.code === "ERR_CANCELED" || error?.name === "CanceledError" || error?.name === "AbortError";
+};
+
+const GameHubHeroBanner = ({
+  banners = [],
+  activeIndex = 0,
+  loading,
+  unavailable,
+  onNext,
+  onPrev,
+  onSelect,
+  onBannerEvent,
+}) => {
+  const touchStartRef = useRef({ x: 0, y: 0 });
+  const bannerCount = banners.length;
+  const normalizedIndex = bannerCount ? ((activeIndex % bannerCount) + bannerCount) % bannerCount : 0;
+
+  if (loading && !bannerCount) {
+    return (
+      <div
+        className="min-h-[132px] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 to-primary-700 p-4 text-white sm:min-h-[160px] sm:p-5"
+        role="status"
+        aria-live="polite"
+        data-gamehub-banner-loading="true"
+      >
+        <div className="h-4 w-24 rounded-full bg-white/20" />
+        <div className="mt-5 h-7 w-3/4 rounded-2xl bg-white/20" />
+        <div className="mt-3 h-4 w-full max-w-xl rounded-full bg-white/15" />
+        <div className="mt-2 h-4 w-2/3 rounded-full bg-white/15" />
+      </div>
+    );
+  }
+
+  if (unavailable && !bannerCount) {
+    return (
+      <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800" role="status">
+        운영 배너 연결이 지연되고 있습니다. 게임 목록은 바로 이용할 수 있습니다.
+      </div>
+    );
+  }
+
+  if (!bannerCount) return null;
+
+  const renderBannerContent = (banner) => {
+    const imageUrl = String(banner.imageUrl || "").trim();
+    const hasImageBackground = Boolean(imageUrl);
+    const bannerStyle = hasImageBackground
+      ? {
+          backgroundImage: `linear-gradient(120deg, rgba(2, 6, 23, 0.72), rgba(30, 64, 175, 0.48)), url("${imageUrl}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
+      : undefined;
+    const content = (
+      <div
+        className={`relative flex h-[172px] overflow-hidden p-4 text-white sm:h-[188px] sm:p-5 ${
+          hasImageBackground ? "" : "bg-gradient-to-br from-primary-600 to-primary-400"
+        }`}
+        style={bannerStyle}
+      >
+        <div className="relative z-10 flex h-full max-w-3xl flex-col">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-[11px] font-black text-white backdrop-blur-md">
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+            {banner.type === "AD" ? "광고" : "공지"}
+          </div>
+          <h2 className="mt-3 line-clamp-2 text-xl font-black tracking-tight sm:text-3xl">
+            {banner.title || "Docky 게임 소식"}
+          </h2>
+          {banner.description ? (
+            <p className="mt-2 line-clamp-2 text-sm font-medium leading-relaxed text-white/90 sm:text-base">
+              {banner.description}
+            </p>
+          ) : null}
+          {banner.linkUrl ? (
+            <span className="mt-auto inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-primary-700">
+              {banner.ctaText || "자세히 보기"}
+              <ArrowRight className="h-4 w-4" />
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
+
+    if (banner.linkUrl && banner.linkTarget === "EXTERNAL") {
+      return (
+        <a
+          href={banner.linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200"
+          onClick={() => onBannerEvent(banner, "CLICK")}
+        >
+          {content}
+        </a>
+      );
+    }
+
+    if (banner.linkUrl && banner.linkTarget === "INTERNAL") {
+      return (
+        <Link
+          to={banner.linkUrl}
+          className="block focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200"
+          onClick={() => onBannerEvent(banner, "CLICK")}
+        >
+          {content}
+        </Link>
+      );
+    }
+
+    return content;
+  };
+
+  return (
+    <section
+      className="relative overflow-hidden rounded-2xl"
+      aria-label="게임 허브 배너"
+      aria-roledescription="carousel"
+      data-gamehub-banner="true"
+      onTouchStart={(event) => {
+        const touch = event.touches?.[0];
+        if (!touch) return;
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      }}
+      onTouchEnd={(event) => {
+        const touch = event.changedTouches?.[0];
+        if (!touch || bannerCount <= 1) return;
+        const deltaX = touch.clientX - touchStartRef.current.x;
+        const deltaY = touch.clientY - touchStartRef.current.y;
+        const isHorizontalSwipe = Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY);
+        if (!isHorizontalSwipe) return;
+        if (deltaX < 0) onNext();
+        if (deltaX > 0) onPrev();
+      }}
+    >
+      <div
+        className="flex flex-nowrap transition-transform duration-500 ease-out"
+        style={{ transform: `translateX(-${normalizedIndex * 100}%)` }}
+      >
+        {banners.map((banner, idx) => (
+          <div
+            key={`${banner.id}-${idx}`}
+            className="w-full flex-shrink-0"
+            aria-hidden={idx !== normalizedIndex}
+            aria-roledescription="slide"
+            aria-label={`${idx + 1} / ${bannerCount}`}
+          >
+            {renderBannerContent(banner)}
+          </div>
+        ))}
+      </div>
+
+      {bannerCount > 1 ? (
+        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full bg-slate-950/45 px-2 py-1.5 backdrop-blur">
+          {banners.map((banner, idx) => (
+            <button
+              key={`${banner.id}-dot-${idx}`}
+              type="button"
+              className={`h-2 rounded-full transition-all ${idx === normalizedIndex ? "w-6 bg-white" : "w-2 bg-white/50"}`}
+              onClick={() => onSelect(idx)}
+              aria-label={`배너 ${idx + 1}번 보기`}
+              aria-current={idx === normalizedIndex ? "true" : undefined}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+};
+
 const GameManualModal = ({ game, onClose }) => {
   const titleId = useId();
   const descriptionId = useId();
@@ -3126,11 +3299,20 @@ const GameManualModal = ({ game, onClose }) => {
 };
 
 export const GamesHub = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("board");
   const [activeFilter, setActiveFilter] = useState("all");
   const [manualGame, setManualGame] = useState(null);
   const [resumeEntries, setResumeEntries] = useState([]);
+  const [hubBanners, setHubBanners] = useState([]);
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const [bannerLoading, setBannerLoading] = useState(true);
+  const [bannerUnavailable, setBannerUnavailable] = useState(false);
+  const bannerImpressionRef = useRef(new Set());
   const closeManual = useCallback(() => setManualGame(null), []);
+  const bannerCount = hubBanners.length;
+  const normalizedBannerIndex = bannerCount ? ((bannerIndex % bannerCount) + bannerCount) % bannerCount : 0;
+  const activeBanner = bannerCount ? hubBanners[normalizedBannerIndex] : null;
   const resumeGames = activeTab === "video" ? videoGames : boardGames;
   const refreshResumeEntries = useCallback(() => {
     setResumeEntries(readGameHubResumeEntries(resumeGames));
@@ -3143,6 +3325,22 @@ export const GamesHub = () => {
     games: section.games.filter(selectedFilter.predicate),
   }));
   const visibleGames = filteredSections.flatMap((section) => section.games);
+
+  const sendGameHubBannerEvent = useCallback(async (banner, eventType) => {
+    try {
+      await homeAdapter.trackBannerEvent(banner, eventType);
+    } catch {
+      // Banner analytics must not block game hub interactions.
+    }
+  }, []);
+
+  const showNextBanner = useCallback(() => {
+    setBannerIndex((prev) => (bannerCount ? (prev + 1) % bannerCount : 0));
+  }, [bannerCount]);
+
+  const showPrevBanner = useCallback(() => {
+    setBannerIndex((prev) => (bannerCount ? (prev - 1 + bannerCount) % bannerCount : 0));
+  }, [bannerCount]);
 
   useEffect(() => {
     refreshResumeEntries();
@@ -3160,6 +3358,53 @@ export const GamesHub = () => {
   }, [refreshResumeEntries]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    setBannerLoading(true);
+    setBannerUnavailable(false);
+
+    homeAdapter.fetchBanners({ user, signal: controller.signal, limit: 5 })
+      .then((banners) => {
+        if (controller.signal.aborted) return;
+        setHubBanners(banners);
+        setBannerIndex(0);
+        bannerImpressionRef.current = new Set();
+        setBannerUnavailable(false);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || isGameHubBannerRequestCanceled(error)) return;
+        setHubBanners([]);
+        setBannerIndex(0);
+        setBannerUnavailable(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setBannerLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [user]);
+
+  useEffect(() => {
+    if (!bannerCount || bannerIndex < bannerCount) return;
+    setBannerIndex(0);
+  }, [bannerCount, bannerIndex]);
+
+  useEffect(() => {
+    if (bannerCount <= 1) return undefined;
+    const timer = window.setInterval(showNextBanner, 4500);
+    return () => window.clearInterval(timer);
+  }, [bannerCount, showNextBanner]);
+
+  useEffect(() => {
+    if (!activeBanner?.id) return;
+    const key = String(activeBanner.id);
+    if (bannerImpressionRef.current.has(key)) return;
+    bannerImpressionRef.current.add(key);
+    sendGameHubBannerEvent(activeBanner, "IMPRESSION");
+  }, [activeBanner, sendGameHubBannerEvent]);
+
+  useEffect(() => {
     setActiveFilter("all");
   }, [activeTab]);
 
@@ -3167,14 +3412,20 @@ export const GamesHub = () => {
     <div className="animate-fade-in space-y-4">
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-200/60 sm:p-6">
         <div className="space-y-5">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
-              <Sparkles className="h-3.5 w-3.5 text-primary-500" />
-              게임 허브
-            </div>
-            <h1 className="mt-4 text-2xl font-black text-slate-900 sm:text-4xl">게임을 선택하세요</h1>
-            <p className="mt-2 text-sm font-medium text-slate-500 sm:text-base">원하는 게임을 고르고 바로 입장하세요.</p>
+          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
+            <Sparkles className="h-3.5 w-3.5 text-primary-500" />
+            게임 허브
           </div>
+          <GameHubHeroBanner
+            banners={hubBanners}
+            activeIndex={normalizedBannerIndex}
+            loading={bannerLoading}
+            unavailable={bannerUnavailable}
+            onNext={showNextBanner}
+            onPrev={showPrevBanner}
+            onSelect={setBannerIndex}
+            onBannerEvent={sendGameHubBannerEvent}
+          />
           <div className="grid max-w-md grid-cols-2 rounded-2xl bg-slate-100 p-1" role="tablist" aria-label="게임 종류">
             {[
               { key: "board", label: "보드게임", count: boardGames.length },
@@ -3232,6 +3483,7 @@ export const GamesHub = () => {
           )}
         </section>
       ))}
+      <BusinessPrivacyFooter headingId="gamehub-footer-info-heading" />
       <GameManualModal game={manualGame} onClose={closeManual} />
     </div>
   );

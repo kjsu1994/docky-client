@@ -162,6 +162,15 @@ function assertStaticBannerFormBounds() {
     if (!pageSource.includes("min={ADMIN_BANNER_LIMITS.priorityMin}") || !pageSource.includes("max={ADMIN_BANNER_LIMITS.priorityMax}")) {
         throw new Error("admin-operations-ui-smoke: banner priority input must be clamped.");
     }
+    if (!adapterSource.includes("uploadBannerImage(file)") || !adapterSource.includes("/admin/banners/image")) {
+        throw new Error("admin-operations-ui-smoke: banner image upload adapter must be wired.");
+    }
+    if (!pageSource.includes('type="file"')
+        || !pageSource.includes("data-banner-image-upload")
+        || !pageSource.includes("uploadBannerImageFile")
+        || !pageSource.includes("image/jpeg,image/png,image/gif,image/webp,image/bmp")) {
+        throw new Error("admin-operations-ui-smoke: banner form must support local image file upload.");
+    }
 }
 
 function assertStaticModerationBounds() {

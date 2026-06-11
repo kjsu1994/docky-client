@@ -167,6 +167,13 @@ export const normalizeBanner = (banner) => ({
     modifiedAt: pick(banner, "modifiedAt", "modified_at", ""),
 });
 
+export const normalizeBannerImageUpload = (response) => {
+    const data = unwrapAdminOperationsData(response) || {};
+    return {
+        imageUrl: pick(data, "imageUrl", "image_url", "") || pick(data, "url", "url", ""),
+    };
+};
+
 const toLimitedText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
 
 const toNullableText = (value, maxLength) => {
@@ -304,6 +311,15 @@ export const adminOperationsAdapter = {
             ? await api.patch(`/admin/banners/${bannerId}`, payload)
             : await api.post("/admin/banners", payload);
         return normalizeBanner(unwrapAdminOperationsData(response));
+    },
+
+    async uploadBannerImage(file) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await api.post("/admin/banners/image", formData, {
+            timeout: 120000,
+        });
+        return normalizeBannerImageUpload(response);
     },
 
     async updateBannerActive({ bannerId, activeYn }) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ShieldAlert, UserSearch, EyeOff, RotateCcw, RefreshCw, ClipboardList } from "lucide-react";
+import { ShieldAlert, UserSearch, EyeOff, RotateCcw, RefreshCw, ClipboardList, UploadCloud } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
@@ -39,6 +39,7 @@ export const AdminOperations = () => {
 
     const [bannerLoading, setBannerLoading] = useState(false);
     const [bannerSaving, setBannerSaving] = useState(false);
+    const [bannerImageUploading, setBannerImageUploading] = useState(false);
     const [bannerError, setBannerError] = useState("");
     const [banners, setBanners] = useState([]);
     const [editingBannerId, setEditingBannerId] = useState(null);
@@ -81,6 +82,32 @@ export const AdminOperations = () => {
             Math.max(ADMIN_BANNER_LIMITS.priorityMin, Math.trunc(parsed)),
         );
         setBannerForm((prev) => ({ ...prev, priority: String(clamped) }));
+    };
+
+    const uploadBannerImageFile = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+
+        setBannerImageUploading(true);
+        try {
+            const result = await adminOperationsAdapter.uploadBannerImage(file);
+            const imageUrl = String(result?.imageUrl || "").trim();
+            if (!imageUrl) {
+                notifyError("배너 이미지 업로드 응답을 확인할 수 없습니다.");
+                return;
+            }
+            if (imageUrl.length > ADMIN_BANNER_LIMITS.imageUrl) {
+                notifyError("업로드된 이미지 URL이 허용 길이를 초과했습니다.");
+                return;
+            }
+            setBannerForm((prev) => ({ ...prev, imageUrl }));
+            notifySuccess("배너 이미지를 업로드했습니다.");
+        } catch (err) {
+            notifyError(adminOperationsErrorMessage(err, "배너 이미지 업로드에 실패했습니다."));
+        } finally {
+            setBannerImageUploading(false);
+        }
     };
 
     const filteredModerationItems = useMemo(() => {
@@ -640,6 +667,18 @@ export const AdminOperations = () => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <label className={`md:col-span-2 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 text-sm font-black transition ${bannerImageUploading ? "bg-slate-100 text-slate-400" : "bg-slate-900 text-white hover:bg-primary-600"}`}>
+                        {bannerImageUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                        <span>{bannerImageUploading ? "업로드 중..." : "내 기기에서 배너 이미지 선택"}</span>
+                        <input
+                            type="file"
+                            className="sr-only"
+                            accept="image/jpeg,image/png,image/gif,image/webp,image/bmp"
+                            disabled={bannerImageUploading || bannerSaving}
+                            onChange={uploadBannerImageFile}
+                            data-banner-image-upload="true"
+                        />
+                    </label>
                     <select className="input-base" value={bannerForm.bannerType} onChange={(e) => setBannerForm((prev) => ({ ...prev, bannerType: e.target.value }))}>
                         <option value="NOTICE">공지</option>
                         <option value="AD">광고</option>
@@ -672,11 +711,11 @@ export const AdminOperations = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <button className="btn-primary" type="button" onClick={submitBannerForm} disabled={bannerSaving} aria-busy={bannerSaving} data-busy-indicator="true">
+                    <button className="btn-primary" type="button" onClick={submitBannerForm} disabled={bannerSaving || bannerImageUploading} aria-busy={bannerSaving || bannerImageUploading} data-busy-indicator="true">
                         {bannerSaving ? "저장 중..." : editingBannerId ? "배너 수정" : "배너 생성"}
                     </button>
                     {editingBannerId ? (
-                        <button className="btn-secondary" type="button" onClick={resetBannerForm} disabled={bannerSaving}>
+                        <button className="btn-secondary" type="button" onClick={resetBannerForm} disabled={bannerSaving || bannerImageUploading}>
                             수정 취소
                         </button>
                     ) : null}

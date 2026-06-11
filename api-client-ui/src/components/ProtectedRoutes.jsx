@@ -55,7 +55,8 @@ export const ProtectedRoutes = () => (
             <ProtectedAppLayout>
                 <Suspense fallback={<LoadingPage />}>
                     <Routes>
-                        <Route index element={<Home />} />
+                        <Route index element={<GamesHub />} />
+                        <Route path="home" element={<Home />} />
                         <Route path="boards/:kind" element={<BoardList />} />
                         <Route path="boards/:kind/new" element={<BoardForm />} />
                         <Route path="boards/:kind/:boardId/edit" element={<BoardForm />} />
@@ -66,7 +67,7 @@ export const ProtectedRoutes = () => (
                         <Route path="streaming" element={<StreamingHub />} />
                         <Route path="invest" element={<InvestAssistant />} />
                         <Route path="all-menu" element={<AllMenu />} />
-                        <Route path="games" element={<GamesHub />} />
+                        <Route path="games" element={<Navigate to="/app" replace />} />
 
                         <Route path="statistics" element={<Statistics />} />
                         <Route path="ranks" element={<Ranks />} />
