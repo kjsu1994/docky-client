@@ -51,8 +51,8 @@ export const authAdapter = {
         return unwrapAuthData(response);
     },
 
-    async loginWithPassword({ email, password }) {
-        const response = await api.post("/members/login", { email, password });
+    async loginWithPassword({ email, password, remember = false }) {
+        const response = await api.post("/members/login", { email, password, remember });
         return {
             roles: extractAuthRoles(response),
             ...extractAuthTokens(response.headers),

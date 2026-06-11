@@ -1,3 +1,5 @@
+import { getStoredAccessToken } from "../utils/authStorage.js";
+
 export const DEFAULT_REALTIME_ERROR_MESSAGE = "실시간 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
 export const REALTIME_ERROR_NOTICE_COOLDOWN_MS = 8000;
 
@@ -8,7 +10,7 @@ const TECHNICAL_MESSAGE_PATTERN =
 const lastRealtimeErrorNoticeAt = new Map();
 
 export const buildStompConnectHeaders = () => {
-    const token = localStorage.getItem("accessToken");
+    const token = getStoredAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

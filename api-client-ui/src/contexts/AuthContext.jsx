@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { normalizePostOauthRedirect } from "../utils/authRedirect.js";
+import { clearAuthSession, getStoredAccessToken, getStoredUserRoles, persistAuthSession } from "../utils/authStorage.js";
 import { logClientError } from "../utils/clientDiagnostics.js";
 import { notifyError, notifySuccess } from "../utils/toast.js";
 
@@ -10,7 +11,7 @@ export { normalizePostOauthRedirect } from "../utils/authRedirect.js";
 
 const parseStoredRoles = () => {
     try {
-        const raw = localStorage.getItem("userRoles");
+        const raw = getStoredUserRoles();
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : null;
@@ -43,7 +44,7 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const initAuth = async () => {
-            const token = localStorage.getItem("accessToken");
+            const token = getStoredAccessToken();
             if (token) {
                 try {
                     const { authAdapter } = await loadAuthAdapter();
@@ -51,9 +52,7 @@ export const AuthProvider = ({ children }) => {
                     setUser(withRolesFallback(data, parseStoredRoles()));
                 } catch (error) {
                     logClientError("auth.member.fetch", error);
-                    localStorage.removeItem("accessToken");
-                    localStorage.removeItem("refreshToken");
-                    localStorage.removeItem("userRoles");
+                    clearAuthSession();
                 }
             }
             setLoading(false);
@@ -80,24 +79,17 @@ export const AuthProvider = ({ children }) => {
         navigate("/app", { replace });
     }, [navigate]);
 
-    const login = async (email, password) => {
+    const login = async (email, password, options = {}) => {
         let authModule = null;
         try {
             authModule = await loadAuthAdapter();
             const { authAdapter } = authModule;
-            const { accessToken, refreshToken, roles: loginRoles } = await authAdapter.loginWithPassword({ email, password });
+            const remember = Boolean(options.remember);
+            const { accessToken, refreshToken, roles: loginRoles } = await authAdapter.loginWithPassword({ email, password, remember });
 
             if (!accessToken) throw new Error("로그인 토큰을 찾을 수 없습니다.");
 
-            localStorage.setItem("accessToken", accessToken);
-            if (refreshToken) {
-                localStorage.setItem("refreshToken", refreshToken);
-            } else {
-                localStorage.removeItem("refreshToken");
-            }
-            if (loginRoles) {
-                localStorage.setItem("userRoles", JSON.stringify(loginRoles));
-            }
+            persistAuthSession({ accessToken, refreshToken, roles: loginRoles, remember });
 
             const [userData, queueData] = await Promise.all([
                 authAdapter.fetchCurrentMember(),
@@ -117,15 +109,12 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const loginWithTokens = useCallback(async ({ accessToken, refreshToken }) => {
+    const loginWithTokens = useCallback(async ({ accessToken, refreshToken, remember = true }) => {
         if (!accessToken) {
             throw new Error("액세스 토큰이 없습니다.");
         }
 
-        localStorage.setItem("accessToken", accessToken);
-        if (refreshToken) {
-            localStorage.setItem("refreshToken", refreshToken);
-        }
+        persistAuthSession({ accessToken, refreshToken, roles: parseStoredRoles(), remember });
 
         const postOauthRedirect = normalizePostOauthRedirect(localStorage.getItem("postOauthRedirect"));
         const { authAdapter } = await loadAuthAdapter();
@@ -159,9 +148,7 @@ export const AuthProvider = ({ children }) => {
             }
         }
 
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("userRoles");
+        clearAuthSession();
         setUser(null);
 
         if (!silent) {

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearAuthSession, getStoredAccessToken, getStoredRefreshToken, updateStoredAuthTokens } from "./authStorage.js";
 import { beginNetworkActivity, endNetworkActivity } from "./networkActivity.js";
 import { notifyError } from "./toast.js";
 
@@ -113,9 +114,7 @@ const extractRefreshToken = (headers) => {
 };
 
 const clearStoredAuth = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("userRoles");
+    clearAuthSession();
 };
 
 const redirectToLogin = () => {
@@ -209,7 +208,7 @@ const formatValidationErrors = (errors, fieldKey) => {
 const refreshAccessToken = async () => {
     if (refreshPromise) return refreshPromise;
 
-    const refreshToken = localStorage.getItem("refreshToken");
+    const refreshToken = getStoredRefreshToken();
     if (!refreshToken) {
         throw new Error("리프레시 토큰이 없습니다.");
     }
@@ -228,10 +227,7 @@ const refreshAccessToken = async () => {
                 throw new Error("재발급 토큰을 찾을 수 없습니다.");
             }
             const nextRefreshToken = extractRefreshToken(response.headers);
-            localStorage.setItem("accessToken", accessToken);
-            if (nextRefreshToken) {
-                localStorage.setItem("refreshToken", nextRefreshToken);
-            }
+            updateStoredAuthTokens({ accessToken, refreshToken: nextRefreshToken });
             sessionExpiredNotified = false;
             return accessToken;
         })
@@ -260,7 +256,7 @@ api.interceptors.request.use(
             config.headers["Content-Type"] = "application/json";
         }
 
-        const token = localStorage.getItem("accessToken");
+        const token = getStoredAccessToken();
         if (token && isSameOriginApiRequest(config) && !isPublicAuthRequest(config)) {
             config.headers.Authorization = `Bearer ${token}`;
         }

@@ -16,6 +16,7 @@
 - API 호출과 응답 정규화는 `src/adapters/**`에 둔다.
 - page component에서 raw response shape를 직접 해석하지 않는다.
 - 요청 범위 밖의 UI 개편, 리팩터링, 문서 추가를 하지 않는다.
+- PC, 테블릿, 모바일 환경(마우스클릭, 터치, 화면비율, 화면의 작은크기에 대한 UX대응 등)을 모두 고려해서 작업한다.
   Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.

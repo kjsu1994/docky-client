@@ -9,6 +9,81 @@ import { notifyError, notifyLoading, notifySuccess } from "../../utils/toast.js"
 
 const loadAuthAdapter = () => import("../../adapters/authAdapter.js");
 
+const SAVED_LOGIN_EMAIL_KEY = "ctfmon.savedLoginEmail";
+const AUTO_LOGIN_KEY = "ctfmon.autoLogin";
+const OAUTH_REMEMBER_KEY = "ctfmon.pendingOauthRemember";
+
+const readLocalValue = (key) => {
+    if (typeof window === "undefined") return "";
+    try {
+        return window.localStorage?.getItem(key) || "";
+    } catch {
+        return "";
+    }
+};
+
+const writeLocalValue = (key, value) => {
+    if (typeof window === "undefined") return;
+    try {
+        if (value) {
+            window.localStorage?.setItem(key, value);
+        } else {
+            window.localStorage?.removeItem(key);
+        }
+    } catch {
+        // Ignore storage failures in private or restricted browser modes.
+    }
+};
+
+const writeBooleanPreference = (key, value) => {
+    writeLocalValue(key, value ? "true" : "false");
+};
+
+const readAutoLoginPreference = () => readLocalValue(AUTO_LOGIN_KEY) === "true";
+
+const persistLoginPreferences = ({ email, rememberEmail, autoLogin }) => {
+    const normalizedEmail = String(email || "").trim();
+    writeLocalValue(SAVED_LOGIN_EMAIL_KEY, rememberEmail && normalizedEmail ? normalizedEmail : "");
+    writeBooleanPreference(AUTO_LOGIN_KEY, Boolean(autoLogin));
+};
+
+const writePendingOauthRemember = (remember) => {
+    writeBooleanPreference(AUTO_LOGIN_KEY, Boolean(remember));
+    if (typeof window === "undefined") return;
+    try {
+        window.sessionStorage?.setItem(OAUTH_REMEMBER_KEY, remember ? "true" : "false");
+    } catch {
+        // Ignore storage failures in private or restricted browser modes.
+    }
+};
+
+const readPendingOauthRemember = () => {
+    if (typeof window !== "undefined") {
+        try {
+            const pending = window.sessionStorage?.getItem(OAUTH_REMEMBER_KEY);
+            if (pending === "true" || pending === "false") {
+                return pending === "true";
+            }
+        } catch {
+            // Fall back to the saved preference below.
+        }
+    }
+    return readAutoLoginPreference();
+};
+
+const clearPendingOauthRemember = () => {
+    if (typeof window === "undefined") return;
+    try {
+        window.sessionStorage?.removeItem(OAUTH_REMEMBER_KEY);
+    } catch {
+        // Ignore storage failures in private or restricted browser modes.
+    }
+};
+
+const oauthAuthorizationUrl = (provider, remember) => (
+    `/api/oauth2/authorization/${provider}?remember=${remember ? "true" : "false"}`
+);
+
 const readOauthRedirectParams = () => {
     const searchParams = new URLSearchParams(window.location.search);
     const rawHash = window.location.hash?.startsWith("#")
@@ -37,8 +112,10 @@ export const Login = () => {
             params.error
         );
     });
-    const [email, setEmail] = useState("");
+    const [email, setEmail] = useState(() => readLocalValue(SAVED_LOGIN_EMAIL_KEY));
     const [password, setPassword] = useState("");
+    const [rememberEmail, setRememberEmail] = useState(() => Boolean(readLocalValue(SAVED_LOGIN_EMAIL_KEY)));
+    const [autoLogin, setAutoLogin] = useState(() => readAutoLoginPreference());
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [naverLoading, setNaverLoading] = useState(false);
@@ -73,6 +150,7 @@ export const Login = () => {
 
         if (oauthError) {
             const message = "소셜 로그인에 실패했습니다. 다시 시도해주세요.";
+            clearPendingOauthRemember();
             window.history.replaceState({}, document.title, window.location.pathname);
             setOauthErrorMessage(message);
             notifyError(message);
@@ -86,6 +164,8 @@ export const Login = () => {
             return;
         }
         oauthHandledRef.current = true;
+        const remember = readPendingOauthRemember();
+        clearPendingOauthRemember();
         window.history.replaceState({}, document.title, window.location.pathname);
         setOauthProcessing(true);
 
@@ -93,7 +173,7 @@ export const Login = () => {
             setGoogleLoading(true);
             setNaverLoading(true);
             try {
-                await loginWithTokens({ accessToken, refreshToken });
+                await loginWithTokens({ accessToken, refreshToken, remember });
                 notifySuccess("소셜 로그인 성공!");
             } catch (error) {
                 const { extractAuthErrorMessage } = await loadAuthAdapter();
@@ -145,13 +225,17 @@ export const Login = () => {
     const handleGoogleLogin = () => {
         setGoogleLoading(true);
         setOauthErrorMessage("");
-        window.location.href = "/api/oauth2/authorization/google";
+        persistLoginPreferences({ email, rememberEmail, autoLogin });
+        writePendingOauthRemember(autoLogin);
+        window.location.href = oauthAuthorizationUrl("google", autoLogin);
     };
 
     const handleNaverLogin = () => {
         setNaverLoading(true);
         setOauthErrorMessage("");
-        window.location.href = "/api/oauth2/authorization/naver";
+        persistLoginPreferences({ email, rememberEmail, autoLogin });
+        writePendingOauthRemember(autoLogin);
+        window.location.href = oauthAuthorizationUrl("naver", autoLogin);
     };
 
     const closeLockDialog = () => {
@@ -181,11 +265,13 @@ export const Login = () => {
         e.preventDefault();
         setLoading(true);
         setOauthErrorMessage("");
+        const normalizedEmail = email.trim();
         try {
-            await login(email, password);
+            await login(normalizedEmail, password, { remember: autoLogin });
+            persistLoginPreferences({ email: normalizedEmail, rememberEmail, autoLogin });
         } catch (error) {
             const { extractAccountLockInfo } = await loadAuthAdapter();
-            const nextLockInfo = extractAccountLockInfo(error, email);
+            const nextLockInfo = extractAccountLockInfo(error, normalizedEmail);
             if (nextLockInfo) {
                 setLockInfo(nextLockInfo);
             }
@@ -250,6 +336,8 @@ export const Login = () => {
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="input-base pl-12 h-14 bg-white font-bold"
                                     placeholder="이메일 주소"
+                                    autoComplete="email"
+                                    spellCheck={false}
                                     required
                                 />
                             </div>
@@ -267,9 +355,31 @@ export const Login = () => {
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="input-base pl-12 h-14 bg-white font-bold"
                                     placeholder="••••••••"
+                                    autoComplete="current-password"
                                     required
                                 />
                             </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-sm font-bold text-slate-500">
+                            <label className="inline-flex cursor-pointer items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={rememberEmail}
+                                    onChange={(event) => setRememberEmail(event.target.checked)}
+                                    className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                />
+                                <span>아이디 저장</span>
+                            </label>
+                            <label className="inline-flex cursor-pointer items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={autoLogin}
+                                    onChange={(event) => setAutoLogin(event.target.checked)}
+                                    className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                />
+                                <span>자동 로그인</span>
+                            </label>
                         </div>
 
                         <div className="pt-2 space-y-4">

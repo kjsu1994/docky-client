@@ -1,4 +1,5 @@
 import api from "../utils/api.js";
+import { getStoredAccessToken } from "../utils/authStorage.js";
 import { logClientError } from "../utils/clientDiagnostics.js";
 import { normalizeExternalUrl } from "../utils/helpers.js";
 import { statsAdapter } from "./statsAdapter.js";
@@ -296,12 +297,7 @@ const sendClickEventWithBeacon = (payload) => {
 };
 
 const readStoredAccessToken = () => {
-    if (typeof window === "undefined" || !window.localStorage) return "";
-    try {
-        return String(window.localStorage.getItem("accessToken") || "").trim();
-    } catch {
-        return "";
-    }
+    return getStoredAccessToken();
 };
 
 const sendClickEventWithKeepalive = (payload) => {
