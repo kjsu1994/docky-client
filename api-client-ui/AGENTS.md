@@ -1,134 +1,61 @@
-﻿# Client Agent Playbook (프론트 운영 규칙)
-## 1. Think Before Coding
+# Client Agent Playbook
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+## 경로
 
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+- 클라이언트 저장소: `C:\Users\honeybadger\Desktop\ctfmon_project\client`
+- 앱 루트: `client\api-client-ui`
+- 서버 저장소: `C:\Users\honeybadger\Desktop\ctfmon_project\CommunityServer`
+- 운영 compose: `C:\compose`
+- 운영 도메인: `https://ctfmon.shop`
 
-## 2. Simplicity First
+## 작업 원칙
 
-**Minimum code that solves the problem. Nothing speculative.**
+- React + Vite 프론트엔드다.
+- 브라우저 API base는 `/api`, WebSocket은 `/ws`를 사용한다.
+- 백엔드 API 계약은 OpenAPI 기준으로 확인한다.
+- API 호출과 응답 정규화는 `src/adapters/**`에 둔다.
+- page component에서 raw response shape를 직접 해석하지 않는다.
+- 요청 범위 밖의 UI 개편, 리팩터링, 문서 추가를 하지 않는다.
 
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
+## README 규칙
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+저장소 루트 `README.md`는 클라이언트 화면별 기능 문서로만 관리한다.
 
-## 3. Surgical Changes
+- 포함: 화면 경로별 기능, 사용자에게 보이는 동작, 공통 UI/인증/상태 원칙, 실행/빌드/검증 명령, 앱 구조
+- 제외: 날짜별 작업 로그, PR 요약, 회고, 인수인계, API 체크리스트 이력, 검증 이력 누적, 구현 과정 설명, 서버 API 상세 스키마
+- 화면 경로, 사용자 기능, 공통 UX 정책이 바뀐 경우에만 README를 갱신한다.
+- API 상세 계약은 서버 OpenAPI와 서버 README를 기준으로 한다.
 
-**Touch only what you must. Clean up only your own mess.**
+## 구현 기준
 
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
+- 인증 토큰 key는 `accessToken`, `refreshToken`, `userRoles`를 유지한다.
+- 요청/응답 필드는 백엔드 `SNAKE_CASE` 기준에 맞춘다.
+- public auth endpoint나 외부 URL에는 bearer token을 붙이지 않는다.
+- 공통 UI는 기존 역할에 맞춰 `src/common/**` 또는 `src/components/**`에 둔다.
+- 버튼, 폼, CTA는 실제 handler와 사용자 피드백을 가져야 한다.
+- 완료 상태에서 mock-only, TODO-only, hollow UI를 남기지 않는다.
+- 주요 화면은 loading, empty, error, forbidden/unauthorized 상태를 처리한다.
 
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
+## 화면 기준
 
-The test: Every changed line should trace directly to the user's request.
+- 기존 화면 밀도와 스타일을 우선한다.
+- 관리자/운영 화면은 스캔, 비교, 반복 작업 효율을 우선한다.
+- 게임 화면은 실제 조작과 상태 이해가 먼저 보이게 구성한다.
+- 텍스트, floating chat, toast, modal, 하단 내비게이션이 서로 겹치지 않게 확인한다.
 
-## 1) Scope (범위)
-- Frontend project root: `client`
-- Runtime: React + Vite
-- API base through Vite proxy: `/api`
+## 검증
 
-## 2) Backend Alignment (백엔드 정합)
-- Backend base (docker compose): `http://backend:8080`
-- Vite proxy rewrite:
-  - Request `/api/*` -> Backend `/*`
-- WebSocket proxy:
-  - `/ws` -> `http://backend:8080` with `ws=true`
-- OpenAPI source of truth (단일 계약 기준):
-  - `http://localhost:8080/swagger-ui/index.html`
-  - `http://localhost:8080/v3/api-docs`
+```powershell
+cd api-client-ui
+npm run build
+```
 
-## 3) Auth Rules (인증 규칙)
-- Access token header: `Authorization: Bearer {token}`
-- Refresh flow: on `401`, call `/api/auth/reissue` with refresh token
-- Persisted keys (localStorage):
-  - `accessToken`
-  - `refreshToken`
-  - `userRoles`
+- 변경 범위에 맞춰 `package.json`의 `smoke:*` script를 선택한다.
+- 한글 포함 파일은 UTF-8로 저장하고, 깨진 문자열이 보이면 즉시 복구한다.
 
-## 4) Implementation Rules (구현 규칙)
-- API를 백엔드 코드에서 추측하지 말고 OpenAPI + 체크리스트 기준으로 구현한다.
-- API 계약 변경 시 docs/checklists를 같은 변경 세트로 갱신한다.
-- 비자명 로직 주석은 한글로 작성한다.
-- owner/admin 권한 분기 UI를 유지한다.
-- API adapter 계층을 강제한다. (page component에서 응답 shape 직접 파싱 금지)
-- 작업 단위는 작게 유지한다. (one PR = one feature/risk domain)
+## 완료 보고
 
-## 4-1) FE/BE Responsibility Decision Rule (책임 분리)
-- 신규 기능 구현 전 FE / BE / Mixed를 먼저 판정한다.
-- BE-first:
-  - auth/permission/security validation 필요
-  - data consistency/transaction/concurrency 필요
-  - external API secret/key 처리 필요
-- FE-first:
-  - UI 렌더링/인터랙션/상태 전환이 핵심
-  - 서버 진실값 변경 없는 format/filter/sort
-- Mixed:
-  - Backend = rule/validation/calculation
-  - Frontend = flow/interaction/presentation
-- PR summary에 한 줄로 기록: `BE 70 / FE 30`
-
-## 4-2) UI Contract Auto-Apply Rule (자동 적용)
-- 신규 화면 요청 시 `docs/UI_CONTRACTS/`를 먼저 자동 탐색한다.
-- best match 1개면 질문 없이 적용한다.
-- 후보가 여러 개면 route/feature 이름 기준으로 가장 가까운 파일을 선택하고 보고한다.
-- 계약서가 없으면 `docs/SCREEN_COMPOSITION_BASELINE.md` + `docs/UI_CONTRACT_TEMPLATE.md` 기본값으로 진행한다.
-- UI contract vs API contract 충돌 시 코딩 전에 중단하고 충돌을 보고한다.
-- Conflict precedence (우선순위):
-  - Data schema/required/auth/error code: OpenAPI first
-  - Screen layout/copy/interaction flow: UI Contract first
-  - Existing UI pattern: third priority
-
-## 4-3) UI Contract File Naming Rule (파일명 규칙)
-- Location: `docs/UI_CONTRACTS/`
-- Format: `{route-or-domain}-{feature-kebab}.md`
-- Examples:
-  - `boards-write.md`
-  - `mypage-profile-edit.md`
-  - `statistics-dashboard.md`
-- lowercase/digits/hyphen only
-
-## 4-4) No Hollow Screen Rule (깡통 화면 금지)
-- scaffold-only 화면은 완료로 간주하지 않는다.
-- visible CTA/button/form action은 모두 real handler에 연결되어야 한다.
-- placeholder/TODO/mock-only control은 완료 상태에서 금지.
-- 부분 전달이 불가피하면:
-  - unfinished action을 disabled/hidden 처리
-  - PR에 범위 명시
-  - completion gate에서 미완료로 유지
-
-## 5) Definition of Done (완료 기준)
-- target route에서 기능 동작 확인
-- `npm run build` 통과
-- OpenAPI/API checklist 영향 문서화
-- README/docs 업데이트 포함
-- UI 4-state 통과: loading / empty / error / forbidden
-- action wiring 통과: hollow button/form 없음
-
-## 6) Required Docs (필수 문서)
-- `.github/PULL_REQUEST_TEMPLATE.md`
-- `docs/API_CHANGE_CHECKLIST.md`
-- `docs/SCREEN_API_MAPPING.md` (route/screen 영향 시)
-- `docs/VIBE_CODING_RULES.md`
-- `docs/UI_CONTRACT_TEMPLATE.md` (or concrete file under `docs/UI_CONTRACTS/`)
-- `docs/HANDOFF_TEMPLATE.md` (long-thread handoff)
-
-## 7) Encoding Safety (한글 인코딩 안전 규칙)
-- 한글이 포함된 소스/문서(.js, .jsx, .ts, .tsx, .md)는 UTF-8(권장: UTF-8 without BOM)으로 저장한다.
-- PowerShell로 파일 저장 시 기본 인코딩(CP949/ANSI) 저장을 금지하고 UTF-8을 명시한다.
-- 수정 후 �, ì, ë 같은 깨진 문자열이 보이면 즉시 인코딩 복구 후 진행한다.
-- 한글 UI 문자열이 있는 파일을 수정한 경우, 최소 1회 화면 확인(브라우저) 또는 문자열 grep 점검을 수행한다.
+- 변경 파일
+- 사용자 영향
+- 검증 결과
+- API/data shape/권한/문서 영향: 있음/없음
