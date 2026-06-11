@@ -5,6 +5,7 @@ import { Crown, Dices, MessageSquare, Play, RefreshCw, TimerReset, Users } from 
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { CasinoEmptyLaneArt, CasinoTableSign, DiceCountBadge, DiceFace, MoneyCard } from "../../common/LasVegasVisuals.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import GameRoomChatPanel from "../../common/GameRoomChatPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
@@ -2992,7 +2993,8 @@ export const LasVegasGame = () => {
     const isBetSoundPlayingRef = useRef(false);
 
     const myMemberId = getMemberId(user) || user?.id || null;
-    const chatRoomId = normalizeChatRoomId(state) || normalizeChatRoomId(selectedRoom) || null;
+    const gameChatRoomId = normalizeRoomId(selectedRoom);
+    const chatRoomId = null;
     const roomStatus = state?.roomStatus || selectedRoom?.roomStatus || null;
     const normalizedRoomStatus = String(roomStatus || "WAITING").toUpperCase();
     const isWaiting = normalizedRoomStatus === "WAITING";
@@ -3292,20 +3294,7 @@ export const LasVegasGame = () => {
         return matchedRoom || null;
     };
 
-    const subscribeChatRoom = (client, roomId) => {
-        if (chatSubRef.current) chatSubRef.current.unsubscribe();
-        chatSubRef.current = client.subscribe(`/sub/chat/room/${roomId}`, (msg) => {
-            let payload;
-            try {
-                payload = normalizeMessage(JSON.parse(msg.body || "{}"));
-            } catch {
-                fetchChatMessages(roomId).catch(() => {});
-                return;
-            }
-            if (payload) setChatMessages((prev) => [...prev, payload].sort(compareMessagesByChronology));
-            markChatRoomAsRead(roomId).catch(() => {});
-        });
-    };
+    const subscribeChatRoom = () => {};
 
     const fetchRooms = async () => {
         setRooms(await lasVegasGameAdapter.fetchRooms());
@@ -3337,7 +3326,6 @@ export const LasVegasGame = () => {
     const bindRealtimeRoom = (client, roomId, targetChatRoomId) => {
         if (!client?.connected || !roomId) return;
         subscribeGameRoom(client, roomId);
-        if (targetChatRoomId) subscribeChatRoom(client, targetChatRoomId);
     };
 
     const bindLatestRealtimeRoom = (client) => {
@@ -3354,14 +3342,8 @@ export const LasVegasGame = () => {
 
         const loadSnapshot = async () => {
             const snapshot = await fetchState(roomId);
-            const snapshotChatRoomId = normalizeChatRoomId(snapshot) || normalizeChatRoomId(room);
-            if (snapshotChatRoomId) {
-                await fetchChatMessages(snapshotChatRoomId);
-                await markChatRoomAsRead(snapshotChatRoomId);
-            } else {
-                setChatMessages([]);
-            }
-            return snapshotChatRoomId;
+            setChatMessages([]);
+            return null;
         };
         const snapshotChatRoomId = await loadSnapshot();
 
@@ -3704,7 +3686,7 @@ export const LasVegasGame = () => {
     };
 
     const sendChatMessage = async () => {
-        if (!chatInput.trim() || !chatRoomId || !myMemberId) return;
+        if (!chatInput.trim() || !gameChatRoomId || !myMemberId) return;
         const client = await ensureSocket();
         if (!client?.connected) {
             notifyError("채팅 연결이 아직 준비되지 않았습니다.");
@@ -3712,8 +3694,8 @@ export const LasVegasGame = () => {
         }
         const message = chatInput.trim();
         client.publish({
-            destination: "/pub/chat/message",
-            body: JSON.stringify(buildTalkPayload({ roomId: chatRoomId, senderId: myMemberId, message })),
+            destination: `/pub/game/las-vegas/room/${gameChatRoomId}/chat`,
+            body: JSON.stringify({ message, type: "TALK" }),
             headers: { "content-type": "application/json" },
         });
         setChatInput("");
@@ -4280,50 +4262,12 @@ export const LasVegasGame = () => {
                             />
                         </div>
 
-                        <aside className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">
-                            <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
-                                <MessageSquare className="h-4 w-4" />
-                                방 채팅
-                            </div>
-                            <div ref={chatScrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-2xl bg-slate-50 p-3 text-xs sm:h-[320px] xl:h-[420px]">
-                                {!chatMessages.length && (
-                                    <GameChatEmptyState
-                                        game="las-vegas"
-                                        title="아직 채팅 내역이 없습니다"
-                                        detail="주사위 굴림, 카지노 배팅, 정산 흐름을 짧게 남기면 같은 테이블의 판단을 맞출 수 있습니다."
-                                        prompts={["첫 인사", "배팅 방향", "준비 확인"]}
-                                        tone="amber"
-                                    />
-                                )}
-                                {chatMessages.map((msg) => {
-                                    const normalized = normalizeMessage(msg);
-                                    return (
-                                    <div key={normalized.key || normalized.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-                                        <div className="flex items-center gap-2 font-black text-slate-800">
-                                            <UserAvatar name={normalized.senderName || "SYSTEM"} profileUrl={normalized.senderProfileUrl} size="xs" />
-                                            <span className="min-w-0 truncate">{normalized.senderName || "SYSTEM"}</span>
-                                        </div>
-                                        <div className="mt-0.5 text-slate-700">{normalized.message || ""}</div>
-                                    </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="flex gap-2">
-                                <input
-                                    className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                                    placeholder="메시지를 입력하세요"
-                                    value={chatInput}
-                                    onChange={(e) => setChatInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.preventDefault();
-                                            sendChatMessage();
-                                        }
-                                    }}
-                                />
-                                <button className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white" onClick={sendChatMessage}>전송</button>
-                            </div>
-                        </aside>
+                        <GameRoomChatPanel
+                            gameCode="las-vegas"
+                            roomId={gameChatRoomId}
+                            resetKey={normalizedRoomStatus}
+                            title="방 채팅"
+                        />
                     </div>
                 </section>
             )}

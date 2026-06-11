@@ -16,6 +16,7 @@ import {
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import GameRoomChatPanel from "../../common/GameRoomChatPanel.jsx";
 import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
@@ -5272,6 +5273,13 @@ export const CitadelsGame = () => {
               </aside>
             </div>
           )}
+
+          <GameRoomChatPanel
+            gameCode={GAME_CODE}
+            roomId={roomIdOf(selectedRoom)}
+            resetKey={`${status}-${phase || ""}`}
+            title="방 채팅"
+          />
         </section>
       )}
     </div>

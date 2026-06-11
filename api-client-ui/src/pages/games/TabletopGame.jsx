@@ -37,6 +37,7 @@ import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
+import GameRoomChatPanel from "../../common/GameRoomChatPanel.jsx";
 import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
@@ -20813,6 +20814,13 @@ export const TabletopGame = ({ game }) => {
               </div>
             </>
           )}
+
+          <GameRoomChatPanel
+            gameCode={game}
+            roomId={idOf(selectedRoom)}
+            resetKey={`${status}-${get(gameState, "phase", "phase", "")}`}
+            title="방 채팅"
+          />
         </section>
       )}
     </div>
