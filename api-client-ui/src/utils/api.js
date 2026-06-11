@@ -205,7 +205,7 @@ const formatValidationErrors = (errors, fieldKey) => {
         .join(", ");
 };
 
-const refreshAccessToken = async () => {
+export const refreshAccessToken = async () => {
     if (refreshPromise) return refreshPromise;
 
     const refreshToken = getStoredRefreshToken();

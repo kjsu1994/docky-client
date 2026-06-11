@@ -1,12 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { normalizePostOauthRedirect } from "../utils/authRedirect.js";
-import { clearAuthSession, getStoredAccessToken, getStoredUserRoles, persistAuthSession } from "../utils/authStorage.js";
+import {
+    clearAuthSession,
+    getStoredAccessToken,
+    getStoredRefreshToken,
+    getStoredUserRoles,
+    persistAuthSession,
+} from "../utils/authStorage.js";
 import { logClientError } from "../utils/clientDiagnostics.js";
 import { notifyError, notifySuccess } from "../utils/toast.js";
 
 const AuthContext = createContext(null);
 const loadAuthAdapter = () => import("../adapters/authAdapter.js");
+const loadApi = () => import("../utils/api.js");
 export { normalizePostOauthRedirect } from "../utils/authRedirect.js";
 
 const parseStoredRoles = () => {
@@ -45,8 +52,13 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const initAuth = async () => {
             const token = getStoredAccessToken();
-            if (token) {
+            const refreshToken = getStoredRefreshToken();
+            if (token || refreshToken) {
                 try {
+                    if (!token && refreshToken) {
+                        const { refreshAccessToken } = await loadApi();
+                        await refreshAccessToken();
+                    }
                     const { authAdapter } = await loadAuthAdapter();
                     const data = await authAdapter.fetchCurrentMember();
                     setUser(withRolesFallback(data, parseStoredRoles()));

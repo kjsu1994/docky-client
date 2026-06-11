@@ -44,7 +44,11 @@ const authStorage = () => {
     const session = getStorage("session");
     const localToken = safeGet(local, ACCESS_TOKEN_KEY);
     const sessionToken = safeGet(session, ACCESS_TOKEN_KEY);
-    return localToken ? local : (sessionToken ? session : local);
+    const localRefreshToken = safeGet(local, REFRESH_TOKEN_KEY);
+    const sessionRefreshToken = safeGet(session, REFRESH_TOKEN_KEY);
+    if (localToken || localRefreshToken) return local;
+    if (sessionToken || sessionRefreshToken) return session;
+    return local;
 };
 
 export const getStoredAccessToken = () => safeGet(authStorage(), ACCESS_TOKEN_KEY).trim();

@@ -122,6 +122,24 @@ function assertStaticAuthRuntimeBoundaries() {
         || !source.includes("const { authAdapter } = await loadAuthAdapter()")) {
         throw new Error("auth-ui-smoke: auth adapter must stay lazy-loaded until auth state or auth action needs it.");
     }
+    if (!source.includes("getStoredRefreshToken")
+        || !source.includes("!token && refreshToken")
+        || !source.includes("await refreshAccessToken()")) {
+        throw new Error("auth-ui-smoke: auth init must recover from a stored refresh token when the access token is missing.");
+    }
+
+    const authStorageSource = readFileSync("src/utils/authStorage.js", "utf8");
+    if (!authStorageSource.includes("localRefreshToken")
+        || !authStorageSource.includes("sessionRefreshToken")
+        || !authStorageSource.includes("localToken || localRefreshToken")
+        || !authStorageSource.includes("sessionToken || sessionRefreshToken")) {
+        throw new Error("auth-ui-smoke: auth storage must select the store that still has a refresh token.");
+    }
+
+    const apiSource = readFileSync("src/utils/api.js", "utf8");
+    if (!apiSource.includes("export const refreshAccessToken = async ()")) {
+        throw new Error("auth-ui-smoke: refresh token recovery must expose the access-token reissue helper.");
+    }
 
     const appSource = readFileSync("src/App.jsx", "utf8");
     const protectedRoutesSource = readFileSync("src/components/ProtectedRoutes.jsx", "utf8");
@@ -241,6 +259,16 @@ function routeMock(url, method, postData) {
                     roles: ["ROLE_USER"],
                 },
             },
+        };
+    }
+
+    if (method === "POST" && pathname === "/api/auth/reissue") {
+        return {
+            status: 200,
+            headers: [
+                { name: "Authorization", value: "Bearer smoke-reissued-access-token" },
+            ],
+            body: null,
         };
     }
 
@@ -523,6 +551,16 @@ async function inspectAuth(cdp, sessionId) {
     await clickByText(cdp, sessionId, "닫기");
     await waitFor(cdp, sessionId, `!document.querySelector("[role='dialog'][aria-modal='true']")`, "locked account dialog close");
     await assertNoBlockedText(cdp, sessionId, "locked account dialog");
+
+    await evaluate(cdp, sessionId, `(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+        localStorage.setItem("refreshToken", "smoke-refresh-token");
+    })()`);
+    await cdp.send("Page.navigate", { url: `${baseUrl}/app` }, sessionId);
+    await waitFor(cdp, sessionId, `location.pathname === "/app"`, "mobile refresh-token-only auth recovery");
+    await waitFor(cdp, sessionId, `localStorage.getItem("accessToken") === "smoke-reissued-access-token"`, "reissued access token persisted in local storage");
+    await assertNoBlockedText(cdp, sessionId, "refresh-token-only recovery");
 
     await cdp.send("Page.navigate", { url: `${baseUrl}/login` }, sessionId);
     await waitForText(cdp, sessionId, "로그인");
