@@ -62,18 +62,21 @@ export const AuthProvider = ({ children }) => {
         initAuth();
     }, []);
 
-    const routeAfterQueue = useCallback(async ({ replace = false } = {}) => {
+    const requestQueueAdmission = useCallback(async () => {
         try {
             const { queueAdapter } = await import("../adapters/queueAdapter.js");
-            const queueData = await queueAdapter.join();
-            if (queueData.status === "WAITING" || queueData.status === "BLOCKED") {
-                navigate("/queue", { replace: true });
-                return;
-            }
+            return await queueAdapter.join();
         } catch (err) {
             logClientError("auth.queue.join", err);
+            return null;
         }
+    }, []);
 
+    const routeAfterQueue = useCallback((queueData, { replace = false } = {}) => {
+        if (queueData?.status === "WAITING" || queueData?.status === "BLOCKED") {
+            navigate("/queue", { replace: true });
+            return;
+        }
         navigate("/app", { replace });
     }, [navigate]);
 
@@ -96,12 +99,15 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem("userRoles", JSON.stringify(loginRoles));
             }
 
-            const userData = await authAdapter.fetchCurrentMember();
+            const [userData, queueData] = await Promise.all([
+                authAdapter.fetchCurrentMember(),
+                requestQueueAdmission(),
+            ]);
             setUser(withRolesFallback(userData, loginRoles || parseStoredRoles()));
 
             notifySuccess("로그인 성공!");
 
-            await routeAfterQueue();
+            routeAfterQueue(queueData);
         } catch (error) {
             if (authModule?.isAccountLockedError?.(error)) {
                 throw error;
@@ -121,19 +127,22 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem("refreshToken", refreshToken);
         }
 
+        const postOauthRedirect = normalizePostOauthRedirect(localStorage.getItem("postOauthRedirect"));
         const { authAdapter } = await loadAuthAdapter();
-        const userData = await authAdapter.fetchCurrentMember();
+        const [userData, queueData] = await Promise.all([
+            authAdapter.fetchCurrentMember(),
+            postOauthRedirect ? Promise.resolve(null) : requestQueueAdmission(),
+        ]);
         setUser(withRolesFallback(userData, parseStoredRoles()));
 
-        const postOauthRedirect = normalizePostOauthRedirect(localStorage.getItem("postOauthRedirect"));
         localStorage.removeItem("postOauthRedirect");
         if (postOauthRedirect) {
             navigate(postOauthRedirect, { replace: true });
             return;
         }
 
-        await routeAfterQueue({ replace: true });
-    }, [navigate, routeAfterQueue]);
+        routeAfterQueue(queueData, { replace: true });
+    }, [navigate, requestQueueAdmission, routeAfterQueue]);
 
     const logout = async (options = {}) => {
         if (options && typeof options.preventDefault === "function") {

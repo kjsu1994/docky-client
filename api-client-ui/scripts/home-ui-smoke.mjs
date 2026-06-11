@@ -104,9 +104,10 @@ function assertStaticPageGuideAccessibility() {
     }
     if (
         !entrySource.includes("const PageGuideButton = lazy(() =>") ||
-        !entrySource.includes("import(\"./PageGuideButton.jsx\")")
+        !entrySource.includes("import(\"./PageGuideButton.jsx\")") ||
+        !entrySource.includes("requestIdleCallback")
     ) {
-        throw new Error("home-ui-smoke: page guide button must stay lazy-loaded from the protected layout.");
+        throw new Error("home-ui-smoke: page guide button must stay idle lazy-loaded from the protected layout.");
     }
     if (!buttonSource.includes("const PageGuideDialog = lazy(() =>")) {
         throw new Error("home-ui-smoke: page guide dialog must stay lazy-loaded from the app shell.");
@@ -918,6 +919,7 @@ async function inspectHome(ws, viewport) {
     if (customCursorChunkRequests > 0) {
         throw new Error(`home ${viewport.name}: custom cursor chunk loaded before pointer activation`);
     }
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-page-guide-trigger="true"]'))`, 3500);
     const utilityButtonState = await evaluate(ws, `(() => {
         const toRect = (node) => {
             const rect = node?.getBoundingClientRect?.();
