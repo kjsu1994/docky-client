@@ -27,7 +27,8 @@ const allMenuTexts = [
     "검증 관리자",
     "핵심 서비스",
     "편의 도구",
-    "게임",
+    "게임 허브",
+    "홈 대시보드",
     "계정",
     "관리자",
     "스트리밍 스튜디오",
@@ -35,6 +36,7 @@ const allMenuTexts = [
 ];
 const allMenuLinks = [
     "/app",
+    "/app/home",
     "/app/todos",
     "/app/statistics",
     "/app/streaming",
@@ -45,6 +47,13 @@ const allMenuLinks = [
     "/app/facility",
     "/app/ranks",
     "/app/news",
+    "/app/mypage",
+    "/app/mypage/edit",
+    "/app/admin/anomalies",
+    "/app/admin/operations",
+    "/app/admin/streaming",
+];
+const allMenuForbiddenLinks = [
     "/app/games",
     "/app/poker",
     "/app/games/las-vegas",
@@ -57,11 +66,6 @@ const allMenuLinks = [
     "/app/games/telestrations",
     "/app/games/mafia",
     "/app/games/citadels",
-    "/app/mypage",
-    "/app/mypage/edit",
-    "/app/admin/anomalies",
-    "/app/admin/operations",
-    "/app/admin/streaming",
 ];
 const gamesHubTexts = [
     "게임 허브",
@@ -853,6 +857,13 @@ async function inspectAllMenu(ws, viewport) {
     })()`);
     if (missingLinks.length) {
         throw new Error(`all-menu ${viewport.name}: missing links ${missingLinks.join(", ")}`);
+    }
+    const forbiddenLinks = await evaluate(ws, `(() => {
+        const links = new Set(Array.from(document.querySelectorAll("a[href]")).map((node) => node.getAttribute("href")));
+        return ${JSON.stringify(allMenuForbiddenLinks)}.filter((href) => links.has(href));
+    })()`);
+    if (forbiddenLinks.length) {
+        throw new Error(`all-menu ${viewport.name}: forbidden game links ${forbiddenLinks.join(", ")}`);
     }
 
     return `all-menu ${viewport.name}: ok ${value.clientWidth}/${value.scrollWidth} ${value.url}`;

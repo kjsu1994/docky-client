@@ -17,7 +17,7 @@ import {
     ChevronRight,
     HelpCircle,
     Film,
-    Bot, BadgeX, BadgeDollarSign,
+    Bot,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
@@ -51,7 +51,8 @@ export const AllMenu = () => {
     const isAdmin = isAdminUser(user);
 
     const mainServices = [
-        { title: "홈", to: "/app", icon: Home, color: "bg-blue-50 text-blue-600" },
+        { title: "게임 허브", to: "/app", icon: Dices, color: "bg-amber-50 text-amber-700" },
+        { title: "홈 대시보드", to: "/app/home", icon: Home, color: "bg-blue-50 text-blue-600" },
         { title: "할 일", to: "/app/todos", icon: CalendarDays, color: "bg-emerald-50 text-emerald-700" },
         { title: "통계", to: "/app/statistics", icon: BarChart, color: "bg-indigo-50 text-indigo-600" },
         { title: "스트리밍", to: "/app/streaming", icon: Film, color: "bg-fuchsia-50 text-fuchsia-700" },
@@ -65,21 +66,6 @@ export const AllMenu = () => {
         { title: "주변 찾기", to: "/app/facility", icon: Car, color: "bg-cyan-50 text-cyan-700" },
         { title: "순위", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
         { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
-    ];
-
-    const games = [
-        { title: "게임 허브", to: "/app/games", icon: Dices, color: "bg-amber-50 text-amber-700" },
-        { title: "포커", to: "/app/poker", icon: Dices, color: "bg-emerald-50 text-emerald-700" },
-        { title: "라스베거스", to: "/app/games/las-vegas", icon: BadgeDollarSign, color: "bg-orange-50 text-orange-600" },
-        { title: "노땡스", to: "/app/games/no-thanks", icon: BadgeX, color: "bg-slate-50 text-orange-600" },
-        { title: "카탄", to: "/app/games/catan", icon: Dices, color: "bg-lime-50 text-lime-700" },
-        { title: "블로커스", to: "/app/games/blokus", icon: Dices, color: "bg-blue-50 text-blue-700" },
-        { title: "마헤", to: "/app/games/mahe", icon: Dices, color: "bg-emerald-50 text-emerald-700" },
-        { title: "달무티", to: "/app/games/dalmuti", icon: Dices, color: "bg-rose-50 text-rose-700" },
-        { title: "6 nimmt!", to: "/app/games/six-nimmt", icon: Dices, color: "bg-rose-50 text-rose-700" },
-        { title: "텔레스트레이션", to: "/app/games/telestrations", icon: Dices, color: "bg-sky-50 text-sky-700" },
-        { title: "마피아", to: "/app/games/mafia", icon: Dices, color: "bg-zinc-100 text-zinc-800" },
-        { title: "시티델", to: "/app/games/citadels", icon: Dices, color: "bg-amber-50 text-zinc-800" },
     ];
 
     const account = [
@@ -114,7 +100,6 @@ export const AllMenu = () => {
 
             <MenuSection title="핵심 서비스" items={mainServices} />
             <MenuSection title="편의 도구" items={tools} />
-            <MenuSection title="게임" items={games} />
             <MenuSection title="계정" items={account} />
             {isAdmin && <MenuSection title="관리자" items={admin} />}
 

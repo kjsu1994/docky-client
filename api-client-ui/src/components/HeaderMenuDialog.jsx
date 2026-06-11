@@ -51,7 +51,8 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
             {
                 title: "핵심",
                 items: [
-                    { title: "홈", to: "/app", icon: Home },
+                    { title: "게임 허브", to: "/app", icon: Dices },
+                    { title: "홈 대시보드", to: "/app/home", icon: Home },
                     { title: "할 일", to: "/app/todos", icon: CalendarDays },
                     { title: "통계", to: "/app/statistics", icon: BarChart },
                     { title: "사용자게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare },
@@ -66,23 +67,6 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
                     { title: "순위", to: "/app/ranks", icon: Trophy },
                     { title: "뉴스", to: "/app/news", icon: Newspaper },
                     { title: "스트리밍", to: "/app/streaming", icon: Film },
-                ],
-            },
-            {
-                title: "게임",
-                items: [
-                    { title: "게임 허브", to: "/app/games", icon: Dices },
-                    { title: "포커", to: "/app/poker", icon: Dices },
-                    { title: "라스베거스", to: "/app/games/las-vegas", icon: Dices },
-                    { title: "노땡스", to: "/app/games/no-thanks", icon: Dices },
-                    { title: "카탄", to: "/app/games/catan", icon: Dices },
-                    { title: "블로커스", to: "/app/games/blokus", icon: Dices },
-                    { title: "마헤", to: "/app/games/mahe", icon: Dices },
-                    { title: "달무티", to: "/app/games/dalmuti", icon: Dices },
-                    { title: "6 nimmt!", to: "/app/games/six-nimmt", icon: Dices },
-                    { title: "텔레스트레이션", to: "/app/games/telestrations", icon: Dices },
-                    { title: "마피아", to: "/app/games/mafia", icon: Dices },
-                    { title: "시티델", to: "/app/games/citadels", icon: Dices },
                 ],
             },
             {
