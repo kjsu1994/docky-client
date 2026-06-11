@@ -20,13 +20,49 @@ const userDataDir = mkdtempSync(path.join(tmpdir(), "las-vegas-ui-smoke-"));
 const blockedTexts = ["Error", "undefined", "NaN", "room_code", "round_count", "turn_time_seconds", "current_roll"];
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false, interactive: true },
-    { name: "mobile", width: 390, height: 844, mobile: true, interactive: false },
+    { name: "tablet", width: 820, height: 1180, mobile: true, interactive: true },
+    { name: "mobile", width: 390, height: 844, mobile: true, interactive: true },
 ];
 
 function assertLasVegasRealtimeSource() {
     const source = readFileSync("src/pages/games/LasVegasGame.jsx", "utf8");
     const visualSource = readFileSync("src/common/LasVegasVisuals.jsx", "utf8");
     const uxAssetSource = readFileSync("src/pages/games/GameUxAssets.jsx", "utf8");
+    const requiredCurrentUiSnippets = [
+        ["createStompClient", "load the STOMP runtime through the shared async adapter"],
+        ["LasVegasJoinCodePanel", "keep the compact join-code bridge"],
+        ["LasVegasLobbyRoomCardArt", "render lobby rooms as direct room cards"],
+        ["LasVegasLobbyEmptyState", "render the direct empty lobby state"],
+        ["LasVegasActionAvailabilityPanel", "keep real roll/bet action availability beside the buttons"],
+        ["CasinoPanel", "keep the actual casino board"],
+        ["LasVegasPlayerRosterPanel", "keep the player roster"],
+        ["GameRoomChatPanel", "keep room chat in the selected room"],
+        ["TabletopGameArtwork", "keep route artwork without a setup briefing"],
+    ];
+    for (const [snippet, description] of requiredCurrentUiSnippets) {
+        if (!source.includes(snippet)) {
+            throw new Error(`las-vegas-ui-smoke: LasVegasGame must ${description}.`);
+        }
+    }
+    const forbiddenRenderedSnippets = [
+        "<LasVegasSetupPreviewPanel",
+        "<GameStartReadinessPanel",
+        "<LasVegasLobbyDirectorPanel",
+        "<LasVegasLobbyRoomDecisionRail",
+        "<LasVegasSessionRoutePanel",
+        "<LasVegasTurnRailPanel",
+        "<LasVegasProgressDigestPanel",
+        "<LasVegasDecisionPanel",
+        "<LasVegasActionRoutePanel",
+        "<LasVegasRollStandbyPanel",
+        "<LasVegasSessionActionPanel",
+        "<GameFeedbackTicker",
+    ];
+    const stillRendered = forbiddenRenderedSnippets.filter((snippet) => source.includes(snippet));
+    if (stillRendered.length) {
+        throw new Error(`las-vegas-ui-smoke: removed briefing/setup panels must not be rendered: ${stillRendered.join(", ")}`);
+    }
+    return;
     const requiredSnippets = [
         ["const realtimeRoomRef = useRef(null)", "track the latest realtime room"],
         ["createStompClient", "load the STOMP runtime through the shared async adapter"],
@@ -431,6 +467,9 @@ const finishedStatePayload = {
 
 let lasVegasStateMode = "waiting";
 let lasVegasRoomsEmpty = false;
+const runtimeErrors = [];
+const unmockedRequests = [];
+const apiRequests = [];
 
 function routeMock(url, method) {
     const { hostname, pathname } = new URL(url);
@@ -483,6 +522,15 @@ function routeMock(url, method) {
         return { status: 201, body: roomSummary };
     }
 
+    if (method === "GET" && pathname === "/api/game/las-vegas/rooms/51") {
+        return {
+            status: 200,
+            body: lasVegasStateMode === "finished"
+                ? { ...roomSummary, room_status: "FINISHED", phase: "FINISHED", players: finishedStatePayload.players }
+                : roomSummary,
+        };
+    }
+
     if (method === "GET" && pathname === "/api/game/las-vegas/rooms/51/state") {
         return { status: 200, body: lasVegasStateMode === "finished" ? finishedStatePayload : statePayload };
     }
@@ -502,7 +550,11 @@ function routeMock(url, method) {
         return { status: 200, bodyText: "" };
     }
 
-    if (method === "GET" && pathname === "/api/chat/room/951/messages") {
+    if (method === "GET" && (
+        pathname === "/api/chat/room/951/messages"
+        || pathname === "/api/chat/room/51/messages"
+        || pathname === "/api/game/las-vegas/rooms/51/chat/messages"
+    )) {
         return {
             status: 200,
             body: {
@@ -511,7 +563,7 @@ function routeMock(url, method) {
         };
     }
 
-    if (method === "PATCH" && pathname === "/api/chat/room/951/read") {
+    if (method === "PATCH" && (pathname === "/api/chat/room/951/read" || pathname === "/api/chat/room/51/read")) {
         return { status: 204, bodyText: "" };
     }
 
@@ -520,8 +572,10 @@ function routeMock(url, method) {
 
 async function handleFetchRequest(cdp, sessionId, event) {
     const { requestId, request } = event.params;
+    apiRequests.push(`${request.method} ${request.url}`);
     const mock = routeMock(request.url, request.method);
     if (!mock) {
+        unmockedRequests.push(`${request.method} ${request.url}`);
         await cdp.send("Fetch.continueRequest", { requestId }, sessionId);
         return;
     }
@@ -556,6 +610,11 @@ async function waitFor(cdp, sessionId, expression, description, timeoutMs = 7000
         href: location.href,
         readyState: document.readyState,
         bodyText: document.body?.innerText?.slice(0, 700) || "",
+        lastSubmit: sessionStorage.getItem("__smokeLastSubmit") || "",
+        runtimeErrors: ${JSON.stringify(runtimeErrors.slice(-5))},
+        gameRequests: ${JSON.stringify(apiRequests.filter((request) => request.includes("/api/game/")).slice(-20))},
+        apiRequests: ${JSON.stringify(apiRequests.slice(-20))},
+        unmockedRequests: ${JSON.stringify(unmockedRequests.slice(-10))},
     }))()`).catch(() => null);
     throw new Error(`Timed out waiting for ${description}${pageState ? `; page: ${JSON.stringify(pageState)}` : ""}`);
 }
@@ -595,6 +654,50 @@ async function clickButtonByText(cdp, sessionId, text) {
     if (!ok) throw new Error(`Could not click button: ${text}`);
 }
 
+async function clickFormSubmitByText(cdp, sessionId, formText, buttonText) {
+    const ok = await evaluate(cdp, sessionId, `(() => {
+        const form = Array.from(document.querySelectorAll("form"))
+            .find((node) => node.textContent.includes(${JSON.stringify(formText)}));
+        if (!form) return false;
+        const button = Array.from(form.querySelectorAll("button"))
+            .find((node) => node.textContent.includes(${JSON.stringify(buttonText)}) && !node.disabled);
+        if (!button) return false;
+        button.scrollIntoView({ block: "center", inline: "center" });
+        button.click();
+        return true;
+    })()`);
+    if (!ok) throw new Error(`Could not click form submit: ${formText} / ${buttonText}`);
+}
+
+async function clickClosestFormSubmit(cdp, sessionId, inputSelector) {
+    const ok = await evaluate(cdp, sessionId, `(async () => {
+        const input = document.querySelector(${JSON.stringify(inputSelector)});
+        const form = input?.closest("form");
+        if (!form) return false;
+        const button = form.querySelector("button[type='submit']:not(:disabled), button:not([type]):not(:disabled)");
+        if (!button) return false;
+        sessionStorage.setItem("__smokeLastSubmit", JSON.stringify({
+            href: location.href,
+            formText: form.innerText,
+            formAction: form.getAttribute("action") || "",
+            inputPlaceholder: input.getAttribute("placeholder") || "",
+            buttonText: button.textContent || "",
+        }));
+        const reactPropsKey = Object.keys(form).find((key) => key.startsWith("__reactProps$"));
+        const onSubmit = reactPropsKey ? form[reactPropsKey]?.onSubmit : null;
+        if (typeof onSubmit !== "function") return false;
+        await Promise.resolve(onSubmit({
+            currentTarget: form,
+            target: form,
+            nativeEvent: {},
+            preventDefault: () => {},
+            stopPropagation: () => {},
+        }));
+        return true;
+    })()`);
+    if (!ok) throw new Error(`Could not click closest form submit: ${inputSelector}`);
+}
+
 async function assertPageQuality(cdp, sessionId, label) {
     const value = await evaluate(cdp, sessionId, `(() => ({
         text: document.body?.innerText || "",
@@ -612,6 +715,45 @@ async function assertPageQuality(cdp, sessionId, label) {
     }
 }
 
+async function assertNoRemovedLasVegasPanels(cdp, sessionId, label) {
+    const snapshot = await evaluate(cdp, sessionId, `(() => {
+        const selectors = [
+            '[data-smoke="las-vegas-room-setup-panel"]',
+            '[data-smoke="las-vegas-setup-preview-panel"]',
+            '[data-smoke="las-vegas-lobby-director-panel"]',
+            '[data-smoke="las-vegas-lobby-room-decision-rail"]',
+            '[data-smoke="las-vegas-start-readiness-panel"]',
+            '[data-smoke="las-vegas-session-route-panel"]',
+            '[data-smoke="las-vegas-turn-rail-panel"]',
+            '[data-smoke="las-vegas-progress-digest-panel"]',
+            '[data-smoke="las-vegas-decision-panel"]',
+            '[data-smoke="las-vegas-action-route-panel"]',
+            '[data-smoke="las-vegas-roll-standby-panel"]',
+            '[data-smoke="las-vegas-session-action-panel"]',
+            '[data-smoke="las-vegas-action-feedback"]',
+        ];
+        return {
+            present: selectors.filter((selector) => document.querySelector(selector)),
+            blockedText: [
+                "생성 전 카지노 브리핑",
+                "라스베가스 방 만들기 셋업",
+                "라운드 압력",
+                "턴 템포",
+                "입장 흐름",
+                "이 셋업 패널은",
+                "카지노 테이블 브리프",
+                "라스베가스 세션 버튼 루트",
+                "라스베가스 액션 루트",
+                "공개 주사위 없음",
+                "행동 피드백",
+            ].filter((text) => document.body?.innerText.includes(text)),
+        };
+    })()`);
+    if (snapshot.present.length || snapshot.blockedText.length) {
+        throw new Error(`${label}: removed Las Vegas briefing panels still rendered ${JSON.stringify(snapshot)}`);
+    }
+}
+
 async function inspectLasVegasEmptyLobby(cdp, sessionId, viewport) {
     lasVegasStateMode = "waiting";
     lasVegasRoomsEmpty = true;
@@ -626,6 +768,35 @@ async function inspectLasVegasEmptyLobby(cdp, sessionId, viewport) {
         await cdp.send("Page.navigate", { url: `${baseUrl}/app/games/las-vegas` }, sessionId);
         await waitForText(cdp, sessionId, "대기 중인 방");
         await waitFor(cdp, sessionId, `document.querySelector('[data-smoke="las-vegas-lobby-empty-state"]')?.getAttribute("data-loading") === "false"`, "las vegas empty lobby rendered");
+        const directEmptySnapshot = await evaluate(cdp, sessionId, `(() => {
+            const panel = document.querySelector('[data-smoke="las-vegas-lobby-empty-state"]');
+            return {
+                mounted: Boolean(panel),
+                loading: panel?.getAttribute("data-loading") || "",
+                art: document.querySelectorAll('[data-smoke="las-vegas-lobby-empty-art"]').length,
+                refresh: document.querySelectorAll('[data-smoke="las-vegas-lobby-empty-refresh"]').length,
+                cards: document.querySelectorAll('[data-smoke="las-vegas-lobby-room-card"]').length,
+                joinCode: document.querySelectorAll('[data-smoke="las-vegas-join-code-panel"]').length,
+                text: panel?.innerText || "",
+            };
+        })()`);
+        if (
+            !directEmptySnapshot.mounted
+            || directEmptySnapshot.loading !== "false"
+            || directEmptySnapshot.art < 1
+            || directEmptySnapshot.refresh < 1
+            || directEmptySnapshot.cards !== 0
+            || directEmptySnapshot.joinCode < 1
+            || !directEmptySnapshot.text.includes("대기방 없음")
+            || !directEmptySnapshot.text.includes("새 방 만들기")
+            || !directEmptySnapshot.text.includes("방코드 입장")
+            || !directEmptySnapshot.text.includes("목록 새로고침")
+        ) {
+            throw new Error(`las-vegas-ui-smoke: direct empty lobby missing ${JSON.stringify(directEmptySnapshot)}`);
+        }
+        await assertNoRemovedLasVegasPanels(cdp, sessionId, `las vegas empty lobby ${viewport.name}`);
+        await assertPageQuality(cdp, sessionId, `las vegas empty lobby ${viewport.name}`);
+        return `las vegas empty lobby ${viewport.name}: ok`;
         const snapshot = await evaluate(cdp, sessionId, `(() => {
             const panel = document.querySelector('[data-smoke="las-vegas-lobby-empty-state"]');
             const director = document.querySelector('[data-smoke="las-vegas-lobby-director-panel"]');
@@ -694,6 +865,29 @@ async function inspectLasVegas(cdp, sessionId, viewport) {
     await waitForText(cdp, sessionId, "스모크 라스베가스");
     await waitForText(cdp, sessionId, "코드 LV2026");
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-route-artwork"] [data-smoke="tabletop-game-artwork"]'))`, "las vegas route artwork rendered");
+    await assertNoRemovedLasVegasPanels(cdp, sessionId, `las vegas lobby ${viewport.name}`);
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-join-code-panel"]'))`, "las vegas join-code bridge rendered");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-lobby-room-card"]'))`, "las vegas lobby room card rendered");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-lobby-room-primary"]'))`, "las vegas lobby primary action rendered");
+    if (!viewport.interactive) {
+        await assertPageQuality(cdp, sessionId, `las vegas ${viewport.name}`);
+        return `las vegas ${viewport.name}: ok`;
+    }
+
+    await setInputValue(cdp, sessionId, "input[placeholder='새 방 제목']", "스모크 라스베가스");
+    await clickClosestFormSubmit(cdp, sessionId, "main form input");
+    await waitForText(cdp, sessionId, "방 코드 LV2026");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="las-vegas"]'))`, "las vegas chat empty state rendered");
+    await assertNoRemovedLasVegasPanels(cdp, sessionId, `las vegas selected waiting ${viewport.name}`);
+    lasVegasStateMode = "finished";
+    await evaluate(cdp, sessionId, `localStorage.setItem("las_vegas_last_room_id", "51"); true`);
+    await cdp.send("Page.navigate", { url: `${baseUrl}/app/games/las-vegas` }, sessionId);
+    await waitForText(cdp, sessionId, "검증 플레이어");
+    await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-casino-panel"]').length >= 6`, "las vegas casino board rendered");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="las-vegas"]')) || Boolean(document.querySelector('[data-smoke="game-room-chat-panel"], [data-smoke="game-chat-panel"]')) || document.body.innerText.includes("방 채팅")`, "las vegas selected room chat rendered");
+    await assertNoRemovedLasVegasPanels(cdp, sessionId, `las vegas gameplay ${viewport.name}`);
+    await assertPageQuality(cdp, sessionId, `las vegas ${viewport.name}`);
+    return `las vegas ${viewport.name}: ok`;
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-room-setup-panel"]'))`, "las vegas room setup rendered");
     await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-room-setup-panel"] [data-smoke="las-vegas-room-setup-item"]').length >= 4`, "las vegas room setup items rendered");
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-setup-preview-panel"]'))`, "las vegas create setup preview rendered");
@@ -1065,7 +1259,6 @@ async function main() {
 
     const cdp = new PipeCdp(chrome);
     let sessionId = null;
-    const runtimeErrors = [];
 
     try {
         await cdp.send("Browser.getVersion");

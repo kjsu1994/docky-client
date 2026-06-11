@@ -10,7 +10,7 @@ import UserAvatar from "../../common/UserAvatar.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
-import { GameActionCueBar, GameChatEmptyState, GameFeedbackTicker, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
+import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 import {
     buildLasVegasActionPayload,
@@ -3873,18 +3873,6 @@ export const LasVegasGame = () => {
                         {creating ? "생성 중..." : "방 만들기"}
                     </button>
                 </form>
-                <LasVegasSetupPreviewPanel createForm={createForm} rooms={rooms} />
-                <GameStartReadinessPanel
-                    title="라스베가스 방 만들기 셋업"
-                    detail="방 생성과 코드 입장 전에 입력값이 어떤 의미인지 핵심만 확인합니다."
-                    statusText={lobbySetup.statusText}
-                    items={lobbySetup.items}
-                    ruleHint={lobbySetup.ruleHint}
-                    canStart={Boolean(String(createForm.title || "").trim() || String(joinCode || "").trim())}
-                    smoke="las-vegas-room-setup-panel"
-                    itemSmoke="las-vegas-room-setup-item"
-                    className="mt-4"
-                />
                 </section>
             )}
 
@@ -3894,11 +3882,6 @@ export const LasVegasGame = () => {
                         <Users className="h-5 w-5" />
                         대기 중인 방
                     </h2>
-                    <LasVegasLobbyDirectorPanel
-                        rooms={rooms}
-                        loading={loading}
-                        onJoin={joinRoom}
-                    />
                     <LasVegasJoinCodePanel
                         joinCode={joinCode}
                         setJoinCode={setJoinCode}
@@ -3920,18 +3903,6 @@ export const LasVegasGame = () => {
                             const joinable = status === "WAITING" && !roomFull;
                             const joinDisabled = loading || !joinable;
                             const readiness = lasVegasLobbyRoomReadiness(room);
-                            const actionSignal = lasVegasLobbyRoomActionSignal(room);
-                            const decisionItems = buildLasVegasLobbyRoomDecisionItems({
-                                room,
-                                playersCount,
-                                minPlayers,
-                                maxPlayers,
-                                status,
-                                roomFull,
-                                joinable,
-                                readiness,
-                                actionSignal,
-                            });
                             return (
                                 <div
                                     key={roomId}
@@ -3983,7 +3954,6 @@ export const LasVegasGame = () => {
                                             {roomFull ? "가득 참" : status !== "WAITING" ? "진행 중" : "입장"}
                                         </button>
                                     </div>
-                                    <LasVegasLobbyRoomDecisionRail items={decisionItems} />
                                 </div>
                             );
                         })}
@@ -4050,110 +4020,6 @@ export const LasVegasGame = () => {
                             </div>
                         )}
                     </div>
-
-                    <GameStartReadinessPanel
-                        title="라스베가스 시작 준비"
-                        detail="방장이 눌러야 하는 시작 버튼이 실제로 언제 활성화되는지 핵심 조건만 확인합니다."
-                        statusText={startStatusText}
-                        items={startReadiness?.items || []}
-                        ruleHint={startReadiness?.ruleHint}
-                        canStart={canStart}
-                        smoke="las-vegas-start-readiness-panel"
-                        itemSmoke="las-vegas-start-readiness-item"
-                    />
-
-                    <LasVegasSessionRoutePanel
-                        roomStatus={roomStatus}
-                        isHost={isHost}
-                        startReadiness={startReadiness}
-                        selectedRoom={selectedRoom}
-                        players={players}
-                        readyMemberIds={readyMemberIds}
-                        forceFinishing={forceFinishing}
-                        rematching={rematching}
-                    />
-
-                    <LasVegasTurnRailPanel
-                        players={players}
-                        selectedRoom={selectedRoom}
-                        state={state}
-                        myMemberId={myMemberId}
-                        readyMemberIds={readyMemberIds}
-                        roomStatus={roomStatus}
-                        winnerMemberId={winnerMemberId}
-                        winnerNickname={winnerNickname}
-                        lastPlacedText={lastPlacedText}
-                    />
-
-                    <LasVegasProgressDigestPanel
-                        state={state}
-                        players={players}
-                        roomStatus={roomStatus}
-                        lastPlacedText={lastPlacedText}
-                        winnerMemberId={winnerMemberId}
-                        winnerNickname={winnerNickname}
-                        currentRollCountByFace={currentRollCountByFace}
-                    />
-
-                    <LasVegasDecisionPanel
-                        state={state}
-                        players={players}
-                        myMemberId={myMemberId}
-                        currentRollCountByFace={currentRollCountByFace}
-                        canRoll={canRoll}
-                        canBet={canBet}
-                        isFinished={isFinished}
-                        lastPlacedText={lastPlacedText}
-                        winnerMemberId={winnerMemberId}
-                    />
-
-                    <div className="rounded-[1.6rem] bg-slate-950 p-3 shadow-lg">
-                        <LasVegasActionRoutePanel
-                            roomStatus={roomStatus}
-                            myTurn={myTurn}
-                            canRoll={canRoll}
-                            canBet={canBet}
-                            currentRollCountByFace={currentRollCountByFace}
-                            roundNo={state?.roundNo || 0}
-                            roundCount={state?.roundCount || selectedRoom?.roundCount || 0}
-                            casinoCount={Array.isArray(state?.casinos) ? state.casinos.length : 6}
-                            lastPlacedText={lastPlacedText}
-                            turnName={currentTurnMemberId ? lasVegasPlayerName(players, currentTurnMemberId) : "-"}
-                        />
-                        <LasVegasRollStandbyPanel
-                            roomStatus={roomStatus}
-                            myTurn={myTurn}
-                            canRoll={canRoll}
-                            canBet={canBet}
-                            roundNo={state?.roundNo || 0}
-                            roundCount={state?.roundCount || selectedRoom?.roundCount || 0}
-                            turnName={currentTurnMemberId ? lasVegasPlayerName(players, currentTurnMemberId) : "-"}
-                            casinoCount={Array.isArray(state?.casinos) ? state.casinos.length : 6}
-                            lastPlacedText={lastPlacedText}
-                        />
-                    </div>
-
-                    <LasVegasSessionActionPanel
-                        selectedRoom={selectedRoom}
-                        state={state}
-                        players={players}
-                        isHost={isHost}
-                        isFinished={isFinished}
-                        winnerMemberId={winnerMemberId}
-                        winnerNickname={winnerNickname}
-                        rematching={rematching}
-                        onRefresh={refreshSelectedSession}
-                        onRematch={rematchGame}
-                        onLeave={leaveRoom}
-                    />
-
-                    <GameFeedbackTicker
-                        title="행동 피드백"
-                        detail={actionFeedback.detail}
-                        items={actionFeedbackItems}
-                        tone={actionFeedbackTone}
-                        smoke="las-vegas-action-feedback"
-                    />
 
                     <div className={`grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] ${myTurn ? "rounded-[1.8rem] bg-sky-100/70 p-3 ring-2 ring-sky-300/70" : ""}`}>
                         <div className="space-y-4">

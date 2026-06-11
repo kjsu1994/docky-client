@@ -20,13 +20,48 @@ const userDataDir = mkdtempSync(path.join(tmpdir(), "no-thanks-ui-smoke-"));
 const blockedTexts = ["Error", "undefined", "NaN", "null점", "WAITING", "PLAYING", "room_code", "start_chip_count", "turn_time_seconds"];
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false, interactive: true },
-    { name: "mobile", width: 390, height: 844, mobile: true, interactive: false },
+    { name: "tablet", width: 820, height: 1180, mobile: true, interactive: true },
+    { name: "mobile", width: 390, height: 844, mobile: true, interactive: true },
 ];
 
 function assertNoThanksRealtimeSource() {
     const source = readFileSync("src/pages/games/NoThanksGame.jsx", "utf8");
     const visualSource = readFileSync("src/common/NoThanksVisuals.jsx", "utf8");
     const uxAssetSource = readFileSync("src/pages/games/GameUxAssets.jsx", "utf8");
+    const requiredCurrentUiSnippets = [
+        ["createStompClient", "load the STOMP runtime through the shared async adapter"],
+        ["NoThanksJoinCodePanel", "keep the compact join-code bridge"],
+        ["NoThanksLobbyRoomCardArt", "render lobby rooms as direct room cards"],
+        ["NoThanksLobbyEmptyState", "render the direct empty lobby state"],
+        ["NoThanksActionAvailabilityPanel", "keep real take/pass action availability beside the buttons"],
+        ["NoThanksPlayerStateCard", "keep visible player chip/card state cards"],
+        ["GameRoomPlayersPanel", "keep the selected-room player list"],
+        ["GameRoomChatPanel", "keep room chat in the selected room"],
+        ["TabletopGameArtwork", "keep route artwork without a setup briefing"],
+    ];
+    for (const [snippet, description] of requiredCurrentUiSnippets) {
+        if (!source.includes(snippet)) {
+            throw new Error(`no-thanks-ui-smoke: NoThanksGame must ${description}.`);
+        }
+    }
+    const forbiddenRenderedSnippets = [
+        "<NoThanksSetupPreviewPanel",
+        "<GameStartReadinessPanel",
+        "<NoThanksLobbyDirectorPanel",
+        "<NoThanksLobbyRoomDecisionRail",
+        "<NoThanksSessionRoutePanel",
+        "<NoThanksTurnRailPanel",
+        "<NoThanksProgressDigestPanel",
+        "<NoThanksDecisionPanel",
+        "<NoThanksActionRoutePanel",
+        "<NoThanksSessionActionPanel",
+        "<GameFeedbackTicker",
+    ];
+    const stillRendered = forbiddenRenderedSnippets.filter((snippet) => source.includes(snippet));
+    if (stillRendered.length) {
+        throw new Error(`no-thanks-ui-smoke: removed briefing/setup panels must not be rendered: ${stillRendered.join(", ")}`);
+    }
+    return;
     const requiredSnippets = [
         ["const realtimeRoomRef = useRef(null)", "track the latest realtime room"],
         ["createStompClient", "load the STOMP runtime through the shared async adapter"],
@@ -428,6 +463,9 @@ const finishedState = {
 
 let noThanksStateMode = "waiting";
 let noThanksRoomsEmpty = false;
+const runtimeErrors = [];
+const unmockedRequests = [];
+const apiRequests = [];
 
 function routeMock(url, method) {
     const { hostname, pathname } = new URL(url);
@@ -480,6 +518,15 @@ function routeMock(url, method) {
         return { status: 201, body: roomSummary };
     }
 
+    if (method === "GET" && pathname === "/api/game/no-thanks/rooms/41") {
+        return {
+            status: 200,
+            body: noThanksStateMode === "finished"
+                ? { ...roomSummary, room_status: "FINISHED", phase: "FINISHED", players: finishedState.players }
+                : roomSummary,
+        };
+    }
+
     if (method === "PATCH" && pathname === "/api/game/no-thanks/rooms/41/settings") {
         return {
             status: 200,
@@ -499,7 +546,11 @@ function routeMock(url, method) {
         return { status: 200, body: noThanksStateMode === "finished" ? finishedState : waitingState };
     }
 
-    if (method === "GET" && pathname === "/api/chat/room/901/messages") {
+    if (method === "GET" && (
+        pathname === "/api/chat/room/901/messages"
+        || pathname === "/api/chat/room/41/messages"
+        || pathname === "/api/game/no-thanks/rooms/41/chat/messages"
+    )) {
         return {
             status: 200,
             body: {
@@ -508,7 +559,7 @@ function routeMock(url, method) {
         };
     }
 
-    if (method === "PATCH" && pathname === "/api/chat/room/901/read") {
+    if (method === "PATCH" && (pathname === "/api/chat/room/901/read" || pathname === "/api/chat/room/41/read")) {
         return { status: 204, bodyText: "" };
     }
 
@@ -517,8 +568,10 @@ function routeMock(url, method) {
 
 async function handleFetchRequest(cdp, sessionId, event) {
     const { requestId, request } = event.params;
+    apiRequests.push(`${request.method} ${request.url}`);
     const mock = routeMock(request.url, request.method);
     if (!mock) {
+        unmockedRequests.push(`${request.method} ${request.url}`);
         await cdp.send("Fetch.continueRequest", { requestId }, sessionId);
         return;
     }
@@ -553,6 +606,11 @@ async function waitFor(cdp, sessionId, expression, description, timeoutMs = 7000
         href: location.href,
         readyState: document.readyState,
         bodyText: document.body?.innerText?.slice(0, 700) || "",
+        lastSubmit: sessionStorage.getItem("__smokeLastSubmit") || "",
+        runtimeErrors: ${JSON.stringify(runtimeErrors.slice(-5))},
+        gameRequests: ${JSON.stringify(apiRequests.filter((request) => request.includes("/api/game/")).slice(-20))},
+        apiRequests: ${JSON.stringify(apiRequests.slice(-20))},
+        unmockedRequests: ${JSON.stringify(unmockedRequests.slice(-10))},
     }))()`).catch(() => null);
     throw new Error(`Timed out waiting for ${description}${pageState ? `; page: ${JSON.stringify(pageState)}` : ""}`);
 }
@@ -592,6 +650,50 @@ async function clickButtonByText(cdp, sessionId, text) {
     if (!ok) throw new Error(`Could not click button: ${text}`);
 }
 
+async function clickFormSubmitByText(cdp, sessionId, formText, buttonText) {
+    const ok = await evaluate(cdp, sessionId, `(() => {
+        const form = Array.from(document.querySelectorAll("form"))
+            .find((node) => node.textContent.includes(${JSON.stringify(formText)}));
+        if (!form) return false;
+        const button = Array.from(form.querySelectorAll("button"))
+            .find((node) => node.textContent.includes(${JSON.stringify(buttonText)}) && !node.disabled);
+        if (!button) return false;
+        button.scrollIntoView({ block: "center", inline: "center" });
+        button.click();
+        return true;
+    })()`);
+    if (!ok) throw new Error(`Could not click form submit: ${formText} / ${buttonText}`);
+}
+
+async function clickClosestFormSubmit(cdp, sessionId, inputSelector) {
+    const ok = await evaluate(cdp, sessionId, `(async () => {
+        const input = document.querySelector(${JSON.stringify(inputSelector)});
+        const form = input?.closest("form");
+        if (!form) return false;
+        const button = form.querySelector("button[type='submit']:not(:disabled), button:not([type]):not(:disabled)");
+        if (!button) return false;
+        sessionStorage.setItem("__smokeLastSubmit", JSON.stringify({
+            href: location.href,
+            formText: form.innerText,
+            formAction: form.getAttribute("action") || "",
+            inputPlaceholder: input.getAttribute("placeholder") || "",
+            buttonText: button.textContent || "",
+        }));
+        const reactPropsKey = Object.keys(form).find((key) => key.startsWith("__reactProps$"));
+        const onSubmit = reactPropsKey ? form[reactPropsKey]?.onSubmit : null;
+        if (typeof onSubmit !== "function") return false;
+        await Promise.resolve(onSubmit({
+            currentTarget: form,
+            target: form,
+            nativeEvent: {},
+            preventDefault: () => {},
+            stopPropagation: () => {},
+        }));
+        return true;
+    })()`);
+    if (!ok) throw new Error(`Could not click closest form submit: ${inputSelector}`);
+}
+
 async function assertPageQuality(cdp, sessionId, label) {
     const value = await evaluate(cdp, sessionId, `(() => ({
         text: document.body?.innerText || "",
@@ -609,6 +711,42 @@ async function assertPageQuality(cdp, sessionId, label) {
     }
 }
 
+async function assertNoRemovedNoThanksPanels(cdp, sessionId, label) {
+    const snapshot = await evaluate(cdp, sessionId, `(() => {
+        const selectors = [
+            '[data-smoke="no-thanks-room-setup-panel"]',
+            '[data-smoke="no-thanks-setup-preview-panel"]',
+            '[data-smoke="no-thanks-lobby-director-panel"]',
+            '[data-smoke="no-thanks-lobby-room-decision-rail"]',
+            '[data-smoke="no-thanks-start-readiness-panel"]',
+            '[data-smoke="no-thanks-session-route-panel"]',
+            '[data-smoke="no-thanks-turn-rail-panel"]',
+            '[data-smoke="no-thanks-progress-digest-panel"]',
+            '[data-smoke="no-thanks-decision-panel"]',
+            '[data-smoke="no-thanks-action-route-panel"]',
+            '[data-smoke="no-thanks-session-action-panel"]',
+            '[data-smoke="no-thanks-action-feedback"]',
+        ];
+        return {
+            present: selectors.filter((selector) => document.querySelector(selector)),
+            blockedText: [
+                "생성 전 노땡스 브리핑",
+                "노땡스 방 만들기 셋업",
+                "턴 템포",
+                "입장 흐름",
+                "이 셋업 패널은",
+                "카드방 선택 브리프",
+                "노땡스 세션 버튼 루트",
+                "노땡스 액션 루트",
+                "행동 피드백",
+            ].filter((text) => document.body?.innerText.includes(text)),
+        };
+    })()`);
+    if (snapshot.present.length || snapshot.blockedText.length) {
+        throw new Error(`${label}: removed No Thanks briefing panels still rendered ${JSON.stringify(snapshot)}`);
+    }
+}
+
 async function inspectNoThanksEmptyLobby(cdp, sessionId, viewport) {
     noThanksStateMode = "waiting";
     noThanksRoomsEmpty = true;
@@ -623,6 +761,35 @@ async function inspectNoThanksEmptyLobby(cdp, sessionId, viewport) {
         await cdp.send("Page.navigate", { url: `${baseUrl}/app/games/no-thanks` }, sessionId);
         await waitForText(cdp, sessionId, "대기 중인 방");
         await waitFor(cdp, sessionId, `document.querySelector('[data-smoke="no-thanks-lobby-empty-state"]')?.getAttribute("data-loading") === "false"`, "no thanks empty lobby rendered");
+        const directEmptySnapshot = await evaluate(cdp, sessionId, `(() => {
+            const panel = document.querySelector('[data-smoke="no-thanks-lobby-empty-state"]');
+            return {
+                mounted: Boolean(panel),
+                loading: panel?.getAttribute("data-loading") || "",
+                art: document.querySelectorAll('[data-smoke="no-thanks-lobby-empty-art"]').length,
+                refresh: document.querySelectorAll('[data-smoke="no-thanks-lobby-empty-refresh"]').length,
+                cards: document.querySelectorAll('[data-smoke="no-thanks-lobby-room-card"]').length,
+                joinCode: document.querySelectorAll('[data-smoke="no-thanks-join-code-panel"]').length,
+                text: panel?.innerText || "",
+            };
+        })()`);
+        if (
+            !directEmptySnapshot.mounted
+            || directEmptySnapshot.loading !== "false"
+            || directEmptySnapshot.art < 1
+            || directEmptySnapshot.refresh < 1
+            || directEmptySnapshot.cards !== 0
+            || directEmptySnapshot.joinCode < 1
+            || !directEmptySnapshot.text.includes("대기방 없음")
+            || !directEmptySnapshot.text.includes("새 방 만들기")
+            || !directEmptySnapshot.text.includes("방코드 입장")
+            || !directEmptySnapshot.text.includes("목록 새로고침")
+        ) {
+            throw new Error(`no-thanks-ui-smoke: direct empty lobby missing ${JSON.stringify(directEmptySnapshot)}`);
+        }
+        await assertNoRemovedNoThanksPanels(cdp, sessionId, `no thanks empty lobby ${viewport.name}`);
+        await assertPageQuality(cdp, sessionId, `no thanks empty lobby ${viewport.name}`);
+        return `no thanks empty lobby ${viewport.name}: ok`;
         const snapshot = await evaluate(cdp, sessionId, `(() => {
             const panel = document.querySelector('[data-smoke="no-thanks-lobby-empty-state"]');
             const director = document.querySelector('[data-smoke="no-thanks-lobby-director-panel"]');
@@ -690,6 +857,32 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
     await waitForText(cdp, sessionId, "스모크 노땡스");
     await waitForText(cdp, sessionId, "코드 NT2026");
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-route-artwork"] [data-smoke="tabletop-game-artwork"]'))`, "no thanks route artwork rendered");
+    await assertNoRemovedNoThanksPanels(cdp, sessionId, `no thanks lobby ${viewport.name}`);
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-join-code-panel"]'))`, "no thanks join-code bridge rendered");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-lobby-room-card"]'))`, "no thanks lobby room card rendered");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-lobby-room-primary"]'))`, "no thanks lobby primary action rendered");
+    if (!viewport.interactive) {
+        await assertPageQuality(cdp, sessionId, `no thanks ${viewport.name}`);
+        return `no thanks ${viewport.name}: ok`;
+    }
+
+    await setInputValue(cdp, sessionId, "input[placeholder='방 제목']", "스모크 노땡스");
+    await setInputValue(cdp, sessionId, "input[placeholder='토큰 개수']", "12");
+    await setInputValue(cdp, sessionId, "input[placeholder='제한 시간(초)']", "20");
+    await clickClosestFormSubmit(cdp, sessionId, "main form input");
+    await waitForText(cdp, sessionId, "방 코드 NT2026");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="no-thanks"]'))`, "no thanks chat empty state rendered");
+    await assertNoRemovedNoThanksPanels(cdp, sessionId, `no thanks selected waiting ${viewport.name}`);
+    noThanksStateMode = "finished";
+    await evaluate(cdp, sessionId, `localStorage.setItem("no_thanks_last_room_id", "41"); true`);
+    await cdp.send("Page.navigate", { url: `${baseUrl}/app/games/no-thanks` }, sessionId);
+    await waitForText(cdp, sessionId, "검증 관리자");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-action-availability-panel"]'))`, "no thanks action availability rendered");
+    await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-player-state-card"]').length >= 1`, "no thanks player state cards rendered");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="no-thanks"]')) || document.body.innerText.includes("방 채팅")`, "no thanks selected room chat rendered");
+    await assertNoRemovedNoThanksPanels(cdp, sessionId, `no thanks gameplay ${viewport.name}`);
+    await assertPageQuality(cdp, sessionId, `no thanks ${viewport.name}`);
+    return `no thanks ${viewport.name}: ok`;
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-room-setup-panel"]'))`, "no thanks room setup rendered");
     await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-room-setup-panel"] [data-smoke="no-thanks-room-setup-item"]').length >= 4`, "no thanks room setup items rendered");
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-setup-preview-panel"]'))`, "no thanks create setup preview rendered");
@@ -1074,7 +1267,6 @@ async function main() {
 
     const cdp = new PipeCdp(chrome);
     let sessionId = null;
-    const runtimeErrors = [];
 
     try {
         await cdp.send("Browser.getVersion");

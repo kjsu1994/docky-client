@@ -160,6 +160,12 @@ function assertStaticAuthRuntimeBoundaries() {
         leakedImports.length ||
         !appSource.includes("const ProtectedRoutes = lazy(() =>") ||
         !appSource.includes("import(\"./components/ProtectedRoutes.jsx\")") ||
+        !appSource.includes("const GuestRoute = ({ children }) =>") ||
+        !appSource.includes("const { isAuthenticated, loading } = useAuth();") ||
+        !appSource.includes("if (isAuthenticated) return <Navigate to=\"/app\" replace />;") ||
+        !appSource.includes("path=\"/login\" element={<GuestRoute><Login /></GuestRoute>}") ||
+        !appSource.includes("path=\"/register\" element={<GuestRoute><Register /></GuestRoute>}") ||
+        !appSource.includes("path=\"/queue\" element={<PublicRoute><Queue /></PublicRoute>}") ||
         !appSource.includes("path=\"/app/*\"") ||
         !protectedRoutesSource.includes("const ProtectedAppLayout = lazy(() =>") ||
         !protectedRoutesSource.includes("import(\"./ProtectedAppLayout.jsx\")") ||
@@ -511,6 +517,19 @@ async function assertNoBlockedText(cdp, sessionId, label) {
     }
 }
 
+async function assertStoredRefreshRedirectsFromLogin(cdp, sessionId, label, metrics) {
+    await cdp.send("Emulation.setDeviceMetricsOverride", metrics, sessionId);
+    await evaluate(cdp, sessionId, `(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+        localStorage.setItem("refreshToken", "smoke-refresh-token");
+    })()`);
+    await cdp.send("Page.navigate", { url: `${baseUrl}/login` }, sessionId);
+    await waitFor(cdp, sessionId, `location.pathname === "/app"`, `${label} stored refresh login redirect`);
+    await waitFor(cdp, sessionId, `localStorage.getItem("accessToken") === "smoke-reissued-access-token"`, `${label} reissued access token persisted`);
+    await assertNoBlockedText(cdp, sessionId, label);
+}
+
 async function inspectAuth(cdp, sessionId) {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
         width: 390,
@@ -562,15 +581,43 @@ async function inspectAuth(cdp, sessionId) {
     await waitFor(cdp, sessionId, `localStorage.getItem("accessToken") === "smoke-reissued-access-token"`, "reissued access token persisted in local storage");
     await assertNoBlockedText(cdp, sessionId, "refresh-token-only recovery");
 
+    await assertStoredRefreshRedirectsFromLogin(cdp, sessionId, "mobile stored refresh login route", {
+        width: 390,
+        height: 844,
+        deviceScaleFactor: 2,
+        mobile: true,
+    });
+    await assertStoredRefreshRedirectsFromLogin(cdp, sessionId, "tablet stored refresh login route", {
+        width: 820,
+        height: 1180,
+        deviceScaleFactor: 2,
+        mobile: true,
+    });
+
+    await evaluate(cdp, sessionId, `(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+    })()`);
     await cdp.send("Page.navigate", { url: `${baseUrl}/login` }, sessionId);
     await waitForText(cdp, sessionId, "로그인");
     await setInputValue(cdp, sessionId, "input[type='email']", "smoke@example.com");
     await setInputValue(cdp, sessionId, "input[type='password']", "password123");
+    const autoLoginChecked = await evaluate(cdp, sessionId, `(() => {
+        const checkbox = document.querySelectorAll("form input[type='checkbox']")[1];
+        if (!checkbox || checkbox.checked) return Boolean(checkbox?.checked);
+        checkbox.click();
+        return checkbox.checked;
+    })()`);
+    if (!autoLoginChecked) throw new Error("auth-ui-smoke: mobile login must expose an auto-login checkbox.");
     await clickSelector(cdp, sessionId, "form button[type='submit']");
     await waitFor(cdp, sessionId, `location.pathname === "/app"`, "login redirect");
+    await waitFor(cdp, sessionId, `localStorage.getItem("refreshToken") === "smoke-refresh-token" && sessionStorage.getItem("refreshToken") === null`, "auto-login refresh token persisted in local storage");
     await assertNoBlockedText(cdp, sessionId, "login");
 
-    await evaluate(cdp, sessionId, `localStorage.clear()`);
+    await evaluate(cdp, sessionId, `(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+    })()`);
     await cdp.send("Page.navigate", { url: `${baseUrl}/register` }, sessionId);
     await waitForText(cdp, sessionId, "회원가입");
     await setInputValue(cdp, sessionId, "input[name='email']", "new@example.com");

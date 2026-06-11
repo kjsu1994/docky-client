@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { lazy, Suspense } from "react";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LoadingPage } from "./components/LoadingSpinner";
 import { GlobalNetworkIndicatorEntry } from "./components/GlobalNetworkIndicatorEntry.jsx";
 import { AppErrorBoundary } from "./common/AppErrorBoundary.jsx";
@@ -19,6 +19,15 @@ const PublicRoute = ({ children }) => (
     </Suspense>
 );
 
+const GuestRoute = ({ children }) => {
+    const { isAuthenticated, loading } = useAuth();
+
+    if (loading) return <LoadingPage />;
+    if (isAuthenticated) return <Navigate to="/app" replace />;
+
+    return <PublicRoute>{children}</PublicRoute>;
+};
+
 const ProtectedRoutesBoundary = () => (
     <Suspense fallback={<LoadingPage />}>
         <ProtectedRoutes />
@@ -33,8 +42,8 @@ const AppShell = () => {
             <AuthProvider>
                 <GlobalNetworkIndicatorEntry />
                 <Routes>
-                    <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-                    <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+                    <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+                    <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
                     <Route path="/queue" element={<PublicRoute><Queue /></PublicRoute>} />
 
                     <Route path="/app/*" element={<ProtectedRoutesBoundary />} />

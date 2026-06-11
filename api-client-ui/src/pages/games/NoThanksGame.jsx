@@ -23,7 +23,7 @@ import GameRoomChatPanel from "../../common/GameRoomChatPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { NoThanksCardFace, NoThanksChipToken } from "../../common/NoThanksVisuals.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
-import { GameActionCueBar, GameChatEmptyState, GameFeedbackTicker, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
+import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
@@ -3580,18 +3580,6 @@ export const NoThanksGame = () => {
               </div>
               <button type="submit" className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white">노땡스 방 만들기</button>
             </div>
-            <NoThanksSetupPreviewPanel createForm={createForm} rooms={rooms} />
-            <GameStartReadinessPanel
-              title="노땡스 방 만들기 셋업"
-              detail="방 생성과 코드 입장 전에 입력값이 어떤 의미인지 핵심만 확인합니다."
-              statusText={lobbySetup.statusText}
-              items={lobbySetup.items}
-              ruleHint={lobbySetup.ruleHint}
-              canStart={Boolean(String(createForm.title || "").trim() || String(joinCode || "").trim())}
-              smoke="no-thanks-room-setup-panel"
-              itemSmoke="no-thanks-room-setup-item"
-              className="mt-4"
-            />
           </form>
 
           <section className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
@@ -3603,10 +3591,6 @@ export const NoThanksGame = () => {
               joinCode={joinCode}
               setJoinCode={setJoinCode}
               joinByCode={joinByCode}
-            />
-            <NoThanksLobbyDirectorPanel
-              rooms={rooms}
-              onJoin={joinRoom}
             />
             <div className="mt-4 space-y-2.5">
               {!rooms.length && (
@@ -3623,19 +3607,7 @@ export const NoThanksGame = () => {
                 const joinable = status === "WAITING" && !roomFull;
                 const joinDisabled = !joinable;
                 const readiness = noThanksLobbyRoomReadiness(room);
-                const actionSignal = noThanksLobbyRoomActionSignal(room);
                 const hostPlayer = players.find((player) => playerIdOf(player) === Number(room.hostMemberId || 0));
-                const decisionItems = buildNoThanksLobbyRoomDecisionItems({
-                  room,
-                  playersCount,
-                  minPlayers,
-                  maxPlayers,
-                  status,
-                  roomFull,
-                  joinable,
-                  readiness,
-                  actionSignal,
-                });
                 return (
                   <div
                     key={roomId}
@@ -3692,7 +3664,6 @@ export const NoThanksGame = () => {
                         {roomFull ? "가득 참" : status !== "WAITING" ? "진행 중" : "입장"}
                       </button>
                     </div>
-                    <NoThanksLobbyRoomDecisionRail items={decisionItems} />
                   </div>
                 );
               })}
@@ -3757,100 +3728,6 @@ export const NoThanksGame = () => {
               </div>
             )}
           </div>
-
-          <GameStartReadinessPanel
-            title="노땡스 시작 준비"
-            detail="방장이 눌러야 하는 시작 버튼이 실제로 언제 활성화되는지 핵심 조건만 확인합니다."
-            statusText={startStatusText}
-            items={startReadiness?.items || []}
-            ruleHint={startReadiness?.ruleHint}
-            canStart={canStart}
-            smoke="no-thanks-start-readiness-panel"
-            itemSmoke="no-thanks-start-readiness-item"
-          />
-
-          <NoThanksSessionRoutePanel
-            roomStatus={roomStatus}
-            isHost={isHost}
-            startReadiness={startReadiness}
-            selectedRoom={selectedRoom}
-            players={players}
-            readyMemberIds={readyMemberIds}
-            rematching={rematching}
-          />
-
-          <NoThanksTurnRailPanel
-            players={players}
-            selectedRoom={selectedRoom}
-            gameState={gameState}
-            myMemberId={myMemberId}
-            readyMemberIds={readyMemberIds}
-            roomStatus={roomStatus}
-            winnerMemberId={winnerMemberId}
-            winnerNickname={winnerNickname}
-            currentCard={currentCard}
-            potChips={potChips}
-            deckRemaining={deckRemaining}
-            myPlayer={myPlayer}
-          />
-
-          <NoThanksProgressDigestPanel
-            gameState={gameState}
-            players={players}
-            roomStatus={roomStatus}
-            currentCard={currentCard}
-            potChips={potChips}
-            deckRemaining={deckRemaining}
-            turnMemberId={turnMemberId}
-            winnerMemberId={winnerMemberId}
-            winnerNickname={winnerNickname}
-            sortedPlayers={sortedPlayers}
-          />
-
-          <NoThanksDecisionPanel
-            gameState={gameState}
-            players={players}
-            sortedPlayers={sortedPlayers}
-            myPlayer={myPlayer}
-            roomStatus={roomStatus}
-            isMyTurn={isMyTurn}
-            winnerMemberId={winnerMemberId}
-            winnerNickname={winnerNickname}
-          />
-
-          <div className="rounded-[1.6rem] bg-slate-950 p-3 shadow-lg">
-            <NoThanksActionRoutePanel
-              roomStatus={roomStatus}
-              isMyTurn={isMyTurn}
-              myChips={myChips}
-              currentCard={currentCard}
-              potChips={potChips}
-              myCards={myPlayer?.cards}
-              deckRemaining={deckRemaining}
-              turnName={turnMemberId ? noThanksPlayerName(players, turnMemberId) : "-"}
-            />
-          </div>
-
-          <NoThanksSessionActionPanel
-            selectedRoom={selectedRoom}
-            gameState={gameState}
-            sortedPlayers={sortedPlayers}
-            isHost={isHost}
-            isFinished={roomStatus === "FINISHED"}
-            winnerMemberId={winnerMemberId}
-            winnerNickname={winnerNickname}
-            onRefresh={refreshSelectedSession}
-            onRematch={rematchGame}
-            onLeave={leaveRoom}
-          />
-
-          <GameFeedbackTicker
-            title="행동 피드백"
-            detail={actionFeedback.detail}
-            items={actionFeedbackItems}
-            tone={actionFeedbackTone}
-            smoke="no-thanks-action-feedback"
-          />
 
           <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <div className="space-y-4">

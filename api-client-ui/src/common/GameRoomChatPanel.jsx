@@ -165,7 +165,11 @@ export const GameRoomChatPanel = ({
   };
 
   return (
-    <aside className={`rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg ${className}`}>
+    <aside
+      className={`rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg ${className}`}
+      data-smoke="game-room-chat-panel"
+      data-chat-game={gameCode}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-black text-slate-900">
           <MessageSquare className="h-4 w-4" />
@@ -183,7 +187,11 @@ export const GameRoomChatPanel = ({
           </div>
         )}
         {!loading && !messages.length && (
-          <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
+          <div
+            className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center"
+            data-smoke="game-chat-empty-state"
+            data-chat-game={gameCode}
+          >
             <MessageSquare className="h-7 w-7 text-slate-300" />
             <div className="mt-2 text-sm font-black text-slate-700">아직 채팅 내역이 없습니다</div>
             <div className="mt-1 text-xs font-bold leading-relaxed text-slate-400">이 방 안에서만 보이고, 한 판이 끝나면 남지 않습니다.</div>
