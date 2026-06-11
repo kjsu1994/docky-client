@@ -6,7 +6,7 @@
 - 앱 루트: `client\api-client-ui`
 - 서버 저장소: `C:\Users\honeybadger\Desktop\ctfmon_project\CommunityServer`
 - 운영 compose: `C:\compose`
-- 운영 도메인: `https://ctfmon.shop`
+- 운영 도메인: `https://docky.co.kr`
 
 ## 작업 원칙
 

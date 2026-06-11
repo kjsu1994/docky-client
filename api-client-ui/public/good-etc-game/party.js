@@ -4059,7 +4059,7 @@
       : savedServerUrl() || defaultServerUrl();
   if (isSolo) {
     ui.serverUrl.disabled = true;
-    ui.serverUrl.value = trainingMode ? "훈련장: AI 포함" : siteMode ? "CTFMON 사이트 방" : "혼자하기: 서버 연결 없음";
+    ui.serverUrl.value = trainingMode ? "훈련장: AI 포함" : siteMode ? "Docky 사이트 방" : "혼자하기: 서버 연결 없음";
     ui.connect.textContent = trainingMode ? "훈련 시작" : siteMode ? "사이트 방장" : "혼자 시작";
     ui.disconnect.style.display = "none";
     startSolo();

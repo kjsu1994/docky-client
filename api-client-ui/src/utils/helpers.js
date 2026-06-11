@@ -1,4 +1,4 @@
-﻿import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 import { logClientError } from "./clientDiagnostics.js";
 
@@ -136,7 +136,7 @@ const INTERNAL_HOST_PATTERN = /^(localhost|127\.0\.0\.1|minio|host\.docker\.inte
 const PUBLIC_IMAGE_PROXY_PATH = "/api/image/view";
 const PUBLIC_IMAGE_OBJECT_PREFIXES = ["editor/", "profile/"];
 const PUBLIC_IMAGE_OBJECT_MAX_LENGTH = 512;
-const PUBLIC_IMAGE_HOSTS = new Set(["ctfmon.shop", "www.ctfmon.shop"]);
+const PUBLIC_IMAGE_HOSTS = new Set(["docky.co.kr", "www.docky.co.kr"]);
 const RASTER_IMAGE_EXTENSION_PATTERN = /\.(jpe?g|png|gif|webp|bmp)$/i;
 const CHAT_ATTACHMENT_PROXY_PATHS = new Set(["/api/chat/file/view", "/api/chat/file/download"]);
 
@@ -144,7 +144,7 @@ const getCurrentOrigin = () => {
     if (typeof window !== "undefined" && window.location?.origin) {
         return window.location.origin;
     }
-    return "https://ctfmon.shop";
+    return "https://docky.co.kr";
 };
 
 const getAssetOrigin = () => {

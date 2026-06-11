@@ -35,7 +35,7 @@ const requiredTexts = [
     "개인정보처리방침",
     "상세 내용 보기",
     "사업자 정보",
-    "CTFMON",
+    "Docky",
     "김진수",
     "kjsu1701@naver.com",
     "전화번호",

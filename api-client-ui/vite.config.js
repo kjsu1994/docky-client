@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: 5173,
-      allowedHosts: ["ctfmon.shop", "www.ctfmon.shop"],
+      allowedHosts: ["docky.co.kr", "www.docky.co.kr"],
       proxy: {
         "/api": {
           target: proxyTarget,

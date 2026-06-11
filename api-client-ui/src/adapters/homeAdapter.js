@@ -56,7 +56,7 @@ const normalizeBannerInternalPath = (value) => {
     if (!raw.startsWith("/")) return "";
 
     try {
-        const parsed = new URL(raw, "https://ctfmon.shop");
+        const parsed = new URL(raw, "https://docky.co.kr");
         const target = `${parsed.pathname}${parsed.search}${parsed.hash}`;
         if (
             target === "/" ||

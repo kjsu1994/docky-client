@@ -309,7 +309,7 @@ export const Login = () => {
                         로그인
                     </h1>
                     <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">
-                        CTFMON community
+                        Docky community
                     </p>
                 </div>
 

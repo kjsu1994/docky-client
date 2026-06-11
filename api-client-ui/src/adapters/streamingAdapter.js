@@ -12,14 +12,14 @@ const normalizeUrl = (url) => {
     return String(url);
 };
 
-const STREAMING_PUBLIC_HOSTS = new Set(["ctfmon.shop", "www.ctfmon.shop", "localhost", "127.0.0.1"]);
+const STREAMING_PUBLIC_HOSTS = new Set(["docky.co.kr", "www.docky.co.kr", "localhost", "127.0.0.1"]);
 const STREAMING_ASSET_PATTERN = /^\/api\/streaming\/videos\/(\d+)\/(thumbnail|playlist\.m3u8|hls\/index\.m3u8)$/;
 
 const getCurrentOrigin = () => {
     if (typeof window !== "undefined" && window.location?.origin) {
         return window.location.origin;
     }
-    return "https://ctfmon.shop";
+    return "https://docky.co.kr";
 };
 
 export const normalizeStreamingAssetUrl = (url, videoId, assetType) => {

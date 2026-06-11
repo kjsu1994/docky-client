@@ -2,7 +2,7 @@ const ABSOLUTE_URL_PATTERN = /^https?:\/\//i;
 const PROFILE_OBJECT_KEY_MAX_LENGTH = 512;
 const INTERNAL_STORAGE_HOST_PATTERN = /^(localhost|127\.0\.0\.1|minio|host\.docker\.internal)$/i;
 const PROFILE_IMAGE_EXTENSION_PATTERN = /\.(jpe?g|png|gif|webp|bmp)$/i;
-const PROFILE_PUBLIC_HOSTS = new Set(["ctfmon.shop", "www.ctfmon.shop"]);
+const PROFILE_PUBLIC_HOSTS = new Set(["docky.co.kr", "www.docky.co.kr"]);
 
 const isValidProfileObjectKey = (objectKey) => {
     const normalized = String(objectKey || "").trim();
@@ -38,7 +38,7 @@ const getCurrentOrigin = () => {
     if (typeof window !== "undefined" && window.location?.origin) {
         return window.location.origin;
     }
-    return "https://ctfmon.shop";
+    return "https://docky.co.kr";
 };
 
 const isTrustedProfileStorageUrl = (url) =>
@@ -65,7 +65,7 @@ export const normalizeProfileImageUrl = (value) => {
         try {
             const origin = typeof window !== "undefined" && window.location?.origin
                 ? window.location.origin
-                : "https://ctfmon.shop";
+                : "https://docky.co.kr";
             const parsed = new URL(raw, origin);
             return toProfileProxyUrl(parsed.searchParams.get("path"));
         } catch {

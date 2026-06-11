@@ -2105,7 +2105,7 @@ window.addEventListener("pointerup", () => {
 
 playerNameInput.value = storage.getItem("lan_arena_name") || "Player";
 if (isLocalArena) {
-  serverUrlInput.value = trainingMode ? "훈련장: AI 포함" : siteMode ? "CTFMON 사이트 방" : "혼자하기: 서버 연결 없음";
+  serverUrlInput.value = trainingMode ? "훈련장: AI 포함" : siteMode ? "Docky 사이트 방" : "혼자하기: 서버 연결 없음";
   serverUrlInput.disabled = true;
   connectButton.textContent = trainingMode ? "훈련 재시작" : siteMode ? "사이트 방장" : "훈련 재시작";
   disconnectButton.style.display = "none";

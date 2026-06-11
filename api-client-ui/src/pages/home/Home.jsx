@@ -1001,7 +1001,7 @@ const HomeQuickSearch = ({ query, results, onQueryChange }) => {
 
 const PrivacyPolicyFooter = () => {
     const businessInfo = [
-        ["상호", "CTFMON"],
+        ["상호", "Docky"],
         ["대표자", "김진수"],
         ["사업자등록번호", "    "],
         ["통신판매업신고번호", "    "],
@@ -1047,7 +1047,7 @@ const PrivacyPolicyFooter = () => {
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 font-black text-slate-600">시행일 2026.06.03</span>
                 </div>
                 <p className="font-medium leading-snug">
-                    전자상거래 등에서의 소비자보호에 관한 법률 및 개인정보 보호법에 따라 CTFMON 운영자 정보와 개인정보 처리 기준을 고지합니다.
+                    전자상거래 등에서의 소비자보호에 관한 법률 및 개인정보 보호법에 따라 Docky 운영자 정보와 개인정보 처리 기준을 고지합니다.
                 </p>
                 <dl className="flex flex-wrap gap-x-3 gap-y-1 leading-snug">
                     {businessInfo.map(([label, value]) => (
@@ -1065,7 +1065,7 @@ const PrivacyPolicyFooter = () => {
             <details className="mt-2 rounded-xl bg-slate-50 px-3 py-2">
                 <summary className="cursor-pointer text-xs font-black text-slate-700 sm:text-sm">개인정보처리방침 상세 내용 보기</summary>
                 <p className="mt-3 font-medium leading-snug">
-                    CTFMON은 개인정보 보호법 등 관계 법령에 따라 이용자의 개인정보를 필요한 범위에서만 처리하며, 처리 목적이 달성된 정보는 지체 없이 파기합니다.
+                    Docky는 개인정보 보호법 등 관계 법령에 따라 이용자의 개인정보를 필요한 범위에서만 처리하며, 처리 목적이 달성된 정보는 지체 없이 파기합니다.
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {privacyItems.map((item) => (

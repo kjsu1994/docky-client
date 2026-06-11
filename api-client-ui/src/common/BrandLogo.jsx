@@ -1,10 +1,10 @@
-export const CTFMON_LOGO_SRC = "/CTFMON_Logo.png";
+export const DOCKY_LOGO_SRC = "/docky.png";
 
 export const BrandMark = ({ className = "h-12", imageClassName = "" }) => (
     <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden aspect-[4/1] ${className}`}>
         <img
-            src={CTFMON_LOGO_SRC}
-            alt="CTFMON"
+            src={DOCKY_LOGO_SRC}
+            alt="Docky"
             loading="eager"
             decoding="async"
             fetchPriority="high"
@@ -18,9 +18,9 @@ export const BrandLogo = ({ className = "", markClassName = "h-12", showText = f
         <BrandMark className={markClassName} />
         {showText && (
             <span className="min-w-0 leading-tight">
-                <span className="block text-lg font-black tracking-tight text-slate-900">CTFMON</span>
+                <span className="block text-lg font-black tracking-tight text-slate-900">Docky</span>
                 <span className="block text-[10px] font-bold uppercase tracking-widest text-primary-500">
-                    ctfmon shop
+                    docky.co.kr
                 </span>
             </span>
         )}
