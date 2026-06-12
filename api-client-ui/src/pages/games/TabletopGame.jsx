@@ -15622,6 +15622,8 @@ const TelestrationsEntry = ({
             src={imageData}
             alt={`${playerNameBySeat(authorSeatNo)} 그림`}
             className="block h-full w-full object-contain"
+            loading="lazy"
+            decoding="async"
             data-smoke="telestrations-entry-image"
             onError={() => setImageFailed(true)}
           />

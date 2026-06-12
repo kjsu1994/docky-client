@@ -166,7 +166,7 @@ export const StreamingHub = () => {
 
     const renderThumbnail = (video, className) => {
         if (video?.thumbnailUrl) {
-            return <img src={video.thumbnailUrl} alt="" className={className} loading="lazy" />;
+            return <img src={video.thumbnailUrl} alt="" className={className} loading="lazy" decoding="async" />;
         }
         return (
             <div className="flex h-full w-full items-center justify-center rounded-xl bg-slate-100 text-slate-300">

@@ -78,6 +78,8 @@ const AuthenticatedAttachmentImage = ({ src, alt, className = "", fallbackClassN
             src={objectUrl}
             alt={alt}
             className={className}
+            loading="lazy"
+            decoding="async"
             onClick={() => window.open(objectUrl, "_blank", "noopener,noreferrer")}
         />
     );

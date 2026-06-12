@@ -407,7 +407,7 @@ export const Login = () => {
                                 data-busy-indicator="true"
                                 className="btn-secondary w-full h-14 flex items-center justify-center gap-3 border-slate-100 hover:border-slate-200"
                             >
-                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="구글" className="h-5 w-5" />
+                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="구글" className="h-5 w-5" decoding="async" />
                                 <span className="tracking-tight">{googleLoading ? "이동 중..." : "구글로 로그인"}</span>
                             </button>
                             <button

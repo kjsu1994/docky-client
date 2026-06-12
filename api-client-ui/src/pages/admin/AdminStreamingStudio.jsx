@@ -527,7 +527,7 @@ export const AdminStreamingStudio = () => {
                                         <div className="flex flex-wrap items-start justify-between gap-3">
                                             <div className="flex min-w-0 items-start gap-4">
                                                 {video.thumbnailUrl ? (
-                                                    <img src={video.thumbnailUrl} alt={video.title} className="h-24 w-40 rounded-2xl object-contain bg-slate-100 p-2" />
+                                                    <img src={video.thumbnailUrl} alt={video.title} className="h-24 w-40 rounded-2xl object-contain bg-slate-100 p-2" loading="lazy" decoding="async" />
                                                 ) : (
                                                     <div className="flex h-24 w-40 items-center justify-center rounded-2xl bg-slate-100 text-slate-300">
                                                         <Film className="h-6 w-6" />

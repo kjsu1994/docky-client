@@ -276,7 +276,14 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
         <div onClick={onOpen} className="card group flex min-h-[120px] cursor-pointer items-stretch overflow-hidden transition-all hover:shadow-lg">
             {thumbnailUrl && !imgError && (
                 <div className="relative w-32 flex-shrink-0 border-r bg-slate-100 sm:w-40">
-                    <img src={thumbnailUrl} alt="게시글 이미지" className="h-full w-full object-cover" onError={() => setImgError(true)} />
+                    <img
+                        src={thumbnailUrl}
+                        alt="게시글 이미지"
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        onError={() => setImgError(true)}
+                    />
                 </div>
             )}
             <div className="flex min-w-0 flex-1 flex-col justify-between p-4 sm:p-5">

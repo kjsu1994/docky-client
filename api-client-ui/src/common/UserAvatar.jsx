@@ -84,6 +84,7 @@ export const UserAvatar = ({
                 alt=""
                 className={`h-full w-full object-cover ${imageClassName}`.trim()}
                 loading="lazy"
+                decoding="async"
                 onError={() => setFailed(true)}
             />
         </span>
