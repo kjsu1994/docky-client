@@ -541,7 +541,7 @@ export const Home = () => {
 
             <section
                 ref={bannerSectionRef}
-                className="relative overflow-hidden rounded-[1.5rem] border border-slate-200/70 bg-white shadow-xl shadow-slate-200/60 sm:rounded-[2rem]"
+                className="relative overflow-hidden rounded-[1.5rem] bg-white shadow-xl shadow-slate-200/60 sm:rounded-[2rem]"
                 aria-label="홈 배너"
                 aria-roledescription="carousel"
                 aria-busy={bannersPending}
@@ -628,7 +628,7 @@ export const Home = () => {
                                     // 운영 배너 규칙/ops rule: CONTENT + image_url는 배너 전체 배경으로 사용.
                                     const contentBannerStyle = hasImageBackground
                                         ? {
-                                            backgroundImage: `linear-gradient(120deg, rgba(2, 6, 23, 0.72), rgba(30, 64, 175, 0.48)), url("${imageUrl}")`,
+                                            backgroundImage: `url("${imageUrl}")`,
                                             backgroundSize: "cover",
                                             backgroundPosition: "center",
                                         }
@@ -639,8 +639,8 @@ export const Home = () => {
                                             className={`relative min-h-[160px] p-4 sm:min-h-[220px] sm:p-7 lg:min-h-[240px] ${adsense ? "bg-white text-slate-900" : "text-white"} ${!adsense && !hasImageBackground ? "bg-gradient-to-br from-primary-600 to-primary-400" : ""}`}
                                             style={contentBannerStyle}
                                         >
-                                            <div className="relative z-10">
-                                                <div className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-bold backdrop-blur-md ${adsense ? "bg-slate-100 text-slate-600" : "bg-white/20 text-white"}`}>
+                                            <div className={`relative z-10 ${hasImageBackground ? "max-w-3xl [text-shadow:0_2px_12px_rgba(15,23,42,0.72)]" : ""}`}>
+                                                <div className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-bold ${adsense ? "bg-slate-100 text-slate-600" : hasImageBackground ? "bg-slate-950/40 text-white shadow-sm backdrop-blur-[2px]" : "bg-white/20 text-white backdrop-blur-md"}`}>
                                                     <Sparkles className={`h-3.5 w-3.5 ${adsense ? "text-primary-500" : "text-amber-300"}`} />
                                                     {banner.type === "AD" ? "광고" : "공지"}
                                                 </div>
@@ -670,8 +670,8 @@ export const Home = () => {
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <h1 className="mt-3 line-clamp-2 text-2xl font-black tracking-tight sm:text-4xl lg:text-5xl">{banner.title}</h1>
-                                                        <p className="mt-2 line-clamp-2 max-w-2xl text-sm font-medium leading-relaxed text-white/90 sm:text-base">
+                                                        <h1 className="mt-3 line-clamp-2 text-xl font-black tracking-tight sm:text-4xl lg:text-5xl">{banner.title}</h1>
+                                                        <p className="mt-2 line-clamp-2 max-w-2xl text-sm font-semibold leading-relaxed text-white sm:text-base">
                                                             {banner.description}
                                                         </p>
                                                         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -680,7 +680,7 @@ export const Home = () => {
                                                                     href={banner.linkUrl}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-primary-700 hover:bg-primary-50"
+                                                                    className={`inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black ${hasImageBackground ? "text-slate-950 hover:bg-white/90" : "text-primary-700 hover:bg-primary-50"}`}
                                                                     onClick={() => sendBannerEvent(banner, "CLICK")}
                                                                     tabIndex={isActiveBannerSlide(idx) ? undefined : -1}
                                                                 >
@@ -691,7 +691,7 @@ export const Home = () => {
                                                             {banner.linkUrl && banner.linkTarget === "INTERNAL" ? (
                                                                 <Link
                                                                     to={banner.linkUrl}
-                                                                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-primary-700 hover:bg-primary-50"
+                                                                    className={`inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black ${hasImageBackground ? "text-slate-950 hover:bg-white/90" : "text-primary-700 hover:bg-primary-50"}`}
                                                                     onClick={() => sendBannerEvent(banner, "CLICK")}
                                                                     tabIndex={isActiveBannerSlide(idx) ? undefined : -1}
                                                                 >

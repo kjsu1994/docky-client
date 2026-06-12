@@ -3055,7 +3055,7 @@ const GameHubHeroBanner = ({
     const hasImageBackground = Boolean(imageUrl);
     const bannerStyle = hasImageBackground
       ? {
-          backgroundImage: `linear-gradient(120deg, rgba(2, 6, 23, 0.72), rgba(30, 64, 175, 0.48)), url("${imageUrl}")`,
+          backgroundImage: `url("${imageUrl}")`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }
@@ -3067,8 +3067,8 @@ const GameHubHeroBanner = ({
         }`}
         style={bannerStyle}
       >
-        <div className="relative z-10 flex h-full max-w-3xl flex-col">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-[11px] font-black text-white backdrop-blur-md">
+        <div className={`relative z-10 flex h-full max-w-3xl flex-col ${hasImageBackground ? "[text-shadow:0_2px_12px_rgba(15,23,42,0.72)]" : ""}`}>
+          <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black text-white ${hasImageBackground ? "bg-slate-950/40 shadow-sm backdrop-blur-[2px]" : "bg-white/20 backdrop-blur-md"}`}>
             <Sparkles className="h-3.5 w-3.5 text-amber-300" />
             {banner.type === "AD" ? "광고" : "공지"}
           </div>
@@ -3081,7 +3081,7 @@ const GameHubHeroBanner = ({
             </p>
           ) : null}
           {banner.linkUrl ? (
-            <span className="mt-auto inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-primary-700">
+            <span className={`mt-auto inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black ${hasImageBackground ? "text-slate-950" : "text-primary-700"}`}>
               {banner.ctaText || "자세히 보기"}
               <ArrowRight className="h-4 w-4" />
             </span>

@@ -13,9 +13,23 @@ const SIZE_CLASSES = {
     "3xl": "h-28 w-28 text-4xl",
 };
 
+const FRAME_PADDING_CLASSES = {
+    xs: "p-[2px]",
+    sm: "p-[2px]",
+    md: "p-[3px]",
+    lg: "p-[3px]",
+    xl: "p-[4px]",
+    "2xl": "p-[5px]",
+    "3xl": "p-[5px]",
+};
+
 const fallbackInitial = (name) => {
     const text = String(name || "").trim();
     return text ? text.charAt(0).toUpperCase() : "";
+};
+
+const stripRoundedUtilities = (className) => {
+    return String(className || "").replace(/\brounded(?:-[^\s]+)?\b/g, "").trim();
 };
 
 export const UserAvatar = ({
@@ -32,49 +46,58 @@ export const UserAvatar = ({
     const imageUrl = useMemo(() => normalizeProfileImageUrl(profileUrl), [profileUrl]);
     const [failed, setFailed] = useState(false);
     const sizeClass = SIZE_CLASSES[size] || SIZE_CLASSES.sm;
+    const framePaddingClass = FRAME_PADDING_CLASSES[size] || FRAME_PADDING_CLASSES.sm;
     const initial = fallbackInitial(name);
     const numericLevel = Number(level);
     const hasLevel = Number.isFinite(numericLevel) && numericLevel > 0;
     const frame = hasLevel || rewardTier || frameCode ? getLevelFrameMeta({ level: numericLevel, rewardTier, frameCode }) : null;
-    const hasRoundedClass = /\brounded(?:-[^\s]+)?\b/.test(className);
-    const roundedClass = hasRoundedClass ? "" : "rounded-full";
+    const safeClassName = stripRoundedUtilities(className);
 
     useEffect(() => {
         setFailed(false);
     }, [imageUrl]);
 
-    const outerClass = `${sizeClass} relative shrink-0 overflow-visible ${roundedClass} ${
-        frame ? `p-[2px] shadow-lg ${frame.ringClass}` : "border border-white bg-slate-100 shadow-sm"
-    } ${className}`.trim();
-    const innerClass = `h-full w-full overflow-hidden rounded-[inherit] bg-slate-100 ${frame ? "ring-1 ring-white/70" : ""}`;
+    const outerClass = `${sizeClass} relative inline-flex shrink-0 items-center justify-center overflow-visible rounded-full ${
+        frame ? `${framePaddingClass} ${frame.frameClass || ""} shadow-lg` : "border border-white bg-slate-100 shadow-sm"
+    } ${safeClassName}`.trim();
+    const innerClass = `relative z-10 h-full w-full overflow-hidden rounded-full bg-slate-100 ${
+        frame ? "ring-2 ring-white/85 shadow-[0_1px_2px_rgba(15,23,42,0.28)]" : ""
+    }`;
+    const frameGlow = frame ? (
+        <span className={`pointer-events-none absolute -inset-1 z-0 rounded-full opacity-70 blur-[3px] ${frame.glowClass || ""}`} />
+    ) : null;
+    const frameCap = frame ? (
+        <span
+            className={`pointer-events-none absolute inset-0 z-20 rounded-full ring-1 ${frame.innerRingClass || "ring-white/80"} shadow-[inset_0_1px_2px_rgba(255,255,255,0.85),inset_0_-2px_4px_rgba(15,23,42,0.32)]`}
+        />
+    ) : null;
     const levelBadge = showLevelBadge && hasLevel && size !== "xs" ? (
-        <span className={`absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ring-1 ${frame?.badgeClass || "bg-slate-800 text-white ring-white"}`}>
+        <span className={`absolute -bottom-1 left-1/2 z-30 -translate-x-1/2 rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ring-1 ${frame?.badgeClass || "bg-slate-800 text-white ring-white"}`}>
             Lv.{numericLevel}
         </span>
     ) : null;
 
-    if (imageUrl && !failed) {
-        return (
-            <span className={outerClass} title={frame ? `${frame.label} 프레임` : undefined}>
-                <span className={innerClass}>
-                    <img
-                        src={imageUrl}
-                        alt=""
-                        className={`h-full w-full object-cover ${imageClassName}`.trim()}
-                        loading="lazy"
-                        onError={() => setFailed(true)}
-                    />
-                </span>
-                {levelBadge}
-            </span>
-        );
-    }
+    const content = imageUrl && !failed ? (
+        <span className={innerClass}>
+            <img
+                src={imageUrl}
+                alt=""
+                className={`h-full w-full object-cover ${imageClassName}`.trim()}
+                loading="lazy"
+                onError={() => setFailed(true)}
+            />
+        </span>
+    ) : (
+        <span className={`${innerClass} flex items-center justify-center font-black text-slate-500`}>
+            {initial || <User className="h-1/2 w-1/2" />}
+        </span>
+    );
 
     return (
-        <span className={outerClass} title={frame ? `${frame.label} 프레임` : undefined}>
-            <span className={`${innerClass} flex items-center justify-center font-black text-slate-500`}>
-                {initial || <User className="h-1/2 w-1/2" />}
-            </span>
+        <span className={outerClass} title={frame ? `${frame.label} frame` : undefined}>
+            {frameGlow}
+            {content}
+            {frameCap}
             {levelBadge}
         </span>
     );
