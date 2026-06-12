@@ -14,7 +14,10 @@ import {
     X,
     Check,
     Star,
-    RefreshCw
+    RefreshCw,
+    MoreVertical,
+    Pencil,
+    LogOut
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { formatRelativeTime, debounce, resolveChatAttachmentUrl, formatFileSize } from "../../utils/helpers.js";
@@ -92,6 +95,9 @@ export const Chat = () => {
     const [uploadingFileName, setUploadingFileName] = useState("");
     const [uploadProgress, setUploadProgress] = useState(0);
     const [roomSearchQuery, setRoomSearchQuery] = useState("");
+    const [roomActionTarget, setRoomActionTarget] = useState(null);
+    const [showRenameModal, setShowRenameModal] = useState(false);
+    const [renameRoomTitle, setRenameRoomTitle] = useState("");
     
     const [newRoomTitle, setNewRoomTitle] = useState("");
     const [newRoomType, setNewRoomType] = useState("GROUP");
@@ -111,6 +117,8 @@ export const Chat = () => {
     const skipNextAutoScrollRef = useRef(false);
     const modalPanelRef = useRef(null);
     const modalCloseButtonRef = useRef(null);
+    const roomLongPressTimerRef = useRef(null);
+    const roomLongPressTriggeredRef = useRef(false);
 
     const handleDownloadAttachment = useCallback(async (fileUrl, fileName) => {
         try {
@@ -563,6 +571,82 @@ export const Chat = () => {
         setMemberSearch(""); setFoundMembers([]); setSelectedMembers([]); setNewRoomTitle("");
     };
 
+    const selectRoom = useCallback((room) => {
+        setCurrentRoom(room);
+        setMessages([]);
+        setMessagePageInfo(createEmptyMessagePageInfo());
+        if (window.innerWidth < 1024) setIsSidebarOpen(false);
+    }, []);
+
+    const openRoomActions = useCallback((room) => {
+        if (!room) return;
+        setRoomActionTarget(room);
+        setRenameRoomTitle(room.title || "");
+    }, []);
+
+    const closeRoomActions = useCallback(() => {
+        setRoomActionTarget(null);
+        setShowRenameModal(false);
+        setRenameRoomTitle("");
+    }, []);
+
+    const beginRoomLongPress = useCallback((room, event) => {
+        if (!room || event.pointerType === "mouse") return;
+        window.clearTimeout(roomLongPressTimerRef.current);
+        roomLongPressTriggeredRef.current = false;
+        roomLongPressTimerRef.current = window.setTimeout(() => {
+            roomLongPressTriggeredRef.current = true;
+            openRoomActions(room);
+        }, 520);
+    }, [openRoomActions]);
+
+    const clearRoomLongPress = useCallback(() => {
+        window.clearTimeout(roomLongPressTimerRef.current);
+    }, []);
+
+    useEffect(() => () => window.clearTimeout(roomLongPressTimerRef.current), []);
+
+    const renameRoom = async () => {
+        const roomId = getRoomId(roomActionTarget);
+        const title = renameRoomTitle.trim();
+        if (!roomId || !title) {
+            notifyError("채팅방 이름을 입력해 주세요.");
+            return;
+        }
+        try {
+            const renamed = await chatAdapter.renameRoom(roomId, title);
+            const nextTitle = renamed?.title || title;
+            setRooms((prev) => prev.map((room) => String(getRoomId(room)) === String(roomId) ? { ...room, title: nextTitle } : room));
+            setCurrentRoom((prev) => String(getRoomId(prev)) === String(roomId) ? { ...prev, title: nextTitle } : prev);
+            notifySuccess("채팅방 이름을 변경했습니다.");
+            closeRoomActions();
+        } catch (error) {
+            notifyError(extractChatErrorMessage(error, "채팅방 이름을 변경하지 못했습니다."));
+        }
+    };
+
+    const leaveSelectedRoom = async () => {
+        const roomId = getRoomId(roomActionTarget);
+        if (!roomId) return;
+        const title = roomActionTarget?.title || "채팅방";
+        if (!window.confirm(`${title}에서 나가시겠습니까?`)) return;
+        try {
+            await chatAdapter.leaveRoom(roomId);
+            setRooms((prev) => prev.filter((room) => String(getRoomId(room)) !== String(roomId)));
+            if (String(getRoomId(currentRoom)) === String(roomId)) {
+                setCurrentRoom(null);
+                setMessages([]);
+                setMessagePageInfo(createEmptyMessagePageInfo());
+                setCurrentMembers([]);
+                setIsSidebarOpen(true);
+            }
+            notifySuccess("채팅방에서 나갔습니다.");
+            closeRoomActions();
+        } catch (error) {
+            notifyError(extractChatErrorMessage(error, "채팅방을 나가지 못했습니다."));
+        }
+    };
+
     const displayedMembers = memberSearch.trim().length > 0 ? foundMembers : recommendedMembers;
     const canLoadOlderMessages = hasOlderMessages(messagePageInfo);
     const filteredRooms = useMemo(() => {
@@ -577,10 +661,10 @@ export const Chat = () => {
     }, [roomSearchQuery, rooms]);
 
     return (
-        <div className="flex h-[calc(100vh-120px)] bg-white rounded-2xl border shadow-sm overflow-hidden">
+        <div className="relative flex h-[calc(100svh-96px)] min-h-[560px] overflow-hidden rounded-2xl border bg-white shadow-sm lg:h-[calc(100vh-120px)]">
             {/* 사이드바 */}
-            <div className={`${isSidebarOpen ? "w-80" : "w-0"} transition-all duration-300 border-r flex flex-col bg-slate-50`}>
-                <div className="p-4 border-b bg-white flex items-center justify-between">
+            <div className={`${isSidebarOpen ? "translate-x-0 lg:w-80" : "-translate-x-full lg:w-0"} absolute inset-y-0 left-0 z-30 flex w-full flex-col border-r bg-slate-50 transition-all duration-300 lg:relative lg:translate-x-0`}>
+                <div className="flex items-center justify-between gap-3 border-b bg-white p-3 sm:p-4">
                     <h2 className="font-bold text-slate-900 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary-600" />채팅방</h2>
                     <div className="flex gap-1">
                         <button type="button" aria-label="채팅방 목록 새로고침" onClick={fetchRooms} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors"><RefreshCw className={`h-4 w-4 ${loadingRooms ? 'animate-spin' : ''}`} /></button>
@@ -610,8 +694,22 @@ export const Chat = () => {
                                 const roomId = getRoomId(room);
                                 const isActive = getRoomId(currentRoom) === roomId;
                                 return (
-                                    <button key={getRoomKey(room, idx)} onClick={() => { setCurrentRoom(room); setMessages([]); setMessagePageInfo(createEmptyMessagePageInfo()); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
-                                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${isActive ? "bg-primary-600 text-white shadow-md" : "hover:bg-white hover:shadow-sm text-slate-700"}`}>
+                                    <div key={getRoomKey(room, idx)}
+                                        className={`group flex w-full items-center gap-1 rounded-xl transition-all ${isActive ? "bg-primary-600 text-white shadow-md" : "text-slate-700 hover:bg-white hover:shadow-sm"}`}>
+                                        <button
+                                            type="button"
+                                            onPointerDown={(event) => beginRoomLongPress(room, event)}
+                                            onPointerUp={clearRoomLongPress}
+                                            onPointerCancel={clearRoomLongPress}
+                                            onPointerLeave={clearRoomLongPress}
+                                            onClick={() => {
+                                                if (roomLongPressTriggeredRef.current) {
+                                                    roomLongPressTriggeredRef.current = false;
+                                                    return;
+                                                }
+                                                selectRoom(room);
+                                            }}
+                                            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-3 text-left">
                                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold shadow-sm ${isActive ? "bg-white/20" : "bg-primary-100 text-primary-700"}`}>
                                             {room.type === "AI" ? <Bot className="h-6 w-6" /> : room.type === "PERSONAL" ? <User className="h-6 w-6" /> : <Users className="h-6 w-6" />}
                                         </div>
@@ -622,7 +720,16 @@ export const Chat = () => {
                                             </div>
                                             <div className={`text-xs truncate ${isActive ? "text-white/80" : "text-slate-500"}`}>{room.lastMessage || "대화 내용이 없습니다."}</div>
                                         </div>
-                                    </button>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label={`${room.title || "채팅방"} 메뉴`}
+                                            onClick={() => openRoomActions(room)}
+                                            className={`mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${isActive ? "text-white/80 hover:bg-white/15" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}
+                                        >
+                                            <MoreVertical className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 );
                             })}
                         </div>
@@ -631,35 +738,43 @@ export const Chat = () => {
             </div>
 
             {/* 메인 */}
-            <div className="flex-1 flex flex-col bg-white">
+            <div className="flex min-w-0 flex-1 flex-col bg-white">
                 {currentRoom ? (
                     <>
-                        <div className="p-4 border-b flex items-center justify-between bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-                            <div className="flex items-center gap-3">
-                                <button type="button" aria-label="채팅방 목록 열기" onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-slate-100"><ArrowLeft className="h-5 w-5" /></button>
-                                <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold">
+                        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between gap-2 border-b bg-white/90 p-3 backdrop-blur-sm sm:p-4">
+                            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                                <button type="button" aria-label="채팅방 목록 열기" onClick={() => setIsSidebarOpen(true)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden"><ArrowLeft className="h-5 w-5" /></button>
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-100 font-bold text-primary-700">
                                     {currentRoom.type === "AI" ? <Bot className="h-5 w-5" /> : currentRoom.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-slate-900">{currentRoom.title}</h3>
+                                <div className="min-w-0">
+                                    <h3 className="truncate font-bold text-slate-900">{currentRoom.title}</h3>
                                     <div className="flex items-center gap-1.5 text-xs text-slate-500"><span className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-amber-400"}`}></span>{isConnected ? "실시간 연결" : "실시간 연결 대기"}</div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button type="button" aria-label={showMemberList ? "참여자 목록 닫기" : "참여자 목록 열기"} onClick={() => setShowMemberList(!showMemberList)} className={`p-2 rounded-xl transition-colors flex items-center gap-1.5 text-sm font-bold ${showMemberList ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                                <button type="button" aria-label={showMemberList ? "참여자 목록 닫기" : "참여자 목록 열기"} onClick={() => setShowMemberList(!showMemberList)} className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold transition-colors sm:w-auto sm:px-3 ${showMemberList ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
                                     <Users className="h-4 w-4" /><span className="hidden sm:inline">{currentMembers.length}</span>
                                 </button>
                                 {currentRoom.type === "GROUP" && (
-                                    <button type="button" aria-label="멤버 초대" onClick={() => { resetMemberSelection(); setShowInviteModal(true); }} className="p-2 rounded-xl bg-primary-50 text-primary-600 hover:bg-primary-100 flex items-center gap-1.5 text-sm font-bold">
+                                    <button type="button" aria-label="멤버 초대" onClick={() => { resetMemberSelection(); setShowInviteModal(true); }} className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-sm font-bold text-primary-600 hover:bg-primary-100 sm:w-auto sm:px-3">
                                         <UserPlus className="h-4 w-4" /><span className="hidden sm:inline">초대</span>
                                     </button>
                                 )}
+                                <button
+                                    type="button"
+                                    aria-label="채팅방 메뉴"
+                                    onClick={() => openRoomActions(currentRoom)}
+                                    className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                                >
+                                    <MoreVertical className="h-5 w-5" />
+                                </button>
                             </div>
                         </div>
 
                         <div className="flex-1 flex overflow-hidden relative">
                             <div className="flex-1 flex flex-col overflow-hidden">
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+                                <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50/50 p-3 sm:p-4">
                                     {loadingMessages ? <div className="h-full flex items-center justify-center"><LoadingSpinner text="메시지 로드 중..." /></div> : messages.length === 0 ? (
                                         <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2"><MessageSquare className="h-12 w-12 opacity-20" /><p className="text-sm font-medium">대화를 시작해보세요!</p></div>
                                     ) : (
@@ -684,7 +799,7 @@ export const Chat = () => {
                                             : "";
                                         return (
                                             <div key={normalized.key || normalized.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                                                <div className={`flex max-w-[80%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
+                                                <div className={`flex max-w-[88%] sm:max-w-[80%] ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2`}>
                                                     {!isMe && (
                                                         <UserAvatar
                                                             name={normalized.senderName}
@@ -702,7 +817,7 @@ export const Chat = () => {
                                                             {normalized.type === "FILE" ? (
                                                                 !messageFileUrl ? (
                                                                     <div
-                                                                        className={`flex min-w-[220px] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3`}
+                                                                        className={`flex min-w-0 max-w-[74vw] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3 sm:min-w-[220px]`}
                                                                         aria-label="표시할 수 없는 첨부파일"
                                                                     >
                                                                         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-slate-200 text-slate-500"}`}>
@@ -720,7 +835,7 @@ export const Chat = () => {
                                                                         <AuthenticatedAttachmentImage
                                                                             src={messageFileUrl}
                                                                             alt={normalized.fileName || "이미지"}
-                                                                            className="max-w-xs rounded-xl cursor-pointer"
+                                                                            className="max-w-[min(18rem,78vw)] cursor-pointer rounded-xl sm:max-w-xs"
                                                                         />
                                                                         {!!(normalized.fileName || normalized.message) && (
                                                                             <div className={`text-[11px] ${isMe ? "text-white/80" : "text-slate-500"}`}>
@@ -732,7 +847,7 @@ export const Chat = () => {
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleDownloadAttachment(messageFileUrl, normalized.fileName || normalized.message)}
-                                                                        className={`flex min-w-[220px] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3 text-left transition-colors hover:opacity-90`}
+                                                                        className={`flex min-w-0 max-w-[74vw] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3 text-left transition-colors hover:opacity-90 sm:min-w-[220px]`}
                                                                     >
                                                                         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-primary-50 text-primary-600"}`}>
                                                                             <Download className="h-5 w-5" />
@@ -760,7 +875,7 @@ export const Chat = () => {
                                     )}
                                     <div ref={messagesEndRef} />
                                 </div>
-                                <div className="p-4 border-t bg-white">
+                                <div className="border-t bg-white p-3 sm:p-4">
                                     {uploadingFileName && (
                                         <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-primary-50 px-4 py-2 text-xs font-bold text-primary-700">
                                             <span className="truncate">업로드 중: {uploadingFileName}</span>
@@ -768,11 +883,11 @@ export const Chat = () => {
                                         </div>
                                     )}
                                     <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-                                        <button type="button" aria-label="파일 첨부" onClick={() => fileInputRef.current.click()} className="p-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"><FileIcon className="h-5 w-5" /></button>
+                                        <button type="button" aria-label="파일 첨부" onClick={() => fileInputRef.current.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"><FileIcon className="h-5 w-5" /></button>
                                         <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.7z" />
-                                        <div className="flex-1 relative">
-                                            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={isAiRoom(currentRoom) ? "질문을 입력하세요. 이미지는 먼저 첨부한 뒤 질문하면 됩니다." : "메시지를 입력해 주세요."} maxLength={CHAT_MESSAGE_MAX_LENGTH} className="w-full pl-4 pr-12 py-3 bg-slate-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-primary-500 resize-none max-h-32" rows="1" />
-                                            <button type="submit" aria-label="메시지 보내기" disabled={!newMessage.trim() || !isConnected} className={`absolute right-2 bottom-2 p-1.5 rounded-lg transition-all ${ (newMessage.trim() && isConnected) ? "bg-primary-600 text-white shadow-md" : "bg-slate-200 text-slate-400" }`}><Send className="h-4 w-4" /></button>
+                                        <div className="relative min-w-0 flex-1">
+                                            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={isAiRoom(currentRoom) ? "질문을 입력하세요. 이미지는 먼저 첨부한 뒤 질문하면 됩니다." : "메시지를 입력해 주세요."} maxLength={CHAT_MESSAGE_MAX_LENGTH} className="max-h-32 min-h-11 w-full resize-none rounded-2xl border-none bg-slate-100 py-3 pl-4 pr-12 text-sm focus:ring-2 focus:ring-primary-500" rows="1" />
+                                            <button type="submit" aria-label="메시지 보내기" disabled={!newMessage.trim() || !isConnected} className={`absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-lg transition-all ${ (newMessage.trim() && isConnected) ? "bg-primary-600 text-white shadow-md" : "bg-slate-200 text-slate-400" }`}><Send className="h-4 w-4" /></button>
                                             <div className="mt-1 text-right text-[11px] font-bold text-slate-400">
                                                 {newMessage.length.toLocaleString("ko-KR")} / {CHAT_MESSAGE_MAX_LENGTH.toLocaleString("ko-KR")}
                                             </div>
@@ -786,7 +901,7 @@ export const Chat = () => {
                                 </div>
                             </div>
                             {showMemberList && (
-                                <div className="w-64 border-l bg-white flex flex-col animate-slide-in-right">
+                                <div className="absolute inset-y-0 right-0 z-20 flex w-full max-w-xs flex-col border-l bg-white shadow-2xl animate-slide-in-right lg:relative lg:z-auto lg:w-64 lg:shadow-none">
                                     <div className="p-4 border-b flex items-center justify-between bg-slate-50"><h4 className="font-bold text-sm text-slate-900">참여자 ({currentMembers.length})</h4><button type="button" aria-label="참여자 목록 닫기" onClick={() => setShowMemberList(false)} className="p-1 hover:bg-slate-200 rounded-lg transition-colors"><X className="h-4 w-4" /></button></div>
                                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
                                         {loadingMembers ? <div className="p-8 flex justify-center"><LoadingSpinner size="sm" /></div> : currentMembers.length === 0 ? <div className="p-4 text-center text-xs text-slate-400">참여자 정보가 없습니다.</div> : currentMembers.map(m => {
@@ -815,6 +930,87 @@ export const Chat = () => {
                     </>
                 ) : <div className="h-full flex flex-col items-center justify-center bg-slate-50/50 text-center p-8"><MessageSquare className="h-16 w-16 text-primary-100 mb-4" /><h2 className="text-xl font-bold text-slate-900">대화방을 선택해주세요.</h2></div>}
             </div>
+
+            {roomActionTarget && !showRenameModal && (
+                <div
+                    className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/35 p-3 pb-[calc(5.75rem+env(safe-area-inset-bottom))] backdrop-blur-[1px] sm:items-center sm:pb-3"
+                    role="presentation"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) closeRoomActions();
+                    }}
+                >
+                    <div className="max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+                            <div className="min-w-0">
+                                <div className="truncate text-sm font-black text-slate-900">{roomActionTarget?.title || "채팅방"}</div>
+                                <div className="mt-0.5 text-xs font-semibold text-slate-400">채팅방 설정</div>
+                            </div>
+                            <button type="button" aria-label="채팅방 메뉴 닫기" onClick={closeRoomActions} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="p-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowRenameModal(true)}
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"
+                            >
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600"><Pencil className="h-5 w-5" /></span>
+                                이름 바꾸기
+                            </button>
+                            <button
+                                type="button"
+                                onClick={leaveSelectedRoom}
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                            >
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600"><LogOut className="h-5 w-5" /></span>
+                                채팅방 나가기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {roomActionTarget && showRenameModal && (
+                <div
+                    className="fixed inset-0 z-[111] flex items-end justify-center bg-slate-950/40 p-3 pb-[calc(5.75rem+env(safe-area-inset-bottom))] backdrop-blur-[1px] sm:items-center sm:pb-3"
+                    role="presentation"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) closeRoomActions();
+                    }}
+                >
+                    <div className="max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="chat-room-rename-title">
+                        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+                            <h3 id="chat-room-rename-title" className="text-base font-black text-slate-900">채팅방 이름 바꾸기</h3>
+                            <button type="button" aria-label="이름 변경 닫기" onClick={closeRoomActions} className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="space-y-3 p-4">
+                            <label htmlFor="chat-room-rename-input" className="text-sm font-bold text-slate-700">새 이름</label>
+                            <input
+                                id="chat-room-rename-input"
+                                type="text"
+                                value={renameRoomTitle}
+                                onChange={(event) => setRenameRoomTitle(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        renameRoom();
+                                    }
+                                }}
+                                maxLength={120}
+                                className="input-base"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex gap-2 bg-slate-50 p-4">
+                            <button type="button" onClick={closeRoomActions} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">취소</button>
+                            <button type="button" onClick={renameRoom} disabled={!renameRoomTitle.trim()} className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold shadow-sm ${renameRoomTitle.trim() ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-slate-200 text-slate-400"}`}>저장</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 모달 */}
             {(showCreateModal || showInviteModal) && (

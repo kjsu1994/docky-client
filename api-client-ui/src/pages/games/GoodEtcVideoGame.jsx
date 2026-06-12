@@ -3072,6 +3072,195 @@ const VideoGameMobileControlPanel = ({
   );
 };
 
+const ArenaVirtualJoystick = ({
+  status,
+  gameFrameSrc,
+  pressedControl = "",
+  onControl,
+}) => {
+  const padRef = useRef(null);
+  const pointerIdRef = useRef(null);
+  const activeDirectionRef = useRef("");
+  const [stick, setStick] = useState({ x: 0, y: 0 });
+  const bridgeReady = status === "PLAYING" && Boolean(gameFrameSrc);
+  const activeDirection = ["up", "right", "down", "left"].includes(pressedControl)
+    ? pressedControl
+    : activeDirectionRef.current;
+
+  const releaseDirection = useCallback(() => {
+    if (activeDirectionRef.current) {
+      onControl?.(activeDirectionRef.current, false);
+      activeDirectionRef.current = "";
+    }
+    pointerIdRef.current = null;
+    setStick({ x: 0, y: 0 });
+  }, [onControl]);
+
+  useEffect(() => releaseDirection, [releaseDirection]);
+
+  useEffect(() => {
+    if (!bridgeReady) releaseDirection();
+  }, [bridgeReady, releaseDirection]);
+
+  const updateDirection = useCallback((event) => {
+    if (!bridgeReady || !padRef.current) return;
+    const rect = padRef.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = event.clientX - cx;
+    const dy = event.clientY - cy;
+    const radius = Math.max(1, rect.width / 2);
+    const distance = Math.hypot(dx, dy);
+    const limited = Math.min(distance, radius * 0.56);
+    const angle = Math.atan2(dy, dx);
+    const nextStick = distance < 8
+      ? { x: 0, y: 0 }
+      : {
+        x: Math.cos(angle) * limited,
+        y: Math.sin(angle) * limited,
+      };
+    setStick(nextStick);
+
+    const nextDirection = distance < radius * 0.18
+      ? ""
+      : Math.abs(dx) > Math.abs(dy)
+        ? (dx > 0 ? "right" : "left")
+        : (dy > 0 ? "down" : "up");
+
+    if (activeDirectionRef.current === nextDirection) return;
+    if (activeDirectionRef.current) {
+      onControl?.(activeDirectionRef.current, false);
+    }
+    activeDirectionRef.current = nextDirection;
+    if (nextDirection) {
+      onControl?.(nextDirection, true);
+    }
+  }, [bridgeReady, onControl]);
+
+  const handlePointerDown = (event) => {
+    if (!bridgeReady) return;
+    event.preventDefault();
+    pointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updateDirection(event);
+  };
+
+  const handlePointerMove = (event) => {
+    if (pointerIdRef.current !== event.pointerId) return;
+    event.preventDefault();
+    updateDirection(event);
+  };
+
+  const handlePointerEnd = (event) => {
+    if (pointerIdRef.current !== event.pointerId) return;
+    event.preventDefault();
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    releaseDirection();
+  };
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-4 left-4 z-20 flex flex-col items-center gap-2 max-lg:landscape:bottom-5 max-lg:landscape:left-5"
+      data-smoke="arena-virtual-joystick"
+      data-bridge-ready={bridgeReady ? "true" : "false"}
+      data-active-direction={activeDirection || ""}
+    >
+      <div
+        ref={padRef}
+        className={`pointer-events-auto relative h-28 w-28 rounded-full border border-white/40 bg-slate-950/30 shadow-2xl shadow-slate-950/30 backdrop-blur-[2px] transition-opacity sm:h-32 sm:w-32 ${
+          bridgeReady ? "opacity-30 active:opacity-45" : "opacity-15"
+        }`}
+        style={{ touchAction: "none" }}
+        role="application"
+        aria-label="Arena movement joystick"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onLostPointerCapture={releaseDirection}
+      >
+        <div className="absolute inset-3 rounded-full border border-white/35" />
+        <div className="absolute left-1/2 top-2 h-4 w-4 -translate-x-1/2 rounded-full bg-white/70" />
+        <div className="absolute bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full bg-white/70" />
+        <div className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white/70" />
+        <div className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white/70" />
+        <div
+          className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 bg-white/70 shadow-lg"
+          style={{ transform: `translate(calc(-50% + ${stick.x}px), calc(-50% + ${stick.y}px))` }}
+        />
+      </div>
+      <span className="rounded-full bg-slate-950/30 px-2.5 py-1 text-[10px] font-black text-white/80 opacity-60 backdrop-blur-sm">
+        {activeDirection ? activeDirection.toUpperCase() : "MOVE"}
+      </span>
+    </div>
+  );
+};
+
+const ArenaTouchActionButtons = ({
+  actionControls = [],
+  pressedControl = "",
+  status,
+  gameFrameSrc,
+  onControl,
+}) => {
+  const bridgeReady = status === "PLAYING" && Boolean(gameFrameSrc);
+  const controls = actionControls.filter((control) => ["fire", "dash"].includes(videoControlKey(control)));
+  if (!controls.length) return null;
+
+  const release = (event, control) => {
+    event.preventDefault();
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    onControl?.(control, false);
+  };
+  const pointerHandlers = (control) => ({
+    onPointerDown: (event) => {
+      if (!bridgeReady) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      onControl?.(control, true);
+    },
+    onPointerUp: (event) => release(event, control),
+    onPointerCancel: (event) => release(event, control),
+    onLostPointerCapture: () => onControl?.(control, false),
+    onContextMenu: (event) => event.preventDefault(),
+  });
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-4 right-4 z-20 flex flex-col-reverse items-end gap-3 max-lg:landscape:bottom-5 max-lg:landscape:right-5"
+      data-smoke="arena-touch-action-buttons"
+      data-bridge-ready={bridgeReady ? "true" : "false"}
+    >
+      {controls.map((control) => {
+        const controlKey = videoControlKey(control);
+        const active = pressedControl === controlKey;
+        const label = videoControlLabel(control);
+        return (
+          <button
+            key={controlKey}
+            type="button"
+            aria-label={`${label} input`}
+            aria-pressed={active}
+            disabled={!bridgeReady}
+            className={`pointer-events-auto flex h-16 min-w-16 items-center justify-center gap-1.5 rounded-full border px-4 text-xs font-black text-white shadow-2xl backdrop-blur-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-200 sm:h-[4.5rem] sm:min-w-[4.5rem] ${
+              active
+                ? "border-cyan-100 bg-cyan-400/70 text-slate-950"
+                : "border-white/35 bg-slate-950/35 hover:bg-slate-950/50 disabled:opacity-25"
+            }`}
+            style={{ touchAction: "none" }}
+            data-smoke="arena-touch-action-button"
+            data-control={controlKey}
+            {...pointerHandlers(control)}
+          >
+            <VideoControlGlyph control={controlKey} active={active} className="h-5 w-5 shrink-0" />
+            <span className="max-w-14 truncate">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 const videoRoomReadinessToneClasses = {
   done: {
     shell: "border-emerald-100 bg-emerald-50 text-emerald-950",
@@ -4265,6 +4454,7 @@ export const GoodEtcVideoGame = () => {
   const roomId = getVideoGameRoomId(selectedRoom);
   const roomCode = getVideoGameRoomCode(selectedRoom);
   const isHost = selectedRoom && Number(selectedRoom.hostMemberId) === myMemberId;
+  const isArenaGame = videoGameCode === "arena";
   const guestPlayers = players.filter((player) => getVideoGameMemberId(player) !== selectedRoom?.hostMemberId);
   const readyGuestCount = guestPlayers.filter(isVideoGameReadyPlayer).length;
   const readyGuests = guestPlayers.every(isVideoGameReadyPlayer);
@@ -4822,28 +5012,51 @@ export const GoodEtcVideoGame = () => {
               </>
             )}
 
-            <VideoGameMobileControlPanel
-              profile={profile}
-              directionControls={directionControls}
-              actionControls={actionControls}
-              pressedControl={pressedControl}
-              pressedControlLabel={pressedControlLabel}
-              status={status}
-              gameFrameSrc={gameFrameSrc}
-              onControl={sendTouchControl}
-              className="xl:hidden"
-            />
+            {!isArenaGame && (
+              <VideoGameMobileControlPanel
+                profile={profile}
+                directionControls={directionControls}
+                actionControls={actionControls}
+                pressedControl={pressedControl}
+                pressedControlLabel={pressedControlLabel}
+                status={status}
+                gameFrameSrc={gameFrameSrc}
+                onControl={sendTouchControl}
+                className="xl:hidden"
+              />
+            )}
 
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-lg" data-smoke="video-game-stage-shell">
-              <div className="min-w-0 bg-slate-950">
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-lg max-lg:landscape:-mx-4 max-lg:landscape:rounded-none max-lg:landscape:border-x-0" data-smoke="video-game-stage-shell">
+              <div className="relative min-w-0 bg-slate-950">
                 {gameFrameSrc ? (
-                  <iframe
-                    ref={iframeRef}
-                    title={`${profile.title} game`}
-                    src={gameFrameSrc}
-                    className="h-[70vh] min-h-[360px] w-full bg-slate-950 sm:min-h-[460px] md:min-h-[620px] xl:h-[84vh]"
-                    allow="fullscreen; gamepad"
-                  />
+                  <>
+                    <iframe
+                      ref={iframeRef}
+                      title={`${profile.title} game`}
+                      src={gameFrameSrc}
+                      className={isArenaGame
+                        ? "h-[70svh] min-h-[320px] w-full bg-slate-950 sm:min-h-[460px] md:min-h-[620px] xl:h-[84svh] max-sm:h-[64svh] max-sm:min-h-[300px] max-lg:landscape:h-[calc(100svh-12px)] max-lg:landscape:min-h-[260px]"
+                        : "h-[70svh] min-h-[360px] w-full bg-slate-950 sm:min-h-[460px] md:min-h-[620px] xl:h-[84svh] max-lg:landscape:h-[calc(100svh-24px)] max-lg:landscape:min-h-[260px]"}
+                      allow="fullscreen; gamepad"
+                    />
+                    {isArenaGame && (
+                      <>
+                        <ArenaVirtualJoystick
+                          status={status}
+                          gameFrameSrc={gameFrameSrc}
+                          pressedControl={pressedControl}
+                          onControl={sendTouchControl}
+                        />
+                        <ArenaTouchActionButtons
+                          actionControls={actionControls}
+                          pressedControl={pressedControl}
+                          status={status}
+                          gameFrameSrc={gameFrameSrc}
+                          onControl={sendTouchControl}
+                        />
+                      </>
+                    )}
+                  </>
                 ) : (
                   <VideoGameFrameStandbyPanel
                     videoGameCode={videoGameCode}

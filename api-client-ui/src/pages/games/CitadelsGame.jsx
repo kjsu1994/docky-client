@@ -4243,6 +4243,7 @@ export const CitadelsGame = () => {
   const stompRef = useRef(null);
   const stompInitRef = useRef(null);
   const gameSubRef = useRef(null);
+  const realtimeRoomRef = useRef(null);
 
   const myMemberId = currentMemberIdOf(user);
   const players = selectedRoom?.players || [];
@@ -4560,6 +4561,9 @@ export const CitadelsGame = () => {
       client.beforeConnect = () => {
         client.connectHeaders = buildStompConnectHeaders();
       };
+      client.onConnect = () => {
+        bindLatestRealtimeRoom(client).catch(() => {});
+      };
       client.activate();
       stompRef.current = client;
       return client;
@@ -4583,17 +4587,22 @@ export const CitadelsGame = () => {
     });
   };
 
+  const bindLatestRealtimeRoom = async (client) => {
+    const target = realtimeRoomRef.current;
+    if (!target) return;
+    await bindRealtimeRoom(client, target.roomId);
+  };
+
   const openRoom = async (room) => {
     setSelectedRoom(room);
     const roomId = roomIdOf(room);
     if (!roomId) return;
     rememberResumeRoom(room);
+    realtimeRoomRef.current = { roomId };
     await fetchState(roomId);
     const client = await ensureSocket();
     if (client?.connected) {
       await bindRealtimeRoom(client, roomId);
-    } else if (client) {
-      client.onConnect = () => bindRealtimeRoom(client, roomId);
     }
   };
 
@@ -4607,6 +4616,7 @@ export const CitadelsGame = () => {
       stompRef.current = null;
       stompInitRef.current = null;
       gameSubRef.current = null;
+      realtimeRoomRef.current = null;
     };
   }, []);
 
@@ -4745,6 +4755,7 @@ export const CitadelsGame = () => {
     await tabletopGameAdapter.leaveRoom(GAME_CODE, roomIdOf(selectedRoom));
     setSelectedRoom(null);
     setGameState(null);
+    realtimeRoomRef.current = null;
     clearResumeRoom(roomIdOf(selectedRoom));
     if (gameSubRef.current) gameSubRef.current.unsubscribe();
     await fetchRooms();

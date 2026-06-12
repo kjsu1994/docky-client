@@ -436,6 +436,11 @@ export const chatAdapter = {
         await api.post(`/chat/room/${roomId}/invite`, memberIds);
     },
 
+    async renameRoom(roomId, title) {
+        const response = await api.patch(`/chat/room/${roomId}`, { title });
+        return normalizeRoom(unwrapChatData(response));
+    },
+
     async leaveRoom(roomId) {
         await api.delete(`/chat/room/${roomId}/leave`);
     },

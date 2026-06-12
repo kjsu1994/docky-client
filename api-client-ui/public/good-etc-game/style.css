@@ -223,6 +223,15 @@ body.ctfmon-embedded .defense-toolbar-body {
   height: 100%;
   display: block;
   cursor: crosshair;
+  touch-action: none;
+}
+
+body.ctfmon-embedded.ctfmon-game-arena .hud-right {
+  top: 12px !important;
+  right: 12px !important;
+  bottom: auto !important;
+  width: min(260px, calc(100vw - 24px)) !important;
+  max-height: min(22vh, 150px) !important;
 }
 
 .hud {

@@ -125,6 +125,10 @@
           params.get("v") || "20260601storage",
         );
         const game = params.get("game");
+        if (game) {
+          document.documentElement.classList.add(`ctfmon-game-${game}`);
+          document.body.classList.add(`ctfmon-game-${game}`);
+        }
         const partyGames = ["kart", "bomb", "snake", "coin"];
         const script = document.createElement("script");
         script.src =

@@ -14158,7 +14158,7 @@ const sixNimmtPhaseLabels = {
 
 const sixNimmtEventLabels = {
   ROUND_STARTED: "라운드 시작",
-  SELECT_CARD: "카드 선택",
+  SELECT_CARD: "카드 제출 완료",
   PLACE_CARD: "카드 배치",
   REVEAL: "카드 공개",
   ROW_CHOICE_REQUIRED: "행 선택 필요",
@@ -14200,13 +14200,12 @@ const sixNimmtPlayerForSeat = (state, seatNo) => {
 };
 const sixNimmtHandCount = (player) => Number(get(player, "hand_count", "handCount", 0)) || 0;
 const sixNimmtHandLength = (player) => listOf(get(player, "hand", "hand", [])).length;
-const sixNimmtNeedsViewerHandRefresh = (previousState, realtimeState, mySeatNo) => {
+const sixNimmtNeedsViewerHandRefresh = (realtimeState, mySeatNo) => {
   const realtimePlayer = sixNimmtPlayerForSeat(realtimeState, mySeatNo);
   if (!realtimePlayer) return false;
   const expectedHandCount = sixNimmtHandCount(realtimePlayer);
   if (expectedHandCount <= 0 || sixNimmtHandLength(realtimePlayer) > 0) return false;
-  const previousPlayer = sixNimmtPlayerForSeat(previousState, mySeatNo);
-  return sixNimmtHandLength(previousPlayer) !== expectedHandCount;
+  return true;
 };
 const buildSixNimmtReplayStepsFromFinal = (previousState, finalState) => {
   const previousRows = cloneSixNimmtRows(get(previousState, "rows", "rows", []));
@@ -14347,6 +14346,7 @@ const mergeSixNimmtRealtimeState = (previousState, realtimeState, mySeatNo) => {
   const previousPlayers = listOf(get(previousState, "players", "players", []));
   const realtimePlayers = listOf(get(realtimeState, "players", "players", []));
   const previousBySeat = new Map(previousPlayers.map((player) => [Number(get(player, "seat_no", "seatNo", 0)), player]));
+  const selectedSeatNos = new Set(listOf(get(realtimeState, "selected_seat_nos", "selectedSeatNos", [])).map(Number));
   return {
     ...previousState,
     ...realtimeState,
@@ -14358,9 +14358,12 @@ const mergeSixNimmtRealtimeState = (previousState, realtimeState, mySeatNo) => {
       const realtimeHand = listOf(get(player, "hand", "hand", []));
       const hasRealtimeSelectedCard = Object.prototype.hasOwnProperty.call(player, "selectedCard")
         || Object.prototype.hasOwnProperty.call(player, "selected_card");
+      const realtimeSelected = Boolean(get(player, "selected", "selected", false)) || selectedSeatNos.has(seatNo);
       const nextSelectedCard = hasRealtimeSelectedCard
         ? get(player, "selected_card", "selectedCard", null)
-        : get(previousPlayer, "selected_card", "selectedCard", null);
+        : realtimeSelected
+          ? get(previousPlayer, "selected_card", "selectedCard", null)
+          : null;
       const nextSelectedCardId = sixNimmtCardId(nextSelectedCard);
       const previousHand = listOf(get(previousPlayer, "hand", "hand", []));
       const nextHand = realtimeHand.length
@@ -15332,13 +15335,15 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           <div className="max-h-[420px] space-y-2 overflow-auto pr-1">
             {[...events].slice(-12).reverse().map((event) => {
               const eventType = get(event, "event_type", "eventType", "");
+              const normalizedEventType = String(eventType || "").toUpperCase();
               const seatNo = Number(get(event, "seat_no", "seatNo", 0));
               const cardValue = get(event, "card_value", "cardValue", "");
+              const displayCardValue = normalizedEventType === "SELECT_CARD" ? "" : cardValue;
               const value = get(event, "value", "value", "");
               return (
                 <div key={get(event, "event_no", "eventNo", eventType)} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-                  <div className="font-black text-slate-800">{sixNimmtEventLabels[eventType] || eventType}</div>
-                  <div className="mt-1">{seatNo ? playerNameBySeat(seatNo) : "시스템"}{cardValue ? ` · 카드 ${cardValue}` : ""}{value ? ` · ${value}` : ""}</div>
+                  <div className="font-black text-slate-800">{sixNimmtEventLabels[normalizedEventType] || eventType}</div>
+                  <div className="mt-1">{seatNo ? playerNameBySeat(seatNo) : "시스템"}{displayCardValue ? ` · 카드 ${displayCardValue}` : ""}{value ? ` · ${value}` : ""}</div>
                 </div>
               );
             })}
@@ -19720,6 +19725,7 @@ export const TabletopGame = ({ game }) => {
   const roomOpenSeqRef = useRef(0);
   const mountedRef = useRef(false);
   const gameStateRef = useRef(null);
+  const mySeatNoRef = useRef(0);
   const sixNimmtReplayQueueRef = useRef([]);
   const sixNimmtQueuedEventNosRef = useRef(new Set());
   const sixNimmtReplayTimerRef = useRef(null);
@@ -19727,10 +19733,16 @@ export const TabletopGame = ({ game }) => {
   const sixNimmtReplayRunningRef = useRef(false);
   const sixNimmtPendingFinalStateRef = useRef(null);
   const sixNimmtHandRefreshInFlightRef = useRef(null);
+  const sixNimmtHandRefreshPendingRef = useRef(null);
 
   const myMemberId = Number(user?.member_id || user?.memberId || user?.id || 0);
   const players = playersOf(selectedRoom);
   const mySeatNo = seatNoOf(players.find((player) => memberIdOf(player) === myMemberId));
+  const syncMySeatNoFromRoom = (room) => {
+    const seatNo = seatNoOf(playersOf(room).find((player) => memberIdOf(player) === myMemberId));
+    mySeatNoRef.current = seatNo || 0;
+    return seatNo;
+  };
   const status = statusOf(selectedRoom);
   const soundTurnSeatNo = tabletopTurnSeatForSound(game, gameState);
   const soundActionSignal = tabletopActionSignalForSound(game, gameState);
@@ -19824,6 +19836,9 @@ export const TabletopGame = ({ game }) => {
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
+  useEffect(() => {
+    mySeatNoRef.current = mySeatNo || 0;
+  }, [mySeatNo]);
 
   const clearSixNimmtReplayTimers = () => {
     if (sixNimmtReplayTimerRef.current) {
@@ -19842,11 +19857,12 @@ export const TabletopGame = ({ game }) => {
     sixNimmtQueuedEventNosRef.current = new Set();
     sixNimmtReplayRunningRef.current = false;
     sixNimmtPendingFinalStateRef.current = null;
+    sixNimmtHandRefreshPendingRef.current = null;
   };
 
   const applySixNimmtState = (nextState) => {
     setGameState((prev) => {
-      const merged = mergeSixNimmtRealtimeState(prev, nextState, mySeatNo);
+      const merged = mergeSixNimmtRealtimeState(prev, nextState, mySeatNoRef.current || mySeatNo);
       gameStateRef.current = merged;
       return merged;
     });
@@ -19990,6 +20006,7 @@ export const TabletopGame = ({ game }) => {
     clearSixNimmtReplay();
     sixNimmtHandRefreshInFlightRef.current = null;
     realtimeRoomRef.current = null;
+    mySeatNoRef.current = 0;
     setSelectedRoom(null);
     gameStateRef.current = null;
     setGameState(null);
@@ -20018,7 +20035,10 @@ export const TabletopGame = ({ game }) => {
     if (!mountedRef.current) return null;
     if (roomSeq !== null && !isLatestRoomOpen(roomSeq)) return null;
     const room = payload?.room || null;
-    if (room) setSelectedRoom(room);
+    if (room) {
+      syncMySeatNoFromRoom(room);
+      setSelectedRoom(room);
+    }
     const nextGameState = payload?.gameState || null;
     gameStateRef.current = nextGameState;
     setGameState(nextGameState);
@@ -20026,7 +20046,10 @@ export const TabletopGame = ({ game }) => {
   };
 
   const refreshSixNimmtViewerHand = (roomId, roomSeq) => {
-    if (sixNimmtHandRefreshInFlightRef.current === roomSeq) return;
+    if (sixNimmtHandRefreshInFlightRef.current === roomSeq) {
+      sixNimmtHandRefreshPendingRef.current = { roomId, roomSeq };
+      return;
+    }
     sixNimmtHandRefreshInFlightRef.current = roomSeq;
     fetchState(roomId, roomSeq)
       .catch((error) => {
@@ -20035,6 +20058,11 @@ export const TabletopGame = ({ game }) => {
       .finally(() => {
         if (sixNimmtHandRefreshInFlightRef.current === roomSeq) {
           sixNimmtHandRefreshInFlightRef.current = null;
+        }
+        const pending = sixNimmtHandRefreshPendingRef.current;
+        if (pending && pending.roomSeq === roomSeq && isLatestRoomOpen(roomSeq)) {
+          sixNimmtHandRefreshPendingRef.current = null;
+          refreshSixNimmtViewerHand(pending.roomId, pending.roomSeq);
         }
       });
   };
@@ -20053,10 +20081,19 @@ export const TabletopGame = ({ game }) => {
         });
         return;
       }
-      if (payload.room) setSelectedRoom(payload.room);
+      if (payload.room) {
+        syncMySeatNoFromRoom(payload.room);
+        setSelectedRoom(payload.room);
+      }
       if (game === "six-nimmt" && payload.gameState) {
         const eventType = String(get(payload, "event_type", "eventType", "") || "").toLowerCase();
-        const needsViewerHandRefresh = sixNimmtNeedsViewerHandRefresh(gameStateRef.current, payload.gameState, mySeatNo);
+        const viewerSeatNo = mySeatNoRef.current || mySeatNo;
+        const needsViewerHandRefresh = sixNimmtNeedsViewerHandRefresh(payload.gameState, viewerSeatNo);
+        let viewerRefreshRequested = false;
+        const requestViewerRefresh = () => {
+          viewerRefreshRequested = true;
+          refreshSixNimmtViewerHand(roomId, roomSeq);
+        };
         if (eventType === "six_nimmt_resolution_step") {
           enqueueSixNimmtReplayStep(payload.gameState);
         } else if (sixNimmtHasNewPlacementEvents(gameStateRef.current, payload.gameState)
@@ -20065,12 +20102,12 @@ export const TabletopGame = ({ game }) => {
           || sixNimmtReplayTimerRef.current) {
           deferSixNimmtFinalState(payload.gameState);
         } else {
-          applySixNimmtState(payload.gameState);
+          requestViewerRefresh();
         }
-        if (needsViewerHandRefresh) {
-          refreshSixNimmtViewerHand(roomId, roomSeq);
+        if (needsViewerHandRefresh && !viewerRefreshRequested) {
+          requestViewerRefresh();
         }
-      } else if ((game === "dalmuti" || game === "catan" || game === "poker" || game === "telestrations") && payload.gameState) {
+      } else if ((game === "dalmuti" || game === "catan" || game === "poker" || game === "telestrations" || game === "mafia") && payload.gameState) {
         fetchState(roomId, roomSeq).catch((error) => {
           if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 정보를 갱신하지 못했습니다.");
         });
@@ -20133,6 +20170,7 @@ export const TabletopGame = ({ game }) => {
   const openRoom = async (room) => {
     if (!mountedRef.current) return;
     const roomSeq = ++roomOpenSeqRef.current;
+    syncMySeatNoFromRoom(room);
     setSelectedRoom(room);
     const roomId = idOf(room);
     if (!roomId) return;
@@ -20202,6 +20240,7 @@ export const TabletopGame = ({ game }) => {
         }
       } catch {
         if (!active) return;
+        mySeatNoRef.current = 0;
         setSelectedRoom(null);
         gameStateRef.current = null;
         setGameState(null);
@@ -20308,6 +20347,7 @@ export const TabletopGame = ({ game }) => {
         variantCode: settingsForm.variantCode,
         turnTimeSeconds: Number(settingsForm.turnTimeSeconds || 30),
       });
+      syncMySeatNoFromRoom(room);
       setSelectedRoom(room);
       gameStateRef.current = null;
       setGameState(null);
@@ -20376,7 +20416,10 @@ export const TabletopGame = ({ game }) => {
     setActionBusy(true);
     try {
       const result = await tabletopGameAdapter.sendAction(game, idOf(selectedRoom), payload);
-      if (result?.room) setSelectedRoom(result.room);
+      if (result?.room) {
+        syncMySeatNoFromRoom(result.room);
+        setSelectedRoom(result.room);
+      }
       if (game === "six-nimmt" && result?.gameState) {
         if (sixNimmtHasNewPlacementEvents(gameStateRef.current, result.gameState)) {
           deferSixNimmtFinalState(result.gameState);
@@ -20413,6 +20456,7 @@ export const TabletopGame = ({ game }) => {
     try {
       setBusy(true);
       const room = await tabletopGameAdapter.forceFinish(game, idOf(selectedRoom));
+      syncMySeatNoFromRoom(room);
       setSelectedRoom(room);
       gameStateRef.current = null;
       setGameState(null);
@@ -20435,6 +20479,7 @@ export const TabletopGame = ({ game }) => {
     try {
       setBusy(true);
       const room = await tabletopGameAdapter.rematch(game, idOf(selectedRoom));
+      syncMySeatNoFromRoom(room);
       setSelectedRoom(room);
       gameStateRef.current = null;
       setGameState(null);

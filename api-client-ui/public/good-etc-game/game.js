@@ -28,6 +28,15 @@ const trainingMode = launchParams.get("training") === "1";
 const isLocalArena = ["solo", "local"].includes(launchParams.get("mode") || "") || (siteMode && siteHost);
 const keys = new Set();
 const pointer = { x: 0, y: 0, down: false };
+const touchControlKeys = {
+  up: "arrowup",
+  down: "arrowdown",
+  left: "arrowleft",
+  right: "arrowright",
+  fire: " ",
+  action: " ",
+  dash: "shift",
+};
 const camera = { x: 0, y: 0 };
 const localArenaConfig = {
   width: 5200,
@@ -2086,6 +2095,14 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("keyup", (event) => {
   keys.delete(event.key.toLowerCase());
+});
+
+window.addEventListener("good-etc-touch-control", (event) => {
+  const control = String(event.detail?.control || "");
+  const key = touchControlKeys[control];
+  if (!key) return;
+  if (event.detail?.pressed) keys.add(key);
+  else keys.delete(key);
 });
 
 canvas.addEventListener("pointermove", (event) => {
