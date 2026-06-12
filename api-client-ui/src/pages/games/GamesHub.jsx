@@ -5,6 +5,7 @@ import { GameUxGlyph, PlayingCardArt } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork, tabletopGameArtProfiles } from "./TabletopGameArtwork.jsx";
 import { VideoGameArtwork, videoGameArtProfiles } from "./VideoGameArtwork.jsx";
 import { getBoardGameRuleGuide } from "../../common/boardGameRules.js";
+import { BannerTypeBadge } from "../../common/BannerTypeBadge.jsx";
 import { BusinessPrivacyFooter } from "../../components/BusinessPrivacyFooter.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { homeAdapter } from "../../adapters/homeAdapter.js";
@@ -3068,10 +3069,11 @@ const GameHubHeroBanner = ({
         style={bannerStyle}
       >
         <div className={`relative z-10 flex h-full max-w-3xl flex-col ${hasImageBackground ? "[text-shadow:0_2px_12px_rgba(15,23,42,0.72)]" : ""}`}>
-          <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black text-white ${hasImageBackground ? "bg-slate-950/40 shadow-sm backdrop-blur-[2px]" : "bg-white/20 backdrop-blur-md"}`}>
-            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-            {banner.type === "AD" ? "광고" : "공지"}
-          </div>
+          <BannerTypeBadge
+            type={banner.type}
+            label={banner.typeLabel}
+            tone={hasImageBackground ? "image" : "glass"}
+          />
           <h2 className="mt-3 line-clamp-2 text-xl font-black tracking-tight sm:text-3xl">
             {banner.title || "Docky 게임 소식"}
           </h2>

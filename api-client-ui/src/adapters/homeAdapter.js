@@ -335,6 +335,7 @@ export const normalizeHomeBanners = (response, fallbackName) => {
                 id: item.bannerId ?? item.banner_id ?? idx,
                 eventBannerId: toValidBannerId(item.bannerId ?? item.banner_id),
                 type: item.bannerType ?? item.banner_type ?? "NOTICE",
+                typeLabel: item.bannerTypeLabel ?? item.banner_type_label ?? "",
                 title: item.title || "",
                 description: item.description || "",
                 imageUrl,

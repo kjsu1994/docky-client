@@ -20,6 +20,7 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 import { formatNumber, formatRelativeTime, stripHtmlTags } from "../../utils/helpers.js";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { EmptyState } from "../../components/EmptyState.jsx";
+import { BannerTypeBadge } from "../../common/BannerTypeBadge.jsx";
 import { homeAdapter } from "../../adapters/homeAdapter.js";
 import { isAdsenseBanner, readStoredAdsConsent } from "../../utils/adsense.js";
 import { logClientError } from "../../utils/clientDiagnostics.js";
@@ -640,10 +641,11 @@ export const Home = () => {
                                             style={contentBannerStyle}
                                         >
                                             <div className={`relative z-10 ${hasImageBackground ? "max-w-3xl [text-shadow:0_2px_12px_rgba(15,23,42,0.72)]" : ""}`}>
-                                                <div className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-bold ${adsense ? "bg-slate-100 text-slate-600" : hasImageBackground ? "bg-slate-950/40 text-white shadow-sm backdrop-blur-[2px]" : "bg-white/20 text-white backdrop-blur-md"}`}>
-                                                    <Sparkles className={`h-3.5 w-3.5 ${adsense ? "text-primary-500" : "text-amber-300"}`} />
-                                                    {banner.type === "AD" ? "광고" : "공지"}
-                                                </div>
+                                                <BannerTypeBadge
+                                                    type={banner.type}
+                                                    label={banner.typeLabel}
+                                                    tone={adsense ? "surface" : hasImageBackground ? "image" : "glass"}
+                                                />
 
                                                 {adsense ? (
                                                     <div className="mt-3">
