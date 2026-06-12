@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { LoadingPage } from "./components/LoadingSpinner";
+import { DelayedLoadingPage } from "./components/LoadingSpinner";
 import { GlobalNetworkIndicatorEntry } from "./components/GlobalNetworkIndicatorEntry.jsx";
 import { AppErrorBoundary } from "./common/AppErrorBoundary.jsx";
 import { ToastViewportEntry } from "./common/ToastViewportEntry.jsx";
@@ -14,7 +14,7 @@ const Register = lazy(() => import("./pages/access/Register.jsx").then((module) 
 const Queue = lazy(() => import("./pages/access/Queue.jsx").then((module) => ({ default: module.Queue })));
 
 const PublicRoute = ({ children }) => (
-    <Suspense fallback={<LoadingPage />}>
+    <Suspense fallback={<DelayedLoadingPage />}>
         {children}
     </Suspense>
 );
@@ -22,14 +22,14 @@ const PublicRoute = ({ children }) => (
 const GuestRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
 
-    if (loading) return <LoadingPage />;
+    if (loading) return <DelayedLoadingPage />;
     if (isAuthenticated) return <Navigate to="/app" replace />;
 
     return <PublicRoute>{children}</PublicRoute>;
 };
 
 const ProtectedRoutesBoundary = () => (
-    <Suspense fallback={<LoadingPage />}>
+    <Suspense fallback={<DelayedLoadingPage />}>
         <ProtectedRoutes />
     </Suspense>
 );

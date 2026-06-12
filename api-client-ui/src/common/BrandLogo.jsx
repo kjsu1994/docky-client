@@ -1,7 +1,7 @@
 export const DOCKY_LOGO_SRC = "/docky.png";
 
-export const BrandMark = ({ className = "h-12", imageClassName = "" }) => (
-    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden aspect-[4/1] ${className}`}>
+export const BrandMark = ({ className = "h-12", imageClassName = "", ratioClassName = "aspect-[4/1]" }) => (
+    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden ${ratioClassName} ${className}`}>
         <img
             src={DOCKY_LOGO_SRC}
             alt="Docky"

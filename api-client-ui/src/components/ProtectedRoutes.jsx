@@ -1,11 +1,8 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { LoadingPage } from "./LoadingSpinner";
-
-const ProtectedAppLayout = lazy(() =>
-    import("./ProtectedAppLayout.jsx").then((module) => ({ default: module.ProtectedAppLayout }))
-);
+import { DelayedLoadingPage, DelayedRouteFallback } from "./LoadingSpinner";
+import { ProtectedAppLayout } from "./ProtectedAppLayout.jsx";
 const Home = lazy(() => import("../pages/home/Home.jsx").then((module) => ({ default: module.Home })));
 const BoardList = lazy(() => import("../pages/boards/BoardList.jsx").then((module) => ({ default: module.BoardList })));
 const BoardDetail = lazy(() => import("../pages/boards/BoardDetail.jsx").then((module) => ({ default: module.BoardDetail })));
@@ -43,7 +40,7 @@ const AdminStreamingStudio = lazy(() => import("../pages/admin/AdminStreamingStu
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
 
-    if (loading) return <LoadingPage />;
+    if (loading) return <DelayedLoadingPage />;
     if (!isAuthenticated) return <Navigate to="/login" replace />;
 
     return children;
@@ -51,55 +48,53 @@ const ProtectedRoute = ({ children }) => {
 
 export const ProtectedRoutes = () => (
     <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-            <ProtectedAppLayout>
-                <Suspense fallback={<LoadingPage />}>
-                    <Routes>
-                        <Route index element={<GamesHub />} />
-                        <Route path="home" element={<Home />} />
-                        <Route path="boards/:kind" element={<BoardList />} />
-                        <Route path="boards/:kind/new" element={<BoardForm />} />
-                        <Route path="boards/:kind/:boardId/edit" element={<BoardForm />} />
-                        <Route path="boards/:kind/:boardId" element={<BoardDetail />} />
+        <ProtectedAppLayout>
+            <Suspense fallback={<DelayedRouteFallback />}>
+                <Routes>
+                    <Route index element={<GamesHub />} />
+                    <Route path="home" element={<Home />} />
+                    <Route path="boards/:kind" element={<BoardList />} />
+                    <Route path="boards/:kind/new" element={<BoardForm />} />
+                    <Route path="boards/:kind/:boardId/edit" element={<BoardForm />} />
+                    <Route path="boards/:kind/:boardId" element={<BoardDetail />} />
 
-                        <Route path="chat" element={<Chat />} />
-                        <Route path="todos" element={<TodoCalendar />} />
-                        <Route path="streaming" element={<StreamingHub />} />
-                        <Route path="invest" element={<InvestAssistant />} />
-                        <Route path="all-menu" element={<AllMenu />} />
-                        <Route path="games" element={<Navigate to="/app" replace />} />
+                    <Route path="chat" element={<Chat />} />
+                    <Route path="todos" element={<TodoCalendar />} />
+                    <Route path="streaming" element={<StreamingHub />} />
+                    <Route path="invest" element={<InvestAssistant />} />
+                    <Route path="all-menu" element={<AllMenu />} />
+                    <Route path="games" element={<Navigate to="/app" replace />} />
 
-                        <Route path="statistics" element={<Statistics />} />
-                        <Route path="ranks" element={<Ranks />} />
-                        <Route path="news" element={<News />} />
-                        <Route path="mypage" element={<Mypage />} />
-                        <Route path="mypage/edit" element={<MypageEdit />} />
-                        <Route path="poker" element={<PokerGame />} />
-                        <Route path="plinko" element={<Navigate to="/app/poker" replace />} />
-                        <Route path="games/las-vegas" element={<LasVegasGame />} />
-                        <Route path="games/no-thanks" element={<NoThanksGame />} />
-                        <Route path="games/catan" element={<CatanGame />} />
-                        <Route path="games/blokus" element={<BlokusGame />} />
-                        <Route path="games/mahe" element={<MaheGame />} />
-                        <Route path="games/dalmuti" element={<DalmutiGame />} />
-                        <Route path="games/six-nimmt" element={<SixNimmtGame />} />
-                        <Route path="games/telestrations" element={<TelestrationsGame />} />
-                        <Route path="games/mafia" element={<MafiaGame />} />
-                        <Route path="games/citadels" element={<CitadelsGame />} />
-                        <Route path="games/video/:videoGameCode" element={<GoodEtcVideoGame />} />
-                        <Route path="optimizer" element={<MeetingOptimizer />} />
-                        <Route path="facility" element={<FacilityFinder />} />
-                        <Route path="parking" element={<Navigate to="/app/facility" replace />} />
-                        <Route path="admin" element={<AdminCommandCenter />} />
-                        <Route path="admin/anomalies" element={<AdminAnomalies />} />
-                        <Route path="admin/operations" element={<AdminOperations />} />
-                        <Route path="admin/streaming" element={<AdminStreamingStudio />} />
+                    <Route path="statistics" element={<Statistics />} />
+                    <Route path="ranks" element={<Ranks />} />
+                    <Route path="news" element={<News />} />
+                    <Route path="mypage" element={<Mypage />} />
+                    <Route path="mypage/edit" element={<MypageEdit />} />
+                    <Route path="poker" element={<PokerGame />} />
+                    <Route path="plinko" element={<Navigate to="/app/poker" replace />} />
+                    <Route path="games/las-vegas" element={<LasVegasGame />} />
+                    <Route path="games/no-thanks" element={<NoThanksGame />} />
+                    <Route path="games/catan" element={<CatanGame />} />
+                    <Route path="games/blokus" element={<BlokusGame />} />
+                    <Route path="games/mahe" element={<MaheGame />} />
+                    <Route path="games/dalmuti" element={<DalmutiGame />} />
+                    <Route path="games/six-nimmt" element={<SixNimmtGame />} />
+                    <Route path="games/telestrations" element={<TelestrationsGame />} />
+                    <Route path="games/mafia" element={<MafiaGame />} />
+                    <Route path="games/citadels" element={<CitadelsGame />} />
+                    <Route path="games/video/:videoGameCode" element={<GoodEtcVideoGame />} />
+                    <Route path="optimizer" element={<MeetingOptimizer />} />
+                    <Route path="facility" element={<FacilityFinder />} />
+                    <Route path="parking" element={<Navigate to="/app/facility" replace />} />
+                    <Route path="admin" element={<AdminCommandCenter />} />
+                    <Route path="admin/anomalies" element={<AdminAnomalies />} />
+                    <Route path="admin/operations" element={<AdminOperations />} />
+                    <Route path="admin/streaming" element={<AdminStreamingStudio />} />
 
-                        <Route path="*" element={<Navigate to="/app" replace />} />
-                    </Routes>
-                </Suspense>
-            </ProtectedAppLayout>
-        </Suspense>
+                    <Route path="*" element={<Navigate to="/app" replace />} />
+                </Routes>
+            </Suspense>
+        </ProtectedAppLayout>
     </ProtectedRoute>
 );
 
