@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, MapPin, Save, User, X } from "lucide-react";
+import { ArrowLeft, Camera, MapPin, Save, X } from "lucide-react";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
+import UserAvatar from "../../common/UserAvatar.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
-import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
 import { notify, notifyError, notifySuccess } from "../../utils/toast.js";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
 import { extractMypageErrorMessage, formatPhoneNumber, isGoogleMember, mypageAdapter } from "../../adapters/mypageAdapter.js";
@@ -41,7 +41,7 @@ export const MypageEdit = () => {
     });
 
     const memberId = member?.memberId || user?.member_id || user?.memberId || null;
-    const profileUrl = normalizeProfileImageUrl(member?.profileUrl || "");
+    const level = member?.level || {};
     const oauthMember = useMemo(() => isGoogleMember(member || user), [member, user]);
 
     const fetchMember = useCallback(async () => {
@@ -242,13 +242,16 @@ export const MypageEdit = () => {
 
             <section className="space-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                 <div className="flex flex-wrap items-center gap-5">
-                    {profileUrl ? (
-                        <img src={profileUrl} alt="" className="h-24 w-24 rounded-2xl border border-slate-200 object-cover" />
-                    ) : (
-                        <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-slate-900 text-white">
-                            <User className="h-10 w-10" />
-                        </div>
-                    )}
+                    <UserAvatar
+                        name={member?.name}
+                        profileUrl={member?.profileUrl}
+                        level={level.level}
+                        rewardTier={level.rewardTier}
+                        frameCode={level.frameCode}
+                        size="2xl"
+                        className="rounded-2xl border border-slate-200"
+                        showLevelBadge
+                    />
 
                     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-200">
                         <Camera className="h-4 w-4" />

@@ -17,6 +17,7 @@ const HeaderMenuDialog = lazy(() =>
 export const Header = () => {
     const { user, logout } = useAuth();
     const isAdmin = isAdminUser(user);
+    const userLevel = user?.levelDto || user?.level_dto || user?.level || {};
     const [menuOpen, setMenuOpen] = useState(false);
     const menuButtonRef = useRef(null);
     const menuPanelId = useId();
@@ -96,7 +97,14 @@ export const Header = () => {
                                 to="/app/mypage"
                                 className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-bold text-slate-600 transition-all hover:bg-slate-50"
                             >
-                                <UserAvatar name={user?.name || user?.email} profileUrl={user?.profileUrl || user?.profile_url} size="sm" />
+                                <UserAvatar
+                                    name={user?.name || user?.email}
+                                    profileUrl={user?.profileUrl || user?.profile_url}
+                                    level={userLevel.level}
+                                    rewardTier={userLevel.rewardTier || userLevel.reward_tier}
+                                    frameCode={userLevel.frameCode || userLevel.frame_code}
+                                    size="sm"
+                                />
                                 <span className="hidden md:inline">{user?.name || user?.email || "내 정보"}</span>
                                 {isAdmin && (
                                     <span className="hidden rounded-lg bg-primary-100 px-2 py-0.5 text-[9px] font-black text-primary-700 md:inline-block">

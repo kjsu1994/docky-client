@@ -4,8 +4,8 @@ import { Trophy, TrendingUp, Heart, Award, Crown, Medal, Star } from "lucide-rea
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { EmptyState } from "../../components/EmptyState.jsx";
+import UserAvatar from "../../common/UserAvatar.jsx";
 import { formatNumber } from "../../utils/helpers.js";
-import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
 import { BOARD_RANK_TYPES, rankErrorMessage, ranksAdapter } from "../../adapters/ranksAdapter.js";
 
 const tabs = [
@@ -206,8 +206,10 @@ const LevelRankList = ({ ranks }) => {
                     rank={index + 1}
                     name={member.name}
                     profileUrl={member.profileUrl}
-                    accent="purple"
-                    title={`Lv. ${member.level}`}
+                    level={member.level}
+                    rewardTier={member.rewardTier}
+                    frameCode={member.frameCode}
+                    title={`Lv. ${member.level}${member.tierName || member.frameLabel ? ` · ${member.tierName || member.frameLabel}` : ""}`}
                     detail={`누적 경험치 ${formatNumber(member.totalExp)}`}
                     progress={member.progressPercent}
                 />
@@ -216,22 +218,20 @@ const LevelRankList = ({ ranks }) => {
     );
 };
 
-const MemberRankRow = ({ rank, name, profileUrl, title, detail, progress, accent }) => {
-    const imageUrl = normalizeProfileImageUrl(profileUrl);
-    const accentClass = accent === "emerald" ? "from-emerald-400 to-emerald-600" : "from-purple-400 to-purple-600";
+const MemberRankRow = ({ rank, name, profileUrl, level, rewardTier, frameCode, title, detail, progress }) => {
     return (
         <div className={`p-5 transition-colors ${rank <= 3 ? "bg-slate-50" : "hover:bg-slate-50"}`}>
             <div className="flex items-center gap-4">
                 <RankBadge rank={rank} />
-                <div className="flex-shrink-0">
-                    {imageUrl ? (
-                        <img src={imageUrl} alt="" className="h-12 w-12 rounded-full border-2 border-white object-cover shadow-sm" />
-                    ) : (
-                        <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${accentClass} font-bold text-white`}>
-                            {String(name || "익").charAt(0)}
-                        </div>
-                    )}
-                </div>
+                <UserAvatar
+                    name={name}
+                    profileUrl={profileUrl}
+                    level={level}
+                    rewardTier={rewardTier}
+                    frameCode={frameCode}
+                    size="lg"
+                    showLevelBadge
+                />
                 <div className="min-w-0 flex-1">
                     <h3 className="truncate text-lg font-bold text-slate-900">{name}</h3>
                     <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">

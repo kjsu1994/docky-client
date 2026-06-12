@@ -3982,7 +3982,14 @@ const VideoGameSyncRailPanel = ({
                 <div key={memberId || seatNo || index} className="rounded-xl border border-slate-100 bg-white px-3 py-2" data-smoke="video-game-sync-rail-player">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2">
-                      <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="xs" />
+                      <UserAvatar
+                        name={player.nickname}
+                        profileUrl={player.profileUrl}
+                        level={player.level}
+                        rewardTier={player.rewardTier}
+                        frameCode={player.frameCode}
+                        size="xs"
+                      />
                       <div className="min-w-0">
                         <div className="truncate text-sm font-black text-slate-900">{player.nickname}</div>
                         <div className="text-[11px] font-bold text-slate-500">좌석 {seatNo || "-"}{host ? " · 방장" : ""}</div>

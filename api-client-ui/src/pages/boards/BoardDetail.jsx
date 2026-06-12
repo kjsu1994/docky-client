@@ -23,7 +23,7 @@ import {
 } from "../../utils/helpers.js";
 import { canManageByOwnerOrAdmin } from "../../utils/authorization.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
-import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
+import UserAvatar from "../../common/UserAvatar.jsx";
 import { logClientError } from "../../utils/clientDiagnostics.js";
 import { boardAdapter, boardErrorMessage, getBoardLikeCount } from "../../adapters/boardAdapter.js";
 import { ReportDialog } from "../../common/ReportDialog.jsx";
@@ -222,7 +222,8 @@ export const BoardDetail = () => {
     const boardBodyHtml = sanitizeBoardContentHtml(normalizeContentImageUrls(board.contents || board.content || ""));
     const currentLikeCount = getBoardLikeCount(board);
     const currentViewCount = board.view_count ?? board.viewCount ?? 0;
-    const authorProfileImageUrl = normalizeProfileImageUrl(board.member?.profile_url || board.member?.profileUrl || "");
+    const authorLevel = board.member?.levelDto || board.member?.level_dto || board.member?.level || {};
+    const authorLevelValue = authorLevel.level ?? board.creatorLevel ?? board.creator_level;
 
     return (
         <div className="space-y-6">
@@ -263,17 +264,14 @@ export const BoardDetail = () => {
                     <h1 className="text-2xl font-bold text-slate-900">{board.title}</h1>
 
                     <div className="flex items-center gap-3 mt-4">
-                        {authorProfileImageUrl ? (
-                            <img
-                                src={authorProfileImageUrl}
-                                alt="author profile"
-                                className="w-10 h-10 rounded-full object-cover border"
-                            />
-                        ) : (
-                            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold">
-                                {(board.member?.name || board.board_creator || "U").charAt(0).toUpperCase()}
-                            </div>
-                        )}
+                        <UserAvatar
+                            name={board.member?.name || board.board_creator || "익명"}
+                            profileUrl={board.member?.profileUrl || board.member?.profile_url}
+                            level={authorLevelValue}
+                            rewardTier={authorLevel.rewardTier || authorLevel.reward_tier}
+                            frameCode={authorLevel.frameCode || authorLevel.frame_code}
+                            size="md"
+                        />
                         <div>
                             <div className="text-sm font-semibold text-slate-900">{board.member?.name || board.board_creator || "익명"}</div>
                             <div className="text-xs text-slate-500">{formatRelativeTime(new Date(board.created_at || board.createdAt))}</div>

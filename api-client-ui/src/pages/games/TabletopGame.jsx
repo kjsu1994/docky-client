@@ -16886,7 +16886,14 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
               return (
                 <div key={seatNo} className={`rounded-lg px-3 py-2 ${done ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500"}`}>
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="xs" />
+                    <UserAvatar
+                      name={player.nickname}
+                      profileUrl={player.profileUrl}
+                      level={player.level}
+                      rewardTier={player.rewardTier}
+                      frameCode={player.frameCode}
+                      size="xs"
+                    />
                     <div className="truncate text-sm font-black">{player.nickname}</div>
                   </div>
                   <div className="text-[10px] font-black">{done ? "제출 완료" : "대기 중"}</div>
@@ -17965,8 +17972,17 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
   const lastTrialResult = get(gameState, "last_trial_result", "lastTrialResult", null);
   const voteCounts = get(gameState, "vote_counts", "voteCounts", {}) || {};
 
-  const playerNameBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
-  const playerProfileBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.profileUrl || "";
+  const playerBySeat = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo)) || null;
+  const playerNameBySeat = (seatNo) => playerBySeat(seatNo)?.nickname || `${seatNo}번`;
+  const playerProfileBySeat = (seatNo) => playerBySeat(seatNo)?.profileUrl || "";
+  const playerLevelMetaBySeat = (seatNo) => {
+    const player = playerBySeat(seatNo);
+    return {
+      level: player?.level,
+      rewardTier: player?.rewardTier,
+      frameCode: player?.frameCode,
+    };
+  };
   const alivePlayers = mafiaPlayers.filter((player) => Boolean(get(player, "alive", "alive", true)));
   const actionType = availableActions.has("MAFIA_KILL") ? "MAFIA_KILL"
     : availableActions.has("POLICE_CHECK") ? "POLICE_CHECK"
@@ -18249,10 +18265,18 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
                 {targetPlayers.map((player) => {
                   const seatNo = Number(get(player, "seat_no", "seatNo", 0));
                   const selected = selectedTargetSeatNo === seatNo;
+                  const levelMeta = playerLevelMetaBySeat(seatNo);
                   return (
                     <button key={seatNo} type="button" onClick={() => setSelectedTargetSeatNo(seatNo)} className={`min-h-16 rounded-xl border px-3 py-2 text-left transition ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
                       <div className="flex min-w-0 items-center gap-2">
-                        <UserAvatar name={playerNameBySeat(seatNo)} profileUrl={playerProfileBySeat(seatNo)} size="xs" />
+                        <UserAvatar
+                          name={playerNameBySeat(seatNo)}
+                          profileUrl={playerProfileBySeat(seatNo)}
+                          level={levelMeta.level}
+                          rewardTier={levelMeta.rewardTier}
+                          frameCode={levelMeta.frameCode}
+                          size="xs"
+                        />
                         <div className="min-w-0">
                           <div className="truncate text-sm font-black">{playerNameBySeat(seatNo)}</div>
                           <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}</div>
@@ -18285,11 +18309,19 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
               const seatNo = Number(get(player, "seat_no", "seatNo", 0));
               const alive = Boolean(get(player, "alive", "alive", true));
               const role = String(get(player, "role", "role", "") || get(player, "revealed_role", "revealedRole", "") || "");
+              const levelMeta = playerLevelMetaBySeat(seatNo);
               return (
                 <div key={seatNo} className={`rounded-xl border px-3 py-2 ${alive ? "border-slate-100 bg-slate-50" : "border-zinc-200 bg-zinc-100 opacity-75"}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
-                      <UserAvatar name={playerNameBySeat(seatNo)} profileUrl={playerProfileBySeat(seatNo)} size="sm" />
+                      <UserAvatar
+                        name={playerNameBySeat(seatNo)}
+                        profileUrl={playerProfileBySeat(seatNo)}
+                        level={levelMeta.level}
+                        rewardTier={levelMeta.rewardTier}
+                        frameCode={levelMeta.frameCode}
+                        size="sm"
+                      />
                       <div className="min-w-0">
                         <div className="truncate text-sm font-black text-slate-900">{playerNameBySeat(seatNo)}</div>
                         <div className="text-[11px] font-bold text-slate-500">좌석 {seatNo} · {alive ? "생존" : "탈락"}</div>
@@ -18502,6 +18534,16 @@ const pokerPlayerName = (roomPlayers, player) => {
 const pokerPlayerProfileUrl = (roomPlayers, player) => {
   const seatNo = Number(get(player, "seat_no", "seatNo", 0));
   return roomPlayers.find((roomPlayer) => seatNoOf(roomPlayer) === seatNo)?.profileUrl || "";
+};
+
+const pokerPlayerLevelMeta = (roomPlayers, player) => {
+  const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+  const roomPlayer = roomPlayers.find((candidate) => seatNoOf(candidate) === seatNo);
+  return {
+    level: roomPlayer?.level,
+    rewardTier: roomPlayer?.rewardTier,
+    frameCode: roomPlayer?.frameCode,
+  };
 };
 
 const roughPokerAdvice = (myCards, communityCards, callAmount, pot, { isFiveCardDraw = false } = {}) => {
@@ -19359,11 +19401,19 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
                 const allIn = Boolean(get(player, "all_in", "allIn", false));
                 const bot = Boolean(get(player, "bot", "bot", false));
                 const holeCards = listOf(get(player, "hole_cards", "holeCards", []));
+                const levelMeta = bot ? {} : pokerPlayerLevelMeta(roomPlayers, player);
                 return (
                   <div key={seatNo} className={`rounded-2xl border px-3 py-2 ${isActive ? "border-amber-300 bg-white text-slate-900" : "border-white/10 bg-zinc-950/45 text-white"} ${folded ? "opacity-55" : ""}`}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2">
-                        <UserAvatar name={pokerPlayerName(roomPlayers, player)} profileUrl={bot ? "" : pokerPlayerProfileUrl(roomPlayers, player)} size="xs" />
+                        <UserAvatar
+                          name={pokerPlayerName(roomPlayers, player)}
+                          profileUrl={bot ? "" : pokerPlayerProfileUrl(roomPlayers, player)}
+                          level={levelMeta.level}
+                          rewardTier={levelMeta.rewardTier}
+                          frameCode={levelMeta.frameCode}
+                          size="xs"
+                        />
                         <div className="min-w-0">
                         <div className="truncate text-sm font-black">{pokerPlayerName(roomPlayers, player)}</div>
                         <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}{seatNo === dealerSeatNo ? " · 딜러" : ""}</div>
@@ -19519,13 +19569,22 @@ const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }
           <div className="space-y-2">
             {pokerPlayers.map((player) => {
               const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+              const bot = Boolean(get(player, "bot", "bot", false));
+              const levelMeta = bot ? {} : pokerPlayerLevelMeta(roomPlayers, player);
               return (
                 <div key={seatNo} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${seatNo === activeSeatNo ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
                   <div className="flex min-w-0 items-center gap-2">
-                    <UserAvatar name={pokerPlayerName(roomPlayers, player)} profileUrl={get(player, "bot", "bot", false) ? "" : pokerPlayerProfileUrl(roomPlayers, player)} size="xs" />
+                    <UserAvatar
+                      name={pokerPlayerName(roomPlayers, player)}
+                      profileUrl={bot ? "" : pokerPlayerProfileUrl(roomPlayers, player)}
+                      level={levelMeta.level}
+                      rewardTier={levelMeta.rewardTier}
+                      frameCode={levelMeta.frameCode}
+                      size="xs"
+                    />
                     <div className="min-w-0">
                     <div className="truncate text-sm font-black text-slate-900">{pokerPlayerName(roomPlayers, player)}</div>
-                    <div className="text-[11px] font-bold text-slate-500">좌석 {seatNo}{get(player, "bot", "bot", false) ? " · AI" : ""}</div>
+                    <div className="text-[11px] font-bold text-slate-500">좌석 {seatNo}{bot ? " · AI" : ""}</div>
                     </div>
                   </div>
                   <div className="text-right text-sm font-black text-slate-900">{Number(get(player, "chips", "chips", 0))}칩</div>
@@ -20908,7 +20967,14 @@ const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo
             <div key={pid || seatNo} className={`rounded-xl border px-3 py-2 ${cardTone}`} data-smoke="tabletop-player-card">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
-                  <UserAvatar name={player.nickname} profileUrl={player.profileUrl} size="sm" />
+                  <UserAvatar
+                    name={player.nickname}
+                    profileUrl={player.profileUrl}
+                    level={player.level}
+                    rewardTier={player.rewardTier}
+                    frameCode={player.frameCode}
+                    size="sm"
+                  />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-black text-slate-900">{player.nickname}</div>
                     <div className="truncate text-[11px] font-bold text-slate-500">

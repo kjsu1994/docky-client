@@ -87,6 +87,9 @@ export const normalizeTabletopPlayer = (player = {}) => {
         memberId,
         profileUrl: normalizeText(pick(player, "profileUrl", "profile_url", "")),
         nickname: normalizeText(pick(player, "nickname", "nickname", ""), memberId ? `플레이어 ${memberId}` : "플레이어"),
+        level: toNullableNumber(pick(player, "level", "level", null)),
+        rewardTier: normalizeText(pick(player, "rewardTier", "reward_tier", "")),
+        frameCode: normalizeText(pick(player, "frameCode", "frame_code", "")),
         seatNo: toNumber(pick(player, "seatNo", "seat_no", 0)),
         ready: Boolean(pick(player, "ready", "ready", false)),
     };

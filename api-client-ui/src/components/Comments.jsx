@@ -4,15 +4,16 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { COMMENT_CONTENT_MAX_LENGTH, commentAdapter, commentErrorMessage } from "../adapters/commentAdapter.js";
 import { confirmAction } from "../common/confirmAction.jsx";
 import { ReportDialog } from "../common/ReportDialog.jsx";
+import UserAvatar from "../common/UserAvatar.jsx";
 import { canManageByOwnerOrAdmin } from "../utils/authorization.js";
 import { formatNumber, formatRelativeTime } from "../utils/helpers.js";
 import { logClientError } from "../utils/clientDiagnostics.js";
-import { normalizeProfileImageUrl } from "../utils/profileImage.js";
 import { notifyError, notifySuccess } from "../utils/toast.js";
 
 const COMMENT_PAGE_SIZE = 20;
 
 const getCommentId = (comment) => comment?.comment_id ?? comment?.commentId;
+const getLevelInfo = (source) => source?.levelDto || source?.level_dto || source?.level || {};
 
 const mergeComments = (prev, next) => {
     const seen = new Set(prev.map(getCommentId));
@@ -95,6 +96,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                 name: user?.name || "익명",
                 profile_url: user?.profile_url || user?.profileUrl || "",
                 profileUrl: user?.profileUrl || user?.profile_url || "",
+                levelDto: getLevelInfo(user),
             },
         };
 
@@ -336,7 +338,9 @@ export const Comments = ({ boardId, onUpdate }) => {
                         const canLikeComment = Number.isFinite(Number(commentId));
                         const canReportComment = Number.isFinite(Number(commentId));
                         const isEditing = editingId === commentId;
-                        const profileImageUrl = normalizeProfileImageUrl(comment.member?.profile_url || comment.member?.profileUrl || "");
+                        const commentLevel = getLevelInfo(comment.member);
+                        const creatorLevel = comment.creator_level ?? comment.creatorLevel ?? commentLevel.level;
+                        const hasCreatorLevel = Number.isFinite(Number(creatorLevel)) && Number(creatorLevel) > 0;
                         const canManageComment = canManageByOwnerOrAdmin(user, comment.member);
                         const isUpdating = Boolean(updatingCommentIds[commentId]);
                         const isDeleting = Boolean(deletingCommentIds[commentId]);
@@ -347,28 +351,23 @@ export const Comments = ({ boardId, onUpdate }) => {
                         return (
                             <div key={commentId} className="card p-6 transition-shadow hover:shadow-md">
                                 <div className="mb-4 flex items-start gap-4">
-                                    <div className="flex-shrink-0">
-                                        {profileImageUrl ? (
-                                            <img
-                                                src={profileImageUrl}
-                                                alt="프로필"
-                                                className="h-10 w-10 rounded-full border object-cover"
-                                            />
-                                        ) : (
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 font-bold text-white shadow-sm">
-                                                {(comment.member?.name || "U").charAt(0).toUpperCase()}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <UserAvatar
+                                        name={comment.member?.name || "익명"}
+                                        profileUrl={comment.member?.profileUrl || comment.member?.profile_url}
+                                        level={creatorLevel}
+                                        rewardTier={commentLevel.rewardTier || commentLevel.reward_tier}
+                                        frameCode={commentLevel.frameCode || commentLevel.frame_code}
+                                        size="md"
+                                    />
 
                                     <div className="min-w-0 flex-1">
                                         <div className="mb-1 flex flex-wrap items-center gap-2">
                                             <span className="font-semibold text-slate-900">
                                                 {comment.member?.name || "익명"}
                                             </span>
-                                            {(comment.creator_level !== undefined || comment.creatorLevel !== undefined) && (
+                                            {hasCreatorLevel && (
                                                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
-                                                    Lv.{comment.creator_level ?? comment.creatorLevel}
+                                                    Lv.{creatorLevel}
                                                 </span>
                                             )}
                                             <span className="text-xs text-slate-400">

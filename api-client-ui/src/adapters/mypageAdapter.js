@@ -43,6 +43,11 @@ export const normalizeLevel = (raw = {}) => {
         remainingExp,
         progressPercent: Math.max(0, Math.min(100, progressRaw)),
         rewardTier: getFirst(raw, ["rewardTier", "reward_tier"], ""),
+        tierName: getFirst(raw, ["tierName", "tier_name"], ""),
+        tierMinLevel: toNumber(getFirst(raw, ["tierMinLevel", "tier_min_level"])),
+        tierMaxLevel: toNumber(getFirst(raw, ["tierMaxLevel", "tier_max_level"])),
+        frameCode: getFirst(raw, ["frameCode", "frame_code"], ""),
+        frameLabel: getFirst(raw, ["frameLabel", "frame_label"], ""),
         badgeCode: getFirst(raw, ["badgeCode", "badge_code"], ""),
     };
 };
@@ -96,6 +101,12 @@ export const normalizeMyBoards = (response) => {
 const historyLabels = {
     BOARD_CREATE: "게시글 작성 보상",
     COMMENT_CREATE: "댓글 작성 보상",
+    BOARD_LIKE_RECEIVED: "게시글 좋아요 보상",
+    COMMENT_LIKE_RECEIVED: "댓글 좋아요 보상",
+    GAME_WIN: "게임 승리 보상",
+    GAME_LOSS: "게임 완료 보상",
+    GAME_DRAW: "게임 무승부 보상",
+    GAME_COMPLETE: "게임 참여 완료 보상",
     MANUAL_ADJUST: "운영자 조정",
 };
 

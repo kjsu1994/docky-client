@@ -41,6 +41,9 @@ export const normalizeLevelRanks = (response) => normalizeList(response)
         totalExp: toNumber(member.totalExp ?? member.total_exp),
         progressPercent: toNumber(member.progressPercent ?? member.progress_percent),
         rewardTier: member.rewardTier ?? member.reward_tier ?? "",
+        tierName: member.tierName ?? member.tier_name ?? "",
+        frameCode: member.frameCode ?? member.frame_code ?? "",
+        frameLabel: member.frameLabel ?? member.frame_label ?? "",
         badgeCode: member.badgeCode ?? member.badge_code ?? "",
         profileUrl: member.profileUrl ?? member.profile_url ?? "",
     }));

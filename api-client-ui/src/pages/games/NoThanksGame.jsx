@@ -1580,7 +1580,14 @@ const NoThanksTurnRailPanel = ({ players, selectedRoom, gameState, myMemberId, r
                 <div key={`no-thanks-rail-player-${memberId || index}`} className={`rounded-xl border px-3 py-2 ${isCurrent || isWinner ? "border-sky-200 bg-sky-50" : isMe ? "border-violet-200 bg-violet-50" : "border-slate-100 bg-slate-50"}`} data-smoke="no-thanks-turn-rail-player">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
-                      <UserAvatar name={player.nickname || `좌석 ${index + 1}`} profileUrl={player.profileUrl} size="xs" />
+                      <UserAvatar
+                        name={player.nickname || `좌석 ${index + 1}`}
+                        profileUrl={player.profileUrl}
+                        level={player.level}
+                        rewardTier={player.rewardTier}
+                        frameCode={player.frameCode}
+                        size="xs"
+                      />
                       <div className="min-w-0 truncate text-xs font-black text-slate-900">{player.nickname || `좌석 ${index + 1}`}</div>
                     </div>
                     <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-600 ring-1 ring-slate-100">{badge}</span>

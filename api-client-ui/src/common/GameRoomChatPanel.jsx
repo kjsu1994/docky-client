@@ -200,7 +200,14 @@ export const GameRoomChatPanel = ({
         {messages.map((message) => (
           <div key={message.messageId || message.id || message.key} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
             <div className="flex items-center gap-2 font-black text-slate-800">
-              <UserAvatar name={message.senderName || "SYSTEM"} profileUrl={message.senderProfileUrl} size="xs" />
+              <UserAvatar
+                name={message.senderName || "SYSTEM"}
+                profileUrl={message.senderProfileUrl}
+                level={message.senderLevel}
+                rewardTier={message.senderRewardTier}
+                frameCode={message.senderFrameCode}
+                size="xs"
+              />
               <span className="min-w-0 truncate">{message.senderName || "SYSTEM"}</span>
             </div>
             <div className="mt-0.5 break-words text-slate-700">{message.message || ""}</div>

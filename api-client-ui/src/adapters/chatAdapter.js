@@ -34,6 +34,11 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const toOptionalNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 const toPositiveInt = (value, fallback = 1) => {
     const parsed = Math.trunc(toNumber(value, fallback));
     return parsed > 0 ? parsed : fallback;
@@ -55,6 +60,31 @@ const toTimestampMillis = (value) => {
 const getRawMessageId = (msg) => getFirst(msg, ["messageId", "message_id", "id", "tempId", "temp_id"], null);
 
 const hasStableValue = (value) => value !== undefined && value !== null && String(value).trim() !== "";
+
+const getLevelMeta = (source = {}, prefix = "") => {
+    const levelDtoKeys = prefix
+        ? [`${prefix}LevelDto`, `${prefix}_level_dto`]
+        : ["levelDto", "level_dto"];
+    const levelValueKeys = prefix
+        ? [`${prefix}Level`, `${prefix}_level`, "level"]
+        : ["level"];
+    const rewardTierKeys = prefix
+        ? [`${prefix}RewardTier`, `${prefix}_reward_tier`, "rewardTier", "reward_tier"]
+        : ["rewardTier", "reward_tier"];
+    const frameCodeKeys = prefix
+        ? [`${prefix}FrameCode`, `${prefix}_frame_code`, "frameCode", "frame_code"]
+        : ["frameCode", "frame_code"];
+
+    const rawLevel = getFirst(source, levelDtoKeys, getFirst(source, levelValueKeys, undefined));
+    const levelSource = rawLevel && typeof rawLevel === "object" ? rawLevel : source;
+    const level = rawLevel && typeof rawLevel !== "object" ? rawLevel : getFirst(levelSource, ["level"], undefined);
+
+    return {
+        level: toOptionalNumber(level),
+        rewardTier: getFirst(levelSource, rewardTierKeys, ""),
+        frameCode: getFirst(levelSource, frameCodeKeys, ""),
+    };
+};
 
 export const getRoomId = (room) => {
     if (typeof room === "number" || typeof room === "string") return room;
@@ -164,14 +194,20 @@ export const compareMessagesByChronology = (left, right) => {
     return compareMessageIdentity(messageIdentity(left), messageIdentity(right));
 };
 
-export const normalizeMember = (member = {}) => ({
-    ...member,
-    memberId: getMemberId(member),
-    member_id: getMemberId(member),
-    name: member.name || "이름 없음",
-    email: member.email || "",
-    profileUrl: getFirst(member, ["profileUrl", "profile_url"], ""),
-});
+export const normalizeMember = (member = {}) => {
+    const levelMeta = getLevelMeta(member);
+    return {
+        ...member,
+        memberId: getMemberId(member),
+        member_id: getMemberId(member),
+        name: member.name || "이름 없음",
+        email: member.email || "",
+        profileUrl: getFirst(member, ["profileUrl", "profile_url"], ""),
+        level: levelMeta.level,
+        rewardTier: levelMeta.rewardTier,
+        frameCode: levelMeta.frameCode,
+    };
+};
 
 export const normalizeRoom = (room) => {
     const roomId = getRoomId(room);
@@ -217,6 +253,7 @@ export const normalizeMessage = (msg = {}) => {
     const fileSize = toNumber(getFirst(msg, ["fileSize", "file_size"], 0));
     const createdAt = normalizeChatTimestamp(getFirst(msg, ["createdAt", "created_at"], null));
     const rawId = getRawMessageId(msg);
+    const senderLevelMeta = getLevelMeta(msg, "sender");
 
     const normalized = {
         ...msg,
@@ -226,6 +263,9 @@ export const normalizeMessage = (msg = {}) => {
         senderId: getFirst(msg, ["senderId", "sender_id"], null),
         senderProfileUrl: getFirst(msg, ["senderProfileUrl", "sender_profile_url"], ""),
         senderName: getFirst(msg, ["senderName", "sender_name"], "익명"),
+        senderLevel: senderLevelMeta.level,
+        senderRewardTier: senderLevelMeta.rewardTier,
+        senderFrameCode: senderLevelMeta.frameCode,
         message,
         type,
         fileUrl,

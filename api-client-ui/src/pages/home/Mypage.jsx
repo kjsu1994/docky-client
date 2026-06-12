@@ -17,8 +17,8 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { EmptyState } from "../../components/EmptyState.jsx";
+import UserAvatar from "../../common/UserAvatar.jsx";
 import { formatNumber, formatRelativeTime } from "../../utils/helpers.js";
-import { normalizeProfileImageUrl } from "../../utils/profileImage.js";
 import { trapFocus } from "../../utils/focusTrap.js";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
 import { extractMypageErrorMessage, isAccountReauthRequiredError, isGoogleMember, mypageAdapter } from "../../adapters/mypageAdapter.js";
@@ -28,6 +28,12 @@ const toDisplayDate = (value) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
     return formatRelativeTime(date);
+};
+
+const formatSignedExp = (value) => {
+    const numeric = Number(value) || 0;
+    const sign = numeric >= 0 ? "+" : "-";
+    return `${sign}${formatNumber(Math.abs(numeric))}`;
 };
 
 export const Mypage = () => {
@@ -49,7 +55,7 @@ export const Mypage = () => {
     const [oauthReauthLoading, setOauthReauthLoading] = useState(false);
 
     const level = member?.level || {};
-    const profileImageUrl = normalizeProfileImageUrl(member?.profileUrl || "");
+    const tierLabel = level.tierName || level.frameLabel || level.rewardTier || "아이언";
     const googleMember = useMemo(() => isGoogleMember(member), [member]);
 
     const fetchMember = useCallback(async () => {
@@ -208,23 +214,23 @@ export const Mypage = () => {
                 <div className="px-5 pb-6 sm:px-6">
                     <div className="-mt-14 flex flex-col gap-4 sm:flex-row sm:items-end">
                         <div className="shrink-0">
-                            {profileImageUrl ? (
-                                <img
-                                    src={profileImageUrl}
-                                    alt=""
-                                    className="h-28 w-28 rounded-2xl border-4 border-white object-cover shadow-xl"
-                                />
-                            ) : (
-                                <div className="flex h-28 w-28 items-center justify-center rounded-2xl border-4 border-white bg-slate-900 text-4xl font-black text-white shadow-xl">
-                                    {String(member.name || "사").charAt(0)}
-                                </div>
-                            )}
+                            <UserAvatar
+                                name={member.name}
+                                profileUrl={member.profileUrl}
+                                level={level.level}
+                                rewardTier={level.rewardTier}
+                                frameCode={level.frameCode}
+                                size="3xl"
+                                className="rounded-2xl border-4 border-white shadow-xl"
+                                showLevelBadge
+                            />
                         </div>
 
                         <div className="min-w-0 flex-1 pt-1">
                             <div className="flex flex-wrap items-center gap-2">
                                 <h1 className="truncate text-2xl font-black text-slate-900">{member.name}</h1>
                                 <span className="rounded-full bg-sky-100 px-3 py-1 text-sm font-black text-sky-700">레벨 {level.level || 1}</span>
+                                <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-700">{tierLabel}</span>
                                 <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-700">{member.statusLabel}</span>
                             </div>
                             <div className="mt-2 space-y-1 text-sm font-medium text-slate-500">
@@ -339,6 +345,7 @@ const ProfileTab = ({ member, level, onDeleteAccount, deleteBusy }) => (
                 <span className="text-sm font-bold text-slate-600">현재 레벨</span>
                 <span className="text-2xl font-black text-slate-900">레벨 {level.level || 1}</span>
             </div>
+            <InfoRow label="현재 티어" value={level.tierName || level.frameLabel || level.rewardTier || "-"} />
             <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-bold text-slate-600">다음 레벨까지</span>
                 <span className="font-black text-sky-700">{formatNumber(level.currentExp)} / {formatNumber(level.nextLevelExp)}</span>
@@ -347,7 +354,7 @@ const ProfileTab = ({ member, level, onDeleteAccount, deleteBusy }) => (
                 <div className="h-full rounded-full bg-sky-500" style={{ width: `${level.progressPercent || 0}%` }} />
             </div>
             <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-500">
-                게시글과 댓글 활동으로 경험치를 얻고 레벨을 올릴 수 있습니다.
+                게시글, 댓글, 좋아요, 게임 참여로 경험치를 얻고 레벨을 올릴 수 있습니다.
             </p>
         </section>
 
@@ -459,7 +466,9 @@ const StatsTab = ({ member, level, history, historyLoading }) => (
                         <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="text-sm font-black text-slate-900">{item.label}</div>
-                                <div className="text-sm font-black text-emerald-600">+{formatNumber(item.grantedExp)} 경험치</div>
+                                <div className={`text-sm font-black ${Number(item.grantedExp) < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                                    {formatSignedExp(item.grantedExp)} 경험치
+                                </div>
                             </div>
                             <div className="mt-1 text-xs font-semibold text-slate-500">
                                 기준 {formatNumber(item.baseExp)} · 차감 {formatNumber(item.penaltyExp)} · {toDisplayDate(item.createdAt) || "-"}

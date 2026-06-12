@@ -1514,7 +1514,14 @@ const LasVegasTurnRailPanel = ({ players, selectedRoom, state, myMemberId, ready
                                 <div key={`las-vegas-rail-player-${memberId || index}`} className={`rounded-xl border px-3 py-2 ${isCurrent || isWinner ? "border-sky-200 bg-sky-50" : isMe ? "border-violet-200 bg-violet-50" : "border-slate-100 bg-slate-50"}`} data-smoke="las-vegas-turn-rail-player">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex min-w-0 items-center gap-2">
-                                            <UserAvatar name={player.nickname || `좌석 ${index + 1}`} profileUrl={player.profileUrl} size="xs" />
+                                            <UserAvatar
+                                                name={player.nickname || `좌석 ${index + 1}`}
+                                                profileUrl={player.profileUrl}
+                                                level={player.level}
+                                                rewardTier={player.rewardTier}
+                                                frameCode={player.frameCode}
+                                                size="xs"
+                                            />
                                             <div className="min-w-0 truncate text-xs font-black text-slate-900">{player.nickname || `좌석 ${index + 1}`}</div>
                                         </div>
                                         <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-600 ring-1 ring-slate-100">{badge}</span>
@@ -1600,7 +1607,14 @@ const LasVegasPlayerRosterPanel = ({
                         <div key={`player-${memberId || seatNo}`} className={`rounded-xl border p-3 ${cardTone}`} data-smoke="las-vegas-player-roster-item" data-ready={ready ? "true" : "false"} data-host={isHostPlayer ? "true" : "false"}>
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex min-w-0 items-center gap-2">
-                                    <UserAvatar name={player.nickname || `좌석 ${seatNo}`} profileUrl={player.profileUrl} size="sm" />
+                                    <UserAvatar
+                                        name={player.nickname || `좌석 ${seatNo}`}
+                                        profileUrl={player.profileUrl}
+                                        level={player.level}
+                                        rewardTier={player.rewardTier}
+                                        frameCode={player.frameCode}
+                                        size="sm"
+                                    />
                                     <div className="min-w-0">
                                         <div className="truncate text-sm font-black text-slate-900">{player.nickname || `좌석 ${seatNo}`}</div>
                                         <div className="mt-1 truncate text-xs font-bold text-slate-600">{detail}</div>
@@ -2306,7 +2320,15 @@ const CasinoPanel = ({ casino, statePlayers, isHot, isLastPlaced }) => {
                     return (
                     <div key={`${casinoNo}-dice-${memberId}`} className="flex items-center justify-between rounded-xl bg-white/10 px-2.5 py-1.5 text-xs font-bold text-slate-100">
                         <span className="flex min-w-0 items-center gap-1.5">
-                            <UserAvatar name={name} profileUrl={player?.profileUrl} size="xs" className="border-white/20 bg-white/15 text-white" />
+                            <UserAvatar
+                                name={name}
+                                profileUrl={player?.profileUrl}
+                                level={player?.level}
+                                rewardTier={player?.rewardTier}
+                                frameCode={player?.frameCode}
+                                size="xs"
+                                className="border-white/20 bg-white/15 text-white"
+                            />
                             <span className="line-clamp-1">{name}</span>
                         </span>
                         <DiceCountBadge value={casinoNo} count={toPlainInt(count, 0)} />

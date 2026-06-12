@@ -18,6 +18,9 @@ const defaultMemberId = (player) => toNumber(pick(player, "memberId", "member_id
 const defaultSeatNo = (player, index) => toNumber(pick(player, "seatNo", "seat_no", "seat"), index + 1);
 const defaultNickname = (player, seatNo) => pick(player, "nickname", "name", "displayName", "display_name") || `좌석 ${seatNo}`;
 const defaultProfileUrl = (player) => pick(player, "profileUrl", "profile_url", "profileImageUrl", "profile_image_url") || "";
+const defaultLevel = (player) => pick(player, "level", "creatorLevel", "creator_level");
+const defaultRewardTier = (player) => pick(player, "rewardTier", "reward_tier");
+const defaultFrameCode = (player) => pick(player, "frameCode", "frame_code");
 const defaultReady = (player) => Boolean(pick(player, "ready", "isReady", "is_ready"));
 
 const readyBadgeClass = (ready) => ready ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600";
@@ -49,6 +52,9 @@ const GameRoomPlayersPanel = ({
   getSeatNo = defaultSeatNo,
   getNickname = defaultNickname,
   getProfileUrl = defaultProfileUrl,
+  getLevel = defaultLevel,
+  getRewardTier = defaultRewardTier,
+  getFrameCode = defaultFrameCode,
   getReady = defaultReady,
   getDetail,
   currentMemberId = 0,
@@ -75,6 +81,9 @@ const GameRoomPlayersPanel = ({
         seatNo,
         nickname: getNickname(player, seatNo),
         profileUrl: getProfileUrl(player),
+        level: getLevel(player),
+        rewardTier: getRewardTier(player),
+        frameCode: getFrameCode(player),
         ready: Boolean(getReady(player)),
       };
     })
@@ -121,7 +130,14 @@ const GameRoomPlayersPanel = ({
             <div key={`${row.memberId || "seat"}-${row.seatNo}-${row.index}`} className={`rounded-xl border px-3 py-2 ${cardTone}`} data-smoke={`${dataSmoke}-item`} data-ready={row.ready ? "true" : "false"} data-host={isHost ? "true" : "false"}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
-                  <UserAvatar name={row.nickname} profileUrl={row.profileUrl} size="sm" />
+                  <UserAvatar
+                    name={row.nickname}
+                    profileUrl={row.profileUrl}
+                    level={row.level}
+                    rewardTier={row.rewardTier}
+                    frameCode={row.frameCode}
+                    size="sm"
+                  />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-black text-slate-900">{row.nickname}</div>
                     <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{detail}</div>

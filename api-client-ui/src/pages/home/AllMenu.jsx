@@ -49,6 +49,7 @@ const MenuSection = ({ title, items }) => (
 export const AllMenu = () => {
     const { user, logout } = useAuth();
     const isAdmin = isAdminUser(user);
+    const userLevel = user?.levelDto || user?.level_dto || user?.level || {};
 
     const mainServices = [
         { title: "게임 허브", to: "/app", icon: Dices, color: "bg-amber-50 text-amber-700" },
@@ -84,7 +85,16 @@ export const AllMenu = () => {
         <div className="animate-fade-in space-y-8 pb-20">
             <div className="flex items-center justify-between rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/50">
                 <div className="flex items-center gap-5">
-                    <UserAvatar name={user?.name || user?.email} profileUrl={user?.profileUrl || user?.profile_url} size="lg" className="h-16 w-16 rounded-[1.5rem] shadow-lg shadow-primary-200" />
+                    <UserAvatar
+                        name={user?.name || user?.email}
+                        profileUrl={user?.profileUrl || user?.profile_url}
+                        level={userLevel.level}
+                        rewardTier={userLevel.rewardTier || userLevel.reward_tier}
+                        frameCode={userLevel.frameCode || userLevel.frame_code}
+                        size="xl"
+                        className="rounded-[1.5rem] shadow-lg shadow-primary-200"
+                        showLevelBadge
+                    />
                     <div>
                         <div className="leading-tight text-xl font-black text-slate-900">{user?.name || "사용자"}</div>
                         <div className="text-sm font-medium text-slate-400">{user?.email}</div>
