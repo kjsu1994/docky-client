@@ -425,6 +425,20 @@ export const Login = () => {
                     </form>
 
                     <div className="mt-10 pt-8 border-t border-slate-50 text-center">
+                        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <Link
+                                to="/account-recovery/find-id"
+                                className="inline-flex h-12 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-600 hover:bg-slate-200"
+                            >
+                                아이디 찾기
+                            </Link>
+                            <Link
+                                to="/account-recovery/password-reset"
+                                className="inline-flex h-12 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-600 hover:bg-slate-200"
+                            >
+                                비밀번호 찾기
+                            </Link>
+                        </div>
                         <p className="text-sm font-medium text-slate-400">
                             처음이신가요?{" "}
                             <Link

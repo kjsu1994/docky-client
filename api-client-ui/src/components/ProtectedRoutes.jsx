@@ -38,10 +38,11 @@ const AdminOperations = lazy(() => import("../pages/admin/AdminOperations.jsx").
 const AdminStreamingStudio = lazy(() => import("../pages/admin/AdminStreamingStudio.jsx").then((module) => ({ default: module.AdminStreamingStudio })));
 
 const ProtectedRoute = ({ children }) => {
-    const { isAuthenticated, loading } = useAuth();
+    const { isAuthenticated, loading, passwordResetRequired } = useAuth();
 
     if (loading) return <DelayedLoadingPage />;
     if (!isAuthenticated) return <Navigate to="/login" replace />;
+    if (passwordResetRequired) return <Navigate to="/password/change-required" replace />;
 
     return children;
 };

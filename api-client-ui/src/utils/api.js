@@ -12,6 +12,10 @@ const PUBLIC_AUTH_PATHS = [
     "/members/email-verification/send",
     "/members/email-verification/confirm",
     "/members/check-email",
+    "/members/account-recovery/find-id",
+    "/members/account-recovery/password-reset/send",
+    "/members/account-recovery/password-reset/confirm",
+    "/members/account-recovery/password-reset/temporary-password",
     "/sanctions/release-request",
 ];
 

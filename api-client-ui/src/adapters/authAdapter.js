@@ -17,6 +17,12 @@ export const extractAuthRoles = (response) => {
     return Array.isArray(body?.roles) ? body.roles : null;
 };
 
+const isPasswordResetRequired = (body) => Boolean(body?.passwordResetRequired || body?.password_reset_required);
+
+const temporaryPasswordExpiresAt = (body) => (
+    body?.temporaryPasswordExpiresAt || body?.temporary_password_expires_at || null
+);
+
 export const getAuthErrorCode = (error) => error?.response?.data?.code || "";
 
 export const extractAuthErrorMessage = (error, fallbackMessage) => getApiErrorMessage(error, fallbackMessage);
@@ -53,8 +59,13 @@ export const authAdapter = {
 
     async loginWithPassword({ email, password, remember = false }) {
         const response = await api.post("/members/login", { email, password, remember });
+        const body = unwrapAuthData(response) || {};
         return {
             roles: extractAuthRoles(response),
+            email: body.email || email,
+            memberId: body.memberId || body.member_id || null,
+            passwordResetRequired: isPasswordResetRequired(body),
+            temporaryPasswordExpiresAt: temporaryPasswordExpiresAt(body),
             ...extractAuthTokens(response.headers),
         };
     },
@@ -88,6 +99,43 @@ export const authAdapter = {
 
     async confirmEmailVerification({ email, code }) {
         const response = await api.post("/members/email-verification/confirm", { email, code });
+        return unwrapAuthData(response);
+    },
+
+    async findLoginId({ name, phone }) {
+        const response = await api.post("/members/account-recovery/find-id", { name, phone });
+        const data = unwrapAuthData(response) || {};
+        return {
+            accepted: Boolean(data.accepted),
+            maskedEmails: Array.isArray(data.maskedEmails)
+                ? data.maskedEmails
+                : Array.isArray(data.masked_emails)
+                  ? data.masked_emails
+                  : [],
+            message: data.message || "",
+        };
+    },
+
+    async sendPasswordResetVerification(email) {
+        const response = await api.post("/members/account-recovery/password-reset/send", { email });
+        return unwrapAuthData(response);
+    },
+
+    async confirmPasswordResetVerification({ email, code }) {
+        const response = await api.post("/members/account-recovery/password-reset/confirm", { email, code });
+        return unwrapAuthData(response);
+    },
+
+    async issueTemporaryPassword(email) {
+        const response = await api.post("/members/account-recovery/password-reset/temporary-password", { email });
+        return unwrapAuthData(response);
+    },
+
+    async changeRequiredPassword({ currentPassword, newPassword }) {
+        const response = await api.post("/members/password/change-required", {
+            current_password: currentPassword,
+            new_password: newPassword,
+        });
         return unwrapAuthData(response);
     },
 };

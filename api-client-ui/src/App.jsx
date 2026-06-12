@@ -12,6 +12,8 @@ const ProtectedRoutes = lazy(() =>
 const Login = lazy(() => import("./pages/access/Login.jsx").then((module) => ({ default: module.Login })));
 const Register = lazy(() => import("./pages/access/Register.jsx").then((module) => ({ default: module.Register })));
 const Queue = lazy(() => import("./pages/access/Queue.jsx").then((module) => ({ default: module.Queue })));
+const AccountRecovery = lazy(() => import("./pages/access/AccountRecovery.jsx").then((module) => ({ default: module.AccountRecovery })));
+const ForcePasswordChange = lazy(() => import("./pages/access/ForcePasswordChange.jsx").then((module) => ({ default: module.ForcePasswordChange })));
 
 const PublicRoute = ({ children }) => (
     <Suspense fallback={<DelayedLoadingPage />}>
@@ -20,10 +22,20 @@ const PublicRoute = ({ children }) => (
 );
 
 const GuestRoute = ({ children }) => {
-    const { isAuthenticated, loading } = useAuth();
+    const { isAuthenticated, loading, passwordResetRequired } = useAuth();
 
     if (loading) return <DelayedLoadingPage />;
-    if (isAuthenticated) return <Navigate to="/app" replace />;
+    if (isAuthenticated) return <Navigate to={passwordResetRequired ? "/password/change-required" : "/app"} replace />;
+
+    return <PublicRoute>{children}</PublicRoute>;
+};
+
+const PasswordChangeRequiredRoute = ({ children }) => {
+    const { isAuthenticated, loading, passwordResetRequired } = useAuth();
+
+    if (loading) return <DelayedLoadingPage />;
+    if (!isAuthenticated) return <Navigate to="/login" replace />;
+    if (!passwordResetRequired) return <Navigate to="/app" replace />;
 
     return <PublicRoute>{children}</PublicRoute>;
 };
@@ -44,6 +56,9 @@ const AppShell = () => {
                 <Routes>
                     <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
                     <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+                    <Route path="/account-recovery/find-id" element={<GuestRoute><AccountRecovery initialMode="find-id" /></GuestRoute>} />
+                    <Route path="/account-recovery/password-reset" element={<GuestRoute><AccountRecovery initialMode="password-reset" /></GuestRoute>} />
+                    <Route path="/password/change-required" element={<PasswordChangeRequiredRoute><ForcePasswordChange /></PasswordChangeRequiredRoute>} />
                     <Route path="/queue" element={<PublicRoute><Queue /></PublicRoute>} />
 
                     <Route path="/app/*" element={<ProtectedRoutesBoundary />} />

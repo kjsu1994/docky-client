@@ -36,6 +36,10 @@ const withRolesFallback = (userData, rolesFallback) => {
     return userData;
 };
 
+const hasPasswordResetRequired = (userData) => Boolean(
+    userData?.passwordResetRequired || userData?.password_reset_required
+);
+
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (!context) {
@@ -61,7 +65,11 @@ export const AuthProvider = ({ children }) => {
                     }
                     const { authAdapter } = await loadAuthAdapter();
                     const data = await authAdapter.fetchCurrentMember();
-                    setUser(withRolesFallback(data, parseStoredRoles()));
+                    const nextUser = withRolesFallback(data, parseStoredRoles());
+                    setUser(nextUser);
+                    if (hasPasswordResetRequired(nextUser) && window.location.pathname !== "/password/change-required") {
+                        navigate("/password/change-required", { replace: true });
+                    }
                 } catch (error) {
                     logClientError("auth.member.fetch", error);
                     clearAuthSession();
@@ -71,7 +79,7 @@ export const AuthProvider = ({ children }) => {
         };
 
         initAuth();
-    }, []);
+    }, [navigate]);
 
     const requestQueueAdmission = useCallback(async () => {
         try {
@@ -97,11 +105,32 @@ export const AuthProvider = ({ children }) => {
             authModule = await loadAuthAdapter();
             const { authAdapter } = authModule;
             const remember = Boolean(options.remember);
-            const { accessToken, refreshToken, roles: loginRoles } = await authAdapter.loginWithPassword({ email, password, remember });
+            const loginResult = await authAdapter.loginWithPassword({ email, password, remember });
+            const {
+                accessToken,
+                refreshToken,
+                roles: loginRoles,
+                passwordResetRequired,
+                temporaryPasswordExpiresAt,
+            } = loginResult;
 
             if (!accessToken) throw new Error("로그인 토큰을 찾을 수 없습니다.");
 
             persistAuthSession({ accessToken, refreshToken, roles: loginRoles, remember });
+
+            if (passwordResetRequired) {
+                const userData = await authAdapter.fetchCurrentMember();
+                setUser(withRolesFallback({
+                    ...userData,
+                    passwordResetRequired: true,
+                    password_reset_required: true,
+                    temporaryPasswordExpiresAt,
+                    temporary_password_expires_at: temporaryPasswordExpiresAt,
+                }, loginRoles || parseStoredRoles()));
+                notifySuccess("임시 비밀번호로 로그인되었습니다. 새 비밀번호로 변경해주세요.");
+                navigate("/password/change-required", { replace: true });
+                return;
+            }
 
             const [userData, queueData] = await Promise.all([
                 authAdapter.fetchCurrentMember(),
@@ -169,6 +198,22 @@ export const AuthProvider = ({ children }) => {
         navigate("/login");
     };
 
+    const completeRequiredPasswordChange = async ({ currentPassword, newPassword }) => {
+        let authModule = null;
+        try {
+            authModule = await loadAuthAdapter();
+            const { authAdapter } = authModule;
+            await authAdapter.changeRequiredPassword({ currentPassword, newPassword });
+            clearAuthSession();
+            setUser(null);
+            notifySuccess("비밀번호가 변경되었습니다. 다시 로그인해주세요.");
+            navigate("/login", { replace: true });
+        } catch (error) {
+            notifyError(authModule?.extractAuthErrorMessage?.(error, "비밀번호 변경에 실패했습니다.") || "비밀번호 변경에 실패했습니다.");
+            throw error;
+        }
+    };
+
     const register = async (userData) => {
         let authModule = null;
         try {
@@ -192,7 +237,9 @@ export const AuthProvider = ({ children }) => {
                 loginWithTokens,
                 logout,
                 register,
+                completeRequiredPasswordChange,
                 isAuthenticated: !!user,
+                passwordResetRequired: hasPasswordResetRequired(user),
             }}
         >
             {children}
