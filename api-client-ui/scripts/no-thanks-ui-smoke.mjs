@@ -86,11 +86,7 @@ function assertNoThanksRealtimeSource() {
         ["buildNoThanksSessionRouteItems", "derive selected-room session button-route guidance from public state"],
         ["NoThanksSessionRoutePanel", "render selected-room session button-route guidance"],
         ["NoThanksSessionRouteArt", "render selected-room session button-route guidance through local SVG artwork"],
-        ["buildNoThanksActionRouteItems", "derive take/pass action-route guidance from visible card and chip state"],
-        ["NoThanksActionRoutePanel", "render take/pass action-route guidance below the real buttons"],
-        ["NoThanksActionRouteArt", "render take/pass action-route guidance through local SVG artwork"],
-        ["NoThanksActionAvailabilityPanel", "render action availability guidance beside the buttons"],
-        ["NoThanksActionAvailabilityArt", "render action availability guidance through local SVG artwork"],
+        ["NoThanksActionAvailabilityPanel", "render compact take/pass action buttons"],
         ["NoThanksCardStandbyPanel", "render empty current-card guidance inside the selected board"],
         ["NoThanksCardStandbyArt", "render empty current-card guidance through local SVG artwork"],
         ["scoreNoThanksCards", "derive score impact explanations from visible cards"],
@@ -142,16 +138,7 @@ function assertNoThanksRealtimeSource() {
         ['smoke="no-thanks-action-cue-bar"', "mark the action cue bar for runtime coverage"],
         ['smoke="no-thanks-action-feedback"', "mark the action feedback ticker for runtime coverage"],
         ['smoke="no-thanks-result-spotlight"', "mark the result spotlight for finished games"],
-        ['data-smoke="no-thanks-action-route-panel"', "mark the No Thanks action-route panel"],
-        ['data-smoke="no-thanks-action-route-art"', "mark the No Thanks action-route SVG artwork"],
-        ['data-smoke="no-thanks-action-route-node"', "mark No Thanks action-route SVG nodes"],
-        ['data-smoke="no-thanks-action-route-item"', "mark No Thanks action-route explanation tiles"],
-        ["노땡스 액션 루트", "render the No Thanks action-route title in Korean"],
         ['data-smoke="no-thanks-action-availability-panel"', "mark the action availability panel"],
-        ['data-smoke="no-thanks-action-availability-art"', "mark the action availability SVG artwork"],
-        ['data-smoke="no-thanks-action-availability-node"', "mark action availability SVG nodes"],
-        ["카드 → 선택 → 결과", "render the action availability route copy in Korean"],
-        ['data-smoke="no-thanks-action-availability-item"', "mark action availability reason tiles"],
         ['data-smoke="no-thanks-take-action"', "mark take action button"],
         ['data-smoke="no-thanks-pass-action"', "mark pass action button"],
         ['data-smoke="no-thanks-card-standby-panel"', "mark the empty current-card guidance panel"],
@@ -1092,78 +1079,30 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-action-cue-bar"] [data-smoke="game-action-cue-item"]').length >= 3`, "no thanks action cue items rendered");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-action-feedback"]'))`, "no thanks action feedback rendered");
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-action-feedback"] [data-smoke="game-feedback-item"]').length >= 4`, "no thanks action feedback items rendered");
-        await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-action-route-panel"]'))`, "no thanks action route rendered");
-        await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-action-route-art"]'))`, "no thanks action route SVG rendered");
-        await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-action-route-node"]').length >= 4`, "no thanks action route SVG nodes rendered");
-        await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-action-route-item"]').length >= 4`, "no thanks action route items rendered");
-        const actionRouteSnapshot = await evaluate(cdp, sessionId, `(() => {
-            const panel = document.querySelector('[data-smoke="no-thanks-action-route-panel"]');
-            return {
-                mounted: Boolean(panel),
-                art: Boolean(document.querySelector('[data-smoke="no-thanks-action-route-art"]')),
-                nodes: document.querySelectorAll('[data-smoke="no-thanks-action-route-node"]').length,
-                items: document.querySelectorAll('[data-smoke="no-thanks-action-route-item"]').length,
-                roomStatus: panel?.getAttribute("data-room-status") || "",
-                myTurn: panel?.getAttribute("data-my-turn") || "",
-                currentCard: panel?.getAttribute("data-current-card") || "",
-                potChips: panel?.getAttribute("data-pot-chips") || "",
-                myChips: panel?.getAttribute("data-my-chips") || "",
-                deckRemaining: panel?.getAttribute("data-deck-remaining") || "",
-                keys: Array.from(document.querySelectorAll('[data-smoke="no-thanks-action-route-item"]')).map((node) => node.getAttribute("data-route-key")),
-                text: panel?.textContent || "",
-            };
-        })()`);
-        if (
-            !actionRouteSnapshot.mounted
-            || !actionRouteSnapshot.art
-            || actionRouteSnapshot.nodes < 4
-            || actionRouteSnapshot.items < 4
-            || !actionRouteSnapshot.roomStatus
-            || !["true", "false"].includes(actionRouteSnapshot.myTurn)
-            || actionRouteSnapshot.potChips === ""
-            || actionRouteSnapshot.myChips === ""
-            || actionRouteSnapshot.deckRemaining === ""
-            || !["card", "chip", "choice", "next"].every((key) => actionRouteSnapshot.keys.includes(key))
-            || !["노땡스 액션 루트", "카드 확인", "칩 비용", "받기/패스", "다음 턴"].every((text) => actionRouteSnapshot.text.includes(text))
-        ) {
-            throw new Error(`no-thanks-ui-smoke: action route artwork missing ${JSON.stringify(actionRouteSnapshot)}`);
-        }
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-action-availability-panel"]'))`, "no thanks action availability rendered");
-        await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-action-availability-art"]'))`, "no thanks action availability SVG rendered");
-        await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-action-availability-node"]').length >= 5`, "no thanks action availability SVG nodes rendered");
-        await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-action-availability-item"]').length >= 2`, "no thanks action availability items rendered");
         const actionAvailabilitySnapshot = await evaluate(cdp, sessionId, `(() => {
             const panel = document.querySelector('[data-smoke="no-thanks-action-availability-panel"]');
-            const art = document.querySelector('[data-smoke="no-thanks-action-availability-art"]');
             return {
                 mounted: Boolean(panel),
-                art: Boolean(art),
-                nodes: document.querySelectorAll('[data-smoke="no-thanks-action-availability-node"]').length,
-                items: document.querySelectorAll('[data-smoke="no-thanks-action-availability-item"]').length,
                 takeButton: document.querySelectorAll('[data-smoke="no-thanks-take-action"]').length,
                 passButton: document.querySelectorAll('[data-smoke="no-thanks-pass-action"]').length,
                 roomStatus: panel?.getAttribute("data-room-status") || "",
                 canTake: panel?.getAttribute("data-can-take") || "",
                 canPass: panel?.getAttribute("data-can-pass") || "",
                 myTurn: panel?.getAttribute("data-my-turn") || "",
-                keys: Array.from(document.querySelectorAll('[data-smoke="no-thanks-action-availability-node"]')).map((node) => node.getAttribute("data-action-key")),
                 text: panel?.textContent || "",
             };
         })()`);
         if (
             !actionAvailabilitySnapshot.mounted
-            || !actionAvailabilitySnapshot.art
-            || actionAvailabilitySnapshot.nodes < 5
-            || actionAvailabilitySnapshot.items < 2
             || actionAvailabilitySnapshot.takeButton < 1
             || actionAvailabilitySnapshot.passButton < 1
             || !actionAvailabilitySnapshot.roomStatus
             || !["true", "false"].includes(actionAvailabilitySnapshot.canTake)
             || !["true", "false"].includes(actionAvailabilitySnapshot.canPass)
             || !["true", "false"].includes(actionAvailabilitySnapshot.myTurn)
-            || !["turn", "card", "pot", "pass", "take"].every((key) => actionAvailabilitySnapshot.keys.includes(key))
-            || !actionAvailabilitySnapshot.text.includes("카드 → 선택 → 결과")
-            || !actionAvailabilitySnapshot.text.includes("팟 칩")
+            || !actionAvailabilitySnapshot.text.includes("카드 가져가기")
+            || !actionAvailabilitySnapshot.text.includes("칩 1개 내고 넘기기")
         ) {
             throw new Error(`no-thanks-ui-smoke: action availability artwork missing ${JSON.stringify(actionAvailabilitySnapshot)}`);
         }

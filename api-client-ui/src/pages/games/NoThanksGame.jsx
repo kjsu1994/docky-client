@@ -1689,23 +1689,36 @@ const NoThanksDecisionPanel = ({ gameState, players, sortedPlayers, myPlayer, ro
           />
         </>
       )}
-      <GameFlowMeter
-        title="노땡스 카드 흐름"
-        detail="공개 카드, 현재 순번, 선택 위험, 내 점수 흐름을 한 번에 확인합니다."
-        items={noThanksFlowItems}
-        tone={isFinished ? "amber" : "slate"}
-        smoke="no-thanks-flow-meter"
-        className="mt-3"
-      />
-      <NoThanksScoreLensPanel
-        currentCard={currentCard}
-        potChips={potChips}
-        myChips={myChips}
-        myCards={myCards}
-        roomStatus={roomStatus}
-        isMyTurn={isMyTurn}
-        decision={decision}
-      />
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {noThanksFlowItems.map((item) => (
+          <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+            <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+            <div className="mt-0.5 truncate text-sm font-black text-slate-900">{item.value}</div>
+            <div className="mt-0.5 line-clamp-1 text-[10px] font-bold text-slate-500">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+      <details className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-black text-slate-600">상세 판단 열기</summary>
+        <div className="mt-3 space-y-3">
+          <GameFlowMeter
+            title="노땡스 카드 흐름"
+            detail="공개 카드, 현재 순번, 선택 위험, 내 점수 흐름을 한 번에 확인합니다."
+            items={noThanksFlowItems}
+            tone={isFinished ? "amber" : "slate"}
+            smoke="no-thanks-flow-meter"
+          />
+          <NoThanksScoreLensPanel
+            currentCard={currentCard}
+            potChips={potChips}
+            myChips={myChips}
+            myCards={myCards}
+            roomStatus={roomStatus}
+            isMyTurn={isMyTurn}
+            decision={decision}
+          />
+        </div>
+      </details>
       <GameActionCueBar
         title={isFinished ? "최종 점수 확인" : isMyTurn ? "내 노땡스 선택" : "상대 선택 관찰"}
         detail={decision.riskText}
@@ -2296,26 +2309,10 @@ const NoThanksActionAvailabilityPanel = ({
   const playable = roomStatus === "PLAYING";
   const canTake = playable && isMyTurn;
   const canPass = playable && isMyTurn && myChips > 0;
-  const currentScore = scoreNoThanksCards(myCards);
-  const takeDetail = !playable
-    ? "게임이 시작되면 공개 카드를 가져갈 수 있습니다."
-    : isMyTurn
-      ? `카드를 가져가면 ${currentCard ?? "-"}점 카드와 팟 칩 ${potChips}개를 함께 받습니다.`
-      : "상대 차례에는 가져가기 버튼이 잠깁니다.";
-  const passDetail = !playable
-    ? "넘기기는 게임 시작 후 내 차례에만 가능합니다."
-    : myChips <= 0
-      ? "칩이 없으면 넘길 수 없어 카드를 가져가야 합니다."
-      : isMyTurn
-        ? "칩 1개를 팟에 올리고 다음 플레이어에게 선택을 넘깁니다."
-        : "상대가 칩을 쓰는지 또는 카드를 가져가는지 관찰하세요.";
-  const statusText = !playable
-    ? "시작 대기"
-    : isMyTurn ? "내 선택 가능성 확인" : "상대 선택 관찰";
 
   return (
     <div
-      className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5"
+      className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3"
       data-smoke="no-thanks-action-availability-panel"
       data-room-status={roomStatus || "UNKNOWN"}
       data-my-turn={isMyTurn ? "true" : "false"}
@@ -2324,57 +2321,9 @@ const NoThanksActionAvailabilityPanel = ({
       data-current-card={currentCard ?? ""}
       data-pot-chips={potChips ?? 0}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
-            <GameUxGlyph type="decision" className="h-4 w-4" />
-            행동
-          </div>
-          <div className="mt-1 text-sm font-black text-slate-900">{statusText}</div>
-        </div>
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${canTake || canPass ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-          {canPass ? "두 선택 가능" : canTake ? "가져가기 가능" : "행동 대기"}
-        </span>
-      </div>
-      <div className="mt-4 space-y-2">
+      <div className="space-y-2">
         <button className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canTake} onClick={onTake} data-smoke="no-thanks-take-action">카드 가져가기</button>
         <button className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canPass} onClick={onPass} data-smoke="no-thanks-pass-action">칩 1개 내고 넘기기</button>
-      </div>
-      <NoThanksActionAvailabilityArt
-        canTake={canTake}
-        canPass={canPass}
-        currentCard={currentCard}
-        potChips={potChips}
-        myChips={myChips}
-        isMyTurn={isMyTurn}
-        playable={playable}
-        className="mt-4 h-auto w-full"
-      />
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-100" data-smoke="no-thanks-action-availability-item">
-          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400">
-            <GameUxGlyph type="input" className="h-3.5 w-3.5" />
-            가져가기 조건
-          </div>
-          <div className="mt-1 text-sm font-black text-slate-900">{canTake ? "지금 가능" : "대기"}</div>
-          <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">{takeDetail}</div>
-        </div>
-        <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-100" data-smoke="no-thanks-action-availability-item">
-          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400">
-            <GameUxGlyph type="score" className="h-3.5 w-3.5" />
-            넘기기 조건
-          </div>
-          <div className="mt-1 text-sm font-black text-slate-900">{canPass ? `칩 ${myChips}개` : "잠김"}</div>
-          <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">{passDetail}</div>
-        </div>
-      </div>
-      <div className="mt-3 space-y-2">
-        <div className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600">
-          <div>내 칩 {myChips}</div>
-          <div className="mt-1">내 카드 {cardsLabel(myCards)}</div>
-          <div className="mt-1">현재 보정 점수 {currentScore - myChips}점</div>
-        </div>
-        <div className="text-xs font-bold leading-relaxed text-slate-500">시간이 초과되면 칩이 남아 있을 때는 자동으로 넘기고, 칩이 없으면 자동으로 카드를 가져갑니다.</div>
       </div>
     </div>
   );
@@ -3823,16 +3772,6 @@ export const NoThanksGame = () => {
                       myCards={myPlayer?.cards}
                       onTake={() => publishAction("TAKE")}
                       onPass={() => publishAction("PASS")}
-                    />
-                    <NoThanksActionRoutePanel
-                      roomStatus={roomStatus}
-                      isMyTurn={isMyTurn}
-                      myChips={myChips}
-                      currentCard={currentCard}
-                      potChips={potChips}
-                      myCards={myPlayer?.cards}
-                      deckRemaining={deckRemaining}
-                      turnName={turnName}
                     />
                   </div>
                 </div>

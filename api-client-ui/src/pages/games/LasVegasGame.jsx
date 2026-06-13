@@ -1727,20 +1727,33 @@ const LasVegasDecisionPanel = ({ state, players, myMemberId, currentRollCountByF
                 players={players}
                 winnerMemberId={winnerMemberId}
             />
-            <GameFlowMeter
-                title="라스베가스 라운드 흐름"
-                detail="라운드, 현재 차례, 카지노 보상 압력, 최근 배팅 근거를 순서대로 읽습니다."
-                items={lasVegasFlowItems}
-                tone={isFinished ? "amber" : "slate"}
-                smoke="las-vegas-flow-meter"
-                className="mt-3"
-            />
-            <LasVegasCasinoPressurePanel
-                state={state}
-                currentRollCountByFace={currentRollCountByFace}
-                myMemberId={myMemberId}
-                canBet={canBet}
-            />
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {lasVegasFlowItems.map((item) => (
+                    <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                        <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                        <div className="mt-0.5 truncate text-sm font-black text-slate-900">{item.value}</div>
+                        <div className="mt-0.5 line-clamp-1 text-[10px] font-bold text-slate-500">{item.detail}</div>
+                    </div>
+                ))}
+            </div>
+            <details className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                <summary className="cursor-pointer text-xs font-black text-slate-600">상세 판단 열기</summary>
+                <div className="mt-3 space-y-3">
+                    <GameFlowMeter
+                        title="라스베가스 라운드 흐름"
+                        detail="라운드, 현재 차례, 카지노 보상 압력, 최근 배팅 근거를 순서대로 읽습니다."
+                        items={lasVegasFlowItems}
+                        tone={isFinished ? "amber" : "slate"}
+                        smoke="las-vegas-flow-meter"
+                    />
+                    <LasVegasCasinoPressurePanel
+                        state={state}
+                        currentRollCountByFace={currentRollCountByFace}
+                        myMemberId={myMemberId}
+                        canBet={canBet}
+                    />
+                </div>
+            </details>
             <GameActionCueBar
                 title={isFinished ? "정산 결과 확인" : canRoll || canBet ? "내 라스베가스 행동" : "상대 배팅 관찰"}
                 detail={statusText}
@@ -2416,25 +2429,10 @@ const LasVegasActionAvailabilityPanel = ({
 }) => {
     const normalizedStatus = String(roomStatus || "WAITING").toUpperCase();
     const rolledDiceCount = Object.values(currentRollCountByFace || {}).reduce((sum, count) => sum + toPlainInt(count, 0), 0);
-    const rollDetail = normalizedStatus !== "PLAYING"
-        ? "게임이 시작되면 첫 행동으로 주사위를 굴릴 수 있습니다."
-        : myTurn
-            ? canRoll ? "아직 굴림 결과가 없어 주사위 굴리기가 가능합니다." : "이미 굴림 결과가 있어 배팅 숫자를 선택해야 합니다."
-            : "상대 차례에는 굴림 버튼이 잠깁니다.";
-    const betDetail = normalizedStatus !== "PLAYING"
-        ? "배팅은 주사위 결과가 나온 뒤 열립니다."
-        : canBet
-            ? `${rolledDiceCount}개 주사위 결과 중 하나의 숫자를 골라 같은 눈을 모두 배팅합니다.`
-            : myTurn ? "먼저 주사위를 굴려 배팅 후보를 만들어야 합니다." : "상대가 배팅할 카지노를 관찰하세요.";
-    const statusText = normalizedStatus === "FINISHED"
-        ? "라운드 정산 완료"
-        : normalizedStatus !== "PLAYING"
-            ? "시작 대기"
-            : myTurn ? "내 행동 가능성 확인" : "상대 행동 관찰";
 
     return (
         <div
-            className="mb-3 rounded-2xl bg-white/10 p-3"
+            className="mb-3 flex flex-wrap gap-2"
             data-smoke="las-vegas-action-availability-panel"
             data-room-status={normalizedStatus}
             data-my-turn={myTurn ? "true" : "false"}
@@ -2442,66 +2440,25 @@ const LasVegasActionAvailabilityPanel = ({
             data-can-bet={canBet ? "true" : "false"}
             data-rolled-dice={rolledDiceCount}
         >
-            <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                    <div className="flex items-center gap-2 text-xs font-black text-emerald-100">
-                        <GameUxGlyph type="decision" className="h-4 w-4" />
-                        행동 가능성
-                    </div>
-                    <div className="mt-1 text-xs font-bold leading-relaxed text-white/65">{statusText}</div>
-                </div>
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${canRoll || canBet ? "bg-emerald-300 text-slate-950" : "bg-white/15 text-white/70"}`}>
-                    {canRoll ? "굴리기 가능" : canBet ? "배팅 가능" : "행동 대기"}
-                </span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <button
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canRoll}
+                onClick={onRoll}
+                data-smoke="las-vegas-roll-action"
+            >
+                <Dices className="h-4 w-4" />
+                주사위 굴리기
+            </button>
+            {canBet && Object.keys(currentRollCountByFace).map((face) => (
                 <button
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!canRoll}
-                    onClick={onRoll}
-                    data-smoke="las-vegas-roll-action"
+                    key={face}
+                    className="min-h-10 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white"
+                    onClick={() => onBet(toPlainInt(face, 0))}
+                    data-smoke="las-vegas-bet-action"
                 >
-                    <Dices className="h-4 w-4" />
-                    주사위 굴리기
+                    {toPlainInt(face, 0)}번 배팅 ({toPlainInt(currentRollCountByFace[face], 0)}개)
                 </button>
-                {canBet && Object.keys(currentRollCountByFace).map((face) => (
-                    <button
-                        key={face}
-                        className="min-h-10 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white"
-                        onClick={() => onBet(toPlainInt(face, 0))}
-                        data-smoke="las-vegas-bet-action"
-                    >
-                        {toPlainInt(face, 0)}번 배팅 ({toPlainInt(currentRollCountByFace[face], 0)}개)
-                    </button>
-                ))}
-            </div>
-            <LasVegasActionAvailabilityArt
-                roomStatus={roomStatus}
-                myTurn={myTurn}
-                canRoll={canRoll}
-                canBet={canBet}
-                currentRollCountByFace={currentRollCountByFace}
-                rolledDiceCount={rolledDiceCount}
-                className="mt-3 h-auto w-full"
-            />
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <div className="rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/10" data-smoke="las-vegas-action-availability-item">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black text-white/55">
-                        <GameUxGlyph type="input" className="h-3.5 w-3.5" />
-                        굴리기 조건
-                    </div>
-                    <div className="mt-1 text-sm font-black text-white">{canRoll ? "지금 가능" : "대기"}</div>
-                    <div className="mt-1 text-[11px] font-bold leading-relaxed text-white/60">{rollDetail}</div>
-                </div>
-                <div className="rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/10" data-smoke="las-vegas-action-availability-item">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black text-white/55">
-                        <GameUxGlyph type="score" className="h-3.5 w-3.5" />
-                        배팅 조건
-                    </div>
-                    <div className="mt-1 text-sm font-black text-white">{canBet ? `${rolledDiceCount}개 후보` : "후보 대기"}</div>
-                    <div className="mt-1 text-[11px] font-bold leading-relaxed text-white/60">{betDetail}</div>
-                </div>
-            </div>
+            ))}
         </div>
     );
 };
@@ -4080,30 +4037,6 @@ export const LasVegasGame = () => {
                                         )}
                                     </div>
 
-                                    {!!currentRoll.length ? (
-                                        <div className="mb-3 rounded-2xl border border-white/20 bg-white/15 p-3 shadow-inner">
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <div>
-                                                    <div className="text-[11px] font-black text-cyan-100">공개 굴림</div>
-                                                    <div className="text-sm font-black text-white">{currentRollPlayerName}님의 주사위</div>
-                                                </div>
-                                                <div className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-black text-white">
-                                                    배팅할 숫자 선택 대기
-                                                </div>
-                                            </div>
-                                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                                {currentRoll.map((value, idx) => <DiceFace key={`public-roll-${idx}`} value={toPlainInt(value, 1)} size={32} />)}
-                                            </div>
-                                            <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-                                                {[1, 2, 3, 4, 5, 6].map((face) => (
-                                                    <div key={`public-roll-count-${face}`} className="rounded-xl bg-white/10 px-2 py-1.5 text-center text-[11px] font-black text-white">
-                                                        {face}번 {toPlainInt(currentRollCountByFace[face], 0)}개
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ) : null}
-
                                     {lastPlacedText && (
                                         <div className="mb-3 rounded-2xl border border-amber-200/50 bg-amber-300/20 px-3 py-2 text-xs font-black leading-relaxed text-amber-50">
                                             {lastPlacedText}
@@ -4132,18 +4065,6 @@ export const LasVegasGame = () => {
                                             />
                                         ))}
                                     </div>
-                                    <LasVegasActionRoutePanel
-                                        roomStatus={roomStatus}
-                                        myTurn={myTurn}
-                                        canRoll={canRoll}
-                                        canBet={canBet}
-                                        currentRollCountByFace={currentRollCountByFace}
-                                        roundNo={state?.roundNo || 0}
-                                        roundCount={state?.roundCount || selectedRoom?.roundCount || 0}
-                                        casinoCount={casinoRows.length || 6}
-                                        lastPlacedText={lastPlacedText}
-                                        turnName={state?.turnMemberId ? lasVegasPlayerName(players, state.turnMemberId) : ""}
-                                    />
                                 </div>
                             ) : (
                                 <div className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">

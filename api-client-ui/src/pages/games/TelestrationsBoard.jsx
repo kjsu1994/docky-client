@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import UserAvatar from "../../common/UserAvatar.jsx";
-import { GameFlowMeter } from "./GameUxAssets.jsx";
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
@@ -1439,67 +1438,49 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
           )}
 
           <div data-smoke="telestrations-support-panel" className="mt-4 border-t border-slate-100 pt-4">
-            {phase === "DRAW" && (
-              <TelestrationsDrawingToolPanel
-                brushColor={brushColor}
-                brushSize={brushSize}
-                hasInk={hasInk}
-                mySubmitted={mySubmitted}
-                awaitingPreviousEntry={awaitingPreviousEntry}
-                completedCount={completedSeatNos.size}
-                playerCount={playerCount}
-              />
-            )}
-
-            <TelestrationsInputGuidePanel
-              phase={phase}
-              phaseLabel={phaseLabel}
-              currentTask={currentTask}
-              previousEntry={previousEntry}
-              previousEntryLabel={previousEntryLabel}
-              awaitingPreviousEntry={awaitingPreviousEntry}
-              mySubmitted={mySubmitted}
-              textLength={text.trim().length}
-              hasInk={hasInk}
-              completedCount={completedSeatNos.size}
-              playerCount={playerCount}
-            />
-
-            <TelestrationsActionRoutePanel
-              phase={phase}
-              phaseLabel={phaseLabel}
-              currentTask={currentTask}
-              previousEntry={previousEntry}
-              previousEntryLabel={previousEntryLabel}
-              awaitingPreviousEntry={awaitingPreviousEntry}
-              mySubmitted={mySubmitted}
-              textLength={text.trim().length}
-              hasInk={hasInk}
-              completedCount={completedSeatNos.size}
-              playerCount={playerCount}
-              isHost={isHost}
-              revealInsight={revealInsight}
-            />
-
-            <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-2">
-              <TelestrationsChainArt
-                phase={phase}
-                currentStep={currentStep}
-                totalSteps={totalSteps}
-                completedCount={completedSeatNos.size}
-                playerCount={playerCount}
-                previousType={previousEntry ? get(previousEntry, "type", "type", "") : ""}
-              />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-black text-slate-900">핵심 요약</div>
+                <div className="mt-0.5 text-xs font-bold text-slate-500">입력 화면을 먼저 보고, 필요한 상태만 아래에서 확인합니다.</div>
+              </div>
+              <div className="rounded-full bg-sky-50 px-3 py-1 text-[11px] font-black text-sky-700">
+                {completedSeatNos.size}/{playerCount}명 제출
+              </div>
             </div>
-
-            <GameFlowMeter
-              title="텔레스트레이션 체인"
-              detail="현재 단계, 이전 단서, 제출 진행률을 한 줄로 확인합니다."
-              items={telestrationsFlowItems}
-              tone="slate"
-              smoke="telestrations-flow-meter"
-              className="mt-4"
-            />
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                {
+                  key: "phase",
+                  label: "현재 단계",
+                  value: `Step ${Math.min(currentStep + 1, totalSteps)}/${totalSteps}`,
+                  detail: phaseLabel,
+                },
+                {
+                  key: "clue",
+                  label: "이전 단서",
+                  value: awaitingPreviousEntry ? "불러오는 중" : previousEntry ? previousEntryLabel : "첫 문장",
+                  detail: previousEntry ? "단서 확인 완료" : phase === "PROMPT" ? "직접 시작 단서 입력" : "대기",
+                },
+                {
+                  key: "input",
+                  label: "내 입력",
+                  value: mySubmitted ? "제출 완료" : phase === "DRAW" ? (hasInk ? "그림 있음" : "빈 캔버스") : text.trim() ? `${text.trim().length}자` : "입력 전",
+                  detail: phase === "DRAW" ? "캔버스 기준" : "문장 입력 기준",
+                },
+                {
+                  key: "submit",
+                  label: "제출 현황",
+                  value: `${completedSeatNos.size}/${playerCount}명`,
+                  detail: mySubmitted ? "내 제출 완료" : awaitingPreviousEntry ? "단서 대기" : "제출 전",
+                },
+              ].map((item) => (
+                <div key={item.key} data-smoke="telestrations-compact-summary-item" className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                  <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                  <div className="mt-0.5 truncate text-sm font-black text-slate-900">{item.value}</div>
+                  <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{item.detail}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

@@ -632,14 +632,26 @@ const CitadelsBoardFocusPanel = ({
           className="mt-3"
         />
       )}
-      <GameFlowMeter
-        title="시티델 라운드 흐름"
-        detail="단계, 호출된 캐릭터, 도시 완성도, 행동 잠금 상태를 순서대로 확인합니다."
-        items={citadelsFlowItems}
-        tone={isFinished ? "amber" : "slate"}
-        smoke="citadels-flow-meter"
-        className="mt-3"
-      />
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {citadelsFlowItems.map((item) => (
+          <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+            <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+            <div className="mt-0.5 truncate text-sm font-black text-slate-900">{item.value}</div>
+            <div className="mt-0.5 line-clamp-1 text-[10px] font-bold text-slate-500">{item.detail}</div>
+          </div>
+        ))}
+      </div>
+      <details className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-black text-slate-600">상세 진행 열기</summary>
+        <GameFlowMeter
+          title="시티델 라운드 흐름"
+          detail="단계, 호출된 캐릭터, 도시 완성도, 행동 잠금 상태를 순서대로 확인합니다."
+          items={citadelsFlowItems}
+          tone={isFinished ? "amber" : "slate"}
+          smoke="citadels-flow-meter"
+          className="mt-3"
+        />
+      </details>
       <GameActionCueBar
         title={cueTitle}
         detail={nextDecision}
@@ -4961,53 +4973,6 @@ export const CitadelsGame = () => {
           </div>
         )}
 
-        <div className="mt-4 border-t border-slate-100 pt-4">
-          <CitadelsActionRoutePanel
-            currentPhaseLabel={currentPhaseLabel}
-            phase={phase}
-            isMyTurn={isMyTurn}
-            actionTaken={actionTaken}
-            incomeTaken={incomeTaken}
-            characterAbilityUsed={characterAbilityUsed}
-            canBuild={canBuild}
-            buildableCards={buildableCards}
-            handCount={myHand.length}
-            myGold={myGold}
-            builtThisTurn={builtThisTurn}
-            buildLimit={buildLimit}
-            incomeColor={incomeColor}
-            incomePreview={incomePreview}
-            activeCharacter={activeCharacter}
-            canEndTurn={canEndTurn}
-            afterWarlordDestruction={afterWarlordDestruction}
-            actionBusy={actionBusy}
-          />
-          <CitadelsActionAvailabilityPanel
-            currentPhaseLabel={currentPhaseLabel}
-            phase={phase}
-            isMyTurn={isMyTurn}
-            actionTaken={actionTaken}
-            incomeTaken={incomeTaken}
-            characterAbilityUsed={characterAbilityUsed}
-            canBuild={canBuild}
-            buildableCards={buildableCards}
-            handCount={myHand.length}
-            myGold={myGold}
-            builtThisTurn={builtThisTurn}
-            buildLimit={buildLimit}
-            incomeColor={incomeColor}
-            incomePreview={incomePreview}
-            activeCharacter={activeCharacter}
-            canEndTurn={canEndTurn}
-            colorProgress={colorProgress}
-            afterWarlordDestruction={afterWarlordDestruction}
-            hasLaboratory={hasDistrict(myCitadelsPlayer, "LABORATORY")}
-            hasSmithy={hasDistrict(myCitadelsPlayer, "SMITHY")}
-            canUseLaboratory={canUseLaboratory}
-            canUseSmithy={canUseSmithy}
-            actionBusy={actionBusy}
-          />
-        </div>
       </div>
     </section>
   );

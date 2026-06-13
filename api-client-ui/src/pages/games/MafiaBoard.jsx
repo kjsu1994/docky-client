@@ -1039,10 +1039,12 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
   const [now, setNow] = useState(() => Date.now());
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [selectedTargetSeatNo, setSelectedTargetSeatNo] = useState(0);
+  const [submittingTarget, setSubmittingTarget] = useState(false);
   const spokenKeyRef = useRef("");
   const autoAdvanceKeyRef = useRef("");
 
   const phase = String(get(gameState, "phase", "phase", "") || "");
+  const roundNo = Number(get(gameState, "round_no", "roundNo", 0)) || 0;
   const phaseLabel = mafiaPhaseLabels[phase] || phase || "-";
   const phaseEndsAt = Number(get(gameState, "phase_ends_at", "phaseEndsAt", 0));
   const phaseDuration = Number(get(gameState, "phase_duration_seconds", "phaseDurationSeconds", 0));
@@ -1093,13 +1095,15 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
     return true;
   });
   const selectedTarget = targetPlayers.find((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(selectedTargetSeatNo));
+  const targetSeatNosKey = targetPlayers.map((player) => Number(get(player, "seat_no", "seatNo", 0))).join(",");
   const submitLabel = actionType === "MAFIA_KILL" ? "습격 대상 확정"
     : actionType === "POLICE_CHECK" ? "조사 대상 확정"
       : actionType === "DOCTOR_SAVE" ? "보호 대상 확정"
         : actionType === "VOTE" ? "투표 확정"
           : mySubmitted ? "선택 완료" : "대기 중";
   const selectedTargetName = selectedTarget ? playerNameBySeat(get(selectedTarget, "seat_no", "seatNo", selectedTargetSeatNo)) : "";
-  const canSubmitTarget = Boolean(actionType && selectedTarget && !mySubmitted && myAlive);
+  const canResubmitVote = actionType === "VOTE";
+  const canSubmitTarget = Boolean(actionType && selectedTarget && myAlive && !submittingTarget && (!mySubmitted || canResubmitVote));
   const actionProfile = mafiaActionProfiles[actionType] || null;
   const actionHeading = phase === "FINISHED" ? "최종 결과"
     : mySubmitted ? "이번 단계 행동 완료"
@@ -1111,12 +1115,15 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
       : actionType === "VOTE" ? "후보 카드를 누르면 아래 확정 버튼이 열립니다. 내 좌석은 투표 후보에서 제외됩니다."
         : actionType ? "후보 카드를 먼저 고른 뒤 확정 버튼으로 현재 밤 행동을 제출합니다."
           : myAlive ? "토론 또는 대기 단계입니다. 필요한 행동이 열리면 이 영역에 바로 표시됩니다." : "탈락 상태라 행동은 제출하지 않고 진행만 관전합니다.";
-  const submitDisabledReason = mySubmitted ? "이미 제출했습니다."
+  const submitDisabledReason = submittingTarget ? "제출 중입니다."
+    : mySubmitted && !canResubmitVote ? "이미 제출했습니다."
     : !myAlive ? "탈락 상태에서는 제출할 수 없습니다."
       : !actionType ? "현재 단계에서 제출할 행동이 없습니다."
         : !selectedTarget ? `${actionType === "VOTE" ? "투표할 플레이어" : "대상"}를 먼저 선택하세요.`
           : "";
-  const submitButtonLabel = mySubmitted ? "선택 완료"
+  const submitButtonLabel = submittingTarget ? "전송 중"
+    : mySubmitted && actionType === "VOTE" && selectedTargetName ? `${selectedTargetName} 투표 변경`
+      : mySubmitted ? "선택 완료"
     : selectedTargetName ? `${selectedTargetName} ${submitLabel}`
       : submitLabel;
   const visibleAliveMafia = mafiaPlayers.filter((player) => Boolean(get(player, "alive", "alive", true)) && String(get(player, "role", "role", "") || "") === "MAFIA").length;
@@ -1190,7 +1197,14 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
 
   useEffect(() => {
     setSelectedTargetSeatNo(0);
-  }, [phase, mySeatNo]);
+  }, [phase, roundNo, mySeatNo, actionType]);
+
+  useEffect(() => {
+    if (!selectedTargetSeatNo) return;
+    if (!targetPlayers.some((player) => Number(get(player, "seat_no", "seatNo", 0)) === Number(selectedTargetSeatNo))) {
+      setSelectedTargetSeatNo(0);
+    }
+  }, [selectedTargetSeatNo, targetSeatNosKey]);
 
   const speak = (text) => {
     if (!text || typeof window === "undefined" || !window.speechSynthesis || typeof window.SpeechSynthesisUtterance === "undefined") return;
@@ -1227,16 +1241,39 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
   const advance = () => onAction({ actionType: "ADVANCE" }).catch(() => notifyError("마피아 단계 진행 실패"));
 
   const submitTarget = async () => {
-    if (!actionType || !selectedTargetSeatNo || mySubmitted) return;
+    if (submittingTarget) return;
+    if (!myAlive) {
+      notifyError("탈락 상태에서는 제출할 수 없습니다.");
+      return;
+    }
+    if (!actionType) {
+      notifyError("현재 단계에서 제출할 행동이 없습니다.");
+      return;
+    }
+    if (!selectedTargetSeatNo || !selectedTarget) {
+      notifyError("대상을 먼저 선택하세요.");
+      return;
+    }
+    if (mySubmitted && actionType !== "VOTE") {
+      notifyError("이미 제출했습니다. 다른 참가자를 기다려 주세요.");
+      return;
+    }
     if (actionType === "VOTE") {
       const confirmed = await confirmAction({
-        title: `${playerNameBySeat(selectedTargetSeatNo)}님에게 투표할까요?`,
+        title: mySubmitted ? `${playerNameBySeat(selectedTargetSeatNo)}님으로 투표를 변경할까요?` : `${playerNameBySeat(selectedTargetSeatNo)}님에게 투표할까요?`,
         description: "투표는 다시 누르면 바꿀 수 있지만, 단계가 넘어가면 결과에 반영됩니다.",
-        confirmText: "투표",
+        confirmText: mySubmitted ? "투표 변경" : "투표",
       });
       if (!confirmed) return;
     }
-    await onAction({ actionType, targetSeatNo: Number(selectedTargetSeatNo) }).catch(() => notifyError("선택을 반영하지 못했습니다."));
+    setSubmittingTarget(true);
+    try {
+      await onAction({ actionType, targetSeatNo: Number(selectedTargetSeatNo) });
+    } catch {
+      notifyError("선택을 반영하지 못했습니다.");
+    } finally {
+      setSubmittingTarget(false);
+    }
   };
 
   return (
@@ -1264,14 +1301,26 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
               <div className="h-full rounded-full bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-300 transition-all" style={{ width: `${progressPercent}%` }} />
             </div>
-            <GameFlowMeter
-              title="마피아 진행 요약"
-              detail="단계, 남은 시간, 내 역할 행동, 생존 균형을 한 번에 확인합니다."
-              items={mafiaFlowItems}
-              tone="dark"
-              smoke="mafia-flow-meter"
-              className="mt-4"
-            />
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {mafiaFlowItems.map((item) => (
+                <div key={item.label} className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2">
+                  <div className="text-[10px] font-black text-white/55">{item.label}</div>
+                  <div className="mt-0.5 truncate text-sm font-black text-white">{item.value}</div>
+                  <div className="mt-0.5 line-clamp-1 text-[10px] font-bold text-white/60">{item.detail}</div>
+                </div>
+              ))}
+            </div>
+            <details className="mt-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-black text-white/70">상세 진행 열기</summary>
+              <GameFlowMeter
+                title="마피아 진행 요약"
+                detail="단계, 남은 시간, 내 역할 행동, 생존 균형을 한 번에 확인합니다."
+                items={mafiaFlowItems}
+                tone="dark"
+                smoke="mafia-flow-meter"
+                className="mt-3"
+              />
+            </details>
             {phase === "FINISHED" && (
               <>
                 <GameResultSpotlight
@@ -1312,7 +1361,7 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl bg-white/10 px-3 py-3">
                   <div className="flex items-center gap-2 text-[11px] font-black text-white/60"><Timer className="h-4 w-4" /> 라운드</div>
-                  <div className="mt-2 text-xl font-black">{Number(get(gameState, "round_no", "roundNo", 0)) || 0}</div>
+                  <div className="mt-2 text-xl font-black">{roundNo}</div>
                 </div>
                 <div className="rounded-2xl bg-white/10 px-3 py-3">
                   <div className="flex items-center gap-2 text-[11px] font-black text-white/60"><Skull className="h-4 w-4" /> 생존 마피아</div>
@@ -1401,6 +1450,7 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
                   disabled={!canSubmitTarget}
                   onClick={submitTarget}
                   data-smoke="mafia-submit-action"
+                  aria-busy={submittingTarget ? "true" : "false"}
                   className="min-h-12 rounded-xl bg-rose-600 px-4 text-sm font-black text-white shadow-lg shadow-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {submitButtonLabel}
@@ -1418,30 +1468,6 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
             </div>
           )}
 
-          <MafiaTargetIntelPanel
-            actionType={actionType}
-            phaseLabel={phaseLabel}
-            mySubmitted={mySubmitted}
-            myAlive={myAlive}
-            aliveMafia={aliveMafia}
-            aliveTown={aliveTown}
-            targetPlayers={targetPlayers}
-            selectedTargetSeatNo={selectedTargetSeatNo}
-            completedSeatNos={completedSeatNos}
-            votedSeatNos={votedSeatNos}
-            playerNameBySeat={playerNameBySeat}
-            onSelectTarget={setSelectedTargetSeatNo}
-          />
-
-          <MafiaVotePressurePanel
-            phase={phase}
-            phaseLabel={phaseLabel}
-            rows={mafiaVotePressureRows}
-            aliveMafia={aliveMafia}
-            aliveTown={aliveTown}
-            selectedTargetSeatNo={selectedTargetSeatNo}
-          />
-
           {investigation && (
             <div className={`mt-3 rounded-xl px-3 py-2 text-sm font-black ${get(investigation, "mafia", "mafia", false) ? "bg-rose-50 text-rose-700" : "bg-sky-50 text-sky-700"}`}>
               경찰 조사: {playerNameBySeat(get(investigation, "target_seat_no", "targetSeatNo", 0))}님은 {get(investigation, "mafia", "mafia", false) ? "마피아입니다." : "마피아가 아닙니다."}
@@ -1454,24 +1480,6 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
             </div>
           )}
 
-          <MafiaActionRoutePanel
-            phase={phase}
-            phaseLabel={phaseLabel}
-            actionType={actionType}
-            myAlive={myAlive}
-            mySubmitted={mySubmitted}
-            myTask={myTask}
-            targetPlayers={targetPlayers}
-            selectedTargetSeatNo={selectedTargetSeatNo}
-            selectedTargetName={selectedTargetName}
-            completedCount={completedSeatNos.size}
-            votedCount={votedSeatNos.size}
-            aliveCount={alivePlayers.length}
-            aliveMafia={aliveMafia}
-            aliveTown={aliveTown}
-            remainingSeconds={remainingSeconds}
-            isHost={isHost}
-          />
         </section>
       </main>
 

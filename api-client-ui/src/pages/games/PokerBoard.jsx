@@ -1197,25 +1197,6 @@ export const PokerBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onA
               <button type="button" disabled={!canUse("ALL_IN")} onClick={() => send("ALL_IN")} className="min-h-11 rounded-xl bg-zinc-800 px-3 text-sm font-black text-white disabled:opacity-40">올인</button>
             </div>
           )}
-          <PokerActionRoutePanel
-            phase={phase}
-            phaseLabel={phaseLabel}
-            myTurn={myTurn}
-            isFiveCardDraw={isFiveCardDraw}
-            isFinished={phase === "FINISHED" || phase === "HAND_FINISHED"}
-            callAmount={callAmount}
-            fixedBet={fixedBet}
-            pot={pot}
-            lastPot={lastPot}
-            potOddsText={potOddsText}
-            availableActions={availableActions}
-            drawSelection={drawSelection}
-            maxDrawCards={maxDrawCards}
-            canSubmitDraw={canSubmitDraw}
-            resultMessage={resultMessage}
-            activePlayerName={activePokerPlayerName}
-            handInfo={handInfo}
-          />
         </section>
       </main>
 

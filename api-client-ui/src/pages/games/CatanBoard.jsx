@@ -4152,27 +4152,32 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
             explorersPiratesRule={explorersPiratesRule}
             citiesKnightsRule={citiesKnightsRule}
           />
-          <div data-smoke="catan-rule-brief" className={`mb-3 rounded-2xl border p-3 shadow-sm ${catanRuleBrief.tone}`}>
-            <div className="flex flex-wrap items-start gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="mt-0.5 rounded-2xl bg-white/75 p-2 shadow-sm">
-                  <Shield className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[11px] font-black opacity-75">선택 규칙</div>
-                  <div className="text-sm font-black leading-snug">{catanRuleBrief.title}</div>
+          <details data-smoke="catan-rule-brief" className={`mb-3 rounded-2xl border px-3 py-2 shadow-sm ${catanRuleBrief.tone}`}>
+            <summary className="cursor-pointer text-xs font-black">
+              규칙 요약 · {catanRuleBrief.title}
+            </summary>
+            <div className="mt-3">
+              <div className="flex flex-wrap items-start gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="mt-0.5 rounded-2xl bg-white/75 p-2 shadow-sm">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-black opacity-75">선택 규칙</div>
+                    <div className="text-sm font-black leading-snug">{catanRuleBrief.title}</div>
+                  </div>
                 </div>
               </div>
+              <div className="mt-2 text-xs font-bold leading-relaxed opacity-90">{catanRuleBrief.summary}</div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {catanRuleBrief.chips.map((chip) => (
+                  <span key={chip} className={`rounded-full px-2.5 py-1 text-[10px] font-black ${catanRuleBrief.chipTone}`}>
+                    {chip}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="mt-2 text-xs font-bold leading-relaxed opacity-90">{catanRuleBrief.summary}</div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {catanRuleBrief.chips.map((chip) => (
-                <span key={chip} className={`rounded-full px-2.5 py-1 text-[10px] font-black ${catanRuleBrief.chipTone}`}>
-                  {chip}
-                </span>
-              ))}
-            </div>
-          </div>
+          </details>
           {phase === "FINISHED" && (
             <GameResultSpotlight
               title={winnerSeatNo > 0 ? `${playerName(winnerSeatNo)} 승리` : "카탄 최종 결과"}
@@ -5911,36 +5916,23 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               {playerName(winnerSeatNo)} 승리
             </div>
           )}
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <CatanActionAtlasPanel
-              title={catanActionAtlasTitle}
-              detail={catanTurnGuidance}
-              activeKey={catanActionAtlasActiveKey}
-              items={catanActionAtlasItems}
-            />
-            <CatanActionRoutePanel
-              phase={phase}
-              myTurn={myTurn}
-              buildMode={buildMode}
-              targetReady={hasSelectedTarget}
-              canMaritimeTrade={canMaritimeTrade}
-              canBuyDevelopmentCard={canBuyDevelopmentCard}
-              actionProgressCount={actionProgressCards.length}
-              items={catanActionRouteItems}
-            />
-          </div>
         </div>
 
-        <CatanResourceStrategyPanel
-          resources={resources}
-          resourceBank={resourceBank}
-          buildSignals={catanBuildSignals}
-          scoreRace={catanScoreRace}
-          myCardCount={myCardCount}
-          tradeSummary={catanTradeSummary}
-          phase={phase}
-          myTurn={myTurn}
-        />
+        <details className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-3 shadow-lg">
+          <summary className="cursor-pointer text-sm font-black text-slate-700">자원 전략 상세 열기</summary>
+          <div className="mt-3">
+            <CatanResourceStrategyPanel
+              resources={resources}
+              resourceBank={resourceBank}
+              buildSignals={catanBuildSignals}
+              scoreRace={catanScoreRace}
+              myCardCount={myCardCount}
+              tradeSummary={catanTradeSummary}
+              phase={phase}
+              myTurn={myTurn}
+            />
+          </div>
+        </details>
 
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
           <div className="mb-3 text-sm font-black text-slate-900">내 자원</div>

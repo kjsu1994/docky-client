@@ -89,11 +89,7 @@ function assertLasVegasRealtimeSource() {
         ["LasVegasSessionRouteArt", "render selected-room session button-route guidance through local SVG artwork"],
         ['aria-label="라스베가스 카지노 보상 요약"', "render casino reward summary SVG with a Korean accessible label"],
         ["buildLasVegasCasinoPressureRows", "derive casino pressure from public dice and reward state"],
-        ["buildLasVegasActionRouteItems", "derive roll/casino/settlement route guidance from public game state"],
-        ["LasVegasActionRoutePanel", "render roll-to-casino action-route guidance below the real board"],
-        ["LasVegasActionRouteArt", "render roll-to-casino action-route guidance through local SVG artwork"],
-        ["LasVegasActionAvailabilityPanel", "render action availability guidance beside the buttons"],
-        ["LasVegasActionAvailabilityArt", "render action availability guidance through local SVG artwork"],
+        ["LasVegasActionAvailabilityPanel", "render compact roll/bet action buttons"],
         ["LasVegasRollStandbyPanel", "render empty public-roll guidance inside the selected board"],
         ["LasVegasRollStandbyArt", "render empty public-roll guidance through local SVG artwork"],
         ["buildLasVegasDecisionRows", "derive casino risk/reward explanations from public state"],
@@ -141,17 +137,9 @@ function assertLasVegasRealtimeSource() {
         ['smoke="las-vegas-action-cue-bar"', "mark the action cue bar for runtime coverage"],
         ['smoke="las-vegas-action-feedback"', "mark the action feedback ticker for runtime coverage"],
         ['smoke="las-vegas-result-spotlight"', "mark the result spotlight for finished games"],
-        ['data-smoke="las-vegas-action-route-panel"', "mark the Las Vegas action-route panel"],
-        ['data-smoke="las-vegas-action-route-art"', "mark the Las Vegas action-route SVG artwork"],
-        ['data-smoke="las-vegas-action-route-node"', "mark Las Vegas action-route SVG nodes"],
-        ['data-smoke="las-vegas-action-route-item"', "mark Las Vegas action-route explanation tiles"],
-        ["라스베가스 액션 루트", "render the Las Vegas action-route title in Korean"],
         ['data-smoke="las-vegas-action-availability-panel"', "mark the action availability panel"],
-        ['data-smoke="las-vegas-action-availability-art"', "mark the action availability SVG artwork"],
-        ['data-smoke="las-vegas-action-availability-node"', "mark action availability SVG nodes"],
-        ["굴림 → 후보 → 카지노", "render the action availability route copy in Korean"],
-        ['data-smoke="las-vegas-action-availability-item"', "mark action availability reason tiles"],
         ['data-smoke="las-vegas-roll-action"', "mark roll action button"],
+        ['data-smoke="las-vegas-bet-action"', "mark bet action buttons"],
         ['data-smoke="las-vegas-roll-standby-panel"', "mark the empty public-roll guidance panel"],
         ['data-smoke="las-vegas-roll-standby-art"', "mark the empty public-roll SVG artwork"],
         ['data-smoke="las-vegas-roll-standby-node"', "mark empty public-roll SVG nodes"],
@@ -1101,55 +1089,11 @@ async function inspectLasVegas(cdp, sessionId, viewport) {
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-action-cue-bar"] [data-smoke="game-action-cue-item"]').length >= 3`, "las vegas action cue items rendered");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-action-feedback"]'))`, "las vegas action feedback rendered");
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-action-feedback"] [data-smoke="game-feedback-item"]').length >= 4`, "las vegas action feedback items rendered");
-        await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-action-route-panel"]'))`, "las vegas action route rendered");
-        await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-action-route-art"]'))`, "las vegas action route SVG rendered");
-        await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-action-route-node"]').length >= 4`, "las vegas action route SVG nodes rendered");
-        await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-action-route-item"]').length >= 4`, "las vegas action route items rendered");
-        const actionRouteSnapshot = await evaluate(cdp, sessionId, `(() => {
-            const panel = document.querySelector('[data-smoke="las-vegas-action-route-panel"]');
-            return {
-                mounted: Boolean(panel),
-                art: Boolean(document.querySelector('[data-smoke="las-vegas-action-route-art"]')),
-                nodes: document.querySelectorAll('[data-smoke="las-vegas-action-route-node"]').length,
-                items: document.querySelectorAll('[data-smoke="las-vegas-action-route-item"]').length,
-                roomStatus: panel?.getAttribute("data-room-status") || "",
-                myTurn: panel?.getAttribute("data-my-turn") || "",
-                canRoll: panel?.getAttribute("data-can-roll") || "",
-                canBet: panel?.getAttribute("data-can-bet") || "",
-                rolledDice: Number(panel?.getAttribute("data-rolled-dice") || 0),
-                round: panel?.getAttribute("data-round") || "",
-                keys: Array.from(document.querySelectorAll('[data-smoke="las-vegas-action-route-item"]')).map((node) => node.getAttribute("data-route-key")),
-                text: panel?.textContent || "",
-            };
-        })()`);
-        if (
-            !actionRouteSnapshot.mounted
-            || !actionRouteSnapshot.art
-            || actionRouteSnapshot.nodes < 4
-            || actionRouteSnapshot.items < 4
-            || !actionRouteSnapshot.roomStatus
-            || !["true", "false"].includes(actionRouteSnapshot.myTurn)
-            || !["true", "false"].includes(actionRouteSnapshot.canRoll)
-            || !["true", "false"].includes(actionRouteSnapshot.canBet)
-            || actionRouteSnapshot.rolledDice < 0
-            || !actionRouteSnapshot.round
-            || !["turn", "roll", "casino", "result"].every((key) => actionRouteSnapshot.keys.includes(key))
-            || !["라스베가스 액션 루트", "차례 확인", "주사위 굴림", "카지노 선택", "다음 정산"].every((text) => actionRouteSnapshot.text.includes(text))
-        ) {
-            throw new Error(`las-vegas-ui-smoke: action route artwork missing ${JSON.stringify(actionRouteSnapshot)}`);
-        }
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-action-availability-panel"]'))`, "las vegas action availability rendered");
-        await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="las-vegas-action-availability-art"]'))`, "las vegas action availability SVG rendered");
-        await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-action-availability-node"]').length >= 4`, "las vegas action availability SVG nodes rendered");
-        await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-action-availability-item"]').length >= 2`, "las vegas action availability items rendered");
         const actionAvailabilitySnapshot = await evaluate(cdp, sessionId, `(() => {
             const panel = document.querySelector('[data-smoke="las-vegas-action-availability-panel"]');
-            const art = document.querySelector('[data-smoke="las-vegas-action-availability-art"]');
             return {
                 mounted: Boolean(panel),
-                art: Boolean(art),
-                nodes: document.querySelectorAll('[data-smoke="las-vegas-action-availability-node"]').length,
-                items: document.querySelectorAll('[data-smoke="las-vegas-action-availability-item"]').length,
                 rollButton: document.querySelectorAll('[data-smoke="las-vegas-roll-action"]').length,
                 betButtons: document.querySelectorAll('[data-smoke="las-vegas-bet-action"]').length,
                 roomStatus: panel?.getAttribute("data-room-status") || "",
@@ -1157,24 +1101,18 @@ async function inspectLasVegas(cdp, sessionId, viewport) {
                 canBet: panel?.getAttribute("data-can-bet") || "",
                 myTurn: panel?.getAttribute("data-my-turn") || "",
                 rolledDice: Number(panel?.getAttribute("data-rolled-dice") || 0),
-                keys: Array.from(document.querySelectorAll('[data-smoke="las-vegas-action-availability-node"]')).map((node) => node.getAttribute("data-action-key")),
                 text: panel?.textContent || "",
             };
         })()`);
         if (
             !actionAvailabilitySnapshot.mounted
-            || !actionAvailabilitySnapshot.art
-            || actionAvailabilitySnapshot.nodes < 4
-            || actionAvailabilitySnapshot.items < 2
             || actionAvailabilitySnapshot.rollButton < 1
             || !actionAvailabilitySnapshot.roomStatus
             || !["true", "false"].includes(actionAvailabilitySnapshot.canRoll)
             || !["true", "false"].includes(actionAvailabilitySnapshot.canBet)
             || !["true", "false"].includes(actionAvailabilitySnapshot.myTurn)
             || actionAvailabilitySnapshot.rolledDice < 0
-            || !["turn", "roll", "candidate", "casino"].every((key) => actionAvailabilitySnapshot.keys.includes(key))
-            || !actionAvailabilitySnapshot.text.includes("굴림 → 후보 → 카지노")
-            || !/같은 눈 모두 배팅|먼저 굴리기|행동 대기/.test(actionAvailabilitySnapshot.text)
+            || !actionAvailabilitySnapshot.text.includes("주사위 굴리기")
         ) {
             throw new Error(`las-vegas-ui-smoke: action availability artwork missing ${JSON.stringify(actionAvailabilitySnapshot)}`);
         }
@@ -1183,9 +1121,6 @@ async function inspectLasVegas(cdp, sessionId, viewport) {
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-roll-standby-node"]').length >= 4`, "las vegas empty public-roll SVG nodes rendered");
         await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-roll-standby-item"]').length >= 4`, "las vegas empty public-roll guidance items rendered");
         await waitFor(cdp, sessionId, `/공개 주사위 없음|굴림 전 보드 상태|주사위 굴리기/.test(document.querySelector('[data-smoke="las-vegas-roll-standby-panel"]')?.textContent || "")`, "las vegas empty public-roll Korean copy rendered");
-        await waitForText(cdp, sessionId, "행동 가능성");
-        await waitForText(cdp, sessionId, "굴리기 조건");
-        await waitForText(cdp, sessionId, "배팅 조건");
         await waitForText(cdp, sessionId, "벨라지오");
         await waitFor(cdp, sessionId, `(() => {
             const panels = [...document.querySelectorAll('[data-smoke="las-vegas-casino-panel"]')];

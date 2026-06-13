@@ -6919,10 +6919,11 @@ export const TabletopGame = ({ game }) => {
       notify("이전 행동을 처리하는 중입니다.");
       return;
     }
+    const roomId = idOf(selectedRoom);
     actionBusyRef.current = true;
     setActionBusy(true);
     try {
-      const result = await tabletopGameAdapter.sendAction(game, idOf(selectedRoom), payload);
+      const result = await tabletopGameAdapter.sendAction(game, roomId, payload);
       if (result?.room) {
         syncMySeatNoFromRoom(result.room);
         setSelectedRoom(result.room);
@@ -6940,6 +6941,9 @@ export const TabletopGame = ({ game }) => {
       }
       return result;
     } catch (error) {
+      if (roomId) {
+        await fetchState(roomId, roomOpenSeqRef.current).catch(() => {});
+      }
       throw error;
     } finally {
       actionBusyRef.current = false;

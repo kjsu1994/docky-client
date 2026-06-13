@@ -1281,27 +1281,6 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
               </div>
             ))}
           </div>
-          <BlokusActionRoutePanel
-            phase={phase}
-            currentColor={currentColor}
-            currentColorLabel={currentColorState?.label || currentColor || ""}
-            myTurn={myTurn}
-            canPass={canPass}
-            selectedPiece={selectedPiece}
-            selectedPieceCode={selectedPieceCode}
-            selectedPieceLegalCount={selectedPieceLegalCount}
-            totalLegalPlacementCount={totalLegalPlacementCount}
-            anchorCell={anchorCell}
-            placementStatus={placementStatus}
-            placeButtonEnabled={placeButtonEnabled}
-            firstPlayablePieceCode={firstPlayablePieceCode}
-            bestPieceEntry={blokusBestPieceEntry}
-            remainingSquares={remainingSquares}
-            remainingPieceCount={remainingPieceCodes.length}
-            rotation={rotation}
-            flipped={flipped}
-            firstPiece={currentColorFirstPiece}
-          />
         </section>
       </div>
 

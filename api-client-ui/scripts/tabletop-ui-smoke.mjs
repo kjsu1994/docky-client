@@ -69,7 +69,7 @@ const cases = [
     path: "/app/games/telestrations",
     label: "telestrations draw room",
     telestrationsPhase: "DRAW",
-    expectedTexts: ["텔레스트레이션", "그림 제출", "보고 그릴 문장", "그림 도구 상태"],
+    expectedTexts: ["텔레스트레이션", "그림 제출", "보고 그릴 문장", "핵심 요약", "내 입력"],
     assertTelestrationsDraw: true,
   },
   {
@@ -124,7 +124,7 @@ const cases = [
   {
     path: "/app/games/las-vegas",
     label: "las vegas active",
-    expectedTexts: ["공개 굴림", "직전 배팅 위치", "검증 사용자님이 벨라지오에 주사위 2개를 배팅했습니다."],
+    expectedTexts: ["주사위 굴리기", "직전 배팅 위치", "검증 사용자님이 벨라지오에 주사위 2개를 배팅했습니다."],
   },
 ];
 
@@ -447,18 +447,6 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="catan-resource-strategy-node"', "marks Catan resource strategy SVG nodes"],
     ['data-smoke="catan-resource-token-art"', "marks Catan local SVG resource tokens"],
     ["자원 → 건설 → 교환 → 승점", "renders Korean Catan resource strategy route copy"],
-    ["CatanActionAtlasPanel", "renders Catan action target and lock guidance from loaded game state"],
-    ["CatanActionAtlasArt", "renders Catan action guidance through reusable SVG artwork"],
-    ['data-smoke="catan-action-atlas-panel"', "marks the Catan action atlas panel"],
-    ['data-smoke="catan-action-atlas-art"', "marks reusable Catan action atlas SVG artwork"],
-    ["buildCatanActionRouteItems", "derives Catan phase, target, button, and end-turn route guidance from loaded game state"],
-    ["CatanActionRoutePanel", "renders Catan action-route guidance beside the existing action buttons"],
-    ["CatanActionRouteArt", "renders Catan action-route guidance through local SVG artwork"],
-    ['data-smoke="catan-action-route-panel"', "marks the Catan action-route panel"],
-    ['data-smoke="catan-action-route-art"', "marks Catan action-route SVG artwork"],
-    ['data-smoke="catan-action-route-node"', "marks Catan action-route SVG nodes"],
-    ['data-smoke="catan-action-route-item"', "marks Catan action-route explanation tiles"],
-    ["카탄 액션 루트", "renders Korean Catan action-route copy"],
     ['smoke="catan-result-spotlight"', "marks the Catan finished-game result explanation spotlight"],
     ["catanResultDetail", "derives Catan finished-game winner explanation from loaded score state"],
     ['data-smoke="blokus-bottom-summary"', "marks the compact Blokus bottom summary"],
@@ -466,14 +454,6 @@ function assertTabletopRealtimeSource() {
     ["남은 압박", "renders compact Blokus remaining-pressure copy"],
     ["BlokusPieceArt", "renders Blokus pieces through reusable SVG artwork"],
     ['data-smoke="blokus-piece-art"', "marks reusable Blokus piece artwork"],
-    ["buildBlokusActionRouteItems", "derives Blokus piece/orientation/cell/submit route guidance from loaded board state"],
-    ["BlokusActionRoutePanel", "renders Blokus action-route guidance below the real placement controls"],
-    ["BlokusActionRouteArt", "renders Blokus action-route guidance through local SVG artwork"],
-    ['data-smoke="blokus-action-route-panel"', "marks the Blokus action-route panel"],
-    ['data-smoke="blokus-action-route-art"', "marks Blokus action-route SVG artwork"],
-    ['data-smoke="blokus-action-route-node"', "marks Blokus action-route SVG nodes"],
-    ['data-smoke="blokus-action-route-item"', "marks Blokus action-route explanation tiles"],
-    ["블로커스 액션 루트", "renders Korean Blokus action-route copy"],
     ["BlokusRemainingPiecesEmptyPanel", "renders Blokus empty remaining-piece guidance from loaded game state"],
     ["BlokusRemainingPiecesEmptyArt", "renders Blokus empty remaining-piece guidance through reusable SVG artwork"],
     ['data-smoke="blokus-remaining-empty-panel"', "marks the Blokus empty remaining-piece panel"],
@@ -485,35 +465,8 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="mahe-bottom-summary-item"', "marks compact Mahe bottom summary tiles"],
     ["MaheTurtleArt", "renders Mahe turtle pieces through reusable SVG artwork"],
     ['data-smoke="mahe-turtle-art"', "marks reusable Mahe turtle artwork"],
-    ["buildMaheActionRouteItems", "derives Mahe roll/stop/choice route guidance from loaded game state"],
-    ["MaheActionRoutePanel", "renders Mahe action-route guidance beside the board"],
-    ["MaheActionRouteArt", "renders Mahe action-route guidance through local SVG artwork"],
-    ['data-smoke="mahe-action-route-panel"', "marks the Mahe action-route panel"],
-    ['data-smoke="mahe-action-route-art"', "marks Mahe action-route SVG artwork"],
-    ['data-smoke="mahe-action-route-node"', "marks Mahe action-route SVG nodes"],
-    ['data-smoke="mahe-action-route-item"', "marks Mahe action-route explanation tiles"],
-    ["마헤 선택 루트", "renders Korean Mahe action-route copy"],
-    ['smoke="dalmuti-flow-meter"', "marks the Dalmuti board flow meter"],
     ["DalmutiCardArt", "renders Dalmuti cards through reusable SVG artwork"],
     ['data-smoke="dalmuti-card-art"', "marks reusable Dalmuti card artwork"],
-    ["DalmutiPlayAdvisorPanel", "renders Dalmuti play guidance from loaded game state"],
-    ["DalmutiPlayAdvisorArt", "renders Dalmuti play guidance through reusable SVG artwork"],
-    ['data-smoke="dalmuti-play-advisor-panel"', "marks the Dalmuti play advisor panel"],
-    ['data-smoke="dalmuti-play-advisor-art"', "marks reusable Dalmuti play advisor SVG artwork"],
-    ["buildDalmutiActionRouteItems", "derives Dalmuti tax/revolution/play/pass route guidance from loaded game state"],
-    ["DalmutiActionRoutePanel", "renders Dalmuti action-route guidance near the action buttons"],
-    ["DalmutiActionRouteArt", "renders Dalmuti action-route guidance through local SVG artwork"],
-    ['data-smoke="dalmuti-action-route-panel"', "marks the Dalmuti action-route panel"],
-    ['data-smoke="dalmuti-action-route-art"', "marks Dalmuti action-route SVG artwork"],
-    ['data-smoke="dalmuti-action-route-node"', "marks Dalmuti action-route SVG nodes"],
-    ['data-smoke="dalmuti-action-route-item"', "marks Dalmuti action-route explanation tiles"],
-    ["달무티 액션 루트", "renders Korean Dalmuti action-route copy"],
-    ["DalmutiRankPressurePanel", "renders Dalmuti hand depletion and rank pressure from loaded game state"],
-    ["DalmutiRankPressureArt", "renders Dalmuti rank pressure through reusable SVG artwork"],
-    ['data-smoke="dalmuti-rank-pressure-panel"', "marks the Dalmuti rank pressure panel"],
-    ['data-smoke="dalmuti-rank-pressure-art"', "marks reusable Dalmuti rank pressure SVG artwork"],
-    ['data-smoke="dalmuti-rank-pressure-node"', "marks Dalmuti rank pressure SVG player nodes"],
-    ['data-smoke="dalmuti-rank-pressure-item"', "marks Dalmuti rank pressure explanation tiles"],
     ["DalmutiPlayPileEmptyState", "renders Dalmuti current-pile empty guidance from loaded game state"],
     ["DalmutiPlayPileEmptyArt", "renders Dalmuti current-pile empty guidance through reusable SVG artwork"],
     ['data-smoke="dalmuti-play-pile-empty-state"', "marks the Dalmuti current-pile empty guidance panel"],
@@ -526,51 +479,17 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="dalmuti-empty-hand-art"', "marks reusable Dalmuti empty-hand SVG artwork"],
     ['data-smoke="dalmuti-empty-hand-node"', "marks Dalmuti empty-hand SVG state nodes"],
     ['data-smoke="dalmuti-empty-hand-item"', "marks Dalmuti empty-hand explanation tiles"],
-    ['smoke="six-nimmt-flow-meter"', "marks the Six Nimmt board flow meter"],
     ["SixNimmtCardArt", "renders Six Nimmt cards through reusable SVG artwork"],
     ['data-smoke="six-nimmt-card-art"', "marks reusable Six Nimmt card artwork"],
-    ["SixNimmtRiskPanel", "renders Six Nimmt row risk guidance from loaded game state"],
-    ["SixNimmtRowRiskArt", "renders Six Nimmt row risk meters through reusable SVG artwork"],
-    ["SixNimmtTurnPressurePanel", "renders Six Nimmt selection and reveal pressure from loaded game state"],
-    ["SixNimmtTurnPressureArt", "renders Six Nimmt selection pressure through reusable SVG artwork"],
-    ["buildSixNimmtActionRouteItems", "derives Six Nimmt select/reveal/row/penalty route guidance from loaded game state"],
-    ["SixNimmtActionRoutePanel", "renders Six Nimmt action-route guidance beside the board"],
-    ["SixNimmtActionRouteArt", "renders Six Nimmt action-route guidance through local SVG artwork"],
-    ['data-smoke="six-nimmt-risk-panel"', "marks the Six Nimmt row risk guidance panel"],
-    ['data-smoke="six-nimmt-row-risk-art"', "marks reusable Six Nimmt row risk SVG meters"],
-    ['data-smoke="six-nimmt-turn-pressure-panel"', "marks the Six Nimmt turn pressure panel"],
-    ['data-smoke="six-nimmt-turn-pressure-art"', "marks reusable Six Nimmt turn pressure SVG artwork"],
-    ['data-smoke="six-nimmt-turn-pressure-node"', "marks Six Nimmt turn pressure player nodes"],
-    ['data-smoke="six-nimmt-turn-pressure-item"', "marks Six Nimmt turn pressure explanation tiles"],
-    ['data-smoke="six-nimmt-action-route-panel"', "marks the Six Nimmt action-route panel"],
-    ['data-smoke="six-nimmt-action-route-art"', "marks Six Nimmt action-route SVG artwork"],
-    ['data-smoke="six-nimmt-action-route-node"', "marks Six Nimmt action-route SVG nodes"],
-    ['data-smoke="six-nimmt-action-route-item"', "marks Six Nimmt action-route explanation tiles"],
-    ["식스님트 액션 루트", "renders Korean Six Nimmt action-route copy"],
-    ['smoke="telestrations-flow-meter"', "marks the Telestrations board flow meter"],
-    ["TelestrationsChainArt", "renders Telestrations relay progress through reusable SVG artwork"],
-    ['data-smoke="telestrations-chain-art"', "marks reusable Telestrations chain artwork"],
-    ["TelestrationsInputGuidePanel", "renders Telestrations input guidance from loaded game state"],
-    ["TelestrationsClueLensArt", "renders Telestrations clue guidance through reusable SVG artwork"],
-    ["buildTelestrationsActionRouteItems", "derives Telestrations clue/input/submit/next route guidance from loaded game state"],
-    ["TelestrationsActionRoutePanel", "renders Telestrations action-route guidance below the real inputs"],
-    ["TelestrationsActionRouteArt", "renders Telestrations action-route guidance through local SVG artwork"],
-    ["TelestrationsDrawingToolPanel", "renders Telestrations drawing tool state from local canvas controls"],
-    ["TelestrationsDrawingToolArt", "renders Telestrations drawing tool state through reusable SVG artwork"],
+    ['data-smoke="six-nimmt-compact-summary"', "marks the compact Six Nimmt gameplay summary"],
+    ['data-smoke="six-nimmt-compact-summary-item"', "marks compact Six Nimmt summary items"],
+    ["핵심 요약", "renders concise Six Nimmt gameplay summary copy"],
+    ['data-smoke="telestrations-support-panel"', "marks the compact Telestrations gameplay summary"],
+    ['data-smoke="telestrations-compact-summary-item"', "marks compact Telestrations summary items"],
     ["TelestrationsRevealInsightPanel", "renders Telestrations reveal interpretation from loaded book entries"],
     ["TelestrationsRevealArcArt", "renders Telestrations reveal drift through reusable SVG artwork"],
     ["TelestrationsEntryEmptyState", "renders Telestrations empty entry guidance from loaded replay state"],
     ["TelestrationsEntryEmptyArt", "renders Telestrations empty entry guidance through reusable SVG artwork"],
-    ['data-smoke="telestrations-input-guide-panel"', "marks the Telestrations input guidance panel"],
-    ['data-smoke="telestrations-clue-lens-art"', "marks reusable Telestrations clue lens SVG artwork"],
-    ['data-smoke="telestrations-action-route-panel"', "marks the Telestrations action-route panel"],
-    ['data-smoke="telestrations-action-route-art"', "marks Telestrations action-route SVG artwork"],
-    ['data-smoke="telestrations-action-route-node"', "marks Telestrations action-route SVG nodes"],
-    ['data-smoke="telestrations-action-route-item"', "marks Telestrations action-route explanation tiles"],
-    ['data-smoke="telestrations-drawing-tool-panel"', "marks the Telestrations drawing tool panel"],
-    ['data-smoke="telestrations-drawing-tool-art"', "marks reusable Telestrations drawing tool SVG artwork"],
-    ['data-smoke="telestrations-drawing-tool-node"', "marks Telestrations drawing tool SVG nodes"],
-    ['data-smoke="telestrations-drawing-tool-item"', "marks Telestrations drawing tool explanation tiles"],
     ['data-smoke="telestrations-reveal-insight-panel"', "marks the Telestrations reveal interpretation panel"],
     ['data-smoke="telestrations-reveal-arc-art"', "marks reusable Telestrations reveal SVG artwork"],
     ['data-smoke="telestrations-reveal-current"', "marks the current Telestrations replay item summary"],
@@ -583,36 +502,17 @@ function assertTabletopRealtimeSource() {
     ["브러시 굵기", "explains current Telestrations brush size"],
     ["캔버스 잉크", "explains whether the drawing canvas has ink"],
     ["제출 전 캔버스 점검", "summarizes Telestrations drawing submission readiness"],
-    ["텔레스트레이션 액션 루트", "renders Korean Telestrations action-route copy"],
     ['smoke="mafia-flow-meter"', "marks the Mafia board flow meter"],
     ["MafiaRoleSigil", "renders Mafia roles through reusable SVG artwork"],
     ['data-smoke="mafia-role-sigil"', "marks reusable Mafia role artwork"],
-    ["MafiaTargetIntelPanel", "renders Mafia action target guidance from loaded game state"],
-    ["MafiaTargetIntelArt", "renders Mafia target/balance guidance through reusable SVG artwork"],
     ["MafiaTargetEmptyBrief", "renders Mafia empty-target guidance from loaded action state"],
     ["MafiaTargetEmptyBriefArt", "renders Mafia empty-target guidance through reusable SVG artwork"],
-    ["MafiaVotePressurePanel", "renders Mafia survival and vote pressure from loaded game state"],
-    ["MafiaVotePressureArt", "renders Mafia vote pressure through reusable SVG artwork"],
-    ["buildMafiaActionRouteItems", "derives Mafia state/target/submit/advance route guidance from loaded game state"],
-    ["MafiaActionRoutePanel", "renders Mafia action-route guidance below the real target buttons"],
-    ["MafiaActionRouteArt", "renders Mafia action-route guidance through local SVG artwork"],
-    ['data-smoke="mafia-target-intel-panel"', "marks the Mafia target intelligence panel"],
-    ['data-smoke="mafia-target-intel-art"', "marks reusable Mafia target intelligence SVG artwork"],
     ['data-smoke="mafia-target-empty-brief"', "marks Mafia empty-target explanation panel"],
     ['data-smoke="mafia-target-empty-art"', "marks reusable Mafia empty-target SVG artwork"],
     ['data-smoke="mafia-target-empty-node"', "marks Mafia empty-target SVG nodes"],
     ['data-smoke="mafia-target-empty-item"', "marks Mafia empty-target explanation tiles"],
     ["비어 있는 이유", "explains why Mafia target candidates are unavailable"],
     ["행동 제출 완료", "explains locked Mafia candidate state after submission"],
-    ['data-smoke="mafia-vote-pressure-panel"', "marks the Mafia vote pressure panel"],
-    ['data-smoke="mafia-vote-pressure-art"', "marks reusable Mafia vote pressure SVG artwork"],
-    ['data-smoke="mafia-vote-pressure-node"', "marks Mafia vote pressure player nodes"],
-    ['data-smoke="mafia-vote-pressure-item"', "marks Mafia vote pressure explanation tiles"],
-    ['data-smoke="mafia-action-route-panel"', "marks the Mafia action-route panel"],
-    ['data-smoke="mafia-action-route-art"', "marks Mafia action-route SVG artwork"],
-    ['data-smoke="mafia-action-route-node"', "marks Mafia action-route SVG nodes"],
-    ['data-smoke="mafia-action-route-item"', "marks Mafia action-route explanation tiles"],
-    ["마피아 액션 루트", "renders Korean Mafia action-route copy"],
     ['smoke="mafia-result-spotlight"', "marks the Mafia finished-game result explanation spotlight"],
     ["mafiaResultDetail", "derives Mafia finished-game winner explanation from loaded survival state"],
     ["buildMafiaOutcomeLedgerItems", "derives Mafia finished-game winner reasoning items from loaded outcome state"],
@@ -632,14 +532,6 @@ function assertTabletopRealtimeSource() {
     ['id="poker-action-panel"', "keeps the Poker action section addressable from the compact rail"],
     ["현재 비용", "shows the current Poker call cost in the action panel"],
     ['핸드 {handNo || "-"} / {maxHands || "-"}', "moves the Poker hand counter into the chip status panel"],
-    ["buildPokerActionRouteItems", "derives Poker button-route guidance from loaded action state"],
-    ["PokerActionRoutePanel", "renders Poker action route guidance near the real action buttons"],
-    ["PokerActionRouteArt", "renders Poker action route through local SVG artwork"],
-    ['data-smoke="poker-action-route-panel"', "marks the Poker action route panel"],
-    ['data-smoke="poker-action-route-art"', "marks reusable Poker action route SVG artwork"],
-    ['data-smoke="poker-action-route-node"', "marks Poker action route SVG nodes"],
-    ['data-smoke="poker-action-route-item"', "marks Poker action route explanation tiles"],
-    ["포커 액션 루트", "labels Poker button-route guidance in Korean"],
     ["PokerCommunityStandbyPanel", "renders Poker no-community-card guidance from loaded hand state"],
     ["PokerCommunityStandbyArt", "renders Poker no-community-card guidance through reusable SVG artwork"],
     ['data-smoke="poker-community-standby-panel"', "marks the Poker community standby panel"],
@@ -896,19 +788,6 @@ function assertCitadelsExperienceSource() {
     "건설 후보 브리핑",
     "막힌 이유",
     "금화 부족",
-    'data-smoke="citadels-action-availability-panel"',
-    'data-smoke="citadels-action-availability-art"',
-    'data-smoke="citadels-action-availability-node"',
-    'data-smoke="citadels-action-availability-item"',
-    "기본 → 수입/능력 → 건설 → 종료",
-    "buildCitadelsActionRouteItems",
-    "CitadelsActionRoutePanel",
-    "CitadelsActionRouteArt",
-    'data-smoke="citadels-action-route-panel"',
-    'data-smoke="citadels-action-route-art"',
-    'data-smoke="citadels-action-route-node"',
-    'data-smoke="citadels-action-route-item"',
-    "시티델 액션 루트",
     'data-smoke="citadels-empty-hand-panel"',
     'data-smoke="citadels-empty-hand-art"',
     'data-smoke="citadels-empty-hand-node"',
@@ -2646,11 +2525,6 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="catan-score-race-item"]').length >= 1`, "catan score race rendered");
     await waitForExpression(ws, `/자원 → 건설 → 교환 → 승점/.test(document.querySelector('[data-smoke="catan-resource-strategy-panel"]')?.textContent || "")`, "catan resource strategy route copy rendered");
     await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="catan-resource-strategy-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="catan-resource-strategy-node"]')).map((node) => node.getAttribute("data-strategy-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-my-turn") !== null && panel.getAttribute("data-resource-total") !== null && panel.getAttribute("data-ready-builds") !== null && ["resource", "build", "trade", "score"].every((key) => keys.includes(key))); })()`, "catan resource strategy metadata rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-action-atlas-panel"]'))`, "catan action atlas panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-action-atlas-art"]'))`, "catan action atlas SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="catan-action-atlas-item"]').length >= 4`, "catan action atlas items rendered");
-    await waitForExpression(ws, `/액션 아틀라스|보드 대상|주 액션/.test(document.querySelector('[data-smoke="catan-action-atlas-panel"]')?.textContent || "")`, "catan action atlas guidance copy rendered");
-
     mockState.catanDiscardPhase = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 버리기 검증 방`);
@@ -2811,18 +2685,7 @@ async function runRoomFlowSmoke(ws, game) {
     );
   }
   if (game === "dalmuti") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-flow-meter"]'))`, "dalmuti flow meter rendered", 15000);
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "dalmuti flow meter items rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-card-art"]').length >= 2`, "dalmuti card SVG assets rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-play-advisor-panel"]'))`, "dalmuti play advisor panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-play-advisor-art"]'))`, "dalmuti play advisor SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-play-advisor-item"]').length >= 4`, "dalmuti play advisor items rendered");
-    await waitForExpression(ws, `/카드 제출 판단|제출 기준|선택 묶음/.test(document.querySelector('[data-smoke="dalmuti-play-advisor-panel"]')?.textContent || "")`, "dalmuti play advisor copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-rank-pressure-panel"]'))`, "dalmuti rank pressure panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-rank-pressure-art"]'))`, "dalmuti rank pressure SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-rank-pressure-node"]').length >= 2`, "dalmuti rank pressure nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-rank-pressure-item"]').length >= 4`, "dalmuti rank pressure items rendered");
-    await waitForExpression(ws, `/손패 레이스|현재 선|패스 압력/.test(document.querySelector('[data-smoke="dalmuti-rank-pressure-panel"]')?.textContent || "")`, "dalmuti rank pressure copy rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-play-pile-empty-state"]'))`, "dalmuti current pile empty state rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-play-pile-empty-art"]'))`, "dalmuti current pile empty SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-play-pile-empty-node"]').length >= 4`, "dalmuti current pile empty SVG nodes rendered");
@@ -2848,33 +2711,15 @@ async function runRoomFlowSmoke(ws, game) {
   if (game === "six-nimmt") {
     await waitForText(ws, "내 손패");
     await waitForText(ws, "선택한 카드 제출");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-flow-meter"]'))`, "six-nimmt flow meter rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "six-nimmt flow meter items rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-compact-summary"]'))`, "six-nimmt compact summary rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-compact-summary-item"]').length === 4`, "six-nimmt compact summary items rendered");
+    await waitForExpression(ws, `/핵심 요약|현재 단계|주의 행|내 예측/.test(document.querySelector('[data-smoke="six-nimmt-compact-summary"]')?.textContent || "")`, "six-nimmt compact summary copy rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-card-art"]').length >= 8`, "six-nimmt card SVG assets rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-turn-pressure-panel"]'))`, "six-nimmt turn pressure panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-turn-pressure-art"]'))`, "six-nimmt turn pressure SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-turn-pressure-node"]').length >= 2`, "six-nimmt turn pressure nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-turn-pressure-item"]').length >= 4`, "six-nimmt turn pressure items rendered");
-    await waitForExpression(ws, `/선택 잠금|공개 순서|벌점 레이스/.test(document.querySelector('[data-smoke="six-nimmt-turn-pressure-panel"]')?.textContent || "")`, "six-nimmt turn pressure copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-risk-panel"]'))`, "six-nimmt risk panel rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-risk-item"]').length >= 4`, "six-nimmt risk items rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-row-risk-art"]').length >= 4`, "six-nimmt row risk SVG assets rendered");
-    await waitForExpression(ws, `/행 위험|벌점|압박/.test(document.querySelector('[data-smoke="six-nimmt-risk-panel"]')?.textContent || "")`, "six-nimmt risk guidance copy rendered");
   }
   if (game === "telestrations") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-flow-meter"]'))`, "telestrations flow meter rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="telestrations-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "telestrations flow meter items rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-chain-art"]'))`, "telestrations chain SVG asset rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-input-guide-panel"]'))`, "telestrations input guide panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-clue-lens-art"]'))`, "telestrations clue lens SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="telestrations-input-guide-item"]').length >= 4`, "telestrations input guide items rendered");
-    await waitForExpression(ws, `/입력 판단|보고 있는 단서|품질 목표/.test(document.querySelector('[data-smoke="telestrations-input-guide-panel"]')?.textContent || "")`, "telestrations input guidance copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-action-route-panel"]'))`, "telestrations action-route panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-action-route-art"]'))`, "telestrations action-route SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="telestrations-action-route-node"]').length >= 4`, "telestrations action-route SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="telestrations-action-route-item"]').length >= 4`, "telestrations action-route items rendered");
-    await waitForExpression(ws, `/텔레스트레이션 액션 루트|단서 확인|입력 준비|제출|다음 흐름/.test(document.querySelector('[data-smoke="telestrations-action-route-panel"]')?.textContent || "")`, "telestrations action-route Korean copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="telestrations-action-route-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="telestrations-action-route-item"]')).map((node) => node.getAttribute("data-route-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-submitted") !== null && panel.getAttribute("data-awaiting-previous") !== null && panel.getAttribute("data-text-length") !== null && panel.getAttribute("data-has-ink") !== null && panel.getAttribute("data-progress") !== null && ["clue", "input", "submit", "next"].every((key) => keys.includes(key))); })()`, "telestrations action-route metadata rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-support-panel"]'))`, "telestrations compact summary rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="telestrations-compact-summary-item"]').length === 4`, "telestrations compact summary items rendered");
+    await waitForExpression(ws, `/핵심 요약|현재 단계|이전 단서|내 입력|제출 현황/.test(document.querySelector('[data-smoke="telestrations-support-panel"]')?.textContent || "")`, "telestrations compact summary copy rendered");
   }
   if (game === "poker") {
     await waitForText(ws, "내 족보");
@@ -2916,16 +2761,8 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-stage"]'))`, "mafia stage rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-flow-meter"]'))`, "mafia flow meter rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "mafia flow meter items rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-target-intel-panel"]'))`, "mafia target intel panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-target-intel-art"]'))`, "mafia target intel SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-intel-item"]').length >= 4`, "mafia target intel items rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-candidate"]').length >= 3`, "mafia target candidates rendered");
-    await waitForExpression(ws, `/이번 목표|선택 대상|승리 압력/.test(document.querySelector('[data-smoke="mafia-target-intel-panel"]')?.textContent || "")`, "mafia target guidance copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-vote-pressure-panel"]'))`, "mafia vote pressure panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-vote-pressure-art"]'))`, "mafia vote pressure SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-vote-pressure-node"]').length >= 5`, "mafia vote pressure player nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-vote-pressure-item"]').length >= 4`, "mafia vote pressure items rendered");
-    await waitForExpression(ws, `/추리 투표 압박|생존 균형|처형 위험/.test(document.querySelector('[data-smoke="mafia-vote-pressure-panel"]')?.textContent || "")`, "mafia vote pressure copy rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-primary-action"]'))`, "mafia primary action rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-button"]').length >= 3`, "mafia target buttons rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-role-sigil"]').length >= 2`, "mafia role SVG assets rendered");
 
     mockState.mafiaEmptyTargets = true;
@@ -2970,13 +2807,6 @@ async function runRoomFlowSmoke(ws, game) {
   }
   if (game === "citadels") {
     await waitForText(ws, "현재 흐름");
-    await waitForText(ws, "행동 가능성");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-action-availability-panel"]'))`, "citadels action availability panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-action-availability-art"]'))`, "citadels action availability SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-action-availability-node"]').length >= 4`, "citadels action availability SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-action-availability-item"]').length >= 4`, "citadels action availability items rendered");
-    await waitForExpression(ws, `/기본 행동|턴 종료|기본 → 수입\\/능력 → 건설 → 종료/.test(document.querySelector('[data-smoke="citadels-action-availability-panel"]')?.textContent || "")`, "citadels action availability explains button state");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="citadels-action-availability-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="citadels-action-availability-node"]')).map((node) => node.getAttribute("data-availability-key")); return Boolean(panel && panel.getAttribute("data-phase") && panel.getAttribute("data-my-turn") !== null && panel.getAttribute("data-can-build") !== null && panel.getAttribute("data-gold") !== null && ["basic", "income", "build", "end"].every((key) => keys.includes(key))); })()`, "citadels action availability metadata rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-empty-hand-panel"]'))`, "citadels empty hand panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-empty-hand-art"]'))`, "citadels empty hand SVG rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="citadels-empty-hand-node"]').length >= 4`, "citadels empty hand SVG nodes rendered");
@@ -3049,12 +2879,11 @@ async function assertSoloAiFirstActionAvailable(ws, game) {
     return;
   }
   if (game === "catan") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-action-atlas-panel"]'))`, "catan solo AI action atlas rendered");
     await waitForExpression(ws, `Array.from(document.querySelectorAll("button")).some((button) => !button.disabled && button.textContent.includes("주사위 굴리기"))`, "catan solo AI roll action enabled");
     return;
   }
   if (game === "six-nimmt") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-action-route-panel"]'))`, "six-nimmt solo AI action route rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-compact-summary"]'))`, "six-nimmt solo AI compact summary rendered");
     const clicked = await evaluate(ws, `(() => {
       const button = Array.from(document.querySelectorAll("button")).find((node) => !node.disabled && (node.getAttribute("aria-label") || "").includes("카드"));
       if (!button) return false;
@@ -3460,12 +3289,9 @@ async function inspectPage(ws, testCase, viewport) {
     }
   }
   if (testCase.assertTelestrationsDraw) {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-drawing-tool-panel"]'))`, "telestrations drawing tool panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-drawing-tool-art"]'))`, "telestrations drawing tool SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="telestrations-drawing-tool-node"]').length >= 4`, "telestrations drawing tool swatches rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="telestrations-drawing-tool-item"]').length >= 4`, "telestrations drawing tool items rendered");
-    await waitForExpression(ws, `/그림 도구 상태|브러시 굵기|캔버스 잉크|제출 전 캔버스 점검/.test(document.querySelector('[data-smoke="telestrations-drawing-tool-panel"]')?.textContent || "")`, "telestrations drawing tool copy rendered");
-    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="telestrations-drawing-tool-panel"]'); const keys = Array.from(document.querySelectorAll('[data-smoke="telestrations-drawing-tool-item"]')).map((node) => node.getAttribute("data-tool-key")); return Boolean(panel && panel.getAttribute("data-brush-size") === "5" && panel.getAttribute("data-has-ink") === "false" && panel.getAttribute("data-submitted") === "false" && ["brush", "color", "ink", "submit"].every((key) => keys.includes(key))); })()`, "telestrations drawing tool metadata rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-support-panel"]'))`, "telestrations compact summary rendered for drawing");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="telestrations-compact-summary-item"]').length === 4`, "telestrations compact summary items rendered for drawing");
+    await waitForExpression(ws, `(() => { const panel = document.querySelector('[data-smoke="telestrations-support-panel"]'); return Boolean(panel && /내 입력|제출 현황/.test(panel.textContent || "")); })()`, "telestrations drawing summary copy rendered");
   }
   if (testCase.assertTelestrationsReveal) {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="telestrations-reveal-insight-panel"]'))`, "telestrations reveal insight panel rendered");

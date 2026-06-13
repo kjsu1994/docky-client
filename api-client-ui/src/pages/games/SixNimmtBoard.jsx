@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { GameFlowMeter } from "./GameUxAssets.jsx";
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
@@ -1028,35 +1027,6 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
   const sixNimmtPlayerCount = sixNimmtTurnPlayers.length || roomPlayers.length || 0;
   const sixNimmtSelectedCount = Math.max(selectedSeatNos.size, sixNimmtTurnPlayers.filter((player) => player.selected).length);
   const sixNimmtWaitingCount = Math.max(0, sixNimmtPlayerCount - sixNimmtSelectedCount);
-  const sixNimmtPenaltyLeader = sixNimmtTurnPlayers.slice().sort((left, right) => left.totalPenalty - right.totalPenalty)[0] || null;
-  const sixNimmtMySignal = sixNimmtTurnPlayers.find((player) => player.seatNo === Number(mySeatNo)) || null;
-  const sixNimmtAllLocked = sixNimmtPlayerCount > 0 && sixNimmtSelectedCount >= sixNimmtPlayerCount;
-  const sixNimmtTurnPressureItems = [
-    {
-      label: "선택 잠금",
-      value: `${sixNimmtSelectedCount}/${sixNimmtPlayerCount || "-"}명`,
-      detail: mySelected ? "내 카드는 숨겨진 선택으로 잠겼습니다." : waitingSelection ? "내 카드가 아직 공개 큐에 들어가지 않았습니다." : `${sixNimmtWaitingCount}명의 선택을 기다립니다.`,
-      className: mySelected ? "border-emerald-100 bg-emerald-50/80" : waitingSelection ? "border-amber-100 bg-amber-50/80" : "border-slate-100 bg-slate-50",
-    },
-    {
-      label: "공개 순서",
-      value: pendingCard ? `${sixNimmtCardValue(pendingCard)} 카드 처리` : sixNimmtAllLocked ? "낮은 숫자부터" : `${sixNimmtWaitingCount}명 대기`,
-      detail: pendingCard ? "현재 공개된 카드가 들어갈 행을 확정해야 합니다." : sixNimmtAllLocked ? "모든 카드가 잠겼고 낮은 숫자부터 행에 배치됩니다." : "아직 선택하지 않은 좌석이 공개를 늦추고 있습니다.",
-      className: pendingCard || sixNimmtAllLocked ? "border-sky-100 bg-sky-50/80" : "border-slate-100 bg-slate-50",
-    },
-    {
-      label: "행 선택",
-      value: needsRowChoice ? "내 선택 차례" : phase === "ROW_CHOICE" ? `${playerNameBySeat(activeSeatNo)} 대기` : recommendedRowIndex >= 0 ? `${recommendedRowIndex + 1}행 최저` : "대기",
-      detail: needsRowChoice ? `${sixNimmtCardValue(pendingCard)} 카드 때문에 가져갈 행을 골라야 합니다.` : phase === "ROW_CHOICE" ? "대상 플레이어가 행을 선택해야 다음 공개가 진행됩니다." : recommendedRowIndex >= 0 ? `강제 회수 시 ${recommendedRowIndex + 1}행이 현재 최저 벌점입니다.` : "행 정보가 도착하면 추천 회수 후보를 표시합니다.",
-      className: needsRowChoice ? "border-orange-100 bg-orange-50/80" : "border-slate-100 bg-slate-50",
-    },
-    {
-      label: "벌점 레이스",
-      value: sixNimmtPenaltyLeader ? `${sixNimmtPenaltyLeader.name} ${sixNimmtPenaltyLeader.totalPenalty}벌점` : "-",
-      detail: sixNimmtMySignal ? `나는 총 ${sixNimmtMySignal.totalPenalty}벌점, 이번 라운드 ${sixNimmtMySignal.roundPenalty}벌점입니다.` : "플레이어 벌점 정보가 도착하면 내 위치를 표시합니다.",
-      className: "border-rose-100 bg-rose-50/80",
-    },
-  ];
   const sixNimmtFlowItems = [
     {
       label: "라운드",
@@ -1205,7 +1175,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           </div>
         </section>
 
-        <section className="scroll-mt-24 space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:rounded-[1.5rem] sm:p-4">
+        <section data-smoke="six-nimmt-compact-summary" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:rounded-[1.5rem] sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-sm font-black text-slate-900">핵심 요약</div>
@@ -1215,48 +1185,40 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
               {sixNimmtSelectedCount}/{sixNimmtPlayerCount || "-"}명 선택
             </div>
           </div>
-          <GameFlowMeter
-            title="6 nimmt! 판 읽기"
-            detail="제출 수, 위험 행, 내 카드 예측을 압축해서 확인합니다."
-            items={sixNimmtFlowItems}
-            tone="amber"
-            smoke="six-nimmt-flow-meter"
-          />
-          <SixNimmtActionRoutePanel
-            phase={phase}
-            waitingSelection={waitingSelection}
-            needsRowChoice={needsRowChoice}
-            mySelected={mySelected}
-            selectedCard={selectedCard}
-            pendingCard={pendingCard}
-            selectedPreview={selectedPreview}
-            selectedAnchorX={selectedAnchorX}
-            selectedRowIndex={selectedRowIndex}
-            recommendedRowIndex={recommendedRowIndex}
-            selectedCount={sixNimmtSelectedCount}
-            playerCount={sixNimmtPlayerCount}
-            waitingCount={sixNimmtWaitingCount}
-          />
-          <SixNimmtTurnPressurePanel
-            playerSignals={sixNimmtTurnPlayers}
-            pressureItems={sixNimmtTurnPressureItems}
-            selectedCount={sixNimmtSelectedCount}
-            playerCount={sixNimmtPlayerCount}
-            phase={phase}
-            pendingCard={pendingCard}
-            activeSeatNo={activeSeatNo}
-            mySeatNo={mySeatNo}
-          />
-          <SixNimmtRiskPanel
-            rows={rows}
-            waitingSelection={waitingSelection}
-            needsRowChoice={needsRowChoice}
-            selectedCard={selectedCard}
-            selectedPreview={selectedPreview}
-            selectedRowIndex={selectedRowIndex}
-            recommendedRowIndex={recommendedRowIndex}
-            pendingCard={pendingCard}
-          />
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                key: "phase",
+                label: "현재 단계",
+                value: phaseLabel,
+                detail: mySelected ? "내 카드는 제출 완료" : waitingSelection ? "손패에서 한 장 선택" : needsRowChoice ? "가져갈 행 선택" : "진행 대기",
+              },
+              {
+                key: "lock",
+                label: "선택 잠금",
+                value: `${sixNimmtSelectedCount}/${sixNimmtPlayerCount || "-"}명`,
+                detail: sixNimmtWaitingCount > 0 ? `${sixNimmtWaitingCount}명 대기` : "공개 준비 완료",
+              },
+              {
+                key: "risk",
+                label: "주의 행",
+                value: mostDangerousRow.index >= 0 ? `${mostDangerousRow.index + 1}행 · ${mostDangerousRow.penalty}벌점` : "-",
+                detail: mostDangerousRow.index >= 0 ? `${mostDangerousRow.cardCount}/5장` : "행 정보 대기",
+              },
+              {
+                key: "preview",
+                label: "내 예측",
+                value: mySelected ? "제출 완료" : selectedPreview ? selectedPreview.label : needsRowChoice ? "행 선택 필요" : "카드 선택",
+                detail: selectedPreview?.penalty ? `${selectedPreview.penalty}벌점 위험` : selectedPreview ? "자동 배치 후보" : "선택 전",
+              },
+            ].map((item) => (
+              <div key={item.key} data-smoke="six-nimmt-compact-summary-item" className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className="mt-0.5 truncate text-sm font-black text-slate-900">{item.value}</div>
+                <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
         </section>
       </main>
 

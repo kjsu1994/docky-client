@@ -1706,62 +1706,15 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
               {dalmutiPhaseLabel}
             </div>
           </div>
-          <GameFlowMeter
-            title="달무티 라운드 흐름"
-            detail="세금, 혁명, 제출 기준, 선택 카드 상태를 같은 흐름으로 확인합니다."
-            items={dalmutiFlowItems}
-            tone={phase === "FINISHED" ? "amber" : canPlay || canReturnTax || canDecideRevolution ? "emerald" : "slate"}
-            smoke="dalmuti-flow-meter"
-          />
-          <DalmutiActionRoutePanel
-            phase={phase}
-            phaseLabel={dalmutiPhaseLabel}
-            canPlay={canPlay}
-            canReturnTax={canReturnTax}
-            canDecideRevolution={canDecideRevolution}
-            selectedCards={selectedCards}
-            selectedPlayStatus={selectedPlayStatus}
-            currentTrick={currentTrick}
-            currentTrickLabel={currentTrickLabel}
-            currentTrickCount={currentTrickCount}
-            pendingTaxCount={pendingTaxCount}
-            passCount={passCount}
-            requiredPassCount={requiredPassCount}
-            taxProgressText={taxProgressText}
-            activeName={activeSeatNo ? playerName(activeSeatNo) : ""}
-            leadName={leadSeatNo ? playerName(leadSeatNo) : ""}
-            eligibleCount={eligibleSeatNos.length}
-            declinedCount={declinedSeatNoSet.size}
-            handCount={hand.length}
-          />
-          <DalmutiRankPressurePanel
-            rows={dalmutiRankPressureRows}
-            phase={phase}
-            activeSeatNo={activeSeatNo}
-            leadSeatNo={leadSeatNo}
-            passCount={passCount}
-            requiredPassCount={requiredPassCount}
-            currentTrickLabel={currentTrickLabel}
-            nextLeaderName={dalmutiNextLeaderName}
-          />
-          <DalmutiPlayAdvisorPanel
-            phase={phase}
-            canPlay={canPlay}
-            canReturnTax={canReturnTax}
-            canDecideRevolution={canDecideRevolution}
-            selectedCards={selectedCards}
-            selectedPlayStatus={selectedPlayStatus}
-            currentTrick={currentTrick}
-            currentTrickCount={currentTrickCount}
-            currentTrickRank={currentTrickRank}
-            handRankGroups={handRankGroups}
-            pendingTaxCount={pendingTaxCount}
-            passCount={passCount}
-            requiredPassCount={requiredPassCount}
-            taxProgressText={taxProgressText}
-            selectionHint={selectionHint}
-            trickClearHint={trickClearHint}
-          />
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {dalmutiFlowItems.map((item) => (
+              <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
+                <div className="mt-0.5 truncate text-sm font-black text-slate-900">{item.value}</div>
+                <div className="mt-0.5 line-clamp-1 text-[10px] font-bold text-slate-500">{item.detail}</div>
+              </div>
+            ))}
+          </div>
         </section>
       </div>
 
