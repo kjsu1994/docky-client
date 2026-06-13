@@ -55,7 +55,7 @@ export const Header = () => {
                             <Menu className={`h-5 w-5 transition-transform duration-300 ${menuOpen ? "rotate-90 scale-110" : ""}`} />
                         </button>
 
-                        <Link to="/app" className="group flex items-center gap-3" aria-label="게임 허브로 이동">
+                        <Link to="/app" className="group flex items-center gap-3" aria-label="홈 대시보드로 이동">
                             <BrandLogo
                                 className="transition-transform duration-500 group-hover:scale-[1.03]"
                                 markClassName="h-12 max-w-[10rem]"

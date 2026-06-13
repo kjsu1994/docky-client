@@ -46,6 +46,7 @@ import { trapFocus } from "../../utils/focusTrap.js";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import AuthenticatedAttachmentImage from "../../components/AuthenticatedAttachmentImage.jsx";
+import { confirmAction } from "../../common/confirmAction.jsx";
 
 const MESSAGE_PAGE_SIZE = 20;
 
@@ -629,7 +630,14 @@ export const Chat = () => {
         const roomId = getRoomId(roomActionTarget);
         if (!roomId) return;
         const title = roomActionTarget?.title || "채팅방";
-        if (!window.confirm(`${title}에서 나가시겠습니까?`)) return;
+        const confirmed = await confirmAction({
+            title: "채팅방 나가기",
+            description: `${title}에서 나가시겠습니까?`,
+            confirmText: "나가기",
+            cancelText: "취소",
+            tone: "danger",
+        });
+        if (!confirmed) return;
         try {
             await chatAdapter.leaveRoom(roomId);
             setRooms((prev) => prev.filter((room) => String(getRoomId(room)) !== String(roomId)));

@@ -17,7 +17,8 @@
 - page component에서 raw response shape를 직접 해석하지 않는다.
 - 요청 범위 밖의 UI 개편, 리팩터링, 문서 추가를 하지 않는다.
 - PC, 테블릿, 모바일 환경(마우스클릭, 터치, 화면비율, 화면의 작은크기에 대한 UX대응 등)을 모두 고려해서 작업한다.
-  Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+- 목표는 현재 운영중인 다른 대규모서비스에 준하는 수준의 서비스 운영이므로 성능, 속도, 사용자편의, UX, UI, 연결성, 신뢰성, 디자인 외에도 다양한 관점에서 높은수준의 구현을 제공하도록 고려하여 작업한다.
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 

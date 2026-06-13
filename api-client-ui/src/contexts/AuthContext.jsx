@@ -61,7 +61,9 @@ export const AuthProvider = ({ children }) => {
             const refreshCookieHint = hasRefreshCookieHint();
             if (token || refreshToken || refreshCookieHint) {
                 try {
-                    if (!token && (refreshToken || refreshCookieHint)) {
+                    const hasStoredRefreshToken = !token && refreshToken;
+                    const shouldRefreshAccessToken = hasStoredRefreshToken || (!token && refreshCookieHint);
+                    if (shouldRefreshAccessToken) {
                         const { refreshAccessToken } = await loadApi();
                         await refreshAccessToken();
                     }

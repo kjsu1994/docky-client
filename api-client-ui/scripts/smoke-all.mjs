@@ -4,6 +4,7 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const includeRuntimeChecks = process.env.SMOKE_RUNTIME === "1";
 const checks = [
     ["run", "smoke:text-quality"],
+    ["run", "smoke:theme-background"],
     ["run", "smoke:api-errors"],
     ["run", "smoke:toast-runtime"],
     ["run", "smoke:page-guides"],

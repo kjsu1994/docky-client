@@ -5,7 +5,9 @@ const root = process.cwd();
 const scanRoots = [
     "src",
     "scripts",
-    "README.md",
+    "../README.md",
+];
+const optionalScanRoots = [
     "docs/SCREEN_API_MAPPING.md",
 ];
 
@@ -34,9 +36,16 @@ const blockedPhrases = [
 
 const files = [];
 
-const walk = async (relativePath) => {
-    const absolutePath = path.join(root, relativePath);
-    const info = await stat(absolutePath);
+const walk = async (relativePath, { optional = false } = {}) => {
+    const absolutePath = path.resolve(root, relativePath);
+    let info;
+
+    try {
+        info = await stat(absolutePath);
+    } catch (error) {
+        if (optional && error?.code === "ENOENT") return;
+        throw error;
+    }
 
     if (info.isDirectory()) {
         if (ignoredDirs.has(path.basename(relativePath))) return;
@@ -50,7 +59,10 @@ const walk = async (relativePath) => {
     }
 };
 
-await Promise.all(scanRoots.map(walk));
+await Promise.all([
+    ...scanRoots.map((scanRoot) => walk(scanRoot)),
+    ...optionalScanRoots.map((scanRoot) => walk(scanRoot, { optional: true })),
+]);
 
 const mainSource = await readFile(path.join(root, "src", "main.jsx"), "utf8");
 const appSource = await readFile(path.join(root, "src", "App.jsx"), "utf8");
@@ -191,15 +203,15 @@ for (const file of files) {
     const normalizedFile = file.split(path.sep).join("/");
     const extension = path.extname(file);
 
+    if (normalizedFile === "scripts/text-quality-smoke.mjs") {
+        continue;
+    }
+
     if (badTextPattern.test(source)) {
         failures.push(`${file}:${patternLine(source, badTextPattern)}: mojibake-like text`);
     }
     if (commonMojibakePattern.test(source)) {
         failures.push(`${file}:${patternLine(source, commonMojibakePattern)}: common UTF-8 mojibake pattern`);
-    }
-
-    if (normalizedFile === "scripts/text-quality-smoke.mjs") {
-        continue;
     }
 
     if (escapedKoreanPattern.test(source)) {

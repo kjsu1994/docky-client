@@ -5,6 +5,7 @@ import { DelayedLoadingPage } from "./components/LoadingSpinner";
 import { GlobalNetworkIndicatorEntry } from "./components/GlobalNetworkIndicatorEntry.jsx";
 import { AppErrorBoundary } from "./common/AppErrorBoundary.jsx";
 import { ToastViewportEntry } from "./common/ToastViewportEntry.jsx";
+import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 
 const ProtectedRoutes = lazy(() =>
     import("./components/ProtectedRoutes.jsx").then((module) => ({ default: module.ProtectedRoutes }))
@@ -22,10 +23,10 @@ const PublicRoute = ({ children }) => (
 );
 
 const GuestRoute = ({ children }) => {
-    const { isAuthenticated, loading, passwordResetRequired } = useAuth();
+    const { isAuthenticated, loading } = useAuth();
 
     if (loading) return <DelayedLoadingPage />;
-    if (isAuthenticated) return <Navigate to={passwordResetRequired ? "/password/change-required" : "/app"} replace />;
+    if (isAuthenticated) return <Navigate to="/app" replace />;
 
     return <PublicRoute>{children}</PublicRoute>;
 };
@@ -76,7 +77,9 @@ const AppShell = () => {
 function App() {
     return (
         <BrowserRouter>
-            <AppShell />
+            <ThemeProvider>
+                <AppShell />
+            </ThemeProvider>
         </BrowserRouter>
     );
 }

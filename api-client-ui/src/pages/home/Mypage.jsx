@@ -13,14 +13,17 @@ import {
     Mail,
     MessageSquare,
     MonitorSmartphone,
+    Moon,
     Phone,
     RefreshCw,
     ShieldCheck,
+    Sun,
     TrendingUp,
     Trash2,
     User,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
+import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { ErrorMessage } from "../../components/ErrorMessage.jsx";
 import { EmptyState } from "../../components/EmptyState.jsx";
@@ -45,8 +48,36 @@ const formatSignedExp = (value) => {
     return `${sign}${formatNumber(Math.abs(numeric))}`;
 };
 
+const themePreferenceLabels = {
+    system: "시스템",
+    light: "라이트",
+    dark: "다크",
+};
+
+const themePreferenceOptions = [
+    {
+        value: "system",
+        label: "시스템",
+        description: "브라우저와 기기 설정에 맞춰 자동으로 전환합니다.",
+        icon: MonitorSmartphone,
+    },
+    {
+        value: "light",
+        label: "라이트",
+        description: "항상 밝은 배경을 사용합니다.",
+        icon: Sun,
+    },
+    {
+        value: "dark",
+        label: "다크",
+        description: "항상 어두운 배경을 사용합니다.",
+        icon: Moon,
+    },
+];
+
 export const Mypage = () => {
     const { user, logout } = useAuth();
+    const { preference: themePreference, resolvedTheme, setPreference: setThemePreference } = useTheme();
     const navigate = useNavigate();
     const [member, setMember] = useState(null);
     const [myBoards, setMyBoards] = useState([]);
@@ -307,6 +338,12 @@ export const Mypage = () => {
         }
     };
 
+    const handleThemePreferenceChange = useCallback((nextPreference) => {
+        if (nextPreference === themePreference) return;
+        setThemePreference(nextPreference);
+        notifySuccess(`화면 테마를 ${themePreferenceLabels[nextPreference] || "시스템"} 모드로 설정했습니다.`);
+    }, [setThemePreference, themePreference]);
+
     if (loading) {
         return <LoadingSpinner text="회원 정보를 불러오는 중입니다..." />;
     }
@@ -370,12 +407,13 @@ export const Mypage = () => {
             </section>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
                     <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>프로필</TabButton>
                     <TabButton active={activeTab === "posts"} onClick={() => setActiveTab("posts")}>작성 글</TabButton>
                     <TabButton active={activeTab === "stats"} onClick={() => setActiveTab("stats")}>활동 통계</TabButton>
                     <TabButton active={activeTab === "security"} onClick={() => setActiveTab("security")}>보안</TabButton>
                     <TabButton active={activeTab === "privacy"} onClick={() => setActiveTab("privacy")}>개인정보</TabButton>
+                    <TabButton active={activeTab === "settings"} onClick={() => setActiveTab("settings")}>설정</TabButton>
                 </div>
             </div>
 
@@ -409,6 +447,13 @@ export const Mypage = () => {
                     onExport={handleDownloadPrivacyExport}
                     onDeleteAccount={openDeleteModal}
                     deleteBusy={deleteBusy}
+                />
+            ) : null}
+            {activeTab === "settings" ? (
+                <SettingsTab
+                    themePreference={themePreference}
+                    resolvedTheme={resolvedTheme}
+                    onThemePreferenceChange={handleThemePreferenceChange}
                 />
             ) : null}
 
@@ -457,6 +502,54 @@ const TabButton = ({ active, onClick, children }) => (
     >
         {children}
     </button>
+);
+
+const SettingsTab = ({ themePreference, resolvedTheme, onThemePreferenceChange }) => (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 className="flex items-center gap-2 text-lg font-black text-slate-900">
+                    <MonitorSmartphone className="h-5 w-5 text-sky-600" />
+                    화면 설정
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                    기본값은 시스템 설정을 따르고, 필요할 때만 라이트 또는 다크 배경을 고정합니다.
+                </p>
+            </div>
+            <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600" role="status">
+                현재 적용: {resolvedTheme === "dark" ? "다크" : "라이트"}
+            </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="화면 테마 선택">
+            {themePreferenceOptions.map((option) => {
+                const Icon = option.icon;
+                const active = themePreference === option.value;
+                return (
+                    <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => onThemePreferenceChange(option.value)}
+                        className={`rounded-2xl border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 ${
+                            active
+                                ? "border-sky-300 bg-sky-50 text-slate-900 shadow-sm"
+                                : "border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-200 hover:bg-white"
+                        }`}
+                    >
+                        <span className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl ${
+                            active ? "bg-sky-600 text-white" : "bg-white text-slate-500"
+                        }`}>
+                            <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="block text-sm font-black">{option.label}</span>
+                        <span className="mt-2 block text-xs font-semibold leading-5 text-slate-500">{option.description}</span>
+                    </button>
+                );
+            })}
+        </div>
+    </section>
 );
 
 const SecurityTab = ({

@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { DelayedLoadingPage, DelayedRouteFallback } from "./LoadingSpinner";
 import { AdminMfaGate } from "./AdminMfaGate.jsx";
-import { ProtectedAppLayout } from "./ProtectedAppLayout.jsx";
+const ProtectedAppLayout = lazy(() => import("./ProtectedAppLayout.jsx").then((module) => ({ default: module.ProtectedAppLayout })));
 const Home = lazy(() => import("../pages/home/Home.jsx").then((module) => ({ default: module.Home })));
 const BoardList = lazy(() => import("../pages/boards/BoardList.jsx").then((module) => ({ default: module.BoardList })));
 const BoardDetail = lazy(() => import("../pages/boards/BoardDetail.jsx").then((module) => ({ default: module.BoardDetail })));
@@ -53,10 +53,10 @@ const ProtectedRoute = ({ children }) => {
 
 export const ProtectedRoutes = () => (
     <ProtectedRoute>
-        <ProtectedAppLayout>
-            <Suspense fallback={<DelayedRouteFallback />}>
+        <Suspense fallback={<DelayedRouteFallback />}>
+            <ProtectedAppLayout>
                 <Routes>
-                    <Route index element={<GamesHub />} />
+                    <Route index element={<Home />} />
                     <Route path="home" element={<Home />} />
                     <Route path="boards/:kind" element={<BoardList />} />
                     <Route path="boards/:kind/new" element={<BoardForm />} />
@@ -68,7 +68,7 @@ export const ProtectedRoutes = () => (
                     <Route path="streaming" element={<StreamingHub />} />
                     <Route path="invest" element={<InvestAssistant />} />
                     <Route path="all-menu" element={<AllMenu />} />
-                    <Route path="games" element={<Navigate to="/app" replace />} />
+                    <Route path="games" element={<GamesHub />} />
 
                     <Route path="statistics" element={<Statistics />} />
                     <Route path="ranks" element={<Ranks />} />
@@ -99,8 +99,8 @@ export const ProtectedRoutes = () => (
 
                     <Route path="*" element={<Navigate to="/app" replace />} />
                 </Routes>
-            </Suspense>
-        </ProtectedAppLayout>
+            </ProtectedAppLayout>
+        </Suspense>
     </ProtectedRoute>
 );
 

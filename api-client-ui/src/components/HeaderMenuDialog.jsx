@@ -52,8 +52,8 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
             {
                 title: "핵심",
                 items: [
-                    { title: "게임 허브", to: "/app", icon: Dices },
-                    { title: "홈 대시보드", to: "/app/home", icon: Home },
+                    { title: "게임 허브", to: "/app/games", icon: Dices },
+                    { title: "홈 대시보드", to: "/app", icon: Home },
                     { title: "할 일", to: "/app/todos", icon: CalendarDays },
                     { title: "통계", to: "/app/statistics", icon: BarChart },
                     { title: "사용자게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare },

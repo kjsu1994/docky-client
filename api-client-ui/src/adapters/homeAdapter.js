@@ -196,6 +196,10 @@ const getCachedHomeDashboard = (cacheKey) => {
         homeDashboardCache.delete(cacheKey);
         return null;
     }
+    if (!isCacheableHomeDashboard(cached.value)) {
+        homeDashboardCache.delete(cacheKey);
+        return null;
+    }
     homeDashboardCache.delete(cacheKey);
     homeDashboardCache.set(cacheKey, cached);
     return cloneHomeDashboard(cached.value);
@@ -203,6 +207,10 @@ const getCachedHomeDashboard = (cacheKey) => {
 
 const isCacheableHomeDashboard = (dashboard) => {
     return Boolean(dashboard) &&
+        Boolean(dashboard.stats?.summary) &&
+        Array.isArray(dashboard.recentBoards) &&
+        Array.isArray(dashboard.heroBanners) &&
+        dashboard.heroBanners.length > 0 &&
         !dashboard.stats?.unavailable &&
         !dashboard.recentBoardsUnavailable &&
         !dashboard.heroBannersUnavailable;
@@ -541,7 +549,10 @@ export const fetchHomeDashboard = async ({ user, signal, force = false, onSectio
 
         const existing = homeDashboardInFlight.get(cacheKey);
         if (existing) {
-            return waitForHomeDashboardEntry(existing, signal, onSection);
+            if (!existing.controller.signal.aborted) {
+                return waitForHomeDashboardEntry(existing, signal, onSection);
+            }
+            homeDashboardInFlight.delete(cacheKey);
         }
 
         return waitForHomeDashboardEntry(startHomeDashboardRequest({ cacheKey, user }), signal, onSection);

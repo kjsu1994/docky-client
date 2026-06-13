@@ -126,6 +126,19 @@ function routeMock(url, method) {
         };
     }
 
+    if (method === "GET" && pathname === "/api/members/admin-mfa/status") {
+        return {
+            status: 200,
+            body: {
+                data: {
+                    required: true,
+                    verified: true,
+                    ttl_seconds: 600,
+                },
+            },
+        };
+    }
+
     if (method === "GET" && pathname === "/api/chat/rooms") {
         return { status: 200, body: { data: [] } };
     }

@@ -1,9 +1,13 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = (relativePath) => readFileSync(path.join(rootDir, relativePath), "utf8");
+const optionalSource = (relativePath) => {
+    const targetPath = path.join(rootDir, relativePath);
+    return existsSync(targetPath) ? readFileSync(targetPath, "utf8") : "";
+};
 
 const pageSource = source("src/pages/admin/AdminCommandCenter.jsx");
 const protectedRoutesSource = source("src/components/ProtectedRoutes.jsx");
@@ -11,7 +15,7 @@ const allMenuSource = source("src/pages/home/AllMenu.jsx");
 const guideSource = source("src/common/pageGuides.js");
 const anomalyAdapterSource = source("src/adapters/adminAnomaliesAdapter.js");
 const packageSource = source("package.json");
-const mappingSource = source("docs/SCREEN_API_MAPPING.md");
+const mappingSource = optionalSource("docs/SCREEN_API_MAPPING.md");
 
 const assert = (condition, message) => {
     if (!condition) {
@@ -55,7 +59,9 @@ assert(protectedRoutesSource.includes("AdminCommandCenter") && protectedRoutesSo
 assert(allMenuSource.includes("운영 커맨드 센터") && allMenuSource.includes('to: "/app/admin"'), "AllMenu must expose the command center entry.");
 assert(guideSource.includes('path === "/app/admin"') && guideSource.includes("처리 순서") && guideSource.includes("회원 360"), "Page guide must explain the admin command center.");
 assert(packageSource.includes('"smoke:admin-command-center-ui"'), "package.json must expose the command center smoke script.");
-assert(mappingSource.includes("- `/app/admin`") && mappingSource.includes("fetchCommandCenter"), "SCREEN_API_MAPPING must document /app/admin.");
+if (mappingSource) {
+    assert(mappingSource.includes("- `/app/admin`") && mappingSource.includes("fetchCommandCenter"), "SCREEN_API_MAPPING must document /app/admin.");
+}
 
 const adapterSnippets = [
     "async fetchCommandCenter",

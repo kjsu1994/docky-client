@@ -486,9 +486,9 @@ export const Home = () => {
     if (error) return <ErrorMessage message={error} onRetry={fetchData} />;
 
     const changeRate = Number(stats.compare?.dayOverDayChangeRate) || 0;
-    const statsPending = loading && !stats.summary && !stats.unavailable;
+    const statsPending = !stats.summary && !stats.unavailable;
     const boardsPending = loading && recentBoards.length === 0 && !recentBoardsUnavailable;
-    const bannersPending = loading && bannerCount === 0 && !heroBannersUnavailable;
+    const bannersPending = bannerCount === 0 && !heroBannersUnavailable;
     const statsUnavailable = Boolean(stats.unavailable);
     const statValue = (value) => (statsPending || statsUnavailable) ? "-" : formatNumber(value || 0);
 
@@ -983,6 +983,7 @@ const HomeQuickSearch = ({ query, results, onQueryChange }) => {
                                 className="rounded-xl bg-slate-50 px-3 py-2 text-left transition hover:bg-primary-50"
                                 onPointerEnter={handlePrefetch}
                                 onFocus={handlePrefetch}
+                                onFocusCapture={handlePrefetch}
                                 onTouchStart={handlePrefetch}
                                 aria-label={`${item.title} 바로 이동`}
                                 role="listitem"
@@ -1102,6 +1103,7 @@ const HeaderStat = ({ label, value, trend }) => {
 };
 
 const QuickMenuLink = ({ to, icon: Icon, title, color, prefetch }) => {
+    const linkRef = useRef(null);
     const colors = {
         blue: "text-blue-500 bg-white shadow-blue-100",
         rose: "text-rose-500 bg-white shadow-rose-100",
@@ -1116,12 +1118,21 @@ const QuickMenuLink = ({ to, icon: Icon, title, color, prefetch }) => {
         if (prefetch) prefetchHomeRoute(prefetch);
     };
 
+    useEffect(() => {
+        const node = linkRef.current;
+        if (!node) return undefined;
+        node.addEventListener("focus", handlePrefetch);
+        return () => node.removeEventListener("focus", handlePrefetch);
+    }, [handlePrefetch]);
+
     return (
         <Link
+            ref={linkRef}
             to={to}
             className="group flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 sm:min-h-[132px]"
             onPointerEnter={handlePrefetch}
             onFocus={handlePrefetch}
+            onFocusCapture={handlePrefetch}
             onTouchStart={handlePrefetch}
             aria-label={`${title} 바로가기`}
         >

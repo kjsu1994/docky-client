@@ -53,8 +53,8 @@ export const AllMenu = () => {
     const userLevel = user?.levelDto || user?.level_dto || user?.level || {};
 
     const mainServices = [
-        { title: "게임 허브", to: "/app", icon: Dices, color: "bg-amber-50 text-amber-700" },
-        { title: "홈 대시보드", to: "/app/home", icon: Home, color: "bg-blue-50 text-blue-600" },
+        { title: "게임 허브", to: "/app/games", icon: Dices, color: "bg-amber-50 text-amber-700" },
+        { title: "홈 대시보드", to: "/app", icon: Home, color: "bg-blue-50 text-blue-600" },
         { title: "할 일", to: "/app/todos", icon: CalendarDays, color: "bg-emerald-50 text-emerald-700" },
         { title: "통계", to: "/app/statistics", icon: BarChart, color: "bg-indigo-50 text-indigo-600" },
         { title: "스트리밍", to: "/app/streaming", icon: Film, color: "bg-fuchsia-50 text-fuchsia-700" },

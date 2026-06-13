@@ -70,6 +70,7 @@ let forceStatsFailure = false;
 let forceBoardsFailure = false;
 let forceBannerFailure = false;
 let slowStatsDashboard = false;
+const observedRequests = [];
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -646,7 +647,11 @@ function routeMock(url, method, postData, headers = {}) {
 async function handleFetchRequest(ws, event) {
     const { requestId, request } = event.params;
     const requestUrl = request.url || "";
-    if (/FloatingChat/i.test(requestUrl)) {
+    if (/\/(?:api|stats|boards|banners|members|src|assets)\b/i.test(requestUrl)) {
+        observedRequests.push(`${request.method} ${requestUrl}`);
+        if (observedRequests.length > 20) observedRequests.shift();
+    }
+    if (/\/FloatingChat(?:\.jsx|-[^/]+\.js)/i.test(requestUrl)) {
         floatingChatChunkRequests += 1;
     }
     if (/PageGuideDialog|pageGuides/i.test(requestUrl)) {
@@ -658,10 +663,10 @@ async function handleFetchRequest(ws, event) {
     if (/HeaderMenuDialog/i.test(requestUrl)) {
         headerMenuChunkRequests += 1;
     }
-    if (/\/BottomNav-[^/]+\.js/i.test(requestUrl)) {
+    if (/\/BottomNav(?:\.jsx|-[^/]+\.js)/i.test(requestUrl)) {
         bottomNavChunkRequests += 1;
     }
-    if (/CustomCursor/i.test(requestUrl)) {
+    if (/\/CustomCursor(?:\.jsx|-[^/]+\.js)/i.test(requestUrl)) {
         customCursorChunkRequests += 1;
     }
     const mock = routeMock(request.url, request.method, request.postData, request.headers);
@@ -698,7 +703,19 @@ async function waitForText(ws, text, timeoutMs = 6000) {
         if (await evaluate(ws, `document.body?.innerText.includes(${JSON.stringify(text)})`)) return;
         await delay(120);
     }
-    throw new Error(`Timed out waiting for text: ${text}`);
+    const pageState = await evaluate(ws, `(() => ({
+        href: location.href,
+        readyState: document.readyState,
+        text: (document.body?.innerText || "").slice(0, 600),
+    }))()`).catch(() => null);
+    const requestState = {
+        statsDashboardRequests,
+        latestBoardsRequests,
+        bannerListRequests,
+        bannerEventRequests,
+        observedRequests,
+    };
+    throw new Error(`Timed out waiting for text: ${text}${pageState ? `; page: ${JSON.stringify(pageState)}` : ""}; requests: ${JSON.stringify(requestState)}`);
 }
 
 async function waitForExpression(ws, expression, timeoutMs = 6000) {
@@ -752,7 +769,7 @@ async function waitForGamesHubChunkRequest(minCount = 1, timeoutMs = 6000) {
         if (gamesHubChunkRequests >= minCount) return;
         await delay(40);
     }
-    throw new Error(`Timed out waiting for ${minCount} GamesHub chunk requests`);
+    throw new Error(`Timed out waiting for ${minCount} GamesHub chunk requests; observed=${JSON.stringify(observedRequests)}`);
 }
 
 async function waitForPageGuideChunkRequest(minCount = 1, timeoutMs = 6000) {
@@ -800,6 +817,10 @@ async function focusElementByLabel(ws, label) {
         });
         if (!element) return "missing";
         element.focus();
+        element.dispatchEvent(new PointerEvent("pointerenter", { bubbles: true, pointerType: "mouse" }));
+        element.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+        element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+        element.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
         return document.activeElement === element ? "focused" : "not-focused";
     })()`);
 }
@@ -1665,6 +1686,8 @@ async function main() {
                 { urlPattern: "*://127.0.0.1*/ws/chat/*", requestStage: "Request" },
                 { urlPattern: "*://localhost*/assets/*", requestStage: "Request" },
                 { urlPattern: "*://127.0.0.1*/assets/*", requestStage: "Request" },
+                { urlPattern: "*://localhost*/src/*", requestStage: "Request" },
+                { urlPattern: "*://127.0.0.1*/src/*", requestStage: "Request" },
                 { urlPattern: "*://localhost*/smoke/*", requestStage: "Request" },
                 { urlPattern: "*://127.0.0.1*/smoke/*", requestStage: "Request" },
                 { urlPattern: "https://oapi.map.naver.com/*", requestStage: "Request" },
