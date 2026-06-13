@@ -811,15 +811,15 @@ export const Home = () => {
                 {boardsPending ? (
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3" data-home-boards-loading="true" role="status" aria-live="polite" aria-label="최신 게시글을 불러오는 중입니다.">
                         {[0, 1, 2].map((item) => (
-                            <div key={item} className="card bg-white p-4 sm:p-5">
-                                <div className="mb-3 h-4 w-28 rounded-lg bg-slate-100" />
-                                <div className="mb-3 h-5 w-3/4 rounded-xl bg-slate-100" />
+                            <div key={item} className="card bg-surface p-4 sm:p-5">
+                                <div className="mb-3 h-4 w-28 rounded-lg bg-control" />
+                                <div className="mb-3 h-5 w-3/4 rounded-xl bg-control" />
                                 <div className="space-y-2">
-                                    <div className="h-4 w-full rounded-full bg-slate-100" />
-                                    <div className="h-4 w-2/3 rounded-full bg-slate-100" />
+                                    <div className="h-4 w-full rounded-full bg-control" />
+                                    <div className="h-4 w-2/3 rounded-full bg-control" />
                                 </div>
-                                <div className="mt-4 border-t border-slate-50 pt-3">
-                                    <div className="h-4 w-20 rounded-full bg-slate-100" />
+                                <div className="mt-4 border-t border-line pt-3">
+                                    <div className="h-4 w-20 rounded-full bg-control" />
                                 </div>
                             </div>
                         ))}
@@ -850,7 +850,7 @@ export const Home = () => {
                                 <Link
                                     key={board.id}
                                     to={`/app/boards/${board.kind}/${board.id}`}
-                                    className="card group bg-white p-4 sm:p-5"
+                                className="card group bg-surface p-4 sm:p-5"
                                     onPointerEnter={prefetchBoardDetailRoute}
                                     onFocus={prefetchBoardDetailRoute}
                                     onTouchStart={prefetchBoardDetailRoute}
@@ -860,24 +860,24 @@ export const Home = () => {
                                         <span className="rounded-lg bg-primary-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary-600">
                                             {board.kindLabel || "게시글"}
                                         </span>
-                                        <div className="h-1 w-1 rounded-full bg-slate-200" />
-                                        <span className="text-[11px] font-bold text-slate-400">{board.creator}</span>
+                                        <div className="h-1 w-1 rounded-full bg-line" />
+                                        <span className="text-[11px] font-bold text-ink-subtle">{board.creator}</span>
                                         {boardTimeLabel ? (
                                             <>
-                                                <div className="h-1 w-1 rounded-full bg-slate-200" />
-                                                <span className="text-[11px] font-bold text-slate-400">{boardTimeLabel}</span>
+                                                <div className="h-1 w-1 rounded-full bg-line" />
+                                                <span className="text-[11px] font-bold text-ink-subtle">{boardTimeLabel}</span>
                                             </>
                                         ) : null}
                                     </div>
-                                    <h3 className="mb-2 line-clamp-1 text-base font-bold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-lg">{board.title}</h3>
-                                    <p className="mb-4 line-clamp-1 text-sm font-medium leading-relaxed text-slate-500 sm:line-clamp-2">
+                                    <h3 className="mb-2 line-clamp-1 text-base font-bold text-ink transition-colors group-hover:text-primary-600 sm:text-lg">{board.title}</h3>
+                                    <p className="mb-4 line-clamp-1 text-sm font-medium leading-relaxed text-ink-muted sm:line-clamp-2">
                                         {stripHtmlTags(board.contents)}
                                     </p>
-                                    <div className="flex items-center justify-between border-t border-slate-50 pt-3">
-                                        <div className="flex items-center gap-3 text-[11px] font-bold text-slate-400">
-                                            <span className="flex items-center gap-1.5"><Eye className="h-3.5 w-3.5 text-slate-300" /> {formatNumber(board.viewCount)}</span>
+                                    <div className="flex items-center justify-between border-t border-line pt-3">
+                                        <div className="flex items-center gap-3 text-[11px] font-bold text-ink-subtle">
+                                            <span className="flex items-center gap-1.5"><Eye className="h-3.5 w-3.5 text-ink-subtle" /> {formatNumber(board.viewCount)}</span>
                                         </div>
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-300 transition-all duration-300 group-hover:bg-primary-500 group-hover:text-white">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-control text-ink-subtle transition-all duration-300 group-hover:bg-primary-500 group-hover:text-white">
                                             <ArrowRight className="h-4 w-4" />
                                         </div>
                                     </div>
@@ -886,7 +886,7 @@ export const Home = () => {
                         })}
                     </div>
                 ) : (
-                    <div className="rounded-[2rem] border border-dashed border-slate-200 bg-white">
+                    <div className="rounded-[2rem] border border-dashed border-line bg-surface">
                         <EmptyState message="아직 최신 게시글이 없습니다." subMessage="첫 게시글을 작성해 커뮤니티를 시작해보세요." />
                     </div>
                 )}

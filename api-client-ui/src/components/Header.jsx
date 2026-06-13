@@ -87,23 +87,25 @@ export const Header = () => {
                             <Settings className="h-5 w-5" />
                         </NavLink>
                         <NotificationCenterEntry />
-                        <NavLink
+                        <Link
                             to="/app/todos"
                             className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700 sm:hidden"
-                            title="투두"
-                            aria-label="투두로 이동"
+                            title="할 일"
+                            aria-label="할 일로 이동"
+                            data-smoke="header-todos-link"
                         >
                             <CalendarDays className="h-5 w-5" />
-                        </NavLink>
+                        </Link>
                         <div className="hidden items-center gap-2 sm:flex">
-                            <NavLink
+                            <Link
                                 to="/app/todos"
                                 className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
-                                title="투두"
-                                aria-label="투두로 이동"
+                                title="할 일"
+                                aria-label="할 일로 이동"
+                                data-smoke="header-todos-link"
                             >
                                 <CalendarDays className="h-5 w-5" />
-                            </NavLink>
+                            </Link>
                             <NavLink
                                 to="/app/mypage"
                                 className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-bold text-ink-muted transition-all hover:bg-control"

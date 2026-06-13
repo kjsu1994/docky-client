@@ -1,7 +1,7 @@
 export const Skeleton = ({ className, ...props }) => {
     return (
         <div
-            className={`animate-pulse bg-slate-200/80 rounded-2xl ${className}`}
+            className={`animate-pulse rounded-2xl bg-control ${className}`}
             {...props}
         />
     );
@@ -31,7 +31,7 @@ export const CardSkeleton = () => (
 export const ListSkeleton = ({ count = 5 }) => (
     <div className="space-y-4">
         {Array.from({ length: count }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 p-4 border border-slate-100 rounded-3xl bg-white">
+            <div key={i} className="flex items-center gap-4 rounded-3xl border border-line bg-surface p-4">
                 <Skeleton className="h-12 w-12 rounded-2xl" />
                 <div className="space-y-2 flex-1">
                     <Skeleton className="h-4 w-1/3" />

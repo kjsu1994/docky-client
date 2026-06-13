@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Gavel, Skull, Timer, Users } from "lucide-react";
+import { Gavel, Skull, Sun, Timer, Users, Volume2 } from "lucide-react";
+import UserAvatar from "../../common/UserAvatar.jsx";
 import { notifyError } from "../../utils/toast.js";
 import { GameFlowMeter, GameResultSpotlight } from "./GameUxAssets.jsx";
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
+const seatNoOf = (player) => Number(get(player, "seat_no", "seatNo", 0));
 
 const mafiaPhaseLabels = {
   ROLE_REVEAL: "역할 확인",

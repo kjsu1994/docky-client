@@ -5,6 +5,7 @@ import { GameFlowMeter, GameUxGlyph } from "./GameUxAssets.jsx";
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
+const seatNoOf = (player) => Number(get(player, "seat_no", "seatNo", 0));
 
 const dalmutiRoleLabels = {
   GREATER_DALMUTI: "대 달무티",

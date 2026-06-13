@@ -65,7 +65,7 @@ export const Ranks = () => {
 
     return (
         <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
@@ -76,7 +76,7 @@ export const Ranks = () => {
                             <p className="text-sm font-medium text-slate-500">커뮤니티 인기 게시글과 활발한 멤버를 확인하세요.</p>
                         </div>
                     </div>
-                    <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
+                    <div className="rounded-xl bg-control px-3 py-2 text-sm font-bold text-ink-muted">
                         {activeLabel} {currentRanks.length ? `${currentRanks.length}건` : "조회 중"}
                     </div>
                 </div>
@@ -131,7 +131,7 @@ const TabButton = ({ active, onClick, icon: Icon, children }) => (
         type="button"
         onClick={onClick}
         className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-3 text-xs font-semibold transition-all sm:gap-2 sm:px-3 sm:text-sm ${
-            active ? "bg-slate-900 text-white shadow-lg" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            active ? "bg-ink text-ink-inverse shadow-lg" : "bg-control text-ink-muted hover:bg-control-hover"
         }`}
     >
         <Icon className="h-4 w-4 flex-shrink-0 sm:h-5 sm:w-5" />
@@ -144,7 +144,7 @@ const BoardTypeButton = ({ active, onClick, children }) => (
         type="button"
         onClick={onClick}
         className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-all ${
-            active ? "border-amber-500 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            active ? "border-amber-500 bg-amber-50 text-amber-800" : "border-line bg-surface text-ink-muted hover:bg-control"
         }`}
     >
         {children}
@@ -158,7 +158,7 @@ const RankBadge = ({ rank }) => {
     const color = rank === 1 ? "bg-amber-500 text-white"
         : rank === 2 ? "bg-slate-400 text-white"
             : rank === 3 ? "bg-orange-500 text-white"
-                : "bg-slate-100 text-slate-700";
+                : "bg-control text-ink-muted";
     return (
         <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-sm ${color}`}>
             {rank <= 3 ? icon : rank}
@@ -171,18 +171,18 @@ const BoardRankList = ({ ranks }) => {
         return <EmptyRank message="랭킹에 표시할 게시글이 없습니다." />;
     }
     return (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-line">
             {ranks.map((board, index) => (
                 <Link
                     key={board.id}
                     to={`/app/boards/${board.kind}/${board.id}`}
-                    className={`block p-5 transition-colors ${index < 3 ? "bg-amber-50/40" : "hover:bg-slate-50"}`}
+                    className={`block p-5 transition-colors ${index < 3 ? "bg-amber-50/40" : "hover:bg-control"}`}
                 >
                     <div className="flex items-start gap-4">
                         <RankBadge rank={index + 1} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="mb-2 line-clamp-2 text-lg font-bold text-slate-900">{board.title}</h3>
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+                            <h3 className="mb-2 line-clamp-2 text-lg font-bold text-ink">{board.title}</h3>
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-ink-muted">
                                 <span className="flex items-center gap-1"><Heart className="h-4 w-4 text-rose-500" />좋아요 {formatNumber(board.likeCount)}</span>
                                 <span className="flex items-center gap-1"><TrendingUp className="h-4 w-4 text-blue-500" />조회 {formatNumber(board.viewCount)}</span>
                             </div>
@@ -199,7 +199,7 @@ const LevelRankList = ({ ranks }) => {
         return <EmptyRank message="랭킹에 표시할 레벨 데이터가 없습니다." />;
     }
     return (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-line">
             {ranks.map((member, index) => (
                 <MemberRankRow
                     key={member.id}
@@ -220,7 +220,7 @@ const LevelRankList = ({ ranks }) => {
 
 const MemberRankRow = ({ rank, name, profileUrl, level, rewardTier, frameCode, title, detail, progress }) => {
     return (
-        <div className={`p-5 transition-colors ${rank <= 3 ? "bg-slate-50" : "hover:bg-slate-50"}`}>
+        <div className={`p-5 transition-colors ${rank <= 3 ? "bg-control" : "hover:bg-control"}`}>
             <div className="flex items-center gap-4">
                 <RankBadge rank={rank} />
                 <UserAvatar
@@ -233,13 +233,13 @@ const MemberRankRow = ({ rank, name, profileUrl, level, rewardTier, frameCode, t
                     showLevelBadge
                 />
                 <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-lg font-bold text-slate-900">{name}</h3>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-                        <span className="font-semibold text-slate-800">{title}</span>
+                    <h3 className="truncate text-lg font-bold text-ink">{name}</h3>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-ink-muted">
+                        <span className="font-semibold text-ink">{title}</span>
                         <span>{detail}</span>
                     </div>
                     {Number.isFinite(progress) && progress > 0 ? (
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-control">
                             <div className="h-full rounded-full bg-purple-500" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
                         </div>
                     ) : null}

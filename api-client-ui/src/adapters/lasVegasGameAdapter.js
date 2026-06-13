@@ -66,6 +66,7 @@ export const normalizeLasVegasPlayer = (player = {}) => {
         frameCode: normalizeText(pick(player, "frameCode", "frame_code", "")),
         seatNo: toNumber(pick(player, "seatNo", "seat_no", 0)),
         ready: Boolean(pick(player, "ready", "ready", false)),
+        bot: Boolean(pick(player, "bot", "bot", false)),
         totalMoney: toNumber(pick(player, "totalMoney", "total_money", 0)),
         remainingDice: toNumber(pick(player, "remainingDice", "remaining_dice", 8), 8),
     };

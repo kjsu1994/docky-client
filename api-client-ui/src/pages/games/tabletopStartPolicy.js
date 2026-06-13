@@ -9,8 +9,14 @@ const soloAiStartGames = new Set([
   "mafia",
 ]);
 
+const intrinsicSoloAiStartGames = new Set([
+  "poker",
+]);
+
 export const supportsTabletopSoloAiStart = (game, minPlayers = 0) => (
-  soloAiStartGames.has(String(game || "").toLowerCase()) && Number(minPlayers || 0) > 1
+  intrinsicSoloAiStartGames.has(String(game || "").toLowerCase())
+    ? Number(minPlayers || 0) >= 1
+    : soloAiStartGames.has(String(game || "").toLowerCase()) && Number(minPlayers || 0) > 1
 );
 
 export const canUseTabletopSoloAiStart = ({ game, playerCount = 0, minPlayers = 0 } = {}) => (

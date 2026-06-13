@@ -40,6 +40,8 @@
     "smoke:navigation-routes": "node scripts/navigation-route-smoke.mjs",
     "smoke:text-quality": "node scripts/text-quality-smoke.mjs",
     "smoke:theme-background": "node scripts/theme-background-smoke.mjs",
+    "smoke:production-domain": "node scripts/production-domain-smoke.mjs",
+    "smoke:chunk-budget": "node scripts/chunk-budget-smoke.mjs",
     "smoke:api-errors": "node scripts/api-error-message-smoke.mjs",
     "smoke:toast-runtime": "node scripts/toast-runtime-smoke.mjs",
     "smoke:all": "node scripts/smoke-all.mjs"

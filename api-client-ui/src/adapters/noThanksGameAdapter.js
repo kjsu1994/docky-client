@@ -69,6 +69,7 @@ export const normalizeNoThanksPlayer = (player = {}) => {
         frameCode: normalizeText(pick(player, "frameCode", "frame_code", "")),
         seatNo: toNumber(pick(player, "seatNo", "seat_no", 0)),
         ready: Boolean(pick(player, "ready", "ready", false)),
+        bot: Boolean(pick(player, "bot", "bot", false)),
         chips: toNumber(pick(player, "chips", "chips", 0)),
         cards: asNumberArray(pick(player, "cards", "cards", [])),
         score,

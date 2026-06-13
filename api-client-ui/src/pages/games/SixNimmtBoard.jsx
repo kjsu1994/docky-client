@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GameFlowMeter } from "./GameUxAssets.jsx";
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
+const seatNoOf = (player) => Number(get(player, "seat_no", "seatNo", 0));
 
 const TabletopHistoryEmptyArt = ({ tone = "slate", gameLabel = "기록", nextLabel = "첫 행동" }) => {
   const palette = {
@@ -52,8 +53,7 @@ const TabletopHistoryEmptyState = ({
   detail = "첫 행동이 끝나면 이 영역에 최근 기록이 쌓입니다.",
   nextAction = "첫 행동",
 }) => {
-  const config = gameConfigs[game] || {};
-  const gameLabel = config.title || title;
+  const gameLabel = title;
   const items = [
     { label: "현재 상태", value: "기록 대기", detail: "아직 서버가 전달한 행동 로그가 없습니다." },
     { label: "다음 변화", value: nextAction, detail: "첫 행동이 처리되면 최근 기록, 주체, 결과가 같은 위치에 표시됩니다." },
@@ -1115,6 +1115,22 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             ))}
           </div>
 
+          <SixNimmtActionRoutePanel
+            phase={phase}
+            waitingSelection={waitingSelection}
+            needsRowChoice={needsRowChoice}
+            mySelected={mySelected}
+            selectedCard={selectedCard}
+            pendingCard={pendingCard}
+            selectedPreview={selectedPreview}
+            selectedAnchorX={selectedAnchorX}
+            selectedRowIndex={selectedRowIndex}
+            recommendedRowIndex={recommendedRowIndex}
+            selectedCount={sixNimmtSelectedCount}
+            playerCount={sixNimmtPlayerCount}
+            waitingCount={sixNimmtWaitingCount}
+          />
+
           {needsRowChoice && (
             <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-2 text-xs font-bold leading-relaxed text-amber-800 sm:mt-4 sm:rounded-2xl sm:p-3 sm:text-sm">
               {playerNameBySeat(activeSeatNo)}님이 {sixNimmtCardValue(pendingCard)} 카드를 놓을 행을 선택해야 합니다. 벌점이 가장 낮은 행이 기본 추천입니다.
@@ -1286,10 +1302,10 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             })}
             {!events.length && (
               <TabletopHistoryEmptyState
-                game="catan"
-                title="아직 카탄 기록이 없습니다"
-                detail="주사위, 생산, 건설, 거래가 처리되면 좌석과 자원 근거가 이 기록 영역에 쌓입니다."
-                nextAction="첫 생산"
+                game="six-nimmt"
+                title="아직 카드 기록이 없습니다"
+                detail="카드 선택이나 행 회수가 처리되면 공개 순서와 벌점 근거가 이 기록 영역에 쌓입니다."
+                nextAction="첫 공개"
               />
             )}
           </div>

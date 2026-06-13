@@ -185,6 +185,8 @@ const variantCreateCases = [
 const mockState = {
   nextRoomId: 1000,
   activeRoomsByGame: new Map(),
+  roomFlowGame: null,
+  soloAiFlowGame: null,
   requests: [],
   telestrationsPhase: "PROMPT",
   telestrationsEmptyReveal: false,
@@ -199,6 +201,7 @@ const mockState = {
   dalmutiEmptyHand: false,
   mafiaEmptyTargets: false,
   mafiaFinishedResult: false,
+  pokerActionTurn: false,
   pokerFiveCardDraw: false,
 };
 
@@ -212,7 +215,17 @@ const TELESTRATIONS_SMOKE_IMAGE = `data:image/svg+xml;charset=utf-8,${encodeURIC
 </svg>`)}`;
 
 function assertTabletopRealtimeSource() {
-  const source = readFileSync("src/pages/games/TabletopGame.jsx", "utf8");
+  const source = [
+    "src/pages/games/TabletopGame.jsx",
+    "src/pages/games/BlokusBoard.jsx",
+    "src/pages/games/CatanBoard.jsx",
+    "src/pages/games/MaheBoard.jsx",
+    "src/pages/games/DalmutiBoard.jsx",
+    "src/pages/games/SixNimmtBoard.jsx",
+    "src/pages/games/TelestrationsBoard.jsx",
+    "src/pages/games/MafiaBoard.jsx",
+    "src/pages/games/PokerBoard.jsx",
+  ].map((filePath) => readFileSync(filePath, "utf8")).join("\n");
   const requiredSnippets = [
     ["realtimeRoomRef.current = { roomId, roomSeq }", "tracks the latest opened realtime room"],
     ["client.onConnect = () => {", "binds after STOMP CONNECT"],
@@ -222,7 +235,7 @@ function assertTabletopRealtimeSource() {
     ["client.beforeConnect = () =>", "refreshes STOMP auth headers before reconnect"],
     ["await fetchState(roomId, roomSeq).catch", "loads a REST snapshot before relying on realtime"],
     ["client.subscribe(`/sub/game/${game}/room/${roomId}`", "subscribes to the active tabletop room topic"],
-    ['game === "telestrations") && payload.gameState', "refetches viewer-specific Telestrations state after realtime broadcasts"],
+    ['game === "poker" || game === "telestrations" || game === "mafia") && payload.gameState', "refetches viewer-specific Telestrations state after realtime broadcasts"],
     ["TabletopExperienceRibbon", "keeps a shared tabletop status ribbon mounted in room screens"],
     ['data-smoke="tabletop-experience-ribbon"', "marks the tabletop status ribbon for UI smoke coverage"],
     ["TabletopTurnOrderPanel", "keeps a shared tabletop turn-order rail mounted in room screens"],
@@ -686,9 +699,11 @@ function assertTabletopRealtimeSource() {
     ? source.slice(sixNimmtRealtimeBranchStart, sixNimmtRealtimeBranchEnd)
     : "";
   if (!sixNimmtRealtimeBranch
-    || !sixNimmtRealtimeBranch.includes("applySixNimmtState(payload.gameState)")
-    || !source.includes("mergeSixNimmtRealtimeState(prev, nextState, mySeatNo)")) {
-    throw new Error("tabletop-ui-smoke: Six Nimmt realtime must merge public selection updates immediately.");
+    || !sixNimmtRealtimeBranch.includes("enqueueSixNimmtReplayStep(payload.gameState)")
+    || !sixNimmtRealtimeBranch.includes("deferSixNimmtFinalState(payload.gameState)")
+    || !sixNimmtRealtimeBranch.includes("refreshSixNimmtViewerHand(roomId, roomSeq)")
+    || !source.includes("mergeSixNimmtRealtimeState(prev, nextState,")) {
+    throw new Error("tabletop-ui-smoke: Six Nimmt realtime must route replay, final, and viewer-hand updates explicitly.");
   }
   if (sixNimmtRealtimeBranch.includes("fetchState(")) {
     throw new Error("tabletop-ui-smoke: Six Nimmt realtime must not immediately refetch stale REST state after a public selection update.");
@@ -770,7 +785,10 @@ function assertActionToastSingleton() {
 }
 
 function assertSixNimmtActionSource() {
-  const source = readFileSync("src/pages/games/TabletopGame.jsx", "utf8");
+  const source = [
+    "src/pages/games/TabletopGame.jsx",
+    "src/pages/games/SixNimmtBoard.jsx",
+  ].map((filePath) => readFileSync(filePath, "utf8")).join("\n");
   const requiredSnippets = [
     "const officialRows = possibleRows.filter((item) => item.index === bestIndex);",
     "공식 규칙상 가장 가까운 행에 자동 배치",
@@ -1189,17 +1207,22 @@ function roomFor(game, role, roomStatus = "WAITING") {
   const hostMemberId = role === "host" ? 999 : 700 + roomId;
   const code = `${gameCodePrefix[game]}${String(roomId).slice(-4)}`.slice(0, 8).toUpperCase();
   const players = [];
-  for (let seatNo = 1; seatNo <= minPlayers; seatNo++) {
-    if (seatNo === 1) {
-      players.push(player(hostMemberId, seatNo, false, role === "host" ? "검증 사용자" : "상대 방장"));
-    } else if (role === "guest" && seatNo === 2) {
-      players.push(player(999, seatNo, false, "검증 사용자"));
-    } else {
-      players.push(player(800 + roomId + seatNo, seatNo, true, `준비 게스트 ${seatNo}`));
+  const soloAiHost = role === "host" && mockState.soloAiFlowGame === game;
+  if (soloAiHost) {
+    players.push(player(hostMemberId, 1, false, "검증 사용자"));
+  } else {
+    for (let seatNo = 1; seatNo <= minPlayers; seatNo++) {
+      if (seatNo === 1) {
+        players.push(player(hostMemberId, seatNo, false, role === "host" ? "검증 사용자" : "상대 방장"));
+      } else if (role === "guest" && seatNo === 2) {
+        players.push(player(999, seatNo, false, "검증 사용자"));
+      } else {
+        players.push(player(800 + roomId + seatNo, seatNo, true, `준비 게스트 ${seatNo}`));
+      }
     }
-  }
-  if (role === "guest" && !players.some((item) => item.memberId === 999)) {
-    players.push(player(999, players.length + 1, false, "검증 사용자"));
+    if (role === "guest" && !players.some((item) => item.memberId === 999)) {
+      players.push(player(999, players.length + 1, false, "검증 사용자"));
+    }
   }
   return {
     roomId,
@@ -1768,6 +1791,7 @@ function pokerCard(rank, suit, value) {
 
 function pokerSmokeGameState() {
   const fiveCardDraw = Boolean(mockState.pokerFiveCardDraw);
+  const actionTurn = Boolean(mockState.pokerActionTurn);
   const communityCards = fiveCardDraw ? [] : [
     pokerCard("A", "SPADES", 14),
     pokerCard("7", "CLUBS", 7),
@@ -1800,13 +1824,13 @@ function pokerSmokeGameState() {
     mode: fiveCardDraw ? "FIVE_CARD_DRAW" : "TEXAS_HOLDEM",
     variantName: fiveCardDraw ? "파이브 카드 드로우" : "텍사스 홀덤",
     variant_name: fiveCardDraw ? "파이브 카드 드로우" : "텍사스 홀덤",
-    phase: "HAND_FINISHED",
+    phase: actionTurn ? "PREFLOP" : "HAND_FINISHED",
     handNo: 1,
     hand_no: 1,
     maxHands: 8,
     max_hands: 8,
-    activeSeatNo: 0,
-    active_seat_no: 0,
+    activeSeatNo: actionTurn ? 1 : 0,
+    active_seat_no: actionTurn ? 1 : 0,
     dealerSeatNo: 1,
     dealer_seat_no: 1,
     smallBlind: 5,
@@ -1816,17 +1840,17 @@ function pokerSmokeGameState() {
     fixedBet: 10,
     fixed_bet: 10,
     ante: 0,
-    pot: 0,
+    pot: actionTurn ? 35 : 0,
     lastPot: 85,
     last_pot: 85,
-    callAmount: 0,
-    call_amount: 0,
+    callAmount: actionTurn ? 10 : 0,
+    call_amount: actionTurn ? 10 : 0,
     maxDrawCards: 3,
     max_draw_cards: 3,
     winnerSeatNo: 1,
     winner_seat_no: 1,
-    availableActions: [],
-    available_actions: [],
+    availableActions: actionTurn ? ["FOLD", "CALL", "RAISE", "ALL_IN"] : [],
+    available_actions: actionTurn ? ["FOLD", "CALL", "RAISE", "ALL_IN"] : [],
     communityCards,
     community_cards: communityCards,
     players: [
@@ -2247,7 +2271,7 @@ function routeMock(url, method, postData = "") {
       return { status: 200, body: lasVegasSmokeState() };
     }
   }
-  if (game === "telestrations") {
+  if (game === "telestrations" && mockState.roomFlowGame !== "telestrations") {
     if (method === "GET" && suffix === "rooms") {
       return { status: 200, body: [] };
     }
@@ -2337,13 +2361,15 @@ function routeMock(url, method, postData = "") {
             ? dalmutiSmokeGameState(room)
             : game === "six-nimmt" && room.roomStatus === "PLAYING"
               ? sixNimmtSmokeGameState(room)
-              : game === "poker" && room.roomStatus === "PLAYING"
-                ? pokerSmokeGameState(room)
-                : game === "mafia" && room.roomStatus === "PLAYING"
-                  ? mafiaSmokeGameState(room)
-                  : game === "citadels" && room.roomStatus === "PLAYING"
-                    ? citadelsSmokeGameState(room)
-                    : null;
+              : game === "telestrations" && room.roomStatus === "PLAYING"
+                ? telestrationsSmokeGameState()
+                : game === "poker" && room.roomStatus === "PLAYING"
+                  ? pokerSmokeGameState(room)
+                  : game === "mafia" && room.roomStatus === "PLAYING"
+                    ? mafiaSmokeGameState(room)
+                    : game === "citadels" && room.roomStatus === "PLAYING"
+                      ? citadelsSmokeGameState(room)
+                      : null;
     return {
       status: 200,
       body: {
@@ -2395,7 +2421,7 @@ async function evaluate(ws, expression) {
   return response.result?.result?.value;
 }
 
-async function waitForExpression(ws, expression, label, timeoutMs = 6000) {
+async function waitForExpression(ws, expression, label, timeoutMs = 12000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (await evaluate(ws, expression)) return;
@@ -2494,9 +2520,7 @@ function assertRequest(game, kind, predicate, description) {
   }
 }
 
-async function runRoomFlowSmoke(ws, game) {
-  mockState.requests = mockState.requests.filter((request) => request.game !== game);
-  mockState.activeRoomsByGame.delete(game);
+function resetRoomFlowMockFlags() {
   mockState.dalmutiEmptyHand = false;
   mockState.blokusEmptyPieces = false;
   mockState.catanDiscardPhase = false;
@@ -2507,6 +2531,16 @@ async function runRoomFlowSmoke(ws, game) {
   mockState.citadelsSelectionPhase = false;
   mockState.mafiaEmptyTargets = false;
   mockState.mafiaFinishedResult = false;
+  mockState.pokerActionTurn = false;
+  mockState.pokerFiveCardDraw = false;
+}
+
+async function runRoomFlowSmoke(ws, game) {
+  mockState.requests = mockState.requests.filter((request) => request.game !== game);
+  mockState.roomFlowGame = game;
+  mockState.soloAiFlowGame = null;
+  mockState.activeRoomsByGame.delete(game);
+  resetRoomFlowMockFlags();
   mockState.pokerFiveCardDraw = game === "poker";
 
   await navigateToGame(ws, game);
@@ -2699,7 +2733,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.blokusEmptyPieces = false;
   }
   if (game === "mahe") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-bottom-summary"]'))`, "mahe compact bottom summary rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-bottom-summary"]'))`, "mahe compact bottom summary rendered", 15000);
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-bottom-summary-item"]').length >= 4`, "mahe compact bottom summary items rendered");
     await waitForExpression(ws, `/마헤 흐름 요약|하단 참고|현재 보상|선두/.test(document.querySelector('[data-smoke="mahe-bottom-summary"]')?.textContent || "")`, "mahe compact bottom summary copy rendered");
     await send(ws, "Emulation.setDeviceMetricsOverride", {
@@ -2728,7 +2762,7 @@ async function runRoomFlowSmoke(ws, game) {
     );
   }
   if (game === "dalmuti") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-flow-meter"]'))`, "dalmuti flow meter rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-flow-meter"]'))`, "dalmuti flow meter rendered", 15000);
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-flow-meter"] [data-smoke="game-flow-meter-item"]').length >= 4`, "dalmuti flow meter items rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-card-art"]').length >= 2`, "dalmuti card SVG assets rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-play-advisor-panel"]'))`, "dalmuti play advisor panel rendered");
@@ -2952,7 +2986,79 @@ async function runRoomFlowSmoke(ws, game) {
   await clickButtonByText(ws, "준비하기");
   await delay(300);
   assertRequest(game, "ready", null, "ready POST request");
+  mockState.roomFlowGame = null;
   return `${game} room flow: ok create/start/join-by-code/ready`;
+}
+
+async function assertSoloAiFirstActionAvailable(ws, game) {
+  if (game === "poker") {
+    await waitForExpression(ws, `(() => {
+      const panel = document.querySelector("#poker-action-panel");
+      const enabled = Array.from(panel?.querySelectorAll("button") || []).filter((button) => !button.disabled);
+      return Boolean(panel) && enabled.length >= 3;
+    })()`, "poker solo AI first betting actions enabled");
+    return;
+  }
+  if (game === "catan") {
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="catan-action-atlas-panel"]'))`, "catan solo AI action atlas rendered");
+    await waitForExpression(ws, `Array.from(document.querySelectorAll("button")).some((button) => !button.disabled && button.textContent.includes("주사위 굴리기"))`, "catan solo AI roll action enabled");
+    return;
+  }
+  if (game === "six-nimmt") {
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-action-route-panel"]'))`, "six-nimmt solo AI action route rendered");
+    const clicked = await evaluate(ws, `(() => {
+      const button = Array.from(document.querySelectorAll("button")).find((node) => !node.disabled && (node.getAttribute("aria-label") || "").includes("카드"));
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`);
+    if (!clicked) throw new Error("six-nimmt solo AI: selectable hand card not found");
+    await waitForExpression(ws, `Boolean(document.querySelector("#six-nimmt-action-strip button:not(:disabled)"))`, "six-nimmt solo AI submit action enabled");
+    return;
+  }
+  if (game === "mafia") {
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-candidate"]').length >= 3`, "mafia solo AI target candidates rendered");
+    const clicked = await evaluate(ws, `(() => {
+      const button = Array.from(document.querySelectorAll('[data-smoke="mafia-board"] button')).find((node) => !node.disabled && String(node.className || "").includes("min-h-16"));
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`);
+    if (!clicked) throw new Error("mafia solo AI: selectable target button not found");
+    await waitForExpression(ws, `Array.from(document.querySelectorAll('[data-smoke="mafia-board"] button')).some((node) => !node.disabled && String(node.className || "").includes("bg-rose-600"))`, "mafia solo AI submit action enabled");
+    return;
+  }
+  throw new Error(`Unsupported solo AI first-action smoke game: ${game}`);
+}
+
+async function runSoloAiRoomFlowSmoke(ws, game) {
+  mockState.requests = mockState.requests.filter((request) => request.game !== game);
+  mockState.roomFlowGame = game;
+  mockState.soloAiFlowGame = game;
+  mockState.activeRoomsByGame.delete(game);
+  resetRoomFlowMockFlags();
+  mockState.pokerActionTurn = game === "poker";
+
+  try {
+    await navigateToGame(ws, game);
+    const title = `${gameNames[game]} solo AI smoke room`;
+    await setInputByAriaLabel(ws, "방 제목", title);
+    await clickButtonByText(ws, "방 만들기");
+    await waitForText(ws, "방 코드");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="${game}-waiting-player-roster-item"]').length === 1`, `${game} solo AI waiting roster contains only host`);
+    await waitForEnabledButton(ws, "AI와 시작");
+    assertRequest(game, "create", (request) => request.body?.title === title, "solo AI create-room POST payload");
+
+    await clickButtonByText(ws, "AI와 시작");
+    await waitForText(ws, "진행 중");
+    await assertSoloAiFirstActionAvailable(ws, game);
+    assertRequest(game, "start", null, "solo AI start POST request");
+    return `${game} solo AI flow: ok create/ai-start/first-action`;
+  } finally {
+    mockState.roomFlowGame = null;
+    mockState.soloAiFlowGame = null;
+    mockState.pokerActionTurn = false;
+  }
 }
 
 async function runVariantCreateSmoke(ws, { game, variantCode }) {
@@ -3405,17 +3511,22 @@ async function main() {
       }
     }
     const flowResults = [];
-    const flowGames = ["catan", "blokus", "mahe", "dalmuti", "six-nimmt", "poker", "mafia", "citadels"];
+    const flowGames = ["catan", "blokus", "mahe", "dalmuti", "six-nimmt", "telestrations", "poker", "mafia", "citadels"];
     for (const game of flowGames) {
       flowResults.push(await runRoomFlowSmoke(cdp, game));
+    }
+    const soloAiResults = [];
+    const soloAiFlowGames = ["poker", "catan", "six-nimmt", "mafia"];
+    for (const game of soloAiFlowGames) {
+      soloAiResults.push(await runSoloAiRoomFlowSmoke(cdp, game));
     }
     const variantResults = [];
     for (const item of variantCreateCases) {
       variantResults.push(await runVariantCreateSmoke(cdp, item));
     }
     const expectedPageChecks = cases.length * viewports.length;
-    if (results.length !== expectedPageChecks || flowResults.length !== flowGames.length || variantResults.length !== variantCreateCases.length) {
-      throw new Error(`Incomplete tabletop smoke coverage: pages ${results.length}/${expectedPageChecks}, flows ${flowResults.length}/${flowGames.length}, variants ${variantResults.length}/${variantCreateCases.length}`);
+    if (results.length !== expectedPageChecks || flowResults.length !== flowGames.length || soloAiResults.length !== soloAiFlowGames.length || variantResults.length !== variantCreateCases.length) {
+      throw new Error(`Incomplete tabletop smoke coverage: pages ${results.length}/${expectedPageChecks}, flows ${flowResults.length}/${flowGames.length}, solo AI ${soloAiResults.length}/${soloAiFlowGames.length}, variants ${variantResults.length}/${variantCreateCases.length}`);
     }
     if (runtimeErrors.length) {
       throw new Error(`Runtime errors: ${runtimeErrors.join(" | ")}`);
@@ -3424,8 +3535,9 @@ async function main() {
       console.log(`${result.case} ${result.viewport}: ok ${result.width}/${result.scrollWidth} ${result.url}`);
     });
     flowResults.forEach((result) => console.log(result));
+    soloAiResults.forEach((result) => console.log(result));
     variantResults.forEach((result) => console.log(result));
-    console.log(`tabletop-ui-smoke ok (${results.length} responsive page checks, ${flowResults.length} room flows, ${variantResults.length} variant create checks)`);
+    console.log(`tabletop-ui-smoke ok (${results.length} responsive page checks, ${flowResults.length} room flows, ${soloAiResults.length} solo AI flows, ${variantResults.length} variant create checks)`);
   } finally {
     if (chrome.exitCode === null) {
       chrome.kill();

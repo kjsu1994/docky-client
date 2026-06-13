@@ -29,7 +29,7 @@ import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 const ROOM_TITLE_STORAGE_KEY = "no_thanks_last_room_title";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
-const NO_THANKS_SOUND_VOLUME_MULTIPLIER = 8;
+const NO_THANKS_SOUND_VOLUME_MULTIPLIER = 16;
 
 const roomIdOf = getNoThanksRoomId;
 const chatRoomIdOf = getNoThanksChatRoomId;
@@ -2907,14 +2907,16 @@ export const NoThanksGame = () => {
     const startChipCount = parseIntSafe(selectedRoom.startChipCount, 11);
     const turnTimeSeconds = parseIntSafe(selectedRoom.turnTimeSeconds, 15);
     const enoughPlayers = roomPlayersForReadiness.length >= minPlayers;
+    const soloAiStartAvailable = roomPlayersForReadiness.length === 1 && minPlayers > 1;
+    const playerRequirementMet = enoughPlayers || soloAiStartAvailable;
     const withinMaxPlayers = maxPlayers <= 0 || roomPlayersForReadiness.length <= maxPlayers;
     const guestsReady = !guests.length || readyGuestCount === guests.length;
-    const startSignalReady = roomStatusNormalized === "WAITING" && enoughPlayers && withinMaxPlayers && guestsReady;
-    const playerProgress = minPlayers > 0 ? (roomPlayersForReadiness.length / minPlayers) * 100 : 100;
+    const startSignalReady = roomStatusNormalized === "WAITING" && playerRequirementMet && withinMaxPlayers && guestsReady;
+    const playerProgress = soloAiStartAvailable ? 100 : minPlayers > 0 ? (roomPlayersForReadiness.length / minPlayers) * 100 : 100;
     const guestProgress = guests.length > 0 ? (readyGuestCount / guests.length) * 100 : 100;
     const waitingReason = roomStatusNormalized !== "WAITING"
       ? "대기 상태에서만 시작할 수 있습니다."
-      : !enoughPlayers
+      : !playerRequirementMet
         ? `${Math.max(0, minPlayers - roomPlayersForReadiness.length)}명이 더 필요합니다.`
         : !withinMaxPlayers
           ? `현재 인원이 정원 ${maxPlayers}명을 초과했습니다.`
@@ -2923,20 +2925,23 @@ export const NoThanksGame = () => {
             : "시작 가능";
     return {
       canStart: Boolean(isHost && startSignalReady),
+      soloAiStartAvailable,
       statusText: isHost
-        ? (startSignalReady ? "방장 시작 가능" : waitingReason)
+        ? (startSignalReady ? (soloAiStartAvailable ? "AI와 시작 가능" : "방장 시작 가능") : waitingReason)
         : (startSignalReady ? "방장 시작 대기" : waitingReason),
       items: [
         {
           label: "인원 조건",
           value: `${roomPlayersForReadiness.length}/${maxPlayers || "-"}명`,
-          detail: !enoughPlayers
+          detail: soloAiStartAvailable
+            ? `부족한 ${Math.max(0, minPlayers - roomPlayersForReadiness.length)}자리는 AI가 채웁니다.`
+            : !enoughPlayers
             ? `${Math.max(0, minPlayers - roomPlayersForReadiness.length)}명이 더 필요합니다.`
             : withinMaxPlayers
               ? `최소 ${minPlayers}명 조건을 충족했습니다.`
               : `정원 ${maxPlayers}명을 초과했습니다.`,
           icon: "player",
-          tone: enoughPlayers && withinMaxPlayers ? "done" : "waiting",
+          tone: playerRequirementMet && withinMaxPlayers ? "done" : "waiting",
           progress: playerProgress,
         },
         {
@@ -2944,14 +2949,14 @@ export const NoThanksGame = () => {
           value: guests.length ? `${readyGuestCount}/${guests.length}명 준비` : "게스트 없음",
           detail: guests.length
             ? (guestsReady ? "게스트 준비가 완료되었습니다." : "아직 준비하지 않은 게스트가 있습니다.")
-            : (minPlayers <= 1 ? "1인 시작 가능한 방입니다." : "초대 또는 입장으로 최소 인원을 채웁니다."),
+            : soloAiStartAvailable ? "방장 혼자 AI와 바로 시작할 수 있습니다." : (minPlayers <= 1 ? "1인 시작 가능한 방입니다." : "초대 또는 입장으로 최소 인원을 채웁니다."),
           icon: "turn",
           tone: guests.length ? (guestsReady ? "done" : "waiting") : "neutral",
           progress: guestProgress,
         },
         {
           label: "시작 권한",
-          value: isHost ? (startSignalReady ? "시작 가능" : "방장 대기") : "방장 전용",
+          value: isHost ? (startSignalReady ? (soloAiStartAvailable ? "AI 시작 가능" : "시작 가능") : "방장 대기") : "방장 전용",
           detail: isHost ? "방장만 현재 방을 시작할 수 있습니다." : "모든 조건이 맞으면 방장이 시작합니다.",
           icon: "signal",
           tone: isHost && startSignalReady ? "done" : startSignalReady ? "active" : "waiting",
@@ -3415,7 +3420,10 @@ export const NoThanksGame = () => {
       return;
     }
     try {
-      await noThanksGameAdapter.startGame(roomIdOf(selectedRoom));
+      const roomId = roomIdOf(selectedRoom);
+      await noThanksGameAdapter.startGame(roomId);
+      await fetchState(roomId);
+      await fetchRooms();
     } catch (error) {
       notifyError(noThanksGameErrorMessage(error, "게임 시작 실패"));
     }
@@ -3705,10 +3713,10 @@ export const NoThanksGame = () => {
                     className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={startGame}
                     disabled={!canStart}
-                    aria-label={canStart ? `${selectedRoom.title} 게임 시작` : `${selectedRoom.title} 시작 대기: ${startStatusText}`}
-                    title={canStart ? "게임 시작" : startStatusText}
+                    aria-label={canStart ? `${selectedRoom.title} ${startReadiness?.soloAiStartAvailable ? "AI와 시작" : "게임 시작"}` : `${selectedRoom.title} 시작 대기: ${startStatusText}`}
+                    title={canStart ? (startReadiness?.soloAiStartAvailable ? "AI와 시작" : "게임 시작") : startStatusText}
                   >
-                    {canStart ? "시작" : "시작 대기"}
+                    {canStart ? (startReadiness?.soloAiStartAvailable ? "AI와 시작" : "시작") : "시작 대기"}
                   </button>
                 )}
                 <button className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" onClick={leaveRoom}>퇴장</button>

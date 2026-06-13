@@ -5,6 +5,7 @@ import { GameResultSpotlight } from "./GameUxAssets.jsx";
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
+const seatNoOf = (player) => Number(get(player, "seat_no", "seatNo", 0));
 
 const catanTerrain = {
   FOREST: { label: "숲", fill: "#2f8f5b", text: "#ffffff" },
@@ -771,6 +772,220 @@ const CatanActionRoutePanel = ({
   </section>
 );
 
+const catanDiscardPlannerTone = (status = "waiting") => {
+  if (status === "ready") return "border-emerald-100 bg-emerald-50 text-emerald-800";
+  if (status === "over") return "border-rose-100 bg-rose-50 text-rose-800";
+  if (status === "under") return "border-orange-100 bg-orange-50 text-orange-800";
+  return "border-slate-100 bg-slate-50 text-slate-600";
+};
+
+const buildCatanDiscardPlannerItems = ({
+  mustDiscard = false,
+  discardRequired = 0,
+  discardTotal = 0,
+  resourceRows = [],
+  commodityRows = [],
+  pendingNames = [],
+  explorersPiratesRule = false,
+  robberLocked = false,
+} = {}) => {
+  const required = Math.max(0, Number(discardRequired) || 0);
+  const total = Math.max(0, Number(discardTotal) || 0);
+  const remaining = Math.max(0, required - total);
+  const over = Math.max(0, total - required);
+  const selectedRows = [...resourceRows, ...commodityRows].filter((row) => Number(row.selected || 0) > 0);
+  const selectionText = selectedRows.length
+    ? selectedRows.map((row) => `${row.label} ${row.selected}`).join(" · ")
+    : "아직 선택 없음";
+  const waitText = pendingNames.length ? pendingNames.join(" · ") : "대기 없음";
+  const status = !mustDiscard ? "waiting" : total === required ? "ready" : total > required ? "over" : "under";
+  const nextValue = explorersPiratesRule ? "해적 이동" : robberLocked ? "도적 잠금 유지" : "도둑 이동";
+
+  return [
+    {
+      key: "requirement",
+      label: "필요 장수",
+      value: mustDiscard ? `${required}장 정확히` : "내 차례 아님",
+      detail: mustDiscard ? "보유 카드 절반을 정확히 선택해야 다음 단계로 넘어갑니다." : `${waitText} 플레이어의 선택을 기다립니다.`,
+      status: mustDiscard ? "under" : "waiting",
+    },
+    {
+      key: "selection",
+      label: "선택한 카드",
+      value: `${total}/${required}장`,
+      detail: status === "ready"
+        ? "필요 장수와 일치합니다. 제출 버튼으로 확정할 수 있습니다."
+        : status === "over"
+          ? `${over}장 초과 선택했습니다. 숫자를 줄여야 합니다.`
+          : mustDiscard
+            ? `${remaining}장을 더 골라야 합니다.`
+            : "현재 내가 버릴 대상이 아닙니다.",
+      status,
+    },
+    {
+      key: "composition",
+      label: "선택 구성",
+      value: selectionText,
+      detail: selectedRows.length ? "입력칸에서 고른 자원/상품 구성을 그대로 요약합니다." : "아래 입력칸에서 버릴 자원을 고르면 여기에 바로 요약됩니다.",
+      status: selectedRows.length ? "ready" : "waiting",
+    },
+    {
+      key: "next",
+      label: "다음 처리",
+      value: nextValue,
+      detail: "모든 대상자가 정확히 버리면 서버가 7 처리의 다음 단계를 진행합니다.",
+      status: status === "ready" ? "ready" : "waiting",
+    },
+  ];
+};
+
+const CatanDiscardPlannerArt = ({ items = [], discardTotal = 0, discardRequired = 0, mustDiscard = false }) => {
+  const required = Math.max(0, Number(discardRequired) || 0);
+  const total = Math.max(0, Number(discardTotal) || 0);
+  const safeRequired = Math.max(1, required);
+  const progress = Math.max(0, Math.min(1.15, total / safeRequired));
+  const ready = mustDiscard && required > 0 && total === required;
+  const over = mustDiscard && total > required;
+  const accent = ready ? "#059669" : over ? "#e11d48" : mustDiscard ? "#d97706" : "#64748b";
+  const nodes = [
+    { key: "requirement", x: 74, y: 126 },
+    { key: "selection", x: 206, y: 76 },
+    { key: "composition", x: 346, y: 126 },
+    { key: "next", x: 486, y: 76 },
+  ];
+
+  return (
+    <svg
+      data-smoke="catan-discard-planner-art"
+      viewBox="0 0 560 210"
+      className="h-auto w-full"
+      role="img"
+      aria-label={`카탄 버리기 ${total}/${required}장 선택`}
+      focusable="false"
+    >
+      <rect x="10" y="10" width="540" height="190" rx="24" fill="#fff7ed" stroke={accent} strokeWidth="3" />
+      <path d="M74 126C132 50 206 46 278 102c76 59 141 55 208-26" fill="none" stroke="#fed7aa" strokeWidth="18" strokeLinecap="round" />
+      <path d="M74 126C132 50 206 46 278 102c76 59 141 55 208-26" fill="none" stroke={accent} strokeWidth="5" strokeLinecap="round" />
+      <text x="32" y="42" fontSize="13" fontWeight="900" fill="#7c2d12">7 처리 · 버리기 플래너</text>
+      <rect x="32" y="160" width="496" height="18" rx="9" fill="#ffedd5" stroke="#fdba74" strokeWidth="2" />
+      <rect x="32" y="160" width={Math.min(496, 496 * progress)} height="18" rx="9" fill={accent} opacity=".86" />
+      <text x="280" y="174" textAnchor="middle" fontSize="11" fontWeight="900" fill={ready || over ? "#ffffff" : "#7c2d12"}>{total}/{required}장</text>
+      {nodes.map((node, index) => {
+        const item = items.find((candidate) => candidate.key === node.key) || {};
+        const nodeFill = item.status === "ready" ? "#dcfce7" : item.status === "over" ? "#ffe4e6" : item.status === "under" ? "#fef3c7" : "#f8fafc";
+        const nodeStroke = item.status === "ready" ? "#16a34a" : item.status === "over" ? "#e11d48" : item.status === "under" ? "#d97706" : "#94a3b8";
+        return (
+          <g key={node.key} data-smoke="catan-discard-planner-node" data-discard-key={node.key}>
+            <circle cx={node.x} cy={node.y} r="28" fill={nodeFill} stroke={nodeStroke} strokeWidth="5" />
+            <text x={node.x} y={node.y + 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="#0f172a">{index + 1}</text>
+            <text x={node.x} y={node.y + 45} textAnchor="middle" fontSize="10" fontWeight="900" fill="#431407">{item.label || node.key}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+const CatanDiscardPlannerPanel = ({
+  resources = {},
+  commodities = {},
+  discardForm = {},
+  discardCommodityForm = {},
+  discardRequired = 0,
+  discardTotal = 0,
+  mustDiscard = false,
+  pendingNames = [],
+  citiesKnightsRule = false,
+  explorersPiratesRule = false,
+  robberLocked = false,
+}) => {
+  const resourceRows = catanResourceEntries.map(([key, label]) => ({
+    key,
+    label,
+    owned: Math.max(0, Number(resources?.[key] || 0)),
+    selected: Math.max(0, Number(discardForm?.[key] || 0)),
+  }));
+  const commodityRows = citiesKnightsRule
+    ? Object.entries(catanCommodityLabels).map(([key, label]) => ({
+      key,
+      label,
+      owned: Math.max(0, Number(commodities?.[key] || 0)),
+      selected: Math.max(0, Number(discardCommodityForm?.[key] || 0)),
+    }))
+    : [];
+  const items = buildCatanDiscardPlannerItems({
+    mustDiscard,
+    discardRequired,
+    discardTotal,
+    resourceRows,
+    commodityRows,
+    pendingNames,
+    explorersPiratesRule,
+    robberLocked,
+  });
+  const selectedRows = [...resourceRows, ...commodityRows].filter((row) => row.selected > 0);
+
+  return (
+    <section
+      data-smoke="catan-discard-planner-panel"
+      data-must-discard={mustDiscard ? "true" : "false"}
+      data-discard-required={Math.max(0, Number(discardRequired) || 0)}
+      data-discard-total={Math.max(0, Number(discardTotal) || 0)}
+      data-pending-count={pendingNames.length}
+      className="rounded-2xl border border-orange-200 bg-white p-3 shadow-lg"
+    >
+      <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <CatanDiscardPlannerArt
+          items={items}
+          discardTotal={discardTotal}
+          discardRequired={discardRequired}
+          mustDiscard={mustDiscard}
+        />
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-black text-orange-700">버리기 플래너</div>
+              <div className="mt-1 text-lg font-black text-slate-950">정확히 몇 장을 버려야 하는지</div>
+              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">
+                아래 숫자 입력으로 선택한 자원과 상품을 읽어, 제출 전에 부족/초과 상태를 한 번 더 보여줍니다.
+              </div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black ${mustDiscard ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-600"}`}>
+              {mustDiscard ? "내가 버릴 차례" : "다른 플레이어 대기"}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {items.map((item) => (
+              <div
+                key={item.key}
+                data-smoke="catan-discard-planner-item"
+                data-discard-key={item.key}
+                className={`min-h-[92px] rounded-xl border px-3 py-2 ${catanDiscardPlannerTone(item.status)}`}
+              >
+                <div className="text-[10px] font-black opacity-70">{item.label}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug opacity-75">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {(selectedRows.length ? selectedRows : resourceRows.slice(0, 5)).map((row) => (
+              <span
+                key={row.key}
+                data-smoke="catan-discard-planner-chip"
+                data-discard-key={row.key}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-black ${row.selected ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-500"}`}
+              >
+                {row.label} {row.selected}/{row.owned}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const catanResourceByTerrain = {
   HILL: "BRICK",
   FOREST: "LUMBER",
@@ -792,6 +1007,26 @@ const catanCargoLabels = {
   CREW: "승무원",
   OLD_BOOT: "낡은 장화",
 };
+
+const cargoTypesOf = (carrier) => {
+  const cargoTypes = get(carrier, "cargo_types", "cargoTypes", []);
+  if (Array.isArray(cargoTypes) && cargoTypes.length) return cargoTypes;
+  const cargoType = get(carrier, "cargo_type", "cargoType", "");
+  return cargoType ? [cargoType] : [];
+};
+const cargoLabelOf = (carrier) => {
+  const cargoTypes = cargoTypesOf(carrier);
+  return cargoTypes.length ? cargoTypes.map((cargoType) => catanCargoLabels[cargoType] || cargoType).join(" · ") : "없음";
+};
+
+const catanCargoMarks = {
+  SETTLER: { fill: "#f59e0b", stroke: "#78350f", label: "정" },
+  FISH: { fill: "#e0f2fe", stroke: "#0369a1", label: "어" },
+  SPICE: { fill: "#fef3c7", stroke: "#92400e", label: "향" },
+  CREW: { fill: "#ede9fe", stroke: "#6d28d9", label: "승" },
+};
+
+const cargoMarkOf = (cargoType) => catanCargoMarks[cargoType] || { fill: "#e2e8f0", stroke: "#334155", label: "?" };
 
 const catanMissionLabels = {
   FISH: "어장",
@@ -1867,8 +2102,7 @@ const TabletopHistoryEmptyState = ({
   detail = "첫 행동이 끝나면 이 영역에 최근 기록이 쌓입니다.",
   nextAction = "첫 행동",
 }) => {
-  const config = gameConfigs[game] || {};
-  const gameLabel = config.title || title;
+  const gameLabel = title;
   const items = [
     { label: "현재 상태", value: "기록 대기", detail: "아직 서버가 전달한 행동 로그가 없습니다." },
     { label: "다음 변화", value: nextAction, detail: "첫 행동이 처리되면 최근 기록, 주체, 결과가 같은 위치에 표시됩니다." },
@@ -5863,10 +6097,10 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
             ))}
             {!events.length && (
               <TabletopHistoryEmptyState
-                game="six-nimmt"
-                title="아직 카드 기록이 없습니다"
-                detail="카드 선택이나 행 회수가 처리되면 공개 순서와 벌점 근거가 이 기록 영역에 쌓입니다."
-                nextAction="첫 공개"
+                game="catan"
+                title="아직 카탄 기록이 없습니다"
+                detail="주사위, 생산, 건설, 거래가 처리되면 좌석과 자원 근거가 이 기록 영역에 쌓입니다."
+                nextAction="첫 생산"
               />
             )}
           </div>

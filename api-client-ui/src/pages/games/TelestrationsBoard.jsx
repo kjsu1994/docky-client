@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import UserAvatar from "../../common/UserAvatar.jsx";
 import { GameFlowMeter } from "./GameUxAssets.jsx";
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
+const seatNoOf = (player) => Number(get(player, "seat_no", "seatNo", 0));
 
 const telestrationsPhaseLabels = {
   PROMPT: "시작 문장",
@@ -1361,6 +1363,22 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
             hasInk={hasInk}
             completedCount={completedSeatNos.size}
             playerCount={playerCount}
+          />
+
+          <TelestrationsActionRoutePanel
+            phase={phase}
+            phaseLabel={phaseLabel}
+            currentTask={currentTask}
+            previousEntry={previousEntry}
+            previousEntryLabel={previousEntryLabel}
+            awaitingPreviousEntry={awaitingPreviousEntry}
+            mySubmitted={mySubmitted}
+            textLength={text.trim().length}
+            hasInk={hasInk}
+            completedCount={completedSeatNos.size}
+            playerCount={playerCount}
+            isHost={isHost}
+            revealInsight={revealInsight}
           />
 
           {awaitingPreviousEntry && (

@@ -118,7 +118,7 @@ export const Statistics = () => {
 
     return (
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-slate-900">커뮤니티 통계</h1>
+            <h1 className="text-3xl font-bold text-ink">커뮤니티 통계</h1>
 
             {summary && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -134,7 +134,7 @@ export const Statistics = () => {
             {visitorsCompare && (
                 <div className="card p-6">
                     <div className="flex flex-wrap items-center gap-3 justify-between">
-                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-ink flex items-center gap-2">
                             <Activity className="h-5 w-5 text-primary-600" />
                             방문자 비교
                         </h2>
@@ -156,12 +156,12 @@ export const Statistics = () => {
 
             <div className="card p-6 space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-ink flex items-center gap-2">
                         <Calendar className="h-5 w-5 text-primary-600" />
                         기간 추이
                     </h2>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600">조회 기간</span>
+                        <span className="text-sm text-ink-muted">조회 기간</span>
                         <select
                             value={days}
                             onChange={(e) => setDays(Number(e.target.value))}
@@ -180,7 +180,7 @@ export const Statistics = () => {
                 ) : trendError ? (
                     <ErrorMessage message={trendError} onRetry={() => fetchTrend(days)} />
                 ) : trend.items.length === 0 ? (
-                    <div className="text-sm text-slate-500">표시할 추이 데이터가 없습니다.</div>
+                    <div className="text-sm text-ink-muted">표시할 추이 데이터가 없습니다.</div>
                 ) : (
                     <div className="space-y-3">
                         {trend.items.map((item) => {
@@ -188,10 +188,10 @@ export const Statistics = () => {
                             const boards = Number(item.newBoards || 0);
                             const comments = Number(item.newComments || 0);
                             return (
-                                <div key={item.date} className="rounded-xl border border-slate-200 p-4">
+                                <div key={item.date} className="rounded-xl border border-line p-4">
                                     <div className="flex items-center justify-between mb-3">
-                                        <span className="text-sm font-semibold text-slate-700">{toDateLabel(item.date)}</span>
-                                        <span className="text-xs text-slate-500">방문자 {formatNumber(visitors)}</span>
+                                        <span className="text-sm font-semibold text-ink">{toDateLabel(item.date)}</span>
+                                        <span className="text-xs text-ink-subtle">방문자 {formatNumber(visitors)}</span>
                                     </div>
                                     <TrendBar label="방문자" value={visitors} max={trendMax} color="bg-blue-500" />
                                     <TrendBar label="신규 게시글" value={boards} max={trendMax} color="bg-emerald-500" />
@@ -211,11 +211,11 @@ const TrendBar = ({ label, value, max, color }) => {
     const percent = Math.max(0, Math.min(100, (value / max) * 100));
     return (
         <div className="space-y-1.5 mb-2 last:mb-0">
-            <div className="flex items-center justify-between text-xs text-slate-600">
+            <div className="flex items-center justify-between text-xs text-ink-muted">
                 <span>{label}</span>
                 <span>{formatNumber(value)}</span>
             </div>
-            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2.5 bg-control rounded-full overflow-hidden">
                 <div className={`h-full ${color}`} style={{ width: `${percent}%` }} />
             </div>
         </div>
@@ -224,9 +224,9 @@ const TrendBar = ({ label, value, max, color }) => {
 
 // 단일 메트릭 타일 컴포넌트
 const MetricTile = ({ label, value }) => (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <div className="text-sm text-slate-600">{label}</div>
-        <div className="text-2xl font-bold text-slate-900">{value}</div>
+    <div className="rounded-xl border border-line bg-control px-4 py-3">
+        <div className="text-sm text-ink-muted">{label}</div>
+        <div className="text-2xl font-bold text-ink">{value}</div>
     </div>
 );
 
@@ -248,8 +248,8 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
                     <Icon className="h-5 w-5" />
                 </div>
                 <div>
-                    <p className="text-sm text-slate-600">{label}</p>
-                    <p className="text-2xl font-bold text-slate-900">{value}</p>
+                    <p className="text-sm text-ink-muted">{label}</p>
+                    <p className="text-2xl font-bold text-ink">{value}</p>
                 </div>
             </div>
         </div>
