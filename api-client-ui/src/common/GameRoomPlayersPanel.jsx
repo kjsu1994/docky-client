@@ -23,12 +23,12 @@ const defaultRewardTier = (player) => pick(player, "rewardTier", "reward_tier");
 const defaultFrameCode = (player) => pick(player, "frameCode", "frame_code");
 const defaultReady = (player) => Boolean(pick(player, "ready", "isReady", "is_ready"));
 
-const readyBadgeClass = (ready) => ready ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600";
+const readyBadgeClass = (ready) => ready ? "bg-emerald-500/10 text-emerald-700" : "bg-control text-ink-muted";
 
 const badgeClass = {
-  host: "bg-amber-100 text-amber-700",
-  me: "bg-sky-100 text-sky-700",
-  current: "bg-primary-100 text-primary-700",
+  host: "bg-amber-500/10 text-amber-700",
+  me: "bg-sky-500/10 text-sky-700",
+  current: "bg-primary-500/10 text-primary-700",
   winner: "bg-emerald-600 text-white",
 };
 
@@ -95,15 +95,15 @@ const GameRoomPlayersPanel = ({
     : statusLabel(normalizedStatus);
 
   return (
-    <section className={`rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg ${className}`} data-smoke={dataSmoke} data-room-status={normalizedStatus}>
+    <section className={`rounded-[1.5rem] border border-line bg-surface p-4 shadow-lg ${className}`} data-smoke={dataSmoke} data-room-status={normalizedStatus}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+        <div className="flex items-center gap-2 text-sm font-black text-ink">
           <UserRound className="h-4 w-4 text-primary-600" />
           {title}
         </div>
         <div className="flex flex-wrap gap-1.5 text-[11px] font-black">
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{rows.length}/{resolvedMaxPlayers || "-"}명</span>
-          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">{rosterSummary}</span>
+          <span className="rounded-full bg-control px-2.5 py-1 text-ink-muted">{rows.length}/{resolvedMaxPlayers || "-"}명</span>
+          <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-700">{rosterSummary}</span>
         </div>
       </div>
 
@@ -117,14 +117,14 @@ const GameRoomPlayersPanel = ({
             ? getDetail(row.player, { seatNo: row.seatNo, waiting, isHost, isMe, isCurrent, isWinner })
             : `좌석 ${row.seatNo}${isHost ? " · 방장" : ""}`;
           const cardTone = isWinner
-            ? "border-emerald-200 bg-emerald-50"
+            ? "border-emerald-500/30 bg-emerald-500/10"
             : isCurrent && !waiting
-              ? "border-amber-200 bg-amber-50"
+              ? "border-amber-500/30 bg-amber-500/10"
               : isMe
-                ? "border-sky-200 bg-sky-50"
+                ? "border-sky-500/30 bg-sky-500/10"
                 : row.ready && waiting && !isHost
-                  ? "border-emerald-200 bg-emerald-50"
-                  : "border-slate-100 bg-slate-50";
+                  ? "border-emerald-500/30 bg-emerald-500/10"
+                  : "border-line bg-control";
 
           return (
             <div key={`${row.memberId || "seat"}-${row.seatNo}-${row.index}`} className={`rounded-xl border px-3 py-2 ${cardTone}`} data-smoke={`${dataSmoke}-item`} data-ready={row.ready ? "true" : "false"} data-host={isHost ? "true" : "false"}>
@@ -139,8 +139,8 @@ const GameRoomPlayersPanel = ({
                     size="sm"
                   />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-black text-slate-900">{row.nickname}</div>
-                    <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{detail}</div>
+                    <div className="truncate text-sm font-black text-ink">{row.nickname}</div>
+                    <div className="mt-0.5 truncate text-[11px] font-bold text-ink-muted">{detail}</div>
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -157,7 +157,7 @@ const GameRoomPlayersPanel = ({
       </div>
 
       {!rows.length && (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs font-bold text-slate-500">
+        <div className="rounded-xl border border-dashed border-line bg-control px-3 py-4 text-center text-xs font-bold text-ink-muted">
           참가자 정보가 도착하면 프로필과 준비 상태가 표시됩니다.
         </div>
       )}

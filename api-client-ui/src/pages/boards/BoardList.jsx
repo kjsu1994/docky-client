@@ -129,8 +129,8 @@ export const BoardList = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">{getBoardKindLabel(kind)}</h1>
-                    <p className="mt-1 text-sm text-slate-500">총 {formatNumber(filteredCount)}개의 게시글</p>
+                    <h1 className="text-2xl font-bold text-ink">{getBoardKindLabel(kind)}</h1>
+                    <p className="mt-1 text-sm text-ink-muted">총 {formatNumber(filteredCount)}개의 게시글</p>
                 </div>
                 {canWrite && (
                     <button
@@ -145,13 +145,13 @@ export const BoardList = () => {
             </div>
 
             {isFreeBoard && (
-                <div className="flex gap-8 border-b border-slate-200">
+                <div className="flex gap-8 border-b border-line">
                     {[["all", "전체"], ["notice", "공지"], ["normal", "일반"]].map(([id, label]) => (
                         <button
                             key={id}
                             type="button"
                             onClick={() => setSubTab(id)}
-                            className={`relative pb-3 text-sm font-bold transition-all ${subTab === id ? "text-primary-600" : "text-slate-400 hover:text-slate-600"}`}
+                            className={`relative pb-3 text-sm font-bold transition-all ${subTab === id ? "text-primary-600" : "text-ink-subtle hover:text-ink-muted"}`}
                         >
                             {label}
                             {subTab === id && <div className="absolute bottom-0 left-0 h-0.5 w-full animate-fade-in bg-primary-600" />}
@@ -162,7 +162,7 @@ export const BoardList = () => {
 
             <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
                     <input
                         type="text"
                         placeholder="검색어 입력"
@@ -171,12 +171,12 @@ export const BoardList = () => {
                         maxLength={BOARD_SEARCH_MAX_LENGTH}
                         className="input-base w-full pl-9"
                     />
-                    <div className="mt-1 text-right text-xs font-medium text-slate-400">
+                    <div className="mt-1 text-right text-xs font-medium text-ink-subtle">
                         검색어 {searchTerm.length}/{BOARD_SEARCH_MAX_LENGTH}자
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-slate-400" />
+                    <Filter className="h-4 w-4 text-ink-subtle" />
                     <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="input-base text-sm">
                         <option value="latest">최신순</option>
                         <option value="popular">조회순</option>
@@ -232,7 +232,7 @@ export const BoardList = () => {
                     {regularBoards.length > 0 && (
                         <div className="mt-4 space-y-3">
                             {subTab === "all" && noticeBoards.length > 0 && (
-                                <div className="mb-2 flex items-center gap-2 border-t pt-4 text-sm font-semibold text-slate-700">
+                                <div className="mb-2 flex items-center gap-2 border-t border-line pt-4 text-sm font-semibold text-ink-muted">
                                     <ImageIcon className="h-4 w-4" />
                                     일반 게시글
                                 </div>
@@ -277,7 +277,7 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
     return (
         <div onClick={onOpen} className="card group flex min-h-[120px] cursor-pointer items-stretch overflow-hidden transition-all hover:shadow-lg">
             {thumbnailUrl && !imgError && (
-                <div className="relative w-32 flex-shrink-0 border-r bg-slate-100 sm:w-40">
+                <div className="relative w-32 flex-shrink-0 border-r border-line bg-control sm:w-40">
                     <img
                         src={thumbnailUrl}
                         srcSet={thumbnailSrcSet || undefined}
@@ -293,7 +293,7 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
             <div className="flex min-w-0 flex-1 flex-col justify-between p-4 sm:p-5">
                 <div>
                     <div className="mb-1 flex items-start justify-between">
-                        <h3 className="line-clamp-1 text-base font-bold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-lg">{board.title}</h3>
+                        <h3 className="line-clamp-1 text-base font-bold text-ink transition-colors group-hover:text-primary-600 sm:text-lg">{board.title}</h3>
                         {canManage && (
                             <div className="ml-2 flex shrink-0 gap-1">
                                 <button type="button" onClick={(event) => { event.stopPropagation(); onEdit(); }} className="rounded-md border border-blue-200 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">수정</button>
@@ -301,10 +301,10 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
                             </div>
                         )}
                     </div>
-                    <p className="mb-3 line-clamp-2 text-sm text-slate-500">{truncateText(stripHtmlTags(contentHtml), 150)}</p>
+                    <p className="mb-3 line-clamp-2 text-sm text-ink-muted">{truncateText(stripHtmlTags(contentHtml), 150)}</p>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-slate-400">
-                    <span className="font-medium text-slate-600">{board.board_creator || board.boardCreator || "익명"}</span>
+                <div className="flex items-center gap-4 text-xs text-ink-subtle">
+                    <span className="font-medium text-ink-muted">{board.board_creator || board.boardCreator || "익명"}</span>
                     <span>{formatRelativeTime(new Date(board.created_at || board.createdAt))}</span>
                     <div className="ml-auto flex gap-3">
                         <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{formatNumber(board.view_count || board.viewCount || 0)}</span>
@@ -323,7 +323,7 @@ const NoticeBoardCard = ({ board, onDelete, onOpen, user }) => {
     });
 
     return (
-        <div onClick={onOpen} className="relative cursor-pointer overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 transition-all hover:shadow-md">
+        <div onClick={onOpen} className="relative cursor-pointer overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4 transition-all hover:shadow-md">
             <div className="mb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-amber-600">
                 <span className="flex items-center gap-1"><Megaphone className="h-3 w-3" />공지</span>
                 {canManage && (
@@ -332,8 +332,8 @@ const NoticeBoardCard = ({ board, onDelete, onOpen, user }) => {
                     </button>
                 )}
             </div>
-            <h3 className="line-clamp-1 text-sm font-bold text-slate-900">{board.title}</h3>
-            <p className="mt-1 line-clamp-1 text-xs text-slate-600 opacity-80">{truncateText(stripHtmlTags(board.contents || board.content || ""), 80)}</p>
+            <h3 className="line-clamp-1 text-sm font-bold text-ink">{board.title}</h3>
+            <p className="mt-1 line-clamp-1 text-xs text-ink-muted opacity-80">{truncateText(stripHtmlTags(board.contents || board.content || ""), 80)}</p>
         </div>
     );
 };

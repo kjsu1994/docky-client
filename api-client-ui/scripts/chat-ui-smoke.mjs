@@ -292,6 +292,9 @@ function routeMock(url, method) {
             },
         };
     }
+    if (method === "GET" && pathname === "/api/members/notifications/unread-count") {
+        return { status: 200, body: { data: { unreadCount: 0 } } };
+    }
     if (method === "GET" && pathname === "/api/chat/rooms") {
         return {
             status: 200,

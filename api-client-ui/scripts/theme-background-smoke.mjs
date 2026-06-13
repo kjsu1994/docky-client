@@ -17,6 +17,15 @@ const [
     protectedRoutes,
     gamesHub,
     mypage,
+    boardList,
+    boardDetail,
+    boardForm,
+    chat,
+    comments,
+    addressSearchBox,
+    adminMfaGate,
+    gameRoomChatPanel,
+    gameRoomPlayersPanel,
 ] = await Promise.all([
     readSource("src/index.css"),
     readSource("index.html"),
@@ -30,11 +39,25 @@ const [
     readSource("src/components/ProtectedRoutes.jsx"),
     readSource("src/pages/games/GamesHub.jsx"),
     readSource("src/pages/home/Mypage.jsx"),
+    readSource("src/pages/boards/BoardList.jsx"),
+    readSource("src/pages/boards/BoardDetail.jsx"),
+    readSource("src/pages/boards/BoardForm.jsx"),
+    readSource("src/pages/chat/Chat.jsx"),
+    readSource("src/components/Comments.jsx"),
+    readSource("src/common/AddressSearchBox.jsx"),
+    readSource("src/components/AdminMfaGate.jsx"),
+    readSource("src/common/GameRoomChatPanel.jsx"),
+    readSource("src/common/GameRoomPlayersPanel.jsx"),
 ]);
 
 const failures = [];
 const assert = (condition, message) => {
     if (!condition) failures.push(message);
+};
+const assertIncludesAll = (sourceName, source, tokens) => {
+    for (const token of tokens) {
+        assert(source.includes(token), `${sourceName}: ${token} token is missing`);
+    }
 };
 
 assert(css.includes("--app-bg:"), "src/index.css: app background token is missing");
@@ -52,6 +75,7 @@ assert(/body\s*\{[\s\S]*background:\s*var\(--app-bg\)/.test(css), "src/index.css
 assert(/\.bg-vibe\s*\{[\s\S]*background:\s*var\(--app-bg-vibe\)/.test(css), "src/index.css: .bg-vibe must use --app-bg-vibe");
 assert(/\.glass\s*\{[\s\S]*rgb\(var\(--color-surface\)/.test(css), "src/index.css: .glass must use surface tokens");
 assert(/\.input-base\s*\{[\s\S]*bg-control/.test(css), "src/index.css: inputs must use control tokens");
+assert(css.includes(".board-contents") && css.includes(".rich-board-editor"), "src/index.css: board content theme rules are missing");
 
 for (const token of ["surface", "ink", "line", "control", "focus"]) {
     assert(tailwindConfig.includes(`${token}:`), `tailwind.config.js: ${token} semantic color is missing`);
@@ -93,6 +117,20 @@ assert(mypage.includes('activeTab === "settings"'), "src/pages/home/Mypage.jsx: 
 assert(mypage.includes("getMypageTabFromSearch") && mypage.includes('get("tab")'), "src/pages/home/Mypage.jsx: settings deep link support is missing");
 assert(mypage.includes('role="radiogroup"'), "src/pages/home/Mypage.jsx: theme selector must be a radiogroup");
 assert(mypage.includes('role="radio"') && mypage.includes("aria-checked={active}"), "src/pages/home/Mypage.jsx: theme options must expose radio state");
+
+for (const [sourceName, source, tokens] of [
+    ["src/pages/boards/BoardList.jsx", boardList, ["text-ink", "border-line", "bg-control"]],
+    ["src/pages/boards/BoardDetail.jsx", boardDetail, ["board-contents", "text-ink", "border-line", "bg-control"]],
+    ["src/pages/boards/BoardForm.jsx", boardForm, ["rich-board-editor", "text-ink", "border-line", "bg-surface"]],
+    ["src/pages/chat/Chat.jsx", chat, ["bg-surface", "bg-control", "text-ink", "border-line"]],
+    ["src/components/Comments.jsx", comments, ["text-ink", "text-ink-muted", "text-ink-subtle"]],
+    ["src/common/AddressSearchBox.jsx", addressSearchBox, ["bg-surface", "bg-control", "text-ink", "border-line"]],
+    ["src/components/AdminMfaGate.jsx", adminMfaGate, ["bg-surface", "bg-control", "text-ink", "border-line"]],
+    ["src/common/GameRoomChatPanel.jsx", gameRoomChatPanel, ["bg-surface", "bg-control", "text-ink", "border-line"]],
+    ["src/common/GameRoomPlayersPanel.jsx", gameRoomPlayersPanel, ["bg-surface", "bg-control", "text-ink", "border-line"]],
+]) {
+    assertIncludesAll(sourceName, source, tokens);
+}
 
 if (failures.length) {
     console.error(failures.join("\n"));

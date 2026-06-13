@@ -76,14 +76,14 @@ export const AdminMfaGate = ({ children }) => {
 
     return (
         <div className="mx-auto flex min-h-[60vh] w-full max-w-xl items-center justify-center px-4 py-10">
-            <section className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="w-full rounded-2xl border border-line bg-surface p-6 shadow-sm">
                 <div className="mb-5 flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink text-ink-inverse">
                         <ShieldCheck className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                        <h1 className="text-lg font-black text-slate-900">Admin verification</h1>
-                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                        <h1 className="text-lg font-black text-ink">Admin verification</h1>
+                        <p className="mt-1 text-sm font-semibold leading-6 text-ink-muted">
                             Verify this login session by email before opening admin tools.
                         </p>
                     </div>
@@ -94,14 +94,14 @@ export const AdminMfaGate = ({ children }) => {
                         type="button"
                         onClick={handleSend}
                         disabled={sending || confirming}
-                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-control px-4 py-3 text-sm font-black text-ink-muted transition hover:bg-control-hover disabled:opacity-60"
                     >
                         {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
                         {sending ? "Sending..." : "Send verification code"}
                     </button>
 
                     <label className="block">
-                        <span className="mb-2 block text-sm font-black text-slate-700">6 digit code</span>
+                        <span className="mb-2 block text-sm font-black text-ink-muted">6 digit code</span>
                         <input
                             type="text"
                             inputMode="numeric"
@@ -109,7 +109,7 @@ export const AdminMfaGate = ({ children }) => {
                             maxLength={6}
                             value={code}
                             onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                            className="h-12 w-full rounded-xl border border-slate-200 px-4 text-center text-lg font-black text-slate-900 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                            className="h-12 w-full rounded-xl border border-line bg-control px-4 text-center text-lg font-black text-ink outline-none focus:border-focus focus:ring-4 focus:ring-focus/20"
                             placeholder="000000"
                         />
                     </label>
@@ -117,7 +117,7 @@ export const AdminMfaGate = ({ children }) => {
                     <button
                         type="submit"
                         disabled={confirming || code.length !== 6}
-                        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ink px-4 py-3 text-sm font-black text-ink-inverse transition hover:opacity-90 disabled:opacity-60"
                     >
                         {confirming ? "Verifying..." : "Verify"}
                     </button>

@@ -202,6 +202,9 @@ function routeMock(url, method) {
     if (method === "GET" && pathname === "/api/chat/rooms") {
         return { status: 200, body: { data: [] } };
     }
+    if (method === "GET" && pathname === "/api/members/notifications/unread-count") {
+        return { status: 200, body: { data: { unreadCount: 0 } } };
+    }
 
     return null;
 }
@@ -286,7 +289,7 @@ async function inspectTextAndOverflow(cdp, sessionId, viewport, label, requiredT
 
     const missing = requiredTexts.filter((text) => !value.text.includes(text));
     if (missing.length) {
-        throw new Error(`${label} ${viewport.name}: missing text ${missing.join(", ")}`);
+        throw new Error(`${label} ${viewport.name}: missing text ${missing.join(", ")} at ${value.url}. Body: ${value.text.slice(0, 800)}`);
     }
 
     const blocked = blockedTexts.filter((text) => value.text.includes(text));
@@ -312,8 +315,21 @@ async function inspectMypage(cdp, sessionId, viewport) {
 
     await cdp.send("Page.navigate", { url: `${baseUrl}/app/mypage` }, sessionId);
     const profileResult = await inspectTextAndOverflow(cdp, sessionId, viewport, "mypage profile", profileTexts);
+    if (debug) {
+        console.log("mypage after profile", await evaluate(cdp, sessionId, `({
+            url: location.href,
+            text: document.body?.innerText.slice(0, 240) || ""
+        })`));
+    }
 
-    if (await clickButtonByText(cdp, sessionId, "작성 글") !== "clicked") {
+    const postsClickResult = await clickButtonByText(cdp, sessionId, "작성 글");
+    if (debug) {
+        console.log("mypage posts click", postsClickResult, await evaluate(cdp, sessionId, `({
+            url: location.href,
+            text: document.body?.innerText.slice(0, 240) || ""
+        })`));
+    }
+    if (postsClickResult !== "clicked") {
         throw new Error(`mypage ${viewport.name}: posts tab missing`);
     }
     const postsResult = await inspectTextAndOverflow(cdp, sessionId, viewport, "mypage posts", postsTexts);

@@ -254,6 +254,10 @@ function routeMock(url, method) {
         return { status: 200, body: { data: [] } };
     }
 
+    if (method === "GET" && pathname === "/api/members/notifications/unread-count") {
+        return { status: 200, body: { data: { unreadCount: 0 } } };
+    }
+
     if (method === "GET" && pathname === "/api/boards") {
         const kind = searchParams.get("kind") || "FREE_BOARD";
         const rows = boardRows[kind] || [];
@@ -427,7 +431,9 @@ async function inspectBoards(cdp, sessionId, viewport) {
             .filter((node) => node.right > root.clientWidth + 2 && node.width > 0)
             .slice(0, 5);
         return {
+            href: location.href,
             text,
+            html: body ? body.innerHTML.slice(0, 800) : "",
             clientWidth: root.clientWidth,
             scrollWidth: root.scrollWidth,
             bodyWidth: body ? body.scrollWidth : 0,
@@ -437,7 +443,7 @@ async function inspectBoards(cdp, sessionId, viewport) {
 
     for (const text of ["사용자게시판", "나무 심기 후기 공유", "동네 줍기 모임 안내"]) {
         if (!value.text.includes(text)) {
-            throw new Error(`boards ${viewport.name}: missing text ${text}`);
+            throw new Error(`boards ${viewport.name}: missing text ${text}. State: ${JSON.stringify({ href: value.href, text: value.text.slice(0, 800), html: value.html })}`);
         }
     }
 

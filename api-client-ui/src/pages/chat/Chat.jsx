@@ -669,27 +669,27 @@ export const Chat = () => {
     }, [roomSearchQuery, rooms]);
 
     return (
-        <div className="relative flex h-[calc(100svh-96px)] min-h-[560px] overflow-hidden rounded-2xl border bg-white shadow-sm lg:h-[calc(100vh-120px)]">
+        <div className="relative flex h-[calc(100svh-96px)] min-h-[560px] overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:h-[calc(100vh-120px)]">
             {/* 사이드바 */}
-            <div className={`${isSidebarOpen ? "translate-x-0 lg:w-80" : "-translate-x-full lg:w-0"} absolute inset-y-0 left-0 z-30 flex w-full flex-col border-r bg-slate-50 transition-all duration-300 lg:relative lg:translate-x-0`}>
-                <div className="flex items-center justify-between gap-3 border-b bg-white p-3 sm:p-4">
-                    <h2 className="font-bold text-slate-900 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary-600" />채팅방</h2>
+            <div className={`${isSidebarOpen ? "translate-x-0 lg:w-80" : "-translate-x-full lg:w-0"} absolute inset-y-0 left-0 z-30 flex w-full flex-col border-r border-line bg-control transition-all duration-300 lg:relative lg:translate-x-0`}>
+                <div className="flex items-center justify-between gap-3 border-b border-line bg-surface p-3 sm:p-4">
+                    <h2 className="flex items-center gap-2 font-bold text-ink"><MessageSquare className="h-5 w-5 text-primary-600" />채팅방</h2>
                     <div className="flex gap-1">
-                        <button type="button" aria-label="채팅방 목록 새로고침" onClick={fetchRooms} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors"><RefreshCw className={`h-4 w-4 ${loadingRooms ? 'animate-spin' : ''}`} /></button>
-                        <button type="button" aria-label="AI 채팅방 열기" onClick={openAiRoom} className="p-1.5 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition-colors"><Bot className="h-5 w-5" /></button>
-                        <button type="button" aria-label="새 채팅방 만들기" onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors"><Plus className="h-5 w-5" /></button>
+                        <button type="button" aria-label="채팅방 목록 새로고침" onClick={fetchRooms} className="rounded-lg p-1.5 text-ink-subtle transition-colors hover:bg-control-hover"><RefreshCw className={`h-4 w-4 ${loadingRooms ? 'animate-spin' : ''}`} /></button>
+                        <button type="button" aria-label="AI 채팅방 열기" onClick={openAiRoom} className="rounded-lg bg-cyan-500/10 p-1.5 text-cyan-700 transition-colors hover:bg-cyan-500/20"><Bot className="h-5 w-5" /></button>
+                        <button type="button" aria-label="새 채팅방 만들기" onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="rounded-lg bg-primary-500/10 p-1.5 text-primary-600 transition-colors hover:bg-primary-500/20"><Plus className="h-5 w-5" /></button>
                     </div>
                 </div>
                 <div className="p-3">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-subtle" />
                             <input
                                 aria-label="채팅방 검색"
                                 type="text"
                                 value={roomSearchQuery}
                             onChange={(event) => setRoomSearchQuery(event.target.value)}
                             placeholder="방 이름 또는 최근 메시지 검색"
-                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm"
+                            className="w-full rounded-xl border border-line bg-surface py-2 pl-9 pr-4 text-sm text-ink placeholder:text-ink-subtle"
                         />
                     </div>
                 </div>
@@ -697,13 +697,13 @@ export const Chat = () => {
                     {loadingRooms ? <div className="p-8 flex justify-center"><LoadingSpinner size="sm" /></div> : (rooms && rooms.length > 0) ? (
                         <div className="space-y-1 p-2">
                             {filteredRooms.length === 0 ? (
-                                <div className="p-8 text-center text-slate-500 text-sm">검색 결과가 없습니다.</div>
+                                <div className="p-8 text-center text-sm text-ink-muted">검색 결과가 없습니다.</div>
                             ) : filteredRooms.map((room, idx) => {
                                 const roomId = getRoomId(room);
                                 const isActive = getRoomId(currentRoom) === roomId;
                                 return (
                                     <div key={getRoomKey(room, idx)}
-                                        className={`group flex w-full items-center gap-1 rounded-xl transition-all ${isActive ? "bg-primary-600 text-white shadow-md" : "text-slate-700 hover:bg-white hover:shadow-sm"}`}>
+                                        className={`group flex w-full items-center gap-1 rounded-xl transition-all ${isActive ? "bg-primary-600 text-white shadow-md" : "text-ink-muted hover:bg-surface hover:shadow-sm"}`}>
                                         <button
                                             type="button"
                                             onPointerDown={(event) => beginRoomLongPress(room, event)}
@@ -718,7 +718,7 @@ export const Chat = () => {
                                                 selectRoom(room);
                                             }}
                                             className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-3 text-left">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold shadow-sm ${isActive ? "bg-white/20" : "bg-primary-100 text-primary-700"}`}>
+                                        <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold shadow-sm ${isActive ? "bg-white/20" : "bg-primary-500/10 text-primary-700"}`}>
                                             {room.type === "AI" ? <Bot className="h-6 w-6" /> : room.type === "PERSONAL" ? <User className="h-6 w-6" /> : <Users className="h-6 w-6" />}
                                         </div>
                                         <div className="flex-1 text-left min-w-0">
@@ -726,14 +726,14 @@ export const Chat = () => {
                                                 <span className="font-bold truncate">{room.title}</span>
                                                 {room.unreadCount > 0 && <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isActive ? "bg-white text-primary-600" : "bg-red-500 text-white"}`}>{room.unreadCount}</span>}
                                             </div>
-                                            <div className={`text-xs truncate ${isActive ? "text-white/80" : "text-slate-500"}`}>{room.lastMessage || "대화 내용이 없습니다."}</div>
+                                            <div className={`truncate text-xs ${isActive ? "text-white/80" : "text-ink-muted"}`}>{room.lastMessage || "대화 내용이 없습니다."}</div>
                                         </div>
                                         </button>
                                         <button
                                             type="button"
                                             aria-label={`${room.title || "채팅방"} 메뉴`}
                                             onClick={() => openRoomActions(room)}
-                                            className={`mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${isActive ? "text-white/80 hover:bg-white/15" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}
+                                            className={`mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${isActive ? "text-white/80 hover:bg-white/15" : "text-ink-subtle hover:bg-control-hover hover:text-ink-muted"}`}
                                         >
                                             <MoreVertical className="h-4 w-4" />
                                         </button>
@@ -741,31 +741,31 @@ export const Chat = () => {
                                 );
                             })}
                         </div>
-                    ) : <div className="p-8 text-center text-slate-500 text-sm">참여 중인 방이 없습니다.</div>}
+                    ) : <div className="p-8 text-center text-sm text-ink-muted">참여 중인 방이 없습니다.</div>}
                 </div>
             </div>
 
             {/* 메인 */}
-            <div className="flex min-w-0 flex-1 flex-col bg-white">
+            <div className="flex min-w-0 flex-1 flex-col bg-surface">
                 {currentRoom ? (
                     <>
-                        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between gap-2 border-b bg-white/90 p-3 backdrop-blur-sm sm:p-4">
+                        <div className="sticky top-0 z-10 flex min-h-16 items-center justify-between gap-2 border-b border-line bg-surface/90 p-3 backdrop-blur-sm sm:p-4">
                             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                                <button type="button" aria-label="채팅방 목록 열기" onClick={() => setIsSidebarOpen(true)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden"><ArrowLeft className="h-5 w-5" /></button>
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-100 font-bold text-primary-700">
+                                <button type="button" aria-label="채팅방 목록 열기" onClick={() => setIsSidebarOpen(true)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-ink-muted hover:bg-control-hover lg:hidden"><ArrowLeft className="h-5 w-5" /></button>
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500/10 font-bold text-primary-700">
                                     {currentRoom.type === "AI" ? <Bot className="h-5 w-5" /> : currentRoom.type === "PERSONAL" ? <User className="h-5 w-5" /> : <Users className="h-5 w-5" />}
                                 </div>
                                 <div className="min-w-0">
-                                    <h3 className="truncate font-bold text-slate-900">{currentRoom.title}</h3>
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-500"><span className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-amber-400"}`}></span>{isConnected ? "실시간 연결" : "실시간 연결 대기"}</div>
+                                    <h3 className="truncate font-bold text-ink">{currentRoom.title}</h3>
+                                    <div className="flex items-center gap-1.5 text-xs text-ink-muted"><span className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-amber-400"}`}></span>{isConnected ? "실시간 연결" : "실시간 연결 대기"}</div>
                                 </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-                                <button type="button" aria-label={showMemberList ? "참여자 목록 닫기" : "참여자 목록 열기"} onClick={() => setShowMemberList(!showMemberList)} className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold transition-colors sm:w-auto sm:px-3 ${showMemberList ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                                <button type="button" aria-label={showMemberList ? "참여자 목록 닫기" : "참여자 목록 열기"} onClick={() => setShowMemberList(!showMemberList)} className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold transition-colors sm:w-auto sm:px-3 ${showMemberList ? "bg-primary-600 text-white" : "bg-control text-ink-muted hover:bg-control-hover"}`}>
                                     <Users className="h-4 w-4" /><span className="hidden sm:inline">{currentMembers.length}</span>
                                 </button>
                                 {currentRoom.type === "GROUP" && (
-                                    <button type="button" aria-label="멤버 초대" onClick={() => { resetMemberSelection(); setShowInviteModal(true); }} className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-sm font-bold text-primary-600 hover:bg-primary-100 sm:w-auto sm:px-3">
+                                    <button type="button" aria-label="멤버 초대" onClick={() => { resetMemberSelection(); setShowInviteModal(true); }} className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-sm font-bold text-primary-600 hover:bg-primary-500/20 sm:w-auto sm:px-3">
                                         <UserPlus className="h-4 w-4" /><span className="hidden sm:inline">초대</span>
                                     </button>
                                 )}
@@ -773,7 +773,7 @@ export const Chat = () => {
                                     type="button"
                                     aria-label="채팅방 메뉴"
                                     onClick={() => openRoomActions(currentRoom)}
-                                    className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                                    className="flex h-10 w-10 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-control-hover hover:text-ink"
                                 >
                                     <MoreVertical className="h-5 w-5" />
                                 </button>
@@ -782,9 +782,9 @@ export const Chat = () => {
 
                         <div className="flex-1 flex overflow-hidden relative">
                             <div className="flex-1 flex flex-col overflow-hidden">
-                                <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50/50 p-3 sm:p-4">
+                                <div className="flex-1 space-y-4 overflow-y-auto bg-control/60 p-3 sm:p-4">
                                     {loadingMessages ? <div className="h-full flex items-center justify-center"><LoadingSpinner text="메시지 로드 중..." /></div> : messages.length === 0 ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2"><MessageSquare className="h-12 w-12 opacity-20" /><p className="text-sm font-medium">대화를 시작해보세요!</p></div>
+                                        <div className="flex h-full flex-col items-center justify-center space-y-2 text-ink-subtle"><MessageSquare className="h-12 w-12 opacity-20" /><p className="text-sm font-medium">대화를 시작해보세요!</p></div>
                                     ) : (
                                         <>
                                             {canLoadOlderMessages && (
@@ -793,7 +793,7 @@ export const Chat = () => {
                                                         type="button"
                                                         onClick={fetchOlderMessages}
                                                         disabled={loadingOlderMessages}
-                                                        className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                                                        className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-bold text-ink-muted shadow-sm transition-colors hover:bg-control-hover disabled:cursor-wait disabled:opacity-60"
                                                     >
                                                         {loadingOlderMessages ? "불러오는 중..." : "이전 메시지 더 보기"}
                                                     </button>
@@ -816,24 +816,24 @@ export const Chat = () => {
                                                             rewardTier={normalized.senderRewardTier}
                                                             frameCode={normalized.senderFrameCode}
                                                             size="sm"
-                                                            className="rounded-lg border-slate-100"
+                                                            className="rounded-lg border-line"
                                                         />
                                                     )}
                                                     <div className="flex flex-col">
-                                                        {!isMe && <span className="text-[10px] text-slate-500 mb-1 ml-1">{normalized.senderName}</span>}
-                                                        <div className={`px-4 py-2 rounded-2xl text-sm shadow-sm ${isMe ? "bg-primary-600 text-white rounded-br-none" : "bg-white text-slate-800 border border-slate-100 rounded-bl-none"}`}>
+                                                        {!isMe && <span className="mb-1 ml-1 text-[10px] text-ink-muted">{normalized.senderName}</span>}
+                                                        <div className={`rounded-2xl px-4 py-2 text-sm shadow-sm ${isMe ? "rounded-br-none bg-primary-600 text-white" : "rounded-bl-none border border-line bg-surface text-ink"}`}>
                                                             {normalized.type === "FILE" ? (
                                                                 !messageFileUrl ? (
                                                                     <div
-                                                                        className={`flex min-w-0 max-w-[74vw] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3 sm:min-w-[220px]`}
+                                                                        className={`flex min-w-0 max-w-[74vw] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-control"} px-3 py-3 sm:min-w-[220px]`}
                                                                         aria-label="표시할 수 없는 첨부파일"
                                                                     >
-                                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-slate-200 text-slate-500"}`}>
+                                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-control-hover text-ink-muted"}`}>
                                                                             <FileIcon className="h-5 w-5" />
                                                                         </div>
                                                                         <div className="min-w-0 flex-1">
                                                                             <div className="truncate text-sm font-bold">{normalized.fileName || normalized.message || "첨부파일"}</div>
-                                                                            <div className={`mt-1 text-[11px] font-bold ${isMe ? "text-white/70" : "text-slate-500"}`}>
+                                                                            <div className={`mt-1 text-[11px] font-bold ${isMe ? "text-white/70" : "text-ink-muted"}`}>
                                                                                 첨부파일을 표시할 수 없습니다.
                                                                             </div>
                                                                         </div>
@@ -846,7 +846,7 @@ export const Chat = () => {
                                                                             className="max-w-[min(18rem,78vw)] cursor-pointer rounded-xl sm:max-w-xs"
                                                                         />
                                                                         {!!(normalized.fileName || normalized.message) && (
-                                                                            <div className={`text-[11px] ${isMe ? "text-white/80" : "text-slate-500"}`}>
+                                                                            <div className={`text-[11px] ${isMe ? "text-white/80" : "text-ink-muted"}`}>
                                                                                 {normalized.fileName || normalized.message}
                                                                             </div>
                                                                         )}
@@ -855,16 +855,16 @@ export const Chat = () => {
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleDownloadAttachment(messageFileUrl, normalized.fileName || normalized.message)}
-                                                                        className={`flex min-w-0 max-w-[74vw] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-slate-50"} px-3 py-3 text-left transition-colors hover:opacity-90 sm:min-w-[220px]`}
+                                                                        className={`flex min-w-0 max-w-[74vw] items-center gap-3 rounded-xl ${isMe ? "bg-white/10" : "bg-control"} px-3 py-3 text-left transition-colors hover:opacity-90 sm:min-w-[220px]`}
                                                                     >
-                                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-primary-50 text-primary-600"}`}>
+                                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isMe ? "bg-white/15" : "bg-primary-500/10 text-primary-600"}`}>
                                                                             <Download className="h-5 w-5" />
                                                                         </div>
                                                                         <div className="min-w-0 flex-1">
                                                                             <div className="truncate text-sm font-bold">{normalized.fileName || normalized.message || "첨부파일"}</div>
-                                                                            <div className={`mt-1 flex items-center gap-2 text-[11px] ${isMe ? "text-white/80" : "text-slate-500"}`}>
+                                                                            <div className={`mt-1 flex items-center gap-2 text-[11px] ${isMe ? "text-white/80" : "text-ink-muted"}`}>
                                                                                 <span>{formatFileSize(Number(normalized.fileSize || 0))}</span>
-                                                                                <span className={`rounded-full px-2 py-0.5 font-bold ${isMe ? "bg-white/10 text-white" : "bg-white text-primary-600"}`}>
+                                                                                <span className={`rounded-full px-2 py-0.5 font-bold ${isMe ? "bg-white/10 text-white" : "bg-surface text-primary-600"}`}>
                                                                                     {getAttachmentTypeLabel(normalized.fileName, normalized.fileContentType)}
                                                                                 </span>
                                                                             </div>
@@ -874,7 +874,7 @@ export const Chat = () => {
                                                             ) : normalized.message}
                                                         </div>
                                                     </div>
-                                                    <span className="text-[10px] text-slate-400 pb-1">{formatRelativeTime(new Date(normalized.createdAt))}</span>
+                                                    <span className="pb-1 text-[10px] text-ink-subtle">{formatRelativeTime(new Date(normalized.createdAt))}</span>
                                                 </div>
                                             </div>
                                         );
@@ -883,39 +883,39 @@ export const Chat = () => {
                                     )}
                                     <div ref={messagesEndRef} />
                                 </div>
-                                <div className="border-t bg-white p-3 sm:p-4">
+                                <div className="border-t border-line bg-surface p-3 sm:p-4">
                                     {uploadingFileName && (
-                                        <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-primary-50 px-4 py-2 text-xs font-bold text-primary-700">
+                                        <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-primary-500/10 px-4 py-2 text-xs font-bold text-primary-700">
                                             <span className="truncate">업로드 중: {uploadingFileName}</span>
                                             <span>{uploadProgress}%</span>
                                         </div>
                                     )}
                                     <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-                                        <button type="button" aria-label="파일 첨부" onClick={() => fileInputRef.current.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"><FileIcon className="h-5 w-5" /></button>
+                                        <button type="button" aria-label="파일 첨부" onClick={() => fileInputRef.current.click()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-control text-ink-muted transition-colors hover:bg-control-hover"><FileIcon className="h-5 w-5" /></button>
                                         <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.7z" />
                                         <div className="relative min-w-0 flex-1">
-                                            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={isAiRoom(currentRoom) ? "질문을 입력하세요. 이미지는 먼저 첨부한 뒤 질문하면 됩니다." : "메시지를 입력해 주세요."} maxLength={CHAT_MESSAGE_MAX_LENGTH} className="max-h-32 min-h-11 w-full resize-none rounded-2xl border-none bg-slate-100 py-3 pl-4 pr-12 text-sm focus:ring-2 focus:ring-primary-500" rows="1" />
-                                            <button type="submit" aria-label="메시지 보내기" disabled={!newMessage.trim() || !isConnected} className={`absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-lg transition-all ${ (newMessage.trim() && isConnected) ? "bg-primary-600 text-white shadow-md" : "bg-slate-200 text-slate-400" }`}><Send className="h-4 w-4" /></button>
-                                            <div className="mt-1 text-right text-[11px] font-bold text-slate-400">
+                                            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={isAiRoom(currentRoom) ? "질문을 입력하세요. 이미지는 먼저 첨부한 뒤 질문하면 됩니다." : "메시지를 입력해 주세요."} maxLength={CHAT_MESSAGE_MAX_LENGTH} className="max-h-32 min-h-11 w-full resize-none rounded-2xl border-none bg-control py-3 pl-4 pr-12 text-sm text-ink placeholder:text-ink-subtle focus:ring-2 focus:ring-primary-500" rows="1" />
+                                            <button type="submit" aria-label="메시지 보내기" disabled={!newMessage.trim() || !isConnected} className={`absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-lg transition-all ${ (newMessage.trim() && isConnected) ? "bg-primary-600 text-white shadow-md" : "bg-control-hover text-ink-subtle" }`}><Send className="h-4 w-4" /></button>
+                                            <div className="mt-1 text-right text-[11px] font-bold text-ink-subtle">
                                                 {newMessage.length.toLocaleString("ko-KR")} / {CHAT_MESSAGE_MAX_LENGTH.toLocaleString("ko-KR")}
                                             </div>
                                         </div>
                                     </form>
                                     {isAiRoom(currentRoom) && (
-                                        <p className="mt-2 text-xs font-semibold text-slate-400">
+                                        <p className="mt-2 text-xs font-semibold text-ink-subtle">
                                             AI 방은 서버 기본 모델만 사용합니다. 이미지를 첨부한 뒤 질문을 보내면 최근 첨부 이미지까지 함께 전달합니다.
                                         </p>
                                     )}
                                 </div>
                             </div>
                             {showMemberList && (
-                                <div className="absolute inset-y-0 right-0 z-20 flex w-full max-w-xs flex-col border-l bg-white shadow-2xl animate-slide-in-right lg:relative lg:z-auto lg:w-64 lg:shadow-none">
-                                    <div className="p-4 border-b flex items-center justify-between bg-slate-50"><h4 className="font-bold text-sm text-slate-900">참여자 ({currentMembers.length})</h4><button type="button" aria-label="참여자 목록 닫기" onClick={() => setShowMemberList(false)} className="p-1 hover:bg-slate-200 rounded-lg transition-colors"><X className="h-4 w-4" /></button></div>
+                                <div className="absolute inset-y-0 right-0 z-20 flex w-full max-w-xs animate-slide-in-right flex-col border-l border-line bg-surface shadow-2xl lg:relative lg:z-auto lg:w-64 lg:shadow-none">
+                                    <div className="flex items-center justify-between border-b border-line bg-control p-4"><h4 className="text-sm font-bold text-ink">참여자 ({currentMembers.length})</h4><button type="button" aria-label="참여자 목록 닫기" onClick={() => setShowMemberList(false)} className="rounded-lg p-1 transition-colors hover:bg-control-hover"><X className="h-4 w-4" /></button></div>
                                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                                        {loadingMembers ? <div className="p-8 flex justify-center"><LoadingSpinner size="sm" /></div> : currentMembers.length === 0 ? <div className="p-4 text-center text-xs text-slate-400">참여자 정보가 없습니다.</div> : currentMembers.map(m => {
+                                        {loadingMembers ? <div className="flex justify-center p-8"><LoadingSpinner size="sm" /></div> : currentMembers.length === 0 ? <div className="p-4 text-center text-xs text-ink-subtle">참여자 정보가 없습니다.</div> : currentMembers.map(m => {
                                             const isMe = getMemberId(m) === getMemberId(user);
                                             return (
-                                                <div key={getMemberId(m)} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
+                                                <div key={getMemberId(m)} className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-control">
                                                     <UserAvatar
                                                         name={m.name}
                                                         profileUrl={m.profileUrl || m.profile_url}
@@ -925,8 +925,8 @@ export const Chat = () => {
                                                         size="sm"
                                                     />
                                                     <div className="min-w-0">
-                                                        <div className="text-xs font-bold truncate flex items-center gap-1">{m.name}{isMe && <span className="text-[9px] px-1 py-0.5 bg-primary-100 text-primary-600 rounded">나</span>}</div>
-                                                        <div className="text-[10px] text-slate-400 truncate">{m.email}</div>
+                                                        <div className="flex items-center gap-1 truncate text-xs font-bold">{m.name}{isMe && <span className="rounded bg-primary-500/10 px-1 py-0.5 text-[9px] text-primary-600">나</span>}</div>
+                                                        <div className="truncate text-[10px] text-ink-subtle">{m.email}</div>
                                                     </div>
                                                 </div>
                                             );
@@ -936,7 +936,7 @@ export const Chat = () => {
                             )}
                         </div>
                     </>
-                ) : <div className="h-full flex flex-col items-center justify-center bg-slate-50/50 text-center p-8"><MessageSquare className="h-16 w-16 text-primary-100 mb-4" /><h2 className="text-xl font-bold text-slate-900">대화방을 선택해주세요.</h2></div>}
+                ) : <div className="flex h-full flex-col items-center justify-center bg-control/60 p-8 text-center"><MessageSquare className="mb-4 h-16 w-16 text-primary-100" /><h2 className="text-xl font-bold text-ink">대화방을 선택해주세요.</h2></div>}
             </div>
 
             {roomActionTarget && !showRenameModal && (
@@ -947,13 +947,13 @@ export const Chat = () => {
                         if (event.target === event.currentTarget) closeRoomActions();
                     }}
                 >
-                    <div className="max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl">
-                        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+                    <div className="max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-surface shadow-2xl">
+                        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
                             <div className="min-w-0">
-                                <div className="truncate text-sm font-black text-slate-900">{roomActionTarget?.title || "채팅방"}</div>
-                                <div className="mt-0.5 text-xs font-semibold text-slate-400">채팅방 설정</div>
+                                <div className="truncate text-sm font-black text-ink">{roomActionTarget?.title || "채팅방"}</div>
+                                <div className="mt-0.5 text-xs font-semibold text-ink-subtle">채팅방 설정</div>
                             </div>
-                            <button type="button" aria-label="채팅방 메뉴 닫기" onClick={closeRoomActions} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                            <button type="button" aria-label="채팅방 메뉴 닫기" onClick={closeRoomActions} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ink-subtle hover:bg-control-hover hover:text-ink-muted">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
@@ -961,9 +961,9 @@ export const Chat = () => {
                             <button
                                 type="button"
                                 onClick={() => setShowRenameModal(true)}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold text-ink-muted hover:bg-control"
                             >
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600"><Pencil className="h-5 w-5" /></span>
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-600"><Pencil className="h-5 w-5" /></span>
                                 이름 바꾸기
                             </button>
                             <button
@@ -971,7 +971,7 @@ export const Chat = () => {
                                 onClick={leaveSelectedRoom}
                                 className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"
                             >
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600"><LogOut className="h-5 w-5" /></span>
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-600"><LogOut className="h-5 w-5" /></span>
                                 채팅방 나가기
                             </button>
                         </div>
@@ -987,15 +987,15 @@ export const Chat = () => {
                         if (event.target === event.currentTarget) closeRoomActions();
                     }}
                 >
-                    <div className="max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="chat-room-rename-title">
-                        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-                            <h3 id="chat-room-rename-title" className="text-base font-black text-slate-900">채팅방 이름 바꾸기</h3>
-                            <button type="button" aria-label="이름 변경 닫기" onClick={closeRoomActions} className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                    <div className="max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="chat-room-rename-title">
+                        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+                            <h3 id="chat-room-rename-title" className="text-base font-black text-ink">채팅방 이름 바꾸기</h3>
+                            <button type="button" aria-label="이름 변경 닫기" onClick={closeRoomActions} className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-subtle hover:bg-control-hover hover:text-ink-muted">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
                         <div className="space-y-3 p-4">
-                            <label htmlFor="chat-room-rename-input" className="text-sm font-bold text-slate-700">새 이름</label>
+                            <label htmlFor="chat-room-rename-input" className="text-sm font-bold text-ink-muted">새 이름</label>
                             <input
                                 id="chat-room-rename-input"
                                 type="text"
@@ -1012,9 +1012,9 @@ export const Chat = () => {
                                 autoFocus
                             />
                         </div>
-                        <div className="flex gap-2 bg-slate-50 p-4">
-                            <button type="button" onClick={closeRoomActions} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">취소</button>
-                            <button type="button" onClick={renameRoom} disabled={!renameRoomTitle.trim()} className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold shadow-sm ${renameRoomTitle.trim() ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-slate-200 text-slate-400"}`}>저장</button>
+                        <div className="flex gap-2 bg-control p-4">
+                            <button type="button" onClick={closeRoomActions} className="flex-1 rounded-xl border border-line bg-surface px-4 py-3 text-sm font-bold text-ink-muted hover:bg-control-hover">취소</button>
+                            <button type="button" onClick={renameRoom} disabled={!renameRoomTitle.trim()} className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold shadow-sm ${renameRoomTitle.trim() ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-control-hover text-ink-subtle"}`}>저장</button>
                         </div>
                     </div>
                 </div>
@@ -1031,7 +1031,7 @@ export const Chat = () => {
                 >
                     <div
                         ref={modalPanelRef}
-                        className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
+                        className="w-full max-w-md overflow-hidden rounded-3xl bg-surface shadow-2xl"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={modalTitleId}
@@ -1047,7 +1047,7 @@ export const Chat = () => {
                         <div className="p-6 space-y-5">
                             {showCreateModal ? (
                                 <div>
-                                    <label htmlFor={roomTitleInputId} className="block text-sm font-bold text-slate-700 mb-2">채팅방 제목</label>
+                                    <label htmlFor={roomTitleInputId} className="mb-2 block text-sm font-bold text-ink-muted">채팅방 제목</label>
                                     <input
                                         id={roomTitleInputId}
                                         type="text"
@@ -1057,34 +1057,34 @@ export const Chat = () => {
                                         className="input-base" 
                                         autoFocus
                                     />
-                                    <p className="mt-2 text-xs text-slate-400 font-medium">* 방 생성 후 참여자 목록에서 멤버를 초대할 수 있습니다.</p>
+                                    <p className="mt-2 text-xs font-medium text-ink-subtle">* 방 생성 후 참여자 목록에서 멤버를 초대할 수 있습니다.</p>
                                 </div>
                             ) : (
                                 <>
                                     <div>
-                                        <label htmlFor={memberSearchInputId} className="block text-sm font-bold text-slate-700 mb-2 flex items-center justify-between">멤버 선택{memberSearch.trim().length === 0 && <span className="text-[10px] font-normal text-slate-400 flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> 전체 멤버 목록</span>}</label>
-                                        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" /><input id={memberSearchInputId} type="text" value={memberSearch} onChange={handleSearchChange} maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH} placeholder="이름 또는 이메일 검색..." className="input-base pl-10" /></div>
-                                        <p className="mt-1 text-right text-[11px] font-semibold text-slate-400">검색어 {memberSearch.length}/{MEMBER_SEARCH_KEYWORD_MAX_LENGTH}자</p>
-                                        <div className="mt-3 max-h-56 overflow-y-auto space-y-1 border rounded-2xl p-1 bg-slate-50/50">
-                                            {searching ? <div className="p-8 text-center"><LoadingSpinner size="sm" text="검색 중..." /></div> : displayedMembers.length === 0 ? <div className="p-8 text-center text-sm text-slate-400">{memberSearch.trim().length > 0 ? "검색 결과가 없습니다." : "불러올 수 있는 멤버가 없습니다."}</div> : displayedMembers.map(m => {
+                                        <label htmlFor={memberSearchInputId} className="mb-2 flex items-center justify-between text-sm font-bold text-ink-muted">멤버 선택{memberSearch.trim().length === 0 && <span className="flex items-center gap-1 text-[10px] font-normal text-ink-subtle"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> 전체 멤버 목록</span>}</label>
+                                        <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" /><input id={memberSearchInputId} type="text" value={memberSearch} onChange={handleSearchChange} maxLength={MEMBER_SEARCH_KEYWORD_MAX_LENGTH} placeholder="이름 또는 이메일 검색..." className="input-base pl-10" /></div>
+                                        <p className="mt-1 text-right text-[11px] font-semibold text-ink-subtle">검색어 {memberSearch.length}/{MEMBER_SEARCH_KEYWORD_MAX_LENGTH}자</p>
+                                        <div className="mt-3 max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-line bg-control/60 p-1">
+                                            {searching ? <div className="p-8 text-center"><LoadingSpinner size="sm" text="검색 중..." /></div> : displayedMembers.length === 0 ? <div className="p-8 text-center text-sm text-ink-subtle">{memberSearch.trim().length > 0 ? "검색 결과가 없습니다." : "불러올 수 있는 멤버가 없습니다."}</div> : displayedMembers.map(m => {
                                                 const mId = getMemberId(m);
                                                 const isSelected = selectedMembers.find(sm => getMemberId(sm) === mId);
                                                 return (
-                                                    <button key={mId} type="button" aria-pressed={Boolean(isSelected)} onClick={() => toggleMemberSelection(m)} className={`w-full flex items-center justify-between p-3 rounded-xl text-sm transition-all ${isSelected ? "bg-primary-600 text-white shadow-md" : "hover:bg-white hover:shadow-sm"}`}>
-                                                        <div className="flex items-center gap-3"><UserAvatar name={m.name} profileUrl={m.profileUrl || m.profile_url} level={m.level} rewardTier={m.rewardTier || m.reward_tier} frameCode={m.frameCode || m.frame_code} size="md" className={isSelected ? "border-white/30 bg-white/20 text-white" : ""} /><div className="text-left"><div className="font-bold">{m.name}</div><div className={`text-[10px] ${isSelected ? "text-white/70" : "text-slate-400"}`}>{m.email}</div></div></div>
+                                                    <button key={mId} type="button" aria-pressed={Boolean(isSelected)} onClick={() => toggleMemberSelection(m)} className={`flex w-full items-center justify-between rounded-xl p-3 text-sm transition-all ${isSelected ? "bg-primary-600 text-white shadow-md" : "hover:bg-surface hover:shadow-sm"}`}>
+                                                        <div className="flex items-center gap-3"><UserAvatar name={m.name} profileUrl={m.profileUrl || m.profile_url} level={m.level} rewardTier={m.rewardTier || m.reward_tier} frameCode={m.frameCode || m.frame_code} size="md" className={isSelected ? "border-white/30 bg-white/20 text-white" : ""} /><div className="text-left"><div className="font-bold">{m.name}</div><div className={`text-[10px] ${isSelected ? "text-white/70" : "text-ink-subtle"}`}>{m.email}</div></div></div>
                                                         {isSelected && <Check className="h-5 w-5" />}
                                                     </button>
                                                 );
                                             })}
                                         </div>
                                     </div>
-                                    {selectedMembers.length > 0 && (<div className="space-y-2"><div className="text-[11px] font-bold text-slate-500">선택됨 ({selectedMembers.length})</div><div className="flex flex-wrap gap-2">{selectedMembers.map(m => (<div key={getMemberId(m)} className="flex items-center gap-1.5 pl-2 pr-1 py-1 bg-primary-50 text-primary-700 border border-primary-100 rounded-xl text-xs font-bold animate-fade-in"><span>{m.name}</span><button type="button" aria-label={`${m.name} 선택 해제`} onClick={() => toggleMemberSelection(m)} className="p-0.5 hover:bg-primary-200 rounded-lg transition-colors"><X className="h-3.5 w-3.5" /></button></div>))}</div></div>)}
+                                    {selectedMembers.length > 0 && (<div className="space-y-2"><div className="text-[11px] font-bold text-ink-muted">선택됨 ({selectedMembers.length})</div><div className="flex flex-wrap gap-2">{selectedMembers.map(m => (<div key={getMemberId(m)} className="flex animate-fade-in items-center gap-1.5 rounded-xl border border-primary-500/20 bg-primary-500/10 py-1 pl-2 pr-1 text-xs font-bold text-primary-700"><span>{m.name}</span><button type="button" aria-label={`${m.name} 선택 해제`} onClick={() => toggleMemberSelection(m)} className="rounded-lg p-0.5 transition-colors hover:bg-primary-500/20"><X className="h-3.5 w-3.5" /></button></div>))}</div></div>)}
                                 </>
                             )}
                         </div>
-                        <div className="p-6 bg-slate-50 flex gap-3">
-                            <button type="button" onClick={closeMemberModal} className="flex-1 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50 transition-colors">취소</button>
-                            <button type="button" onClick={showCreateModal ? createRoom : inviteMembers} disabled={showCreateModal ? !newRoomTitle.trim() : selectedMembers.length === 0} className={`flex-1 px-4 py-3 rounded-2xl font-bold transition-all shadow-lg ${ (showCreateModal ? newRoomTitle.trim() : selectedMembers.length > 0) ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-slate-200 text-slate-400 cursor-not-allowed" }`}>{showCreateModal ? "채팅방 생성" : "멤버 초대"}</button>
+                        <div className="flex gap-3 bg-control p-6">
+                            <button type="button" onClick={closeMemberModal} className="flex-1 rounded-2xl border border-line bg-surface px-4 py-3 font-bold text-ink-muted transition-colors hover:bg-control-hover">취소</button>
+                            <button type="button" onClick={showCreateModal ? createRoom : inviteMembers} disabled={showCreateModal ? !newRoomTitle.trim() : selectedMembers.length === 0} className={`flex-1 rounded-2xl px-4 py-3 font-bold shadow-lg transition-all ${ (showCreateModal ? newRoomTitle.trim() : selectedMembers.length > 0) ? "bg-primary-600 text-white hover:bg-primary-700" : "cursor-not-allowed bg-control-hover text-ink-subtle" }`}>{showCreateModal ? "채팅방 생성" : "멤버 초대"}</button>
                         </div>
                     </div>
                 </div>

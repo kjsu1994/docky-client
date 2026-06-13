@@ -240,10 +240,10 @@ export const AddressSearchBox = ({
 
     return (
         <div ref={rootRef} className={`relative ${className}`}>
-            <label htmlFor={inputId} className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">주소 검색</label>
+            <label htmlFor={inputId} className="mb-2 block text-xs font-black uppercase tracking-wider text-ink-subtle">주소 검색</label>
 
             <div className="relative">
-                <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
+                <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
                 <input
                     id={inputId}
                     role="combobox"
@@ -259,7 +259,7 @@ export const AddressSearchBox = ({
                         if (suggestions.length) setOpen(true);
                     }}
                     placeholder={placeholder}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-24 text-sm"
+                    className="w-full rounded-xl border border-line bg-control py-2.5 pl-9 pr-24 text-sm text-ink placeholder:text-ink-subtle"
                     maxLength={ADDRESS_QUERY_MAX_LENGTH}
                     aria-autocomplete="list"
                     aria-expanded={open}
@@ -282,7 +282,7 @@ export const AddressSearchBox = ({
                     type="button"
                     onClick={runSecondaryAction}
                     disabled={secondaryDisabled}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-muted hover:bg-control-hover disabled:opacity-60"
                 >
                     {secondaryLoading ? secondaryLoadingText : secondaryButtonLabel}
                 </button>
@@ -294,12 +294,12 @@ export const AddressSearchBox = ({
                     role="listbox"
                     aria-label="주소 검색 제안"
                     aria-live="polite"
-                    className="absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl"
+                    className="absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl"
                 >
                     {loadingSuggest ? (
-                        <div className="px-3 py-2 text-xs font-semibold text-slate-400">검색 중...</div>
+                        <div className="px-3 py-2 text-xs font-semibold text-ink-subtle">검색 중...</div>
                     ) : suggestions.length === 0 ? (
-                        <div className="px-3 py-2 text-xs font-semibold text-slate-400">일치하는 주소가 없습니다.</div>
+                        <div className="px-3 py-2 text-xs font-semibold text-ink-subtle">일치하는 주소가 없습니다.</div>
                     ) : (
                         suggestions.map((item, index) => {
                             const road = item?.roadAddress;
@@ -317,11 +317,11 @@ export const AddressSearchBox = ({
                                     onMouseEnter={() => setActiveSuggestionIndex(index)}
                                     onClick={() => selectSuggestion(item)}
                                     className={`block w-full rounded-lg px-3 py-2 text-left ${
-                                        active ? "bg-slate-100" : "hover:bg-slate-50"
+                                        active ? "bg-control-hover" : "hover:bg-control"
                                     }`}
                                 >
-                                    <div className="text-sm font-bold text-slate-800">{address}</div>
-                                    <div className="mt-0.5 text-xs text-slate-500">
+                                    <div className="text-sm font-bold text-ink">{address}</div>
+                                    <div className="mt-0.5 text-xs text-ink-muted">
                                         {road && `도로명 ${road}`}
                                         {road && jibun && " | "}
                                         {jibun && `지번 ${jibun}`}
@@ -333,7 +333,7 @@ export const AddressSearchBox = ({
                 </div>
             )}
 
-            <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+            <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-ink-subtle">
                 <Search className="h-3 w-3" />
                 주소 검색어 {query.length}/{ADDRESS_QUERY_MAX_LENGTH}자
             </div>

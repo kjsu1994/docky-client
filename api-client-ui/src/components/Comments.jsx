@@ -279,7 +279,7 @@ export const Comments = ({ boardId, onUpdate }) => {
     const editContentLength = editContent.length;
 
     if (fetching) {
-        return <div className="py-4 text-center text-slate-500">댓글을 불러오는 중...</div>;
+        return <div className="py-4 text-center text-ink-muted">댓글을 불러오는 중...</div>;
     }
 
     return (
@@ -294,7 +294,7 @@ export const Comments = ({ boardId, onUpdate }) => {
             )}
 
             <div className="card p-6">
-                <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900">
+                <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-ink">
                     <MessageCircle className="h-5 w-5 text-blue-600" />
                     댓글 {formatNumber(visibleTotal)}개
                 </h3>
@@ -309,7 +309,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                         disabled={submitting}
                     />
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-ink-subtle">
                             {formatNumber(newCommentLength)} / {formatNumber(COMMENT_CONTENT_MAX_LENGTH)}
                         </span>
                         <button
@@ -329,8 +329,8 @@ export const Comments = ({ boardId, onUpdate }) => {
             <div className="space-y-4">
                 {comments.length === 0 ? (
                     <div className="card border-2 border-dashed p-12 text-center">
-                        <MessageCircle className="mx-auto mb-3 h-12 w-12 text-slate-300" />
-                        <p className="text-slate-600">첫 댓글을 작성해 보세요.</p>
+                        <MessageCircle className="mx-auto mb-3 h-12 w-12 text-ink-subtle" />
+                        <p className="text-ink-muted">첫 댓글을 작성해 보세요.</p>
                     </div>
                 ) : (
                     comments.map((comment) => {
@@ -362,7 +362,7 @@ export const Comments = ({ boardId, onUpdate }) => {
 
                                     <div className="min-w-0 flex-1">
                                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                                            <span className="font-semibold text-slate-900">
+                                            <span className="font-semibold text-ink">
                                                 {comment.member?.name || "익명"}
                                             </span>
                                             {hasCreatorLevel && (
@@ -370,7 +370,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                     Lv.{creatorLevel}
                                                 </span>
                                             )}
-                                            <span className="text-xs text-slate-400">
+                                            <span className="text-xs text-ink-subtle">
                                                 {formatRelativeTime(new Date(comment.created_at || comment.createdAt))}
                                             </span>
                                         </div>
@@ -385,7 +385,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                     disabled={isUpdating}
                                                 />
                                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                                    <span className="text-xs text-slate-400">
+                                                    <span className="text-xs text-ink-subtle">
                                                         {formatNumber(editContentLength)} / {formatNumber(COMMENT_CONTENT_MAX_LENGTH)}
                                                     </span>
                                                     <div className="flex gap-2">
@@ -411,7 +411,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <p className="whitespace-pre-wrap leading-relaxed text-slate-700">
+                                            <p className="whitespace-pre-wrap leading-relaxed text-ink-muted">
                                                 {comment.contents}
                                             </p>
                                         )}
@@ -426,7 +426,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                             disabled={!canLikeComment || isCommentBusy}
                                             aria-busy={isLiking}
                                             data-busy-indicator="true"
-                                            className="group flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                            className="group flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <Heart className="h-4 w-4 group-hover:fill-red-500" />
                                             <span>{comment.like_count ?? comment.likeCount ?? 0}</span>
@@ -437,7 +437,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                 type="button"
                                                 onClick={() => setReportCommentId(commentId)}
                                                 disabled={isCommentBusy}
-                                                className="flex items-center gap-1 text-sm text-slate-500 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                                className="flex items-center gap-1 text-sm text-ink-muted hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
                                                 <Flag className="h-3.5 w-3.5" /> {isReporting ? "신고 중..." : "신고"}
                                             </button>
@@ -449,7 +449,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                     type="button"
                                                     onClick={() => startEdit(comment)}
                                                     disabled={isCommentBusy}
-                                                    className="flex items-center gap-1 text-sm text-slate-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    className="flex items-center gap-1 text-sm text-ink-muted hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
                                                     <Edit2 className="h-3.5 w-3.5" /> 수정
                                                 </button>
@@ -459,7 +459,7 @@ export const Comments = ({ boardId, onUpdate }) => {
                                                     disabled={isCommentBusy}
                                                     aria-busy={isDeleting}
                                                     data-busy-indicator="true"
-                                                    className="flex items-center gap-1 text-sm text-slate-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    className="flex items-center gap-1 text-sm text-ink-muted hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" /> {isDeleting ? "삭제 중..." : "삭제"}
                                                 </button>

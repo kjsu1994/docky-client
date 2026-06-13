@@ -212,6 +212,30 @@ html[data-theme="dark"] {
     @apply w-full rounded-2xl border border-line bg-control px-4 py-3 text-sm text-ink placeholder:text-ink-subtle focus:border-primary-500 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-primary-500/10 disabled:bg-control disabled:cursor-not-allowed transition-all duration-300;
   }
 
+  .board-contents,
+  .rich-board-editor {
+    color: rgb(var(--color-text));
+  }
+
+  .board-contents :where(h1, h2, h3, h4, h5, h6, strong) {
+    color: rgb(var(--color-text));
+  }
+
+  .board-contents :where(p, li, figcaption),
+  .rich-board-editor :where(p, li, figcaption) {
+    color: rgb(var(--color-text-muted));
+  }
+
+  .board-contents :where(blockquote),
+  .rich-board-editor :where(blockquote) {
+    border-left-color: rgb(var(--color-border-strong));
+    color: rgb(var(--color-text-muted));
+  }
+
+  .board-contents :where(hr, table, th, td) {
+    border-color: rgb(var(--color-border));
+  }
+
   .badge {
     @apply inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider;
   }

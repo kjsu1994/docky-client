@@ -34,12 +34,12 @@ const getBoardFileId = (file) => file?.file_id || file?.fileId;
 const BoardBody = memo(({ html, files, downloadingFileIds, onDownload }) => (
     <div className="p-6">
         <div
-            className="prose prose-slate max-w-none min-h-[200px] board-contents"
+            className="prose max-w-none min-h-[200px] board-contents"
             dangerouslySetInnerHTML={{ __html: html }}
         />
 
         {files.length > 0 && (
-            <div className="mt-8 pt-6 border-t">
+            <div className="mt-8 border-t border-line pt-6">
                 <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
                     <FileText className="h-4 w-4" /> 첨부파일 ({files.length})
                 </h3>
@@ -50,8 +50,8 @@ const BoardBody = memo(({ html, files, downloadingFileIds, onDownload }) => (
                         const downloading = Boolean(downloadingFileIds[fileId]);
 
                         return (
-                            <div key={fileId} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
-                                <span className="text-sm truncate mr-4">{fileName}</span>
+                            <div key={fileId} className="flex items-center justify-between rounded-lg border border-line bg-control p-3">
+                                <span className="mr-4 truncate text-sm text-ink-muted">{fileName}</span>
                                 <button
                                     onClick={() => onDownload(fileId, fileName)}
                                     disabled={downloading}
@@ -251,17 +251,17 @@ export const BoardDetail = () => {
             </div>
 
             <div className="card overflow-hidden">
-                <div className="p-6 border-b bg-slate-50/50">
+                <div className="border-b border-line bg-control/60 p-6">
                     <div className="flex items-center gap-2 mb-3">
                         <span className="badge-primary">
                             {getBoardKindLabel(board.kind_of_board || board.kindOfBoard || kind)}
                         </span>
-                        <div className="flex items-center gap-3 text-sm text-slate-500 ml-2">
+                        <div className="ml-2 flex items-center gap-3 text-sm text-ink-muted">
                             <span className="flex items-center gap-1"><Eye className="h-4 w-4" /> {formatNumber(currentViewCount)}</span>
                             <span className="flex items-center gap-1"><Heart className="h-4 w-4" /> {formatNumber(currentLikeCount)}</span>
                         </div>
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">{board.title}</h1>
+                    <h1 className="text-2xl font-bold text-ink">{board.title}</h1>
 
                     <div className="flex items-center gap-3 mt-4">
                         <UserAvatar
@@ -273,8 +273,8 @@ export const BoardDetail = () => {
                             size="md"
                         />
                         <div>
-                            <div className="text-sm font-semibold text-slate-900">{board.member?.name || board.board_creator || "익명"}</div>
-                            <div className="text-xs text-slate-500">{formatRelativeTime(new Date(board.created_at || board.createdAt))}</div>
+                            <div className="text-sm font-semibold text-ink">{board.member?.name || board.board_creator || "익명"}</div>
+                            <div className="text-xs text-ink-muted">{formatRelativeTime(new Date(board.created_at || board.createdAt))}</div>
                         </div>
                     </div>
                 </div>
@@ -286,7 +286,7 @@ export const BoardDetail = () => {
                     onDownload={handleDownload}
                 />
 
-                <div className="p-6 border-t bg-slate-50/30">
+                <div className="border-t border-line bg-control/40 p-6">
                     <div className="flex flex-wrap gap-2">
                         <button onClick={handleLike} disabled={liking} className="btn-secondary text-red-600 border-red-100 hover:bg-red-50">
                             <Heart className={`h-4 w-4 mr-2 ${liking ? "animate-ping" : ""}`} />

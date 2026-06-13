@@ -308,7 +308,7 @@ export const BoardForm = () => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-slate-900">
+                <h1 className="text-2xl font-bold text-ink">
                     {isEdit ? "게시글 수정" : "게시글 작성"}
                 </h1>
                 <button type="button" onClick={() => navigate(`/app/boards/${kind}`)} className="btn-secondary">
@@ -320,7 +320,7 @@ export const BoardForm = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="card space-y-6 p-8">
                     <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">제목</label>
+                        <label className="mb-2 block text-sm font-semibold text-ink-muted">제목</label>
                         <input
                             type="text"
                             value={title}
@@ -331,21 +331,21 @@ export const BoardForm = () => {
                             maxLength={BOARD_TITLE_MAX_LENGTH}
                             required
                         />
-                        <div className="mt-1 text-right text-xs font-medium text-slate-400">
+                        <div className="mt-1 text-right text-xs font-medium text-ink-subtle">
                             제목 {title.length}/{BOARD_TITLE_MAX_LENGTH}자
                         </div>
                     </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        <label className="mb-2 block text-sm font-semibold text-ink-muted">
                             내용
-                            <span className="ml-2 text-xs font-normal text-slate-400">
+                            <span className="ml-2 text-xs font-normal text-ink-subtle">
                                 이미지 복사-붙여넣기 / 드래그앤드롭 지원 (최대 5MB)
                             </span>
                         </label>
 
-                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                            <div className="flex flex-wrap gap-1 border-b border-slate-200 bg-slate-50 p-2">
+                        <div className="overflow-hidden rounded-xl border border-line bg-surface">
+                            <div className="flex flex-wrap gap-1 border-b border-line bg-control p-2">
                                 <ToolbarButton label="굵게" icon={<Bold className="h-4 w-4" />} onClick={() => runCommand("bold")} disabled={editorDisabled} />
                                 <ToolbarButton label="기울임" icon={<Italic className="h-4 w-4" />} onClick={() => runCommand("italic")} disabled={editorDisabled} />
                                 <ToolbarButton label="밑줄" icon={<Underline className="h-4 w-4" />} onClick={() => runCommand("underline")} disabled={editorDisabled} />
@@ -360,7 +360,7 @@ export const BoardForm = () => {
                                 contentEditable={!editorDisabled}
                                 suppressContentEditableWarning
                                 data-placeholder={loadingBoard ? "게시글을 불러오는 중..." : "내용을 입력하세요."}
-                                className="rich-board-editor min-h-[300px] px-4 py-3 leading-7 outline-none"
+                                className="rich-board-editor min-h-[300px] px-4 py-3 leading-7 text-ink outline-none"
                                 onInput={updateContentLength}
                                 onPaste={handlePaste}
                                 onDrop={handleDrop}
@@ -375,15 +375,15 @@ export const BoardForm = () => {
                                 onChange={handleToolbarImageChange}
                             />
                         </div>
-                        <div className={`mt-1 text-right text-xs font-medium ${contentLength > BOARD_CONTENT_MAX_LENGTH ? "text-red-500" : "text-slate-400"}`}>
+                        <div className={`mt-1 text-right text-xs font-medium ${contentLength > BOARD_CONTENT_MAX_LENGTH ? "text-red-500" : "text-ink-subtle"}`}>
                             본문 {formatBoardLimitNumber(contentLength)}/{formatBoardLimitNumber(BOARD_CONTENT_MAX_LENGTH)}자
                         </div>
                     </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        <label className="mb-2 block text-sm font-semibold text-ink-muted">
                             첨부파일
-                            <span className="ml-2 text-xs font-normal text-slate-400">
+                            <span className="ml-2 text-xs font-normal text-ink-subtle">
                                 (본문 외 추가 첨부, 최대 {BOARD_ATTACHMENT_LIMITS.maxFiles}개 / 파일당 20MB)
                             </span>
                         </label>
@@ -400,12 +400,12 @@ export const BoardForm = () => {
                             <label
                                 className={`flex items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 transition-all ${
                                     editorDisabled || attachmentLimitReached
-                                        ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
-                                        : "cursor-pointer border-slate-300 hover:border-primary-500 hover:bg-primary-50"
+                                        ? "cursor-not-allowed border-line bg-control text-ink-subtle"
+                                        : "cursor-pointer border-line-strong hover:border-primary-500 hover:bg-primary-500/10"
                                 }`}
                             >
-                                <Upload className="h-5 w-5 text-slate-400" />
-                                <span className="text-sm text-slate-500">
+                                <Upload className="h-5 w-5 text-ink-subtle" />
+                                <span className="text-sm text-ink-muted">
                                     {attachmentLimitReached ? "첨부파일 최대 개수 도달" : "클릭하여 파일 선택"}
                                 </span>
                                 <input type="file" multiple onChange={handleFileChange} className="hidden" disabled={editorDisabled || attachmentLimitReached} />
@@ -434,7 +434,7 @@ export const BoardForm = () => {
             <style>{`
                 .rich-board-editor:empty::before {
                     content: attr(data-placeholder);
-                    color: #94a3b8;
+                    color: rgb(var(--color-text-subtle));
                 }
                 .rich-board-editor img {
                     max-width: 320px;
@@ -446,10 +446,10 @@ export const BoardForm = () => {
                     margin: 8px 0;
                 }
                 .rich-board-editor blockquote {
-                    border-left: 4px solid #cbd5e1;
+                    border-left: 4px solid rgb(var(--color-border-strong));
                     margin: 0.75rem 0;
                     padding-left: 1rem;
-                    color: #475569;
+                    color: rgb(var(--color-text-muted));
                 }
                 .rich-board-editor ul,
                 .rich-board-editor ol {
@@ -463,7 +463,7 @@ export const BoardForm = () => {
 const ToolbarButton = ({ label, icon, onClick, disabled }) => (
     <button
         type="button"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-white hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
         onClick={onClick}
         disabled={disabled}
         aria-label={label}
@@ -475,15 +475,15 @@ const ToolbarButton = ({ label, icon, onClick, disabled }) => (
 
 const FileList = ({ title, files, tone = "slate", onRemove }) => (
     <div className="space-y-2">
-        {title ? <div className="text-sm font-semibold text-slate-700">{title}</div> : null}
+        {title ? <div className="text-sm font-semibold text-ink-muted">{title}</div> : null}
         {files.map((file, index) => {
             const fileName = file.name || file.file_name || file.fileName || "첨부파일";
             const fileId = getFileIdValue(file);
             const isExisting = Boolean(fileId);
             const rowClass = tone === "amber"
-                ? "border-amber-200 bg-amber-50"
-                : "border-slate-200 bg-slate-50";
-            const iconClass = tone === "amber" ? "text-amber-600" : "text-slate-400";
+                ? "border-amber-500/30 bg-amber-500/10"
+                : "border-line bg-control";
+            const iconClass = tone === "amber" ? "text-amber-600" : "text-ink-subtle";
 
             return (
                 <div key={fileId || `${fileName}-${index}`} className={`flex items-center justify-between rounded-lg border p-3 ${rowClass}`}>
@@ -492,15 +492,15 @@ const FileList = ({ title, files, tone = "slate", onRemove }) => (
                             ? <ImageIcon className={`h-4 w-4 flex-shrink-0 ${iconClass}`} />
                             : <FileText className={`h-4 w-4 flex-shrink-0 ${iconClass}`} />
                         }
-                        <span className="truncate text-sm">{fileName}</span>
-                        <span className="flex-shrink-0 text-xs text-slate-400">
+                        <span className="truncate text-sm text-ink-muted">{fileName}</span>
+                        <span className="flex-shrink-0 text-xs text-ink-subtle">
                             {isExisting ? "기존 파일" : formatFileSize(file.size || 0)}
                         </span>
                     </div>
                     <button
                         type="button"
                         onClick={() => onRemove(file, index)}
-                        className="flex-shrink-0 rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                        className="flex-shrink-0 rounded p-1 text-ink-subtle transition-colors hover:bg-red-50 hover:text-red-500"
                         aria-label={`${fileName} 제거`}
                     >
                         <X className="h-4 w-4" />
