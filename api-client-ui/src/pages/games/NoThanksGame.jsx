@@ -2336,6 +2336,10 @@ const NoThanksActionAvailabilityPanel = ({
           {canPass ? "두 선택 가능" : canTake ? "가져가기 가능" : "행동 대기"}
         </span>
       </div>
+      <div className="mt-4 space-y-2">
+        <button className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canTake} onClick={onTake} data-smoke="no-thanks-take-action">카드 가져가기</button>
+        <button className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canPass} onClick={onPass} data-smoke="no-thanks-pass-action">칩 1개 내고 넘기기</button>
+      </div>
       <NoThanksActionAvailabilityArt
         canTake={canTake}
         canPass={canPass}
@@ -2363,10 +2367,6 @@ const NoThanksActionAvailabilityPanel = ({
           <div className="mt-1 text-sm font-black text-slate-900">{canPass ? `칩 ${myChips}개` : "잠김"}</div>
           <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-500">{passDetail}</div>
         </div>
-      </div>
-      <div className="mt-3 space-y-2">
-        <button className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canTake} onClick={onTake} data-smoke="no-thanks-take-action">카드 가져가기</button>
-        <button className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canPass} onClick={onPass} data-smoke="no-thanks-pass-action">칩 1개 내고 넘기기</button>
       </div>
       <div className="mt-3 space-y-2">
         <div className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600">
@@ -2832,6 +2832,7 @@ export const NoThanksGame = () => {
   const hostMemberId = Number(selectedRoom?.hostMemberId || 0);
   const isHost = Boolean(selectedRoom && hostMemberId === myMemberId);
   const turnMemberId = Number(gameState?.turnMemberId || 0);
+  const turnName = turnMemberId ? noThanksPlayerName(players, turnMemberId) : null;
   const isMyTurn = Boolean(myMemberId && turnMemberId === myMemberId);
   const currentCard = gameState?.currentCard ?? null;
   const potChips = parseIntSafe(gameState?.potChips, 0);
@@ -3822,6 +3823,16 @@ export const NoThanksGame = () => {
                       myCards={myPlayer?.cards}
                       onTake={() => publishAction("TAKE")}
                       onPass={() => publishAction("PASS")}
+                    />
+                    <NoThanksActionRoutePanel
+                      roomStatus={roomStatus}
+                      isMyTurn={isMyTurn}
+                      myChips={myChips}
+                      currentCard={currentCard}
+                      potChips={potChips}
+                      myCards={myPlayer?.cards}
+                      deckRemaining={deckRemaining}
+                      turnName={turnName}
                     />
                   </div>
                 </div>

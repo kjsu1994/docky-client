@@ -1093,6 +1093,27 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
       : actionType === "DOCTOR_SAVE" ? "보호 대상 확정"
         : actionType === "VOTE" ? "투표 확정"
           : mySubmitted ? "선택 완료" : "대기 중";
+  const selectedTargetName = selectedTarget ? playerNameBySeat(get(selectedTarget, "seat_no", "seatNo", selectedTargetSeatNo)) : "";
+  const canSubmitTarget = Boolean(actionType && selectedTarget && !mySubmitted && myAlive);
+  const actionProfile = mafiaActionProfiles[actionType] || null;
+  const actionHeading = phase === "FINISHED" ? "최종 결과"
+    : mySubmitted ? "이번 단계 행동 완료"
+      : actionType === "VOTE" ? "투표할 플레이어를 선택하세요"
+        : actionType ? `${actionProfile?.label || "행동"} 대상을 선택하세요`
+          : "지금은 내가 할 행동이 없습니다";
+  const actionHelp = phase === "FINISHED" ? outcomeMessage
+    : mySubmitted ? "선택은 서버에 반영됐습니다. 다른 참가자의 행동을 기다리면 됩니다."
+      : actionType === "VOTE" ? "후보 카드를 누르면 아래 확정 버튼이 열립니다. 내 좌석은 투표 후보에서 제외됩니다."
+        : actionType ? "후보 카드를 먼저 고른 뒤 확정 버튼으로 현재 밤 행동을 제출합니다."
+          : myAlive ? "토론 또는 대기 단계입니다. 필요한 행동이 열리면 이 영역에 바로 표시됩니다." : "탈락 상태라 행동은 제출하지 않고 진행만 관전합니다.";
+  const submitDisabledReason = mySubmitted ? "이미 제출했습니다."
+    : !myAlive ? "탈락 상태에서는 제출할 수 없습니다."
+      : !actionType ? "현재 단계에서 제출할 행동이 없습니다."
+        : !selectedTarget ? `${actionType === "VOTE" ? "투표할 플레이어" : "대상"}를 먼저 선택하세요.`
+          : "";
+  const submitButtonLabel = mySubmitted ? "선택 완료"
+    : selectedTargetName ? `${selectedTargetName} ${submitLabel}`
+      : submitLabel;
   const visibleAliveMafia = mafiaPlayers.filter((player) => Boolean(get(player, "alive", "alive", true)) && String(get(player, "role", "role", "") || "") === "MAFIA").length;
   const visibleAliveTown = mafiaPlayers.filter((player) => Boolean(get(player, "alive", "alive", true)) && String(get(player, "role", "role", "") || "") !== "MAFIA").length;
   const serverAliveMafia = Number(get(gameState, "alive_mafia_count", "aliveMafiaCount", Number.NaN));
@@ -1314,6 +1335,82 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
             )}
           </div>
 
+          {actionType ? (
+            <div data-smoke="mafia-primary-action" className="mt-3 rounded-2xl border border-rose-100 bg-rose-50/70 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-rose-700">
+                    {actionType === "VOTE" ? "투표" : "내 행동"}
+                  </div>
+                  <div className="mt-1 text-lg font-black text-slate-950">{actionHeading}</div>
+                  <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{actionHelp}</div>
+                </div>
+                <div className={`rounded-full px-3 py-1 text-[11px] font-black ${selectedTargetName ? "bg-slate-900 text-white" : "bg-white text-slate-500"}`}>
+                  {selectedTargetName ? `${selectedTargetName} 선택됨` : "대상 미선택"}
+                </div>
+              </div>
+
+              <div data-smoke="mafia-target-grid" className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {targetPlayers.map((player) => {
+                  const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+                  const selected = selectedTargetSeatNo === seatNo;
+                  const levelMeta = playerLevelMetaBySeat(seatNo);
+                  return (
+                    <button
+                      key={seatNo}
+                      type="button"
+                      onClick={() => setSelectedTargetSeatNo(seatNo)}
+                      aria-pressed={selected}
+                      className={`min-h-16 rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${selected ? "border-slate-900 bg-slate-900 text-white shadow-lg" : "border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:bg-rose-50"}`}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <UserAvatar
+                          name={playerNameBySeat(seatNo)}
+                          profileUrl={playerProfileBySeat(seatNo)}
+                          level={levelMeta.level}
+                          rewardTier={levelMeta.rewardTier}
+                          frameCode={levelMeta.frameCode}
+                          size="xs"
+                        />
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-black">{playerNameBySeat(seatNo)}</div>
+                          <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}</div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
+                <div className="rounded-xl border border-white bg-white/80 px-3 py-2">
+                  <div className="text-[10px] font-black text-slate-400">확정 전 확인</div>
+                  <div className="mt-0.5 text-sm font-black text-slate-900">
+                    {selectedTargetName ? `${selectedTargetName}에게 ${actionType === "VOTE" ? "투표합니다" : "행동합니다"}` : submitDisabledReason}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={!canSubmitTarget}
+                  onClick={submitTarget}
+                  data-smoke="mafia-submit-action"
+                  className="min-h-12 rounded-xl bg-rose-600 px-4 text-sm font-black text-white shadow-lg shadow-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {submitButtonLabel}
+                </button>
+              </div>
+              {!canSubmitTarget && submitDisabledReason && (
+                <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-500">
+                  {submitDisabledReason}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={`mt-3 rounded-xl px-3 py-2 text-sm font-black ${myAlive ? "bg-slate-50 text-slate-600" : "bg-zinc-100 text-zinc-500"}`}>
+              {phase === "FINISHED" ? `${winnerTeam === "MAFIA" ? "마피아팀" : "시민팀"} 승리` : myAlive ? "현재 단계에서 내가 제출할 행동은 없습니다." : "탈락 상태로 관전 중입니다."}
+            </div>
+          )}
+
           <MafiaTargetIntelPanel
             actionType={actionType}
             phaseLabel={phaseLabel}
@@ -1349,42 +1446,24 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
             </div>
           )}
 
-          {actionType ? (
-            <div className="mt-3 space-y-3">
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {targetPlayers.map((player) => {
-                  const seatNo = Number(get(player, "seat_no", "seatNo", 0));
-                  const selected = selectedTargetSeatNo === seatNo;
-                  const levelMeta = playerLevelMetaBySeat(seatNo);
-                  return (
-                    <button key={seatNo} type="button" onClick={() => setSelectedTargetSeatNo(seatNo)} className={`min-h-16 rounded-xl border px-3 py-2 text-left transition ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-                      <div className="flex min-w-0 items-center gap-2">
-                        <UserAvatar
-                          name={playerNameBySeat(seatNo)}
-                          profileUrl={playerProfileBySeat(seatNo)}
-                          level={levelMeta.level}
-                          rewardTier={levelMeta.rewardTier}
-                          frameCode={levelMeta.frameCode}
-                          size="xs"
-                        />
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-black">{playerNameBySeat(seatNo)}</div>
-                          <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}</div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              <button type="button" disabled={!selectedTarget || mySubmitted} onClick={submitTarget} className="min-h-12 w-full rounded-xl bg-rose-600 px-4 text-sm font-black text-white disabled:opacity-40">
-                {mySubmitted ? "선택 완료" : submitLabel}
-              </button>
-            </div>
-          ) : (
-            <div className={`mt-3 rounded-xl px-3 py-2 text-sm font-black ${myAlive ? "bg-slate-50 text-slate-600" : "bg-zinc-100 text-zinc-500"}`}>
-              {phase === "FINISHED" ? `${winnerTeam === "MAFIA" ? "마피아팀" : "시민팀"} 승리` : myAlive ? "현재 단계에서는 내 행동이 없습니다." : "탈락 상태로 관전 중입니다."}
-            </div>
-          )}
+          <MafiaActionRoutePanel
+            phase={phase}
+            phaseLabel={phaseLabel}
+            actionType={actionType}
+            myAlive={myAlive}
+            mySubmitted={mySubmitted}
+            myTask={myTask}
+            targetPlayers={targetPlayers}
+            selectedTargetSeatNo={selectedTargetSeatNo}
+            selectedTargetName={selectedTargetName}
+            completedCount={completedSeatNos.size}
+            votedCount={votedSeatNos.size}
+            aliveCount={alivePlayers.length}
+            aliveMafia={aliveMafia}
+            aliveTown={aliveTown}
+            remainingSeconds={remainingSeconds}
+            isHost={isHost}
+          />
         </section>
       </main>
 

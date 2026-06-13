@@ -467,7 +467,7 @@ function assertTabletopRealtimeSource() {
     ["BlokusPieceArt", "renders Blokus pieces through reusable SVG artwork"],
     ['data-smoke="blokus-piece-art"', "marks reusable Blokus piece artwork"],
     ["buildBlokusActionRouteItems", "derives Blokus piece/orientation/cell/submit route guidance from loaded board state"],
-    ["BlokusActionRoutePanel", "renders Blokus action-route guidance beside the board"],
+    ["BlokusActionRoutePanel", "renders Blokus action-route guidance below the real placement controls"],
     ["BlokusActionRouteArt", "renders Blokus action-route guidance through local SVG artwork"],
     ['data-smoke="blokus-action-route-panel"', "marks the Blokus action-route panel"],
     ['data-smoke="blokus-action-route-art"', "marks Blokus action-route SVG artwork"],
@@ -553,7 +553,7 @@ function assertTabletopRealtimeSource() {
     ["TelestrationsInputGuidePanel", "renders Telestrations input guidance from loaded game state"],
     ["TelestrationsClueLensArt", "renders Telestrations clue guidance through reusable SVG artwork"],
     ["buildTelestrationsActionRouteItems", "derives Telestrations clue/input/submit/next route guidance from loaded game state"],
-    ["TelestrationsActionRoutePanel", "renders Telestrations action-route guidance before the real inputs"],
+    ["TelestrationsActionRoutePanel", "renders Telestrations action-route guidance below the real inputs"],
     ["TelestrationsActionRouteArt", "renders Telestrations action-route guidance through local SVG artwork"],
     ["TelestrationsDrawingToolPanel", "renders Telestrations drawing tool state from local canvas controls"],
     ["TelestrationsDrawingToolArt", "renders Telestrations drawing tool state through reusable SVG artwork"],
@@ -594,7 +594,7 @@ function assertTabletopRealtimeSource() {
     ["MafiaVotePressurePanel", "renders Mafia survival and vote pressure from loaded game state"],
     ["MafiaVotePressureArt", "renders Mafia vote pressure through reusable SVG artwork"],
     ["buildMafiaActionRouteItems", "derives Mafia state/target/submit/advance route guidance from loaded game state"],
-    ["MafiaActionRoutePanel", "renders Mafia action-route guidance before the real target buttons"],
+    ["MafiaActionRoutePanel", "renders Mafia action-route guidance below the real target buttons"],
     ["MafiaActionRouteArt", "renders Mafia action-route guidance through local SVG artwork"],
     ['data-smoke="mafia-target-intel-panel"', "marks the Mafia target intelligence panel"],
     ['data-smoke="mafia-target-intel-art"', "marks reusable Mafia target intelligence SVG artwork"],
@@ -2248,6 +2248,22 @@ function routeMock(url, method, postData = "") {
       },
     };
   }
+  if (method === "POST" && pathname === "/api/auth/reissue") {
+    return {
+      status: 200,
+      headers: [{ name: "Authorization", value: "Bearer smoke-token" }],
+      body: { data: { accessToken: "smoke-token" } },
+    };
+  }
+  if (method === "GET" && pathname === "/api/members/notifications/unread-count") {
+    return { status: 200, body: { data: 0 } };
+  }
+  if (method === "GET" && pathname === "/api/banners") {
+    return { status: 200, body: { data: [] } };
+  }
+  if (method === "POST" && pathname === "/api/banners/events") {
+    return { status: 200, body: { data: true } };
+  }
   if (method === "GET" && pathname === "/api/chat/rooms") {
     return { status: 200, body: { data: [] } };
   }
@@ -2308,7 +2324,7 @@ function routeMock(url, method, postData = "") {
   if (method === "POST" && suffix === "rooms") {
     const room = roomFor(game, "host");
     room.title = body.title || room.title;
-    room.variantCode = body.variant_code || room.variantCode;
+    room.variantCode = body.variant_code || body.variantCode || room.variantCode;
     room.variant_code = room.variantCode;
     mockState.activeRoomsByGame.set(game, room);
     recordRequest("create", game, pathname, body);
@@ -2400,6 +2416,7 @@ async function handleFetchRequest(ws, event) {
     responseHeaders: [
       { name: "Content-Type", value: mock.contentType || "application/json; charset=utf-8" },
       { name: "Cache-Control", value: "no-store" },
+      ...(mock.headers || []),
     ],
     body: mock.bodyText !== undefined ? Buffer.from(mock.bodyText, "utf8").toString("base64") : decodeResponseBody(mock.body),
   });
@@ -3074,7 +3091,7 @@ async function runVariantCreateSmoke(ws, { game, variantCode }) {
   assertRequest(
     game,
     "create",
-    (request) => request.body?.title === title && request.body?.variant_code === variantCode,
+    (request) => request.body?.title === title && (request.body?.variant_code || request.body?.variantCode) === variantCode,
     `create-room POST payload for ${variantCode}`
   );
   return `${game} ${variantCode} variant create: ok`;

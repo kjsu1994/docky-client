@@ -4893,31 +4893,6 @@ export const CitadelsGame = () => {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-lg">
         <div className="mb-3 text-lg font-black text-slate-900">액션</div>
-        <CitadelsActionAvailabilityPanel
-          currentPhaseLabel={currentPhaseLabel}
-          phase={phase}
-          isMyTurn={isMyTurn}
-          actionTaken={actionTaken}
-          incomeTaken={incomeTaken}
-          characterAbilityUsed={characterAbilityUsed}
-          canBuild={canBuild}
-          buildableCards={buildableCards}
-          handCount={myHand.length}
-          myGold={myGold}
-          builtThisTurn={builtThisTurn}
-          buildLimit={buildLimit}
-          incomeColor={incomeColor}
-          incomePreview={incomePreview}
-          activeCharacter={activeCharacter}
-          canEndTurn={canEndTurn}
-          colorProgress={colorProgress}
-          afterWarlordDestruction={afterWarlordDestruction}
-          hasLaboratory={hasDistrict(myCitadelsPlayer, "LABORATORY")}
-          hasSmithy={hasDistrict(myCitadelsPlayer, "SMITHY")}
-          canUseLaboratory={canUseLaboratory}
-          canUseSmithy={canUseSmithy}
-          actionBusy={actionBusy}
-        />
         <div className="grid gap-2">
           <button type="button" disabled={!isMyTurn || actionTaken || actionBusy} onClick={() => sendAction({ actionType: "TAKE_GOLD" })} className="min-h-12 rounded-xl bg-amber-500 px-4 py-2 text-left text-sm font-black text-white disabled:opacity-40">
             <span className="inline-flex items-center gap-2"><Coins className="h-4 w-4" />금화 2개 받기</span>
@@ -4985,6 +4960,54 @@ export const CitadelsGame = () => {
             </div>
           </div>
         )}
+
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <CitadelsActionRoutePanel
+            currentPhaseLabel={currentPhaseLabel}
+            phase={phase}
+            isMyTurn={isMyTurn}
+            actionTaken={actionTaken}
+            incomeTaken={incomeTaken}
+            characterAbilityUsed={characterAbilityUsed}
+            canBuild={canBuild}
+            buildableCards={buildableCards}
+            handCount={myHand.length}
+            myGold={myGold}
+            builtThisTurn={builtThisTurn}
+            buildLimit={buildLimit}
+            incomeColor={incomeColor}
+            incomePreview={incomePreview}
+            activeCharacter={activeCharacter}
+            canEndTurn={canEndTurn}
+            afterWarlordDestruction={afterWarlordDestruction}
+            actionBusy={actionBusy}
+          />
+          <CitadelsActionAvailabilityPanel
+            currentPhaseLabel={currentPhaseLabel}
+            phase={phase}
+            isMyTurn={isMyTurn}
+            actionTaken={actionTaken}
+            incomeTaken={incomeTaken}
+            characterAbilityUsed={characterAbilityUsed}
+            canBuild={canBuild}
+            buildableCards={buildableCards}
+            handCount={myHand.length}
+            myGold={myGold}
+            builtThisTurn={builtThisTurn}
+            buildLimit={buildLimit}
+            incomeColor={incomeColor}
+            incomePreview={incomePreview}
+            activeCharacter={activeCharacter}
+            canEndTurn={canEndTurn}
+            colorProgress={colorProgress}
+            afterWarlordDestruction={afterWarlordDestruction}
+            hasLaboratory={hasDistrict(myCitadelsPlayer, "LABORATORY")}
+            hasSmithy={hasDistrict(myCitadelsPlayer, "SMITHY")}
+            canUseLaboratory={canUseLaboratory}
+            canUseSmithy={canUseSmithy}
+            actionBusy={actionBusy}
+          />
+        </div>
       </div>
     </section>
   );

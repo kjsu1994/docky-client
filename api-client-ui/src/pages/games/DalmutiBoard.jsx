@@ -974,7 +974,7 @@ const DalmutiActionRoutePanel = ({
       data-can-revolution={canDecideRevolution ? "true" : "false"}
       data-selected-count={selectedCards.length}
       data-pass-progress={currentTrick ? `${passCount}/${requiredPassCount}` : ""}
-      className="mb-3 overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-white via-violet-50 to-cyan-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
+      className="overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-white via-violet-50 to-cyan-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
     >
       <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
         <div className="min-h-[132px]">
@@ -1408,42 +1408,6 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">선 {playerName(leadSeatNo)}</span>
             </div>
           </div>
-          <GameFlowMeter
-            title="달무티 라운드 흐름"
-            detail="세금, 혁명, 제출 기준, 선택 카드 상태를 같은 흐름으로 확인합니다."
-            items={dalmutiFlowItems}
-            tone={phase === "FINISHED" ? "amber" : canPlay || canReturnTax || canDecideRevolution ? "emerald" : "slate"}
-            className="mt-4"
-            smoke="dalmuti-flow-meter"
-          />
-          <DalmutiRankPressurePanel
-            rows={dalmutiRankPressureRows}
-            phase={phase}
-            activeSeatNo={activeSeatNo}
-            leadSeatNo={leadSeatNo}
-            passCount={passCount}
-            requiredPassCount={requiredPassCount}
-            currentTrickLabel={currentTrickLabel}
-            nextLeaderName={dalmutiNextLeaderName}
-          />
-          <DalmutiPlayAdvisorPanel
-            phase={phase}
-            canPlay={canPlay}
-            canReturnTax={canReturnTax}
-            canDecideRevolution={canDecideRevolution}
-            selectedCards={selectedCards}
-            selectedPlayStatus={selectedPlayStatus}
-            currentTrick={currentTrick}
-            currentTrickCount={currentTrickCount}
-            currentTrickRank={currentTrickRank}
-            handRankGroups={handRankGroups}
-            pendingTaxCount={pendingTaxCount}
-            passCount={passCount}
-            requiredPassCount={requiredPassCount}
-            taxProgressText={taxProgressText}
-            selectionHint={selectionHint}
-            trickClearHint={trickClearHint}
-          />
           <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-bold leading-relaxed ${dalmutiTurnNoticeTone}`} role="status" aria-live="polite" aria-atomic="true">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 rounded-2xl bg-violet-700 p-2 text-white shadow-sm">
@@ -1731,6 +1695,74 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
             )}
           </div>
         </div>
+
+        <section className="scroll-mt-24 space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-black text-slate-900">핵심 요약</div>
+              <div className="mt-0.5 text-xs font-bold text-slate-500">손패와 실제 제출 버튼을 확인한 뒤 세금, 혁명, 패스 압박만 압축해서 봅니다.</div>
+            </div>
+            <div className="rounded-full bg-violet-50 px-3 py-1 text-[11px] font-black text-violet-700">
+              {dalmutiPhaseLabel}
+            </div>
+          </div>
+          <GameFlowMeter
+            title="달무티 라운드 흐름"
+            detail="세금, 혁명, 제출 기준, 선택 카드 상태를 같은 흐름으로 확인합니다."
+            items={dalmutiFlowItems}
+            tone={phase === "FINISHED" ? "amber" : canPlay || canReturnTax || canDecideRevolution ? "emerald" : "slate"}
+            smoke="dalmuti-flow-meter"
+          />
+          <DalmutiActionRoutePanel
+            phase={phase}
+            phaseLabel={dalmutiPhaseLabel}
+            canPlay={canPlay}
+            canReturnTax={canReturnTax}
+            canDecideRevolution={canDecideRevolution}
+            selectedCards={selectedCards}
+            selectedPlayStatus={selectedPlayStatus}
+            currentTrick={currentTrick}
+            currentTrickLabel={currentTrickLabel}
+            currentTrickCount={currentTrickCount}
+            pendingTaxCount={pendingTaxCount}
+            passCount={passCount}
+            requiredPassCount={requiredPassCount}
+            taxProgressText={taxProgressText}
+            activeName={activeSeatNo ? playerName(activeSeatNo) : ""}
+            leadName={leadSeatNo ? playerName(leadSeatNo) : ""}
+            eligibleCount={eligibleSeatNos.length}
+            declinedCount={declinedSeatNoSet.size}
+            handCount={hand.length}
+          />
+          <DalmutiRankPressurePanel
+            rows={dalmutiRankPressureRows}
+            phase={phase}
+            activeSeatNo={activeSeatNo}
+            leadSeatNo={leadSeatNo}
+            passCount={passCount}
+            requiredPassCount={requiredPassCount}
+            currentTrickLabel={currentTrickLabel}
+            nextLeaderName={dalmutiNextLeaderName}
+          />
+          <DalmutiPlayAdvisorPanel
+            phase={phase}
+            canPlay={canPlay}
+            canReturnTax={canReturnTax}
+            canDecideRevolution={canDecideRevolution}
+            selectedCards={selectedCards}
+            selectedPlayStatus={selectedPlayStatus}
+            currentTrick={currentTrick}
+            currentTrickCount={currentTrickCount}
+            currentTrickRank={currentTrickRank}
+            handRankGroups={handRankGroups}
+            pendingTaxCount={pendingTaxCount}
+            passCount={passCount}
+            requiredPassCount={requiredPassCount}
+            taxProgressText={taxProgressText}
+            selectionHint={selectionHint}
+            trickClearHint={trickClearHint}
+          />
+        </section>
       </div>
 
       <aside className="space-y-4">

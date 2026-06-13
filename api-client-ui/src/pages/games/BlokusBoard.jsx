@@ -458,7 +458,7 @@ const BlokusActionRoutePanel = ({
       data-selected-piece={selectedPieceCode || ""}
       data-anchor-cell={anchorCell ? `${anchorCell.x}:${anchorCell.y}` : ""}
       data-total-legal={Number(totalLegalPlacementCount || 0)}
-      className="mb-3 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
+      className="mt-3 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
     >
       <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
         <div className="min-h-[132px]">
@@ -1281,6 +1281,27 @@ const BlokusBoard = ({ room, gameState, mySeatNo, onAction }) => {
               </div>
             ))}
           </div>
+          <BlokusActionRoutePanel
+            phase={phase}
+            currentColor={currentColor}
+            currentColorLabel={currentColorState?.label || currentColor || ""}
+            myTurn={myTurn}
+            canPass={canPass}
+            selectedPiece={selectedPiece}
+            selectedPieceCode={selectedPieceCode}
+            selectedPieceLegalCount={selectedPieceLegalCount}
+            totalLegalPlacementCount={totalLegalPlacementCount}
+            anchorCell={anchorCell}
+            placementStatus={placementStatus}
+            placeButtonEnabled={placeButtonEnabled}
+            firstPlayablePieceCode={firstPlayablePieceCode}
+            bestPieceEntry={blokusBestPieceEntry}
+            remainingSquares={remainingSquares}
+            remainingPieceCount={remainingPieceCodes.length}
+            rotation={rotation}
+            flipped={flipped}
+            firstPiece={currentColorFirstPiece}
+          />
         </section>
       </div>
 

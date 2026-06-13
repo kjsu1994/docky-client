@@ -4775,12 +4775,6 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
             </a>
           </div>
           {renderSelectedTargetSummary({ className: "mb-3" })}
-          <CatanActionAtlasPanel
-            title={catanActionAtlasTitle}
-            detail={catanTurnGuidance}
-            activeKey={catanActionAtlasActiveKey}
-            items={catanActionAtlasItems}
-          />
           {phase === "SETUP" && (
             <div className="space-y-2">
               {seafarersRule && !explorersPiratesRule && seafarersScenarioCode === "NEW_SHORES" && (
@@ -5917,6 +5911,24 @@ const CatanBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) => 
               {playerName(winnerSeatNo)} 승리
             </div>
           )}
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <CatanActionAtlasPanel
+              title={catanActionAtlasTitle}
+              detail={catanTurnGuidance}
+              activeKey={catanActionAtlasActiveKey}
+              items={catanActionAtlasItems}
+            />
+            <CatanActionRoutePanel
+              phase={phase}
+              myTurn={myTurn}
+              buildMode={buildMode}
+              targetReady={hasSelectedTarget}
+              canMaritimeTrade={canMaritimeTrade}
+              canBuyDevelopmentCard={canBuyDevelopmentCard}
+              actionProgressCount={actionProgressCards.length}
+              items={catanActionRouteItems}
+            />
+          </div>
         </div>
 
         <CatanResourceStrategyPanel

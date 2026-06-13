@@ -53,7 +53,6 @@ function assertNoThanksRealtimeSource() {
         "<NoThanksTurnRailPanel",
         "<NoThanksProgressDigestPanel",
         "<NoThanksDecisionPanel",
-        "<NoThanksActionRoutePanel",
         "<NoThanksSessionActionPanel",
         "<GameFeedbackTicker",
     ];
@@ -88,7 +87,7 @@ function assertNoThanksRealtimeSource() {
         ["NoThanksSessionRoutePanel", "render selected-room session button-route guidance"],
         ["NoThanksSessionRouteArt", "render selected-room session button-route guidance through local SVG artwork"],
         ["buildNoThanksActionRouteItems", "derive take/pass action-route guidance from visible card and chip state"],
-        ["NoThanksActionRoutePanel", "render take/pass action-route guidance before the real buttons"],
+        ["NoThanksActionRoutePanel", "render take/pass action-route guidance below the real buttons"],
         ["NoThanksActionRouteArt", "render take/pass action-route guidance through local SVG artwork"],
         ["NoThanksActionAvailabilityPanel", "render action availability guidance beside the buttons"],
         ["NoThanksActionAvailabilityArt", "render action availability guidance through local SVG artwork"],
@@ -723,7 +722,6 @@ async function assertNoRemovedNoThanksPanels(cdp, sessionId, label) {
             '[data-smoke="no-thanks-turn-rail-panel"]',
             '[data-smoke="no-thanks-progress-digest-panel"]',
             '[data-smoke="no-thanks-decision-panel"]',
-            '[data-smoke="no-thanks-action-route-panel"]',
             '[data-smoke="no-thanks-session-action-panel"]',
             '[data-smoke="no-thanks-action-feedback"]',
         ];
@@ -737,7 +735,6 @@ async function assertNoRemovedNoThanksPanels(cdp, sessionId, label) {
                 "이 셋업 패널은",
                 "카드방 선택 브리프",
                 "노땡스 세션 버튼 루트",
-                "노땡스 액션 루트",
                 "행동 피드백",
             ].filter((text) => document.body?.innerText.includes(text)),
         };

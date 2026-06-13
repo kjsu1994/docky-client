@@ -2454,6 +2454,27 @@ const LasVegasActionAvailabilityPanel = ({
                     {canRoll ? "굴리기 가능" : canBet ? "배팅 가능" : "행동 대기"}
                 </span>
             </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!canRoll}
+                    onClick={onRoll}
+                    data-smoke="las-vegas-roll-action"
+                >
+                    <Dices className="h-4 w-4" />
+                    주사위 굴리기
+                </button>
+                {canBet && Object.keys(currentRollCountByFace).map((face) => (
+                    <button
+                        key={face}
+                        className="min-h-10 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white"
+                        onClick={() => onBet(toPlainInt(face, 0))}
+                        data-smoke="las-vegas-bet-action"
+                    >
+                        {toPlainInt(face, 0)}번 배팅 ({toPlainInt(currentRollCountByFace[face], 0)}개)
+                    </button>
+                ))}
+            </div>
             <LasVegasActionAvailabilityArt
                 roomStatus={roomStatus}
                 myTurn={myTurn}
@@ -2480,27 +2501,6 @@ const LasVegasActionAvailabilityPanel = ({
                     <div className="mt-1 text-sm font-black text-white">{canBet ? `${rolledDiceCount}개 후보` : "후보 대기"}</div>
                     <div className="mt-1 text-[11px] font-bold leading-relaxed text-white/60">{betDetail}</div>
                 </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!canRoll}
-                    onClick={onRoll}
-                    data-smoke="las-vegas-roll-action"
-                >
-                    <Dices className="h-4 w-4" />
-                    주사위 굴리기
-                </button>
-                {canBet && Object.keys(currentRollCountByFace).map((face) => (
-                    <button
-                        key={face}
-                        className="min-h-10 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white"
-                        onClick={() => onBet(toPlainInt(face, 0))}
-                        data-smoke="las-vegas-bet-action"
-                    >
-                        {toPlainInt(face, 0)}번 배팅 ({toPlainInt(currentRollCountByFace[face], 0)}개)
-                    </button>
-                ))}
             </div>
         </div>
     );
@@ -2709,7 +2709,7 @@ const LasVegasActionRoutePanel = ({
             data-can-bet={canBet ? "true" : "false"}
             data-rolled-dice={rolledDiceCount}
             data-round={`${toPlainInt(roundNo, 0)}/${toPlainInt(roundCount, 0) || 0}`}
-            className="mb-3 overflow-hidden rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"
+            className="mt-3 overflow-hidden rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"
         >
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -4121,7 +4121,6 @@ export const LasVegasGame = () => {
                                             onBet={(face) => publishGameAction("PLACE_DICE", face)}
                                         />
                                     )}
-
                                     <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-3">
                                         {casinoRows.map((casino) => (
                                             <CasinoPanel
@@ -4133,6 +4132,18 @@ export const LasVegasGame = () => {
                                             />
                                         ))}
                                     </div>
+                                    <LasVegasActionRoutePanel
+                                        roomStatus={roomStatus}
+                                        myTurn={myTurn}
+                                        canRoll={canRoll}
+                                        canBet={canBet}
+                                        currentRollCountByFace={currentRollCountByFace}
+                                        roundNo={state?.roundNo || 0}
+                                        roundCount={state?.roundCount || selectedRoom?.roundCount || 0}
+                                        casinoCount={casinoRows.length || 6}
+                                        lastPlacedText={lastPlacedText}
+                                        turnName={state?.turnMemberId ? lasVegasPlayerName(players, state.turnMemberId) : ""}
+                                    />
                                 </div>
                             ) : (
                                 <div className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">

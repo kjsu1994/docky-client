@@ -1115,22 +1115,6 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             ))}
           </div>
 
-          <SixNimmtActionRoutePanel
-            phase={phase}
-            waitingSelection={waitingSelection}
-            needsRowChoice={needsRowChoice}
-            mySelected={mySelected}
-            selectedCard={selectedCard}
-            pendingCard={pendingCard}
-            selectedPreview={selectedPreview}
-            selectedAnchorX={selectedAnchorX}
-            selectedRowIndex={selectedRowIndex}
-            recommendedRowIndex={recommendedRowIndex}
-            selectedCount={sixNimmtSelectedCount}
-            playerCount={sixNimmtPlayerCount}
-            waitingCount={sixNimmtWaitingCount}
-          />
-
           {needsRowChoice && (
             <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-2 text-xs font-bold leading-relaxed text-amber-800 sm:mt-4 sm:rounded-2xl sm:p-3 sm:text-sm">
               {playerNameBySeat(activeSeatNo)}님이 {sixNimmtCardValue(pendingCard)} 카드를 놓을 행을 선택해야 합니다. 벌점이 가장 낮은 행이 기본 추천입니다.
@@ -1237,6 +1221,21 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             items={sixNimmtFlowItems}
             tone="amber"
             smoke="six-nimmt-flow-meter"
+          />
+          <SixNimmtActionRoutePanel
+            phase={phase}
+            waitingSelection={waitingSelection}
+            needsRowChoice={needsRowChoice}
+            mySelected={mySelected}
+            selectedCard={selectedCard}
+            pendingCard={pendingCard}
+            selectedPreview={selectedPreview}
+            selectedAnchorX={selectedAnchorX}
+            selectedRowIndex={selectedRowIndex}
+            recommendedRowIndex={recommendedRowIndex}
+            selectedCount={sixNimmtSelectedCount}
+            playerCount={sixNimmtPlayerCount}
+            waitingCount={sixNimmtWaitingCount}
           />
           <SixNimmtTurnPressurePanel
             playerSignals={sixNimmtTurnPlayers}

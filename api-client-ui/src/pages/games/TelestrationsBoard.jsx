@@ -1331,56 +1331,6 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-2">
-            <TelestrationsChainArt
-              phase={phase}
-              currentStep={currentStep}
-              totalSteps={totalSteps}
-              completedCount={completedSeatNos.size}
-              playerCount={playerCount}
-              previousType={previousEntry ? get(previousEntry, "type", "type", "") : ""}
-            />
-          </div>
-
-          <GameFlowMeter
-            title="텔레스트레이션 체인"
-            detail="현재 단계, 이전 단서, 제출 진행률을 한 줄로 확인합니다."
-            items={telestrationsFlowItems}
-            tone="slate"
-            smoke="telestrations-flow-meter"
-            className="mt-4"
-          />
-
-          <TelestrationsInputGuidePanel
-            phase={phase}
-            phaseLabel={phaseLabel}
-            currentTask={currentTask}
-            previousEntry={previousEntry}
-            previousEntryLabel={previousEntryLabel}
-            awaitingPreviousEntry={awaitingPreviousEntry}
-            mySubmitted={mySubmitted}
-            textLength={text.trim().length}
-            hasInk={hasInk}
-            completedCount={completedSeatNos.size}
-            playerCount={playerCount}
-          />
-
-          <TelestrationsActionRoutePanel
-            phase={phase}
-            phaseLabel={phaseLabel}
-            currentTask={currentTask}
-            previousEntry={previousEntry}
-            previousEntryLabel={previousEntryLabel}
-            awaitingPreviousEntry={awaitingPreviousEntry}
-            mySubmitted={mySubmitted}
-            textLength={text.trim().length}
-            hasInk={hasInk}
-            completedCount={completedSeatNos.size}
-            playerCount={playerCount}
-            isHost={isHost}
-            revealInsight={revealInsight}
-          />
-
           {awaitingPreviousEntry && (
             <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm font-black text-amber-700">
               이전 플레이어의 입력을 불러오는 중입니다. 잠시 후 자동으로 갱신됩니다.
@@ -1404,15 +1354,6 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
 
           {phase === "DRAW" && (
             <>
-              <TelestrationsDrawingToolPanel
-                brushColor={brushColor}
-                brushSize={brushSize}
-                hasInk={hasInk}
-                mySubmitted={mySubmitted}
-                awaitingPreviousEntry={awaitingPreviousEntry}
-                completedCount={completedSeatNos.size}
-                playerCount={playerCount}
-              />
               <div className="mt-4 grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <div>
                   <div className="mb-2 text-sm font-black text-slate-900">보고 그릴 문장</div>
@@ -1496,6 +1437,70 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
               내 제출은 완료됐습니다. 다른 참가자의 입력을 기다리는 중입니다.
             </div>
           )}
+
+          <div data-smoke="telestrations-support-panel" className="mt-4 border-t border-slate-100 pt-4">
+            {phase === "DRAW" && (
+              <TelestrationsDrawingToolPanel
+                brushColor={brushColor}
+                brushSize={brushSize}
+                hasInk={hasInk}
+                mySubmitted={mySubmitted}
+                awaitingPreviousEntry={awaitingPreviousEntry}
+                completedCount={completedSeatNos.size}
+                playerCount={playerCount}
+              />
+            )}
+
+            <TelestrationsInputGuidePanel
+              phase={phase}
+              phaseLabel={phaseLabel}
+              currentTask={currentTask}
+              previousEntry={previousEntry}
+              previousEntryLabel={previousEntryLabel}
+              awaitingPreviousEntry={awaitingPreviousEntry}
+              mySubmitted={mySubmitted}
+              textLength={text.trim().length}
+              hasInk={hasInk}
+              completedCount={completedSeatNos.size}
+              playerCount={playerCount}
+            />
+
+            <TelestrationsActionRoutePanel
+              phase={phase}
+              phaseLabel={phaseLabel}
+              currentTask={currentTask}
+              previousEntry={previousEntry}
+              previousEntryLabel={previousEntryLabel}
+              awaitingPreviousEntry={awaitingPreviousEntry}
+              mySubmitted={mySubmitted}
+              textLength={text.trim().length}
+              hasInk={hasInk}
+              completedCount={completedSeatNos.size}
+              playerCount={playerCount}
+              isHost={isHost}
+              revealInsight={revealInsight}
+            />
+
+            <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-2">
+              <TelestrationsChainArt
+                phase={phase}
+                currentStep={currentStep}
+                totalSteps={totalSteps}
+                completedCount={completedSeatNos.size}
+                playerCount={playerCount}
+                previousType={previousEntry ? get(previousEntry, "type", "type", "") : ""}
+              />
+            </div>
+
+            <GameFlowMeter
+              title="텔레스트레이션 체인"
+              detail="현재 단계, 이전 단서, 제출 진행률을 한 줄로 확인합니다."
+              items={telestrationsFlowItems}
+              tone="slate"
+              smoke="telestrations-flow-meter"
+              className="mt-4"
+            />
+          </div>
         </section>
 
         {phase === "REVEAL" && (
