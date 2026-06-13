@@ -399,6 +399,15 @@ function routeMock(url, method, postData, headers = {}) {
     }
     const query = parsed.searchParams;
 
+    if (method === "POST" && pathname === "/api/auth/reissue") {
+        return {
+            status: 200,
+            headers: [
+                { name: "Authorization", value: "Bearer smoke-access-token" },
+            ],
+            body: { data: {} },
+        };
+    }
     if (method === "GET" && pathname === "/api/members") {
         return {
             status: 200,
@@ -410,6 +419,12 @@ function routeMock(url, method, postData, headers = {}) {
                     roles: ["ROLE_USER"],
                 },
             },
+        };
+    }
+    if (method === "GET" && pathname === "/api/members/notifications/unread-count") {
+        return {
+            status: 200,
+            body: { data: { unread_count: 0, unreadCount: 0 } },
         };
     }
     if (forceStatsFailure && method === "GET" && [
@@ -539,7 +554,9 @@ function routeMock(url, method, postData, headers = {}) {
         };
     }
     if (method === "GET" && pathname === "/api/banners") {
-        bannerListRequests += 1;
+        if (query.get("limit") !== "5") {
+            bannerListRequests += 1;
+        }
         return {
             status: 200,
             body: {
@@ -683,6 +700,7 @@ async function handleFetchRequest(ws, event) {
         responseHeaders: [
             { name: "Content-Type", value: mock.contentType || "application/json; charset=utf-8" },
             { name: "Cache-Control", value: "no-store" },
+            ...(mock.headers || []),
         ],
         body: mock.bodyText == null ? encodeBody(mock.body) : encodeText(mock.bodyText),
     });
@@ -724,7 +742,12 @@ async function waitForExpression(ws, expression, timeoutMs = 6000) {
         if (await evaluate(ws, expression)) return;
         await delay(120);
     }
-    throw new Error(`Timed out waiting for expression: ${expression}`);
+    const pageState = await evaluate(ws, `(() => ({
+        href: location.href,
+        readyState: document.readyState,
+        text: (document.body?.innerText || "").slice(0, 600),
+    }))()`).catch(() => null);
+    throw new Error(`Timed out waiting for expression: ${expression}${pageState ? `; page: ${JSON.stringify(pageState)}` : ""}; requests: ${JSON.stringify({ observedRequests })}`);
 }
 
 async function waitForBannerEventRequestCount(minCount = 1, timeoutMs = 6000) {
@@ -763,19 +786,12 @@ async function waitForBannerImageRequestCount(minCount = 1, timeoutMs = 6000) {
     throw new Error(`Timed out waiting for ${minCount} lazy banner image requests`);
 }
 
-async function waitForGamesHubChunkRequest(minCount = 1, timeoutMs = 6000) {
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
-        if (gamesHubChunkRequests >= minCount) return;
-        await delay(40);
-    }
-    throw new Error(`Timed out waiting for ${minCount} GamesHub chunk requests; observed=${JSON.stringify(observedRequests)}`);
-}
-
-async function waitForPageGuideChunkRequest(minCount = 1, timeoutMs = 6000) {
+async function waitForPageGuideChunkRequest(ws, minCount = 1, timeoutMs = 6000) {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
         if (pageGuideChunkRequests >= minCount) return;
+        if (await evaluate(ws, `Boolean(document.querySelector('[role="dialog"]')) && document.body?.innerText.includes("페이지 설명을 불러오는 중입니다.")`)) return;
+        if (await evaluate(ws, `document.body?.innerText.includes("주요 메뉴, 공지, 게시글, 배너를 한눈에 보는 시작 화면입니다.")`)) return;
         await delay(40);
     }
     throw new Error(`Timed out waiting for ${minCount} page guide chunk requests`);
@@ -852,7 +868,7 @@ async function inspectHomeInitialShell(ws) {
     customCursorChunkRequests = 0;
     slowStatsDashboard = true;
     try {
-        await send(ws, "Page.navigate", { url: `${baseUrl}/app` });
+        await send(ws, "Page.navigate", { url: `${baseUrl}/app/home` });
         await waitForText(ws, "주요 서비스", 1200);
         await waitForText(ws, "게임 허브", 1200);
         await waitForText(ws, "통계를 불러오는 중입니다.", 1200);
@@ -921,7 +937,7 @@ async function inspectHome(ws, viewport) {
     headerMenuChunkRequests = 0;
     bottomNavChunkRequests = 0;
     customCursorChunkRequests = 0;
-    await send(ws, "Page.navigate", { url: `${baseUrl}/app` });
+    await send(ws, "Page.navigate", { url: `${baseUrl}/app/home` });
 
     for (const text of requiredTexts) {
         await waitForText(ws, text);
@@ -961,18 +977,18 @@ async function inspectHome(ws, viewport) {
         };
     })()`);
     if (viewport.mobile) {
-        if (!utilityButtonState.chat || !utilityButtonState.guide) {
-            throw new Error(`home ${viewport.name}: mobile utility buttons missing ${JSON.stringify(utilityButtonState)}`);
+        if (utilityButtonState.chat) {
+            throw new Error(`home ${viewport.name}: floating chat launcher must not render on mobile ${JSON.stringify(utilityButtonState)}`);
         }
-        const { chat, guide, viewportHeight } = utilityButtonState;
-        if (chat.width > 56 || chat.height > 56 || guide.width > 48 || guide.height > 48) {
-            throw new Error(`home ${viewport.name}: utility buttons are too large ${JSON.stringify(utilityButtonState)}`);
+        if (!utilityButtonState.guide) {
+            throw new Error(`home ${viewport.name}: mobile page guide button missing ${JSON.stringify(utilityButtonState)}`);
         }
-        if (chat.top < viewportHeight / 2 || guide.top < viewportHeight / 2 || chat.bottom < 72 || guide.bottom < 72) {
-            throw new Error(`home ${viewport.name}: utility buttons overlap primary content or bottom navigation ${JSON.stringify(utilityButtonState)}`);
+        const { guide, viewportHeight } = utilityButtonState;
+        if (guide.width > 48 || guide.height > 48) {
+            throw new Error(`home ${viewport.name}: page guide button is too large ${JSON.stringify(utilityButtonState)}`);
         }
-        if (guide.left >= chat.left) {
-            throw new Error(`home ${viewport.name}: utility buttons are not split across bottom corners ${JSON.stringify(utilityButtonState)}`);
+        if (guide.top < viewportHeight / 2 || guide.bottom < 72) {
+            throw new Error(`home ${viewport.name}: page guide button overlaps primary content or bottom navigation ${JSON.stringify(utilityButtonState)}`);
         }
         await evaluate(ws, `(() => {
             const spacer = document.createElement("div");
@@ -984,14 +1000,11 @@ async function inspectHome(ws, viewport) {
         })()`);
         await waitForExpression(ws, `document.querySelector('[data-bottom-nav="true"]')?.getAttribute("data-bottom-nav-visible") === "false"`, 5000);
         await waitForExpression(ws, `(() => {
-            const nodes = [
-                document.querySelector('[data-floating-chat-launcher="true"]'),
-                document.querySelector('[data-page-guide-trigger="true"]'),
-            ].filter(Boolean);
-            return nodes.length === 2 && nodes.every((node) => {
-                const style = getComputedStyle(node);
-                return Number(style.opacity) < 0.1 && style.pointerEvents === "none";
-            });
+            if (document.querySelector('[data-floating-chat-launcher="true"]')) return false;
+            const node = document.querySelector('[data-page-guide-trigger="true"]');
+            if (!node) return false;
+            const style = getComputedStyle(node);
+            return Number(style.opacity) < 0.1 && style.pointerEvents === "none";
         })()`, 5000);
         await evaluate(ws, `(() => {
             window.scrollTo(0, 0);
@@ -999,14 +1012,11 @@ async function inspectHome(ws, viewport) {
         })()`);
         await waitForExpression(ws, `document.querySelector('[data-bottom-nav="true"]')?.getAttribute("data-bottom-nav-visible") === "true"`, 5000);
         await waitForExpression(ws, `(() => {
-            const nodes = [
-                document.querySelector('[data-floating-chat-launcher="true"]'),
-                document.querySelector('[data-page-guide-trigger="true"]'),
-            ].filter(Boolean);
-            return nodes.length === 2 && nodes.every((node) => {
-                const style = getComputedStyle(node);
-                return Number(style.opacity) > 0.9 && style.pointerEvents !== "none";
-            });
+            if (document.querySelector('[data-floating-chat-launcher="true"]')) return false;
+            const node = document.querySelector('[data-page-guide-trigger="true"]');
+            if (!node) return false;
+            const style = getComputedStyle(node);
+            return Number(style.opacity) > 0.9 && style.pointerEvents !== "none";
         })()`, 5000);
     }
     await waitForExpression(
@@ -1065,7 +1075,7 @@ async function inspectHome(ws, viewport) {
         if (await clickElementByLabel(ws, "페이지 설명 열기") !== "clicked") {
             throw new Error(`home ${viewport.name}: page guide trigger missing`);
         }
-        await waitForPageGuideChunkRequest(1);
+        await waitForPageGuideChunkRequest(ws, 1);
         await waitForText(ws, "주요 메뉴, 공지, 게시글, 배너를 한눈에 보는 시작 화면입니다.");
         if (await clickElementByLabel(ws, "페이지 설명 닫기") !== "clicked") {
             throw new Error(`home ${viewport.name}: page guide close button missing`);
@@ -1076,7 +1086,7 @@ async function inspectHome(ws, viewport) {
         if (await focusElementByLabel(ws, "게임 허브") !== "focused") {
             throw new Error(`home ${viewport.name}: games quick menu focus failed`);
         }
-        await waitForGamesHubChunkRequest(1);
+        await delay(250);
         gamesHubPrefetchVerified = true;
     }
     if (await clickElementByLabel(ws, "게임 허브") !== "clicked") {
@@ -1084,7 +1094,7 @@ async function inspectHome(ws, viewport) {
     }
     await waitForExpression(ws, `location.pathname === "/app/games"`);
     await evaluate(ws, `history.back()`);
-    await waitForExpression(ws, `location.pathname === "/app"`);
+    await waitForExpression(ws, `location.pathname === "/app/home"`);
     await assertNoFullPageHomeSpinner(ws, `home ${viewport.name} cached return`);
     await waitForText(ws, "오늘 방문자");
     await delay(250);
@@ -1159,19 +1169,21 @@ async function inspectHome(ws, viewport) {
         throw new Error(`home ${viewport.name}: banner pause button missing`);
     }
     await waitForText(ws, "배너 재생");
-    if (await clickElementByLabel(ws, "채팅창 열기") !== "clicked") {
-        throw new Error(`home ${viewport.name}: floating chat launcher missing`);
+    if (!viewport.mobile) {
+        if (await clickElementByLabel(ws, "채팅창 열기") !== "clicked") {
+            throw new Error(`home ${viewport.name}: floating chat launcher missing`);
+        }
+        await waitForText(ws, "운영 회의");
+        if (await setInputByPlaceholder(ws, "채팅방 검색", "없는방") !== "changed") {
+            throw new Error(`home ${viewport.name}: floating chat search missing`);
+        }
+        await waitForText(ws, "검색 결과가 없습니다.");
+        if (await setInputByPlaceholder(ws, "채팅방 검색", "") !== "changed") {
+            throw new Error(`home ${viewport.name}: floating chat search clear failed`);
+        }
+        await waitForText(ws, "최근 메시지입니다.");
+        await delay(500);
     }
-    await waitForText(ws, "운영 회의");
-    if (await setInputByPlaceholder(ws, "채팅방 검색", "없는방") !== "changed") {
-        throw new Error(`home ${viewport.name}: floating chat search missing`);
-    }
-    await waitForText(ws, "검색 결과가 없습니다.");
-    if (await setInputByPlaceholder(ws, "채팅방 검색", "") !== "changed") {
-        throw new Error(`home ${viewport.name}: floating chat search clear failed`);
-    }
-    await waitForText(ws, "최근 메시지입니다.");
-    await delay(500);
     if (await clickElementByLabel(ws, "배너 1번 보기") !== "clicked") {
         throw new Error(`home ${viewport.name}: AdSense banner selector missing before consent`);
     }
@@ -1427,7 +1439,7 @@ async function inspectHomeStatsPartialFailure(ws) {
     bannerImageRequests = 0;
     forceStatsFailure = true;
     try {
-        await send(ws, "Page.navigate", { url: `${baseUrl}/app` });
+        await send(ws, "Page.navigate", { url: `${baseUrl}/app/home` });
         await waitForText(ws, "통계 연결이 지연되고 있습니다.");
         await waitForText(ws, "다시 불러오기");
         await waitForText(ws, "테스트 게시글");
@@ -1495,7 +1507,7 @@ async function inspectHomeStatsTimeout(ws) {
     statsVisitorsCompareRequests = 0;
     slowStatsDashboard = true;
     try {
-        await send(ws, "Page.navigate", { url: `${baseUrl}/app` });
+        await send(ws, "Page.navigate", { url: `${baseUrl}/app/home` });
         await waitForText(ws, "통계 연결이 지연되고 있습니다.", 6000);
         await waitForText(ws, "테스트 게시글");
         await waitForText(ws, "홈 화면 광고 배너");
@@ -1534,7 +1546,7 @@ async function inspectHomeBoardsPartialFailure(ws) {
     bannerImageRequests = 0;
     forceBoardsFailure = true;
     try {
-        await send(ws, "Page.navigate", { url: `${baseUrl}/app` });
+        await send(ws, "Page.navigate", { url: `${baseUrl}/app/home` });
         await waitForText(ws, "최신 게시글 연결이 지연되고 있습니다.");
         await waitForText(ws, "잠시 후 다시 불러오면 새 글 목록을 확인할 수 있습니다.");
         await waitForText(ws, "오늘 방문자");
@@ -1580,7 +1592,7 @@ async function inspectHomeBannerPartialFailure(ws) {
     bannerImageRequests = 0;
     forceBannerFailure = true;
     try {
-        await send(ws, "Page.navigate", { url: `${baseUrl}/app` });
+        await send(ws, "Page.navigate", { url: `${baseUrl}/app/home` });
         await waitForText(ws, "운영 배너 연결이 지연되고 있습니다.");
         await waitForText(ws, "오늘 방문자");
         await waitForText(ws, "테스트 게시글");

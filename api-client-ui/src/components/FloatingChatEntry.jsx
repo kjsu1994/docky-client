@@ -1,17 +1,30 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { useBottomNavVisibility } from "../hooks/useBottomNavVisibility.js";
 
 const FloatingChat = lazy(() => import("./FloatingChat.jsx").then((module) => ({ default: module.FloatingChat })));
+
+const isMobileViewport = () => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 1023px)").matches;
+};
 
 export const FloatingChatEntry = () => {
     const { isAuthenticated } = useAuth();
     const [activated, setActivated] = useState(false);
-    const bottomNav = useBottomNavVisibility();
-    const hiddenWithBottomNav = bottomNav.enabled && !bottomNav.visible;
+    const [mobileViewport, setMobileViewport] = useState(isMobileViewport);
 
-    if (!isAuthenticated) return null;
+    useEffect(() => {
+        if (typeof window === "undefined" || !window.matchMedia) return undefined;
+        const query = window.matchMedia("(max-width: 1023px)");
+        const syncViewport = () => setMobileViewport(query.matches);
+
+        syncViewport();
+        query.addEventListener?.("change", syncViewport);
+        return () => query.removeEventListener?.("change", syncViewport);
+    }, []);
+
+    if (!isAuthenticated || mobileViewport) return null;
 
     if (activated) {
         return (
@@ -25,9 +38,7 @@ export const FloatingChatEntry = () => {
         <button
             type="button"
             onClick={() => setActivated(true)}
-            className={`fixed bottom-24 right-4 z-[100] flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-xl shadow-primary-200 transition-all duration-300 hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6 lg:h-16 lg:w-16 lg:rounded-[2rem] lg:shadow-2xl ${
-                hiddenWithBottomNav ? "pointer-events-none translate-y-8 opacity-0" : "pointer-events-auto translate-y-0 opacity-100"
-            }`}
+            className="fixed bottom-24 right-4 z-[100] flex h-12 w-12 translate-y-0 items-center justify-center rounded-2xl bg-primary-600 text-white opacity-100 shadow-xl shadow-primary-200 transition-all duration-300 hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6 lg:h-16 lg:w-16 lg:rounded-[2rem] lg:shadow-2xl"
             aria-label="채팅창 열기"
             data-floating-chat-launcher="true"
         >
