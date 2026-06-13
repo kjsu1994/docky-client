@@ -2356,6 +2356,38 @@ function routeMock(url, method, postData = "") {
     }
     return { status: 200, body: {} };
   }
+  if (method === "POST" && /^rooms\/\d+\/actions$/.test(suffix)) {
+    recordRequest("action", game, pathname, body);
+    const room = mockState.activeRoomsByGame.get(game) || roomFor(game, "host");
+    mockState.activeRoomsByGame.set(game, room);
+    const gameState = game === "mafia"
+      ? {
+          ...mafiaSmokeGameState(room),
+          mySubmitted: true,
+          my_submitted: true,
+          completedSeatNos: [1],
+          completed_seat_nos: [1],
+        }
+      : game === "six-nimmt"
+        ? sixNimmtSmokeGameState(room)
+        : game === "catan"
+          ? catanSmokeGameState(room)
+          : game === "poker"
+            ? pokerSmokeGameState(room)
+            : null;
+    return {
+      status: 200,
+      body: {
+        eventType: "action",
+        event_type: "action",
+        message: null,
+        room,
+        variants: variantsByGame[game] || [],
+        gameState,
+        game_state: gameState,
+      },
+    };
+  }
   if (method === "POST" && /^rooms\/\d+\/force-finish$/.test(suffix)) {
     recordRequest("forceFinish", game, pathname, body);
     const room = mockState.activeRoomsByGame.get(game) || roomFor(game, "host");
@@ -3034,15 +3066,29 @@ async function assertSoloAiFirstActionAvailable(ws, game) {
     return;
   }
   if (game === "mafia") {
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-candidate"]').length >= 3`, "mafia solo AI target candidates rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-button"]').length >= 3`, "mafia solo AI target buttons rendered");
     const clicked = await evaluate(ws, `(() => {
-      const button = Array.from(document.querySelectorAll('[data-smoke="mafia-board"] button')).find((node) => !node.disabled && String(node.className || "").includes("min-h-16"));
+      const button = Array.from(document.querySelectorAll('[data-smoke="mafia-target-button"]')).find((node) => !node.disabled);
       if (!button) return false;
       button.click();
       return true;
     })()`);
     if (!clicked) throw new Error("mafia solo AI: selectable target button not found");
-    await waitForExpression(ws, `Array.from(document.querySelectorAll('[data-smoke="mafia-board"] button')).some((node) => !node.disabled && String(node.className || "").includes("bg-rose-600"))`, "mafia solo AI submit action enabled");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-submit-action"]:not(:disabled)'))`, "mafia solo AI submit action enabled");
+    const submitted = await evaluate(ws, `(() => {
+      const button = document.querySelector('[data-smoke="mafia-submit-action"]:not(:disabled)');
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`);
+    if (!submitted) throw new Error("mafia solo AI: submit action button not clickable");
+    await delay(300);
+    assertRequest(
+      "mafia",
+      "action",
+      (request) => request.body?.action_type === "MAFIA_KILL" && Number(request.body?.target_seat_no) > 0,
+      "mafia kill action request after target confirmation"
+    );
     return;
   }
   throw new Error(`Unsupported solo AI first-action smoke game: ${game}`);

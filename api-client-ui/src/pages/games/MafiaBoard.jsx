@@ -315,6 +315,7 @@ const MafiaTargetIntelPanel = ({
   completedSeatNos = new Set(),
   votedSeatNos = new Set(),
   playerNameBySeat = (seatNo) => `${seatNo}번`,
+  onSelectTarget = () => {},
 }) => {
   const profile = mafiaActionProfiles[actionType] || {
     label: "대기",
@@ -389,13 +390,17 @@ const MafiaTargetIntelPanel = ({
                   const seatNo = Number(get(player, "seat_no", "seatNo", 0));
                   const selected = Number(selectedTargetSeatNo) === seatNo;
                   return (
-                    <span
+                    <button
                       key={seatNo}
+                      type="button"
                       data-smoke="mafia-target-candidate"
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-black ${selected ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}
+                      onClick={() => onSelectTarget(seatNo)}
+                      disabled={actionLocked}
+                      aria-pressed={selected}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${selected ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-rose-100 hover:text-rose-700"}`}
                     >
                       {playerNameBySeat(seatNo)}
-                    </span>
+                    </button>
                   );
                 })}
               </div>
@@ -1053,7 +1058,7 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
   const outcomeMessage = get(gameState, "outcome_message", "outcomeMessage", "") || "";
   const mafiaPlayers = listOf(get(gameState, "players", "players", []));
   const events = listOf(get(gameState, "events", "events", []));
-  const availableActions = new Set(listOf(get(gameState, "available_actions", "availableActions", [])));
+  const availableActions = new Set(listOf(get(gameState, "available_actions", "availableActions", [])).map((action) => String(action || "").toUpperCase()));
   const completedSeatNos = new Set(listOf(get(gameState, "completed_seat_nos", "completedSeatNos", [])).map(Number));
   const votedSeatNos = new Set(listOf(get(gameState, "voted_seat_nos", "votedSeatNos", [])).map(Number));
   const mafiaSeatNos = new Set(listOf(get(gameState, "mafia_seat_nos", "mafiaSeatNos", [])).map(Number));
@@ -1359,6 +1364,8 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
                     <button
                       key={seatNo}
                       type="button"
+                      data-smoke="mafia-target-button"
+                      data-seat-no={seatNo}
                       onClick={() => setSelectedTargetSeatNo(seatNo)}
                       aria-pressed={selected}
                       className={`min-h-16 rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${selected ? "border-slate-900 bg-slate-900 text-white shadow-lg" : "border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:bg-rose-50"}`}
@@ -1423,6 +1430,7 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
             completedSeatNos={completedSeatNos}
             votedSeatNos={votedSeatNos}
             playerNameBySeat={playerNameBySeat}
+            onSelectTarget={setSelectedTargetSeatNo}
           />
 
           <MafiaVotePressurePanel
