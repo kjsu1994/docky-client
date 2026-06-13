@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
     Award,
     BarChart3,
@@ -75,10 +75,18 @@ const themePreferenceOptions = [
     },
 ];
 
+const mypageTabKeys = new Set(["profile", "posts", "stats", "security", "privacy", "settings"]);
+
+const getMypageTabFromSearch = (search) => {
+    const tab = new URLSearchParams(search || "").get("tab");
+    return mypageTabKeys.has(tab) ? tab : "";
+};
+
 export const Mypage = () => {
     const { user, logout } = useAuth();
     const { preference: themePreference, resolvedTheme, setPreference: setThemePreference } = useTheme();
     const navigate = useNavigate();
+    const location = useLocation();
     const [member, setMember] = useState(null);
     const [myBoards, setMyBoards] = useState([]);
     const [levelHistory, setLevelHistory] = useState([]);
@@ -86,7 +94,7 @@ export const Mypage = () => {
     const [boardsLoading, setBoardsLoading] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [error, setError] = useState("");
-    const [activeTab, setActiveTab] = useState("profile");
+    const [activeTab, setActiveTab] = useState(() => getMypageTabFromSearch(location.search) || "profile");
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [deletePassword, setDeletePassword] = useState("");
     const [deleteBusy, setDeleteBusy] = useState(false);
@@ -168,6 +176,12 @@ export const Mypage = () => {
     useEffect(() => {
         fetchMember();
     }, [fetchMember]);
+
+    useEffect(() => {
+        const nextTab = getMypageTabFromSearch(location.search);
+        if (!nextTab) return;
+        setActiveTab((previous) => (previous === nextTab ? previous : nextTab));
+    }, [location.search]);
 
     useEffect(() => {
         if (activeTab === "posts") {
@@ -358,7 +372,7 @@ export const Mypage = () => {
 
     return (
         <div className="space-y-6">
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
                 <div className="h-28 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-600" />
                 <div className="px-5 pb-6 sm:px-6">
                     <div className="-mt-14 flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -377,12 +391,12 @@ export const Mypage = () => {
 
                         <div className="min-w-0 flex-1 pt-1">
                             <div className="flex flex-wrap items-center gap-2">
-                                <h1 className="truncate text-2xl font-black text-slate-900">{member.name}</h1>
+                                <h1 className="truncate text-2xl font-black text-ink">{member.name}</h1>
                                 <span className="rounded-full bg-sky-100 px-3 py-1 text-sm font-black text-sky-700">레벨 {level.level || 1}</span>
                                 <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-700">{tierLabel}</span>
                                 <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-700">{member.statusLabel}</span>
                             </div>
-                            <div className="mt-2 space-y-1 text-sm font-medium text-slate-500">
+                            <div className="mt-2 space-y-1 text-sm font-medium text-ink-muted">
                                 <div className="flex items-center gap-2"><Mail className="h-4 w-4" />{member.email || "-"}</div>
                                 {member.phone ? <div className="flex items-center gap-2"><Phone className="h-4 w-4" />{member.phone}</div> : null}
                             </div>
@@ -391,7 +405,7 @@ export const Mypage = () => {
                         <button
                             type="button"
                             onClick={() => navigate("/app/mypage/edit")}
-                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-200"
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-control px-4 py-3 text-sm font-black text-ink-muted hover:bg-control-hover"
                         >
                             <Edit className="h-4 w-4" />
                             프로필 수정
@@ -406,7 +420,7 @@ export const Mypage = () => {
                 </div>
             </section>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+            <div className="rounded-2xl border border-line bg-surface p-2 shadow-sm">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
                     <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>프로필</TabButton>
                     <TabButton active={activeTab === "posts"} onClick={() => setActiveTab("posts")}>작성 글</TabButton>
@@ -483,12 +497,12 @@ const toneClasses = {
 };
 
 const SummaryCard = ({ icon: Icon, label, value, tone }) => (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-line bg-surface-raised p-4">
         <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${toneClasses[tone] || toneClasses.sky}`}>
             <Icon className="h-5 w-5" />
         </div>
-        <div className="text-xs font-bold text-slate-500">{label}</div>
-        <div className="mt-1 text-xl font-black text-slate-900">{value}</div>
+        <div className="text-xs font-bold text-ink-muted">{label}</div>
+        <div className="mt-1 text-xl font-black text-ink">{value}</div>
     </div>
 );
 
@@ -497,7 +511,7 @@ const TabButton = ({ active, onClick, children }) => (
         type="button"
         onClick={onClick}
         className={`min-h-11 rounded-xl px-2 py-3 text-sm font-black transition-all ${
-            active ? "bg-slate-900 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            active ? "bg-ink text-ink-inverse shadow-sm" : "bg-control text-ink-muted hover:bg-control-hover"
         }`}
     >
         {children}
@@ -505,18 +519,18 @@ const TabButton = ({ active, onClick, children }) => (
 );
 
 const SettingsTab = ({ themePreference, resolvedTheme, onThemePreferenceChange }) => (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-6">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 className="flex items-center gap-2 text-lg font-black text-slate-900">
+                <h2 className="flex items-center gap-2 text-lg font-black text-ink">
                     <MonitorSmartphone className="h-5 w-5 text-sky-600" />
                     화면 설정
                 </h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                <p className="mt-2 text-sm font-semibold leading-6 text-ink-muted">
                     기본값은 시스템 설정을 따르고, 필요할 때만 라이트 또는 다크 배경을 고정합니다.
                 </p>
             </div>
-            <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600" role="status">
+            <span className="inline-flex w-fit items-center rounded-full bg-control px-3 py-1.5 text-xs font-black text-ink-muted" role="status">
                 현재 적용: {resolvedTheme === "dark" ? "다크" : "라이트"}
             </span>
         </div>
@@ -534,17 +548,17 @@ const SettingsTab = ({ themePreference, resolvedTheme, onThemePreferenceChange }
                         onClick={() => onThemePreferenceChange(option.value)}
                         className={`rounded-2xl border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 ${
                             active
-                                ? "border-sky-300 bg-sky-50 text-slate-900 shadow-sm"
-                                : "border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-200 hover:bg-white"
+                                ? "border-sky-300 bg-sky-500/15 text-ink shadow-sm"
+                                : "border-line bg-control text-ink-muted hover:border-sky-200 hover:bg-surface"
                         }`}
                     >
                         <span className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl ${
-                            active ? "bg-sky-600 text-white" : "bg-white text-slate-500"
+                            active ? "bg-sky-600 text-white" : "bg-surface text-ink-muted"
                         }`}>
                             <Icon className="h-5 w-5" />
                         </span>
                         <span className="block text-sm font-black">{option.label}</span>
-                        <span className="mt-2 block text-xs font-semibold leading-5 text-slate-500">{option.description}</span>
+                        <span className="mt-2 block text-xs font-semibold leading-5 text-ink-muted">{option.description}</span>
                     </button>
                 );
             })}
@@ -1000,9 +1014,9 @@ const StatsTab = ({ member, level, history, historyLoading }) => (
 );
 
 const InfoRow = ({ label, value }) => (
-    <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-3 last:border-0">
-        <span className="text-sm font-bold text-slate-500">{label}</span>
-        <span className="text-right text-sm font-black text-slate-900">{value}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-line py-3 last:border-0">
+        <span className="text-sm font-bold text-ink-muted">{label}</span>
+        <span className="text-right text-sm font-black text-ink">{value}</span>
     </div>
 );
 
@@ -1069,14 +1083,14 @@ const DeleteAccountModal = ({
     >
         <div
             ref={dialogRef}
-            className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={descriptionId}
         >
-            <h3 id={titleId} className="text-lg font-black text-slate-900">회원 탈퇴 확인</h3>
-            <p id={descriptionId} className="mt-2 text-sm font-medium leading-6 text-slate-600">
+            <h3 id={titleId} className="text-lg font-black text-ink">회원 탈퇴 확인</h3>
+            <p id={descriptionId} className="mt-2 text-sm font-medium leading-6 text-ink-muted">
                 {googleMember
                     ? "Google 계정은 재인증 후 최종 탈퇴할 수 있습니다."
                     : "탈퇴를 진행하려면 현재 비밀번호를 입력해 주세요."}
@@ -1084,7 +1098,7 @@ const DeleteAccountModal = ({
 
             {!googleMember ? (
                 <div className="mt-4 space-y-2">
-                    <label htmlFor={passwordId} className="block text-sm font-bold text-slate-700">
+                    <label htmlFor={passwordId} className="block text-sm font-bold text-ink-muted">
                         현재 비밀번호
                     </label>
                     <input
@@ -1099,7 +1113,7 @@ const DeleteAccountModal = ({
                     />
                 </div>
             ) : (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-600">
+                <div className="mt-4 rounded-xl border border-line bg-control p-3 text-sm font-semibold text-ink-muted">
                     {oauthWithdrawVerified
                         ? "재인증이 완료되었습니다. 최종 탈퇴를 진행할 수 있습니다."
                         : "먼저 Google 재인증을 진행해 주세요."}

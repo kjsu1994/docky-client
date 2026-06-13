@@ -40,7 +40,7 @@ const privacyItems = [
 
 export const BusinessPrivacyFooter = ({ headingId = "business-privacy-footer-heading" }) => {
     return (
-        <footer className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-[11px] text-slate-500 shadow-sm sm:px-4" aria-labelledby={headingId}>
+        <footer className="rounded-xl border border-line bg-surface px-3 py-3 text-[11px] text-ink-muted shadow-sm sm:px-4" aria-labelledby={headingId}>
             <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <h2 id={headingId} className="text-xs font-black text-slate-800 sm:text-sm">사업자정보 및 개인정보처리방침</h2>
@@ -49,8 +49,8 @@ export const BusinessPrivacyFooter = ({ headingId = "business-privacy-footer-hea
                 <dl className="flex flex-wrap gap-x-3 gap-y-1 leading-snug">
                     {businessInfo.map(([label, value]) => (
                         <div key={label} className="inline-flex min-w-0 items-baseline gap-1">
-                            <dt className="shrink-0 font-black text-slate-700">{label}</dt>
-                            <dd className="min-w-0 break-words font-bold text-slate-500">{value}</dd>
+                            <dt className="shrink-0 font-black text-ink-muted">{label}</dt>
+                            <dd className="min-w-0 break-words font-bold text-ink-subtle">{value}</dd>
                         </div>
                     ))}
                 </dl>
@@ -59,20 +59,20 @@ export const BusinessPrivacyFooter = ({ headingId = "business-privacy-footer-hea
                 </p>
             </div>
 
-            <details className="mt-2 rounded-xl bg-slate-50 px-3 py-2">
+            <details className="mt-2 rounded-xl bg-control px-3 py-2">
                 <summary className="cursor-pointer text-xs font-black text-slate-700 sm:text-sm">개인정보처리방침 상세 내용 보기</summary>
                 <p className="mt-3 font-medium leading-snug">
                     Docky는 개인정보 보호법 및 관계 법령에 따라 이용자의 개인정보를 필요한 범위에서만 처리하며, 처리 목적 달성 후 지체 없이 파기합니다.
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {privacyItems.map((item) => (
-                        <section key={item.title} className="rounded-xl border border-slate-200 bg-white p-2.5">
+                        <section key={item.title} className="rounded-xl border border-line bg-surface p-2.5">
                             <h3 className="font-black text-slate-700">{item.title}</h3>
                             <p className="mt-1 leading-snug">{item.body}</p>
                         </section>
                     ))}
                 </div>
-                <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2.5 leading-snug">
+                <div className="mt-2 rounded-xl border border-line bg-surface p-2.5 leading-snug">
                     개인정보 보호 관련 문의, 권리 행사, 불만 처리는 고객센터 또는 관리자 연락 채널로 접수할 수 있습니다. 방침 변경 시 변경 내용과 시행일을 서비스 화면에 공지합니다.
                 </div>
             </details>

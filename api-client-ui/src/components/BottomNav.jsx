@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Home, LayoutGrid, Menu, MessageCircle } from "lucide-react";
+import { Dices, LayoutGrid, Menu, MessageCircle } from "lucide-react";
 import { publishBottomNavVisibility } from "../hooks/useBottomNavVisibility.js";
 
 const shouldRenderBottomNav = () => {
@@ -15,10 +15,10 @@ const NavItem = ({ to, icon: Icon, end = false, hiddenFromA11y = false, children
             end={end}
             tabIndex={hiddenFromA11y ? -1 : undefined}
             className={({ isActive }) =>
-                `flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 ${
+                `flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus/25 ${
                     isActive
                         ? "scale-110 font-bold text-primary-600"
-                        : "text-slate-400 hover:text-slate-500"
+                        : "text-ink-subtle hover:text-ink-muted"
                 }`
             }
         >
@@ -96,12 +96,12 @@ export const BottomNav = () => {
             aria-hidden={!visible}
             data-bottom-nav="true"
             data-bottom-nav-visible={visible ? "true" : "false"}
-            className={`fixed bottom-0 left-0 right-0 z-50 h-20 border-t-white/20 px-4 pb-safe transition-transform duration-300 lg:hidden ${
+            className={`fixed bottom-0 left-0 right-0 z-50 h-20 border-t border-line/60 px-4 pb-safe transition-transform duration-300 lg:hidden ${
                 visible ? "translate-y-0" : "translate-y-full"
             } glass`}
         >
             <div className="mx-auto grid h-full max-w-lg grid-cols-4 items-center">
-                <NavItem to="/app" icon={Home} end hiddenFromA11y={!visible}>홈</NavItem>
+                <NavItem to="/app" icon={Dices} end hiddenFromA11y={!visible}>게임</NavItem>
                 <NavItem to="/app/boards/FREE_BOARD" icon={LayoutGrid} hiddenFromA11y={!visible}>게시판</NavItem>
                 <NavItem to="/app/chat" icon={MessageCircle} hiddenFromA11y={!visible}>채팅</NavItem>
                 <NavItem to="/app/all-menu" icon={Menu} hiddenFromA11y={!visible}>메뉴</NavItem>

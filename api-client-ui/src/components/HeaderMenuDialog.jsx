@@ -22,21 +22,21 @@ import {
 import { trapFocus } from "../utils/focusTrap.js";
 
 const MenuSection = ({ title, items, onSelect }) => (
-    <section className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-        <h3 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{title}</h3>
+    <section className="rounded-3xl border border-line bg-control/80 p-4">
+        <h3 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-ink-subtle">{title}</h3>
         <div className="mt-3 space-y-1.5">
             {items.map((item) => (
                 <Link
                     key={item.to}
                     to={item.to}
                     onClick={onSelect}
-                    className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 transition-all hover:border-primary-100 hover:bg-primary-50/50 hover:text-primary-700"
+                    className="flex items-center justify-between rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-bold text-ink-muted transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
                 >
                     <span className="flex items-center gap-2.5">
                         <item.icon className="h-4 w-4" />
                         {item.title}
                     </span>
-                    <ChevronRight className="h-4 w-4 text-slate-300" />
+                    <ChevronRight className="h-4 w-4 text-ink-subtle" />
                 </Link>
             ))}
         </div>
@@ -52,8 +52,8 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
             {
                 title: "핵심",
                 items: [
-                    { title: "게임 허브", to: "/app/games", icon: Dices },
-                    { title: "홈 대시보드", to: "/app", icon: Home },
+                    { title: "게임 허브", to: "/app", icon: Dices },
+                    { title: "홈 대시보드", to: "/app/home", icon: Home },
                     { title: "할 일", to: "/app/todos", icon: CalendarDays },
                     { title: "통계", to: "/app/statistics", icon: BarChart },
                     { title: "사용자게시판", to: "/app/boards/FREE_BOARD", icon: MessageSquare },
@@ -141,7 +141,7 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
             <div
                 id={panelId}
                 ref={panelRef}
-                className="hidden lg:block fixed inset-x-6 top-24 z-50 mx-auto w-full max-w-5xl max-h-[78vh] overflow-y-auto rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-2xl backdrop-blur"
+                className="hidden lg:block fixed inset-x-6 top-24 z-50 mx-auto w-full max-w-5xl max-h-[78vh] overflow-y-auto rounded-[2rem] border border-line bg-surface-overlay/95 p-6 shadow-2xl backdrop-blur"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
@@ -156,7 +156,7 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
                         ref={closeButtonRef}
                         type="button"
                         onClick={onClose}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors hover:border-primary-200 hover:text-primary-700"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-ink-muted transition-colors hover:border-primary-200 hover:text-primary-700"
                         aria-label="모달 닫기"
                     >
                         <X className="h-4 w-4" />

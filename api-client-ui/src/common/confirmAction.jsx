@@ -42,21 +42,21 @@ const ConfirmToast = ({
 
     return (
         <div
-            className={`pointer-events-auto w-[min(92vw,380px)] rounded-2xl border bg-white p-4 shadow-2xl ${
+            className={`pointer-events-auto w-[min(92vw,380px)] rounded-2xl border bg-surface p-4 shadow-2xl ${
                 item.visible ? "animate-enter" : "animate-leave"
-            } ${tone === "danger" ? "border-rose-100" : "border-slate-200"}`}
+            } ${tone === "danger" ? "border-rose-500/25" : "border-line"}`}
             role="alertdialog"
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={descriptionId}
         >
-            <div id={titleId} className="text-sm font-black text-slate-900">{title}</div>
-            <p id={descriptionId} className="mt-2 text-xs font-bold leading-relaxed text-slate-500">{description}</p>
+            <div id={titleId} className="text-sm font-black text-ink">{title}</div>
+            <p id={descriptionId} className="mt-2 text-xs font-bold leading-relaxed text-ink-muted">{description}</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
                     ref={cancelRef}
                     type="button"
-                    className="min-h-10 rounded-xl bg-slate-100 px-3 text-sm font-black text-slate-700 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
+                    className="min-h-10 rounded-xl bg-control px-3 text-sm font-black text-ink-muted transition hover:bg-control-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus/20"
                     onClick={() => settle(false, item.id)}
                 >
                     {cancelText}
@@ -64,10 +64,10 @@ const ConfirmToast = ({
                 <button
                     ref={confirmRef}
                     type="button"
-                    className={`min-h-10 rounded-xl px-3 text-sm font-black text-white transition focus-visible:outline-none focus-visible:ring-4 ${
+                    className={`min-h-10 rounded-xl px-3 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 ${
                         tone === "danger"
-                            ? "bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-200"
-                            : "bg-slate-900 hover:bg-primary-600 focus-visible:ring-sky-200"
+                            ? "bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-200"
+                            : "bg-ink text-ink-inverse hover:bg-primary-600 focus-visible:ring-focus/20"
                     }`}
                     onClick={() => settle(true, item.id)}
                 >

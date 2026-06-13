@@ -2,6 +2,10 @@ import { logClientError } from "./clientDiagnostics.js";
 
 export const THEME_STORAGE_KEY = "docky.theme";
 export const THEME_PREFERENCES = ["system", "light", "dark"];
+export const THEME_COLORS = {
+    light: "#f8fafc",
+    dark: "#020617",
+};
 
 export const normalizeThemePreference = (value) => (
     THEME_PREFERENCES.includes(value) ? value : "system"
@@ -32,10 +36,25 @@ export const applyThemePreference = (preference) => {
     root.dataset.themePreference = normalized;
     if (normalized === "light" || normalized === "dark") {
         root.dataset.theme = normalized;
+        updateThemeColorMeta(normalized);
         return;
     }
 
     delete root.dataset.theme;
+    updateThemeColorMeta(normalized);
+};
+
+export const updateThemeColorMeta = (preference) => {
+    if (typeof document === "undefined") return;
+    const resolvedTheme = resolveThemePreference(preference);
+    const content = THEME_COLORS[resolvedTheme] || THEME_COLORS.light;
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+        meta = document.createElement("meta");
+        meta.name = "theme-color";
+        document.head?.appendChild(meta);
+    }
+    meta.setAttribute("content", content);
 };
 
 export const writeStoredThemePreference = (preference) => {

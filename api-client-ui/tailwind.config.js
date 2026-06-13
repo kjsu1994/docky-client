@@ -27,7 +27,27 @@ export default {
           700: "#334155",
           800: "#1e293b",
           900: "#0f172a",
-        }
+        },
+        surface: {
+          DEFAULT: "rgb(var(--color-surface) / <alpha-value>)",
+          raised: "rgb(var(--color-surface-raised) / <alpha-value>)",
+          overlay: "rgb(var(--color-surface-overlay) / <alpha-value>)",
+        },
+        ink: {
+          DEFAULT: "rgb(var(--color-text) / <alpha-value>)",
+          muted: "rgb(var(--color-text-muted) / <alpha-value>)",
+          subtle: "rgb(var(--color-text-subtle) / <alpha-value>)",
+          inverse: "rgb(var(--color-text-inverse) / <alpha-value>)",
+        },
+        line: {
+          DEFAULT: "rgb(var(--color-border) / <alpha-value>)",
+          strong: "rgb(var(--color-border-strong) / <alpha-value>)",
+        },
+        control: {
+          DEFAULT: "rgb(var(--color-control) / <alpha-value>)",
+          hover: "rgb(var(--color-control-hover) / <alpha-value>)",
+        },
+        focus: "rgb(var(--color-focus) / <alpha-value>)",
       },
       animation: {
         "fade-in": "fadeIn 0.3s ease-in-out",

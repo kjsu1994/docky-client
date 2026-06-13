@@ -126,7 +126,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
                 ref={buttonRef}
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
                 title="알림"
                 aria-label="알림"
                 aria-haspopup="dialog"
@@ -143,21 +143,21 @@ export const NotificationCenter = ({ initialOpen = false }) => {
             {open ? (
                 <section
                     ref={panelRef}
-                    className="absolute right-0 top-12 z-[70] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                    className="absolute right-0 top-12 z-[70] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
                     role="dialog"
                     aria-label="알림 센터"
                 >
-                    <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
+                    <div className="flex items-center justify-between gap-3 border-b border-line p-4">
                         <div>
-                            <h2 className="text-sm font-black text-slate-900">알림</h2>
-                            <p className="text-xs font-semibold text-slate-500">{unreadCount}개 미확인</p>
+                            <h2 className="text-sm font-black text-ink">알림</h2>
+                            <p className="text-xs font-semibold text-ink-muted">{unreadCount}개 미확인</p>
                         </div>
                         <div className="flex gap-2">
                             <button
                                 type="button"
                                 onClick={fetchNotifications}
                                 disabled={loading || Boolean(busyKey)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-control text-ink-muted hover:bg-control-hover disabled:opacity-60"
                                 title="새로고침"
                                 aria-label="새로고침"
                             >
@@ -167,7 +167,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
                                 type="button"
                                 onClick={markAllRead}
                                 disabled={unreadCount <= 0 || loading || Boolean(busyKey)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-ink-inverse hover:bg-primary-700 disabled:opacity-60"
                                 title="모두 읽음"
                                 aria-label="모두 읽음"
                             >
@@ -178,32 +178,32 @@ export const NotificationCenter = ({ initialOpen = false }) => {
 
                     <div className="max-h-[70vh] overflow-y-auto p-2">
                         {loading ? (
-                            <div className="p-6 text-center text-sm font-bold text-slate-500">알림을 불러오는 중입니다...</div>
+                            <div className="p-6 text-center text-sm font-bold text-ink-muted">알림을 불러오는 중입니다...</div>
                         ) : !items.length ? (
-                            <div className="p-6 text-center text-sm font-bold text-slate-500">표시할 알림이 없습니다.</div>
+                            <div className="p-6 text-center text-sm font-bold text-ink-muted">표시할 알림이 없습니다.</div>
                         ) : (
                             <div className="space-y-2">
                                 {items.map((item) => (
                                     <article
                                         key={item.id || `${item.type}-${item.createdAt}`}
                                         className={`rounded-xl border p-3 ${
-                                            item.read ? "border-slate-100 bg-slate-50" : "border-sky-100 bg-sky-50/60"
+                                            item.read ? "border-line bg-control" : "border-sky-200 bg-sky-50/60"
                                         }`}
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="text-sm font-black text-slate-900">{item.title}</span>
-                                                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-black text-slate-500">
+                                                    <span className="text-sm font-black text-ink">{item.title}</span>
+                                                    <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-black text-ink-muted">
                                                         {item.severity}
                                                     </span>
                                                 </div>
                                                 {item.message ? (
-                                                    <p className="mt-1 break-words text-xs font-semibold leading-5 text-slate-600">
+                                                    <p className="mt-1 break-words text-xs font-semibold leading-5 text-ink-muted">
                                                         {item.message}
                                                     </p>
                                                 ) : null}
-                                                <p className="mt-2 text-xs font-semibold text-slate-400">
+                                                <p className="mt-2 text-xs font-semibold text-ink-subtle">
                                                     {formatRelativeTime(item.createdAt) || "-"}
                                                 </p>
                                             </div>
@@ -212,7 +212,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
                                                     type="button"
                                                     onClick={() => markRead(item.id)}
                                                     disabled={Boolean(busyKey)}
-                                                    className="shrink-0 rounded-lg bg-white px-2 py-1 text-xs font-black text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                                                    className="shrink-0 rounded-lg bg-surface px-2 py-1 text-xs font-black text-ink-muted hover:bg-control-hover disabled:opacity-60"
                                                 >
                                                     읽음
                                                 </button>
@@ -222,7 +222,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
                                             <button
                                                 type="button"
                                                 onClick={() => openLink(item)}
-                                                className="mt-3 w-full rounded-lg bg-white px-3 py-2 text-left text-xs font-black text-sky-700 hover:bg-sky-100"
+                                                className="mt-3 w-full rounded-lg bg-surface px-3 py-2 text-left text-xs font-black text-sky-700 hover:bg-sky-100"
                                             >
                                                 관련 화면 열기
                                             </button>

@@ -26,21 +26,21 @@ import UserAvatar from "../../common/UserAvatar.jsx";
 
 const MenuSection = ({ title, items }) => (
     <div className="space-y-3">
-        <h3 className="px-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">{title}</h3>
+        <h3 className="px-2 text-[11px] font-black uppercase tracking-[0.2em] text-ink-subtle">{title}</h3>
         <div className="grid grid-cols-1 gap-2">
             {items.map((item) => (
                 <Link
                     key={item.to}
                     to={item.to}
-                    className="flex items-center justify-between rounded-3xl border border-slate-50 bg-white p-4 shadow-sm transition-all active:scale-[0.98]"
+                    className="flex items-center justify-between rounded-3xl border border-line bg-surface p-4 shadow-sm transition-all active:scale-[0.98]"
                 >
                     <div className="flex items-center gap-4">
-                        <div className={`rounded-2xl p-2.5 ${item.color || "bg-slate-50 text-slate-600"}`}>
+                        <div className={`rounded-2xl p-2.5 ${item.color || "bg-control text-ink-muted"}`}>
                             <item.icon className="h-5 w-5" />
                         </div>
-                        <span className="font-bold text-slate-700">{item.title}</span>
+                        <span className="font-bold text-ink-muted">{item.title}</span>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-slate-300" />
+                    <ChevronRight className="h-4 w-4 text-ink-subtle" />
                 </Link>
             ))}
         </div>
@@ -53,8 +53,8 @@ export const AllMenu = () => {
     const userLevel = user?.levelDto || user?.level_dto || user?.level || {};
 
     const mainServices = [
-        { title: "게임 허브", to: "/app/games", icon: Dices, color: "bg-amber-50 text-amber-700" },
-        { title: "홈 대시보드", to: "/app", icon: Home, color: "bg-blue-50 text-blue-600" },
+        { title: "게임 허브", to: "/app", icon: Dices, color: "bg-amber-50 text-amber-700" },
+        { title: "홈 대시보드", to: "/app/home", icon: Home, color: "bg-blue-50 text-blue-600" },
         { title: "할 일", to: "/app/todos", icon: CalendarDays, color: "bg-emerald-50 text-emerald-700" },
         { title: "통계", to: "/app/statistics", icon: BarChart, color: "bg-indigo-50 text-indigo-600" },
         { title: "스트리밍", to: "/app/streaming", icon: Film, color: "bg-fuchsia-50 text-fuchsia-700" },
@@ -85,7 +85,7 @@ export const AllMenu = () => {
 
     return (
         <div className="animate-fade-in space-y-8 pb-20">
-            <div className="flex items-center justify-between rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/50">
+            <div className="flex items-center justify-between rounded-[2.5rem] border border-line bg-surface p-8 shadow-xl shadow-slate-200/20">
                 <div className="flex items-center gap-5">
                     <UserAvatar
                         name={user?.name || user?.email}
@@ -98,8 +98,8 @@ export const AllMenu = () => {
                         showLevelBadge
                     />
                     <div>
-                        <div className="leading-tight text-xl font-black text-slate-900">{user?.name || "사용자"}</div>
-                        <div className="text-sm font-medium text-slate-400">{user?.email}</div>
+                        <div className="leading-tight text-xl font-black text-ink">{user?.name || "사용자"}</div>
+                        <div className="text-sm font-medium text-ink-subtle">{user?.email}</div>
                     </div>
                 </div>
                 <button
@@ -118,7 +118,7 @@ export const AllMenu = () => {
             {isAdmin && <MenuSection title="관리자" items={admin} />}
 
             <div className="pt-4 text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-ink-subtle">
                     커뮤니티 플랫폼 v2.0
                 </p>
             </div>

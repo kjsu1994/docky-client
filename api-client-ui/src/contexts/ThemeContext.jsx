@@ -4,7 +4,9 @@ import {
     getStoredThemePreference,
     normalizeThemePreference,
     resolveThemePreference,
+    THEME_STORAGE_KEY,
     THEME_PREFERENCES,
+    updateThemeColorMeta,
     writeStoredThemePreference,
 } from "../utils/themePreference.js";
 
@@ -25,7 +27,10 @@ export const ThemeProvider = ({ children }) => {
         }
 
         const media = window.matchMedia("(prefers-color-scheme: dark)");
-        const handleChange = () => setResolvedTheme(media.matches ? "dark" : "light");
+        const handleChange = () => {
+            setResolvedTheme(media.matches ? "dark" : "light");
+            updateThemeColorMeta("system");
+        };
 
         handleChange();
         if (typeof media.addEventListener === "function") {
@@ -35,6 +40,19 @@ export const ThemeProvider = ({ children }) => {
         media.addListener(handleChange);
         return () => media.removeListener(handleChange);
     }, [preference]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return undefined;
+        const handleStorage = (event) => {
+            if (event.key !== THEME_STORAGE_KEY) return;
+            const normalized = normalizeThemePreference(event.newValue);
+            setPreferenceState(normalized);
+            setResolvedTheme(resolveThemePreference(normalized));
+            applyThemePreference(normalized);
+        };
+        window.addEventListener("storage", handleStorage);
+        return () => window.removeEventListener("storage", handleStorage);
+    }, []);
 
     const setPreference = useCallback((nextPreference) => {
         const normalized = writeStoredThemePreference(nextPreference);

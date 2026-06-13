@@ -36,7 +36,7 @@ const allMenuTexts = [
 ];
 const allMenuLinks = [
     "/app",
-    "/app/games",
+    "/app/home",
     "/app/todos",
     "/app/statistics",
     "/app/streaming",

@@ -14,14 +14,14 @@ export const LoadingSpinner = ({ size = "md", text = "" }) => {
                 className={`${sizeClasses[size] || sizeClasses.md} animate-spin rounded-full border-primary-100 border-t-primary-600`}
                 aria-hidden="true"
             />
-            {text && <p className="text-sm text-slate-600">{text}</p>}
+            {text && <p className="text-sm text-ink-muted">{text}</p>}
         </div>
     );
 };
 
 export const LoadingPage = () => {
     return (
-        <div className="flex min-h-screen items-center justify-center bg-white px-6" role="status" aria-live="polite" aria-label="로딩 중">
+        <div className="flex min-h-screen items-center justify-center bg-surface px-6" role="status" aria-live="polite" aria-label="로딩 중">
             <BrandMark
                 className="h-36 max-w-[min(88vw,34rem)]"
                 ratioClassName="aspect-[3/1]"

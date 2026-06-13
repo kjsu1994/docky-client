@@ -2,11 +2,11 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 
 export const ErrorMessage = ({ message, onRetry }) => {
     return (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6" role="alert" aria-live="assertive">
+        <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-6" role="alert" aria-live="assertive">
             <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-red-900 mb-1">
+                    <h3 className="text-sm font-semibold text-red-700 mb-1">
                         오류가 발생했습니다
                     </h3>
                     <p className="break-words text-sm text-red-700">{message}</p>

@@ -4,6 +4,7 @@ import {
     CalendarDays,
     LogOut,
     Menu,
+    Settings,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { isAdminUser } from "../utils/authorization";
@@ -33,7 +34,7 @@ export const Header = () => {
     }, [closeMenu, location.pathname]);
 
     return (
-        <header className="sticky top-0 z-50 border-b-white/20 glass transition-all duration-300">
+        <header className="sticky top-0 z-50 border-b border-line/60 glass transition-all duration-300">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-20 items-center justify-between">
                     <div className="relative flex items-center gap-2">
@@ -44,7 +45,7 @@ export const Header = () => {
                             className={`hidden lg:inline-flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition-all ${
                                 menuOpen
                                     ? "border-primary-300 bg-primary-50 text-primary-600"
-                                    : "border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-600"
+                                    : "border-line bg-surface text-ink-muted hover:border-primary-200 hover:bg-control hover:text-primary-600"
                             }`}
                             title="전체 메뉴 펼치기"
                             aria-label="전체 메뉴 펼치기"
@@ -77,10 +78,18 @@ export const Header = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <NavLink
+                            to="/app/mypage?tab=settings"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
+                            title="설정"
+                            aria-label="설정으로 이동"
+                        >
+                            <Settings className="h-5 w-5" />
+                        </NavLink>
                         <NotificationCenterEntry />
                         <NavLink
                             to="/app/todos"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 sm:hidden"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700 sm:hidden"
                             title="투두"
                             aria-label="투두로 이동"
                         >
@@ -89,7 +98,7 @@ export const Header = () => {
                         <div className="hidden items-center gap-2 sm:flex">
                             <NavLink
                                 to="/app/todos"
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
                                 title="투두"
                                 aria-label="투두로 이동"
                             >
@@ -97,7 +106,7 @@ export const Header = () => {
                             </NavLink>
                             <NavLink
                                 to="/app/mypage"
-                                className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-bold text-slate-600 transition-all hover:bg-slate-50"
+                                className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-bold text-ink-muted transition-all hover:bg-control"
                                 aria-label="마이페이지로 이동"
                             >
                                 <UserAvatar
@@ -118,7 +127,7 @@ export const Header = () => {
                             <button
                                 type="button"
                                 onClick={logout}
-                                className="rounded-2xl p-2.5 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-500"
+                                className="rounded-2xl p-2.5 text-ink-subtle transition-all hover:bg-rose-50 hover:text-rose-500"
                                 title="로그아웃"
                                 aria-label="로그아웃"
                             >

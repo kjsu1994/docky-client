@@ -6,7 +6,7 @@ const NotificationCenter = lazy(() =>
 );
 
 const launcherClass =
-    "relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700";
+    "relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700";
 
 const PlaceholderButton = ({ onClick }) => (
     <button

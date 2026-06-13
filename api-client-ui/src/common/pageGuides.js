@@ -87,7 +87,7 @@ const guides = [
         ],
     },
     {
-        test: (path) => path === "/app",
+        test: (path) => path === "/app/home",
         title: "홈",
         summary: "주요 메뉴, 공지, 게시글, 배너를 한눈에 보는 시작 화면입니다.",
         sections: [
@@ -231,7 +231,7 @@ const guides = [
         ],
     },
     {
-        test: (path) => path === "/app/games",
+        test: (path) => path === "/app" || path === "/app/games",
         title: "게임 허브",
         summary: "지원되는 게임을 고르고 방 입장 또는 게임 시작 화면으로 이동하는 화면입니다.",
         sections: [

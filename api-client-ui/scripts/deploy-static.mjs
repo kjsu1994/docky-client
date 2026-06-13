@@ -7,9 +7,11 @@ const sourceDir = path.resolve(projectRoot, "dist");
 const targetRoot = path.resolve(process.env.STATIC_DEPLOY_ROOT || "C:/compose/minio-data/client");
 const releasesDir = path.join(targetRoot, "releases");
 const currentDir = path.join(targetRoot, "current");
+const releaseRetention = Number.parseInt(process.env.STATIC_RELEASE_RETENTION || "1", 10);
 
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-const releaseDir = path.join(releasesDir, `${stamp}-${process.pid}`);
+const previousReleaseDir = path.join(releasesDir, `${stamp}-${process.pid}-previous`);
+const nextCurrentDir = path.join(targetRoot, `.current-next-${stamp}-${process.pid}`);
 
 const requiredFiles = ["index.html", "sw.js"];
 
@@ -37,21 +39,49 @@ const copyBuild = (from, to) => {
 };
 
 const rotateCurrent = () => {
-  const previousDir = path.join(targetRoot, `previous-${stamp}-${process.pid}`);
+  const previousDir = path.join(targetRoot, `.current-previous-${stamp}-${process.pid}`);
+  copyBuild(sourceDir, nextCurrentDir);
+  assertBuildOutput(nextCurrentDir);
+
   if (fs.existsSync(currentDir)) {
+    removeIfExists(previousDir);
     fs.renameSync(currentDir, previousDir);
   }
 
   try {
-    fs.renameSync(releaseDir, currentDir);
+    fs.renameSync(nextCurrentDir, currentDir);
   } catch (error) {
     if (fs.existsSync(previousDir) && !fs.existsSync(currentDir)) {
       fs.renameSync(previousDir, currentDir);
     }
+    removeIfExists(nextCurrentDir);
     throw error;
   }
 
-  removeIfExists(previousDir);
+  if (fs.existsSync(previousDir)) {
+    fs.mkdirSync(releasesDir, { recursive: true });
+    removeIfExists(previousReleaseDir);
+    fs.renameSync(previousDir, previousReleaseDir);
+    assertBuildOutput(previousReleaseDir);
+  }
+};
+
+const pruneOldReleases = () => {
+  if (!Number.isFinite(releaseRetention) || releaseRetention <= 0 || !fs.existsSync(releasesDir)) {
+    return;
+  }
+
+  const releases = fs.readdirSync(releasesDir)
+    .map((name) => ({
+      name,
+      path: path.join(releasesDir, name),
+    }))
+    .filter((entry) => fs.statSync(entry.path).isDirectory())
+    .sort((left, right) => right.name.localeCompare(left.name));
+
+  for (const release of releases.slice(releaseRetention)) {
+    removeIfExists(release.path);
+  }
 };
 
 if (!fs.existsSync(sourceDir)) {
@@ -65,8 +95,7 @@ if (!fs.existsSync(targetRoot)) {
   process.exit(0);
 }
 
-copyBuild(sourceDir, releaseDir);
-assertBuildOutput(releaseDir);
 rotateCurrent();
+pruneOldReleases();
 
-console.log(`[deploy-static] published ${sourceDir} -> ${currentDir}`);
+console.log(`[deploy-static] published ${sourceDir} -> ${currentDir}; previous retained in ${releasesDir}`);

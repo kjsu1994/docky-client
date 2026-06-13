@@ -2291,14 +2291,14 @@ const GameCardBriefPanel = ({ game, experience }) => {
       data-game-title={game.title}
     >
       {items.map((item) => (
-        <div key={item.key} className="min-h-[68px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="game-card-brief-item">
-          <div className="flex items-center justify-between gap-2 text-[10px] font-black text-slate-400">
+        <div key={item.key} className="min-h-[68px] rounded-xl border border-line bg-control px-3 py-2" data-smoke="game-card-brief-item">
+          <div className="flex items-center justify-between gap-2 text-[10px] font-black text-ink-subtle">
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{item.label}</span>
             </span>
           </div>
-          <div className="mt-1 line-clamp-2 text-[11px] font-black leading-snug text-slate-900 sm:text-xs">{item.value}</div>
+          <div className="mt-1 line-clamp-2 text-[11px] font-black leading-snug text-ink sm:text-xs">{item.value}</div>
         </div>
       ))}
     </div>
@@ -2333,7 +2333,7 @@ const GameCard = ({ game, onOpenManual }) => {
         className="block h-full min-w-0 rounded-[calc(1rem-1px)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200/70"
         onFocus={() => preloadGameRoute(game.to)}
       >
-        <div className="flex h-full min-w-0 flex-col rounded-[calc(1rem-1px)] bg-white/95 p-2.5 backdrop-blur sm:p-5">
+        <div className="flex h-full min-w-0 flex-col rounded-[calc(1rem-1px)] bg-surface/95 p-2.5 backdrop-blur sm:p-5">
           <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${game.tone} p-2 sm:rounded-2xl sm:p-3`} aria-hidden="true">
             <div className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-2 py-1 text-[10px] font-black text-slate-800 shadow-sm">
               {game.featured ? "대표 경험" : experience.genre}
@@ -2345,20 +2345,20 @@ const GameCard = ({ game, onOpenManual }) => {
             </div>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1 pr-9 sm:mt-4 sm:gap-2 sm:pr-12">
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600 sm:px-3 sm:py-1 sm:text-[11px]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-control px-2 py-0.5 text-[10px] font-black text-ink-muted sm:px-3 sm:py-1 sm:text-[11px]">
               <Dices className="h-3 w-3" />
               {game.players}
             </span>
-            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white sm:px-3 sm:py-1 sm:text-[11px]">{game.mode}</span>
-            <span className="hidden rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500 ring-1 ring-slate-200 sm:inline-flex sm:px-3 sm:py-1 sm:text-[11px]">
+            <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-black text-ink-inverse sm:px-3 sm:py-1 sm:text-[11px]">{game.mode}</span>
+            <span className="hidden rounded-full bg-surface px-2 py-0.5 text-[10px] font-black text-ink-muted ring-1 ring-line sm:inline-flex sm:px-3 sm:py-1 sm:text-[11px]">
               {experience.pace}
             </span>
           </div>
-          <h2 id={titleId} className="mt-2 text-sm font-black leading-tight text-slate-900 sm:mt-4 sm:text-2xl">{game.title}</h2>
+          <h2 id={titleId} className="mt-2 text-sm font-black leading-tight text-ink sm:mt-4 sm:text-2xl">{game.title}</h2>
           <p id={descId} className="sr-only">{game.description}</p>
           <GameCardBriefPanel game={game} experience={experience} />
           <div className="flex-1" />
-          <div className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-black text-white transition-all group-hover:bg-primary-600 sm:mt-6 sm:min-h-11 sm:w-auto sm:gap-2 sm:rounded-xl sm:px-4 sm:text-sm">
+          <div className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-black text-ink-inverse transition-all group-hover:bg-primary-600 sm:mt-6 sm:min-h-11 sm:w-auto sm:gap-2 sm:rounded-xl sm:px-4 sm:text-sm">
             입장하기
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </div>
@@ -2366,7 +2366,7 @@ const GameCard = ({ game, onOpenManual }) => {
       </Link>
       <button
         type="button"
-        className="absolute right-2 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-lg shadow-slate-900/10 transition hover:scale-105 hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/80 sm:right-4 sm:top-4 sm:h-11 sm:w-11"
+        className="absolute right-2 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface/95 text-ink-muted shadow-lg shadow-slate-900/10 transition hover:scale-105 hover:bg-ink hover:text-ink-inverse focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/80 sm:right-4 sm:top-4 sm:h-11 sm:w-11"
         aria-label={`${game.title} 설명서 열기`}
         title={`${game.title} 설명서`}
         onClick={(event) => {
@@ -3413,9 +3413,9 @@ export const GamesHub = () => {
 
   return (
     <div className="animate-fade-in space-y-4">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-200/60 sm:p-6">
+      <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-slate-200/20 sm:p-6">
         <div className="space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
+          <div className="inline-flex items-center gap-2 rounded-full bg-control px-4 py-1 text-[11px] font-black text-ink-muted">
             <Sparkles className="h-3.5 w-3.5 text-primary-500" />
             게임 허브
           </div>
@@ -3429,7 +3429,7 @@ export const GamesHub = () => {
             onSelect={setBannerIndex}
             onBannerEvent={sendGameHubBannerEvent}
           />
-          <div className="grid max-w-md grid-cols-2 rounded-2xl bg-slate-100 p-1" role="tablist" aria-label="게임 종류">
+          <div className="grid max-w-md grid-cols-2 rounded-2xl bg-control p-1" role="tablist" aria-label="게임 종류">
             {[
               { key: "board", label: "보드게임", count: boardGames.length },
               { key: "video", label: "비디오게임", count: videoGames.length },
@@ -3442,7 +3442,7 @@ export const GamesHub = () => {
                   role="tab"
                   aria-selected={selected}
                   className={`min-h-11 rounded-xl px-4 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 ${
-                    selected ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                    selected ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"
                   }`}
                   onClick={() => {
                     setActiveTab(tab.key);
@@ -3450,7 +3450,7 @@ export const GamesHub = () => {
                   }}
                 >
                   {tab.label}
-                  <span className="ml-1 text-[11px] text-slate-400">{tab.count}</span>
+                  <span className="ml-1 text-[11px] text-ink-subtle">{tab.count}</span>
                 </button>
               );
             })}
@@ -3466,9 +3466,9 @@ export const GamesHub = () => {
         <section key={section.title} className="space-y-3">
           <div className="flex flex-row items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
-              <h2 className="text-lg font-black text-slate-900 sm:text-xl">{section.title}</h2>
+              <h2 className="text-lg font-black text-ink sm:text-xl">{section.title}</h2>
             </div>
-            <div className="text-[11px] font-black text-slate-400">{section.games.length}개</div>
+            <div className="text-[11px] font-black text-ink-subtle">{section.games.length}개</div>
           </div>
           {section.games.length ? (
             <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -3477,9 +3477,9 @@ export const GamesHub = () => {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+            <div className="rounded-2xl border border-dashed border-line bg-control p-4 text-sm font-bold text-ink-muted">
               이 조건에 맞는 게임이 없습니다.
-              <button type="button" className="ml-2 font-black text-slate-900 underline" onClick={() => setActiveFilter("all")}>
+              <button type="button" className="ml-2 font-black text-ink underline" onClick={() => setActiveFilter("all")}>
                 전체 보기
               </button>
             </div>

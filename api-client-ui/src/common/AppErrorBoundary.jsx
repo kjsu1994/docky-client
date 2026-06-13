@@ -57,9 +57,9 @@ export class AppErrorBoundary extends React.Component {
         return (
             <React.Suspense
                 fallback={(
-                    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
+                    <main className="min-h-screen bg-[var(--app-bg)] px-4 py-10 text-ink">
                         <section className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center text-center" role="status" aria-live="polite">
-                            <h1 className="text-xl font-black tracking-normal text-slate-950">
+                            <h1 className="text-xl font-black tracking-normal text-ink">
                                 복구 화면을 불러오는 중입니다
                             </h1>
                         </section>

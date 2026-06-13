@@ -56,7 +56,7 @@ export const ProtectedRoutes = () => (
         <Suspense fallback={<DelayedRouteFallback />}>
             <ProtectedAppLayout>
                 <Routes>
-                    <Route index element={<Home />} />
+                    <Route index element={<GamesHub />} />
                     <Route path="home" element={<Home />} />
                     <Route path="boards/:kind" element={<BoardList />} />
                     <Route path="boards/:kind/new" element={<BoardForm />} />
