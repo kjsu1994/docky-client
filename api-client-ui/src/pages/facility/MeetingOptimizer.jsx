@@ -10,7 +10,7 @@ import {
 } from "../../adapters/optimizerAdapter.js";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
 import { useNaverMaps } from "../../utils/naverMapsLoader.js";
-import { loadDaumPostcodeScript } from "../../utils/daumPostcodeLoader.js";
+import { openDaumPostcodeLayer } from "../../utils/daumPostcodeLoader.js";
 import { escapeHtml } from "../../utils/helpers.js";
 import { notifyError, notifyLoading, notifySuccess } from "../../utils/toast.js";
 
@@ -29,8 +29,14 @@ export const MeetingOptimizer = () => {
     const mapTargetIndexRef = useRef(0);
     const interactionListenersRef = useRef([]);
     const longPressStateRef = useRef({ timerId: null, startX: 0, startY: 0, moved: false });
+    const postcodeLayerCloseRef = useRef(null);
 
     const { isLoaded, error: mapsError } = useNaverMaps();
+
+    useEffect(() => () => {
+        postcodeLayerCloseRef.current?.();
+        postcodeLayerCloseRef.current = null;
+    }, []);
 
     const addressMeta = useMemo(() => {
         const normalized = addresses.map((value) => normalizeOptimizerAddress(value));
@@ -129,8 +135,8 @@ export const MeetingOptimizer = () => {
         if (loadingPostcodeIndex !== null) return;
         setLoadingPostcodeIndex(index);
         try {
-            await loadDaumPostcodeScript();
-            new window.daum.Postcode({
+            postcodeLayerCloseRef.current?.();
+            postcodeLayerCloseRef.current = await openDaumPostcodeLayer({
                 oncomplete: (data) => {
                     const selectedAddress = data?.roadAddress || data?.jibunAddress || data?.address || "";
                     if (!selectedAddress) {
@@ -139,7 +145,10 @@ export const MeetingOptimizer = () => {
                     }
                     updateAddress(index, selectedAddress);
                 },
-            }).open();
+                onclose: () => {
+                    postcodeLayerCloseRef.current = null;
+                },
+            });
         } catch (err) {
             notifyError("우편번호 서비스를 열지 못했습니다.");
         } finally {

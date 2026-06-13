@@ -6,7 +6,7 @@ import {
     extractAddressSearchErrorMessage,
     normalizeAddressQuery,
 } from "../adapters/addressSearchAdapter.js";
-import { loadDaumPostcodeScript } from "../utils/daumPostcodeLoader.js";
+import { openDaumPostcodeLayer } from "../utils/daumPostcodeLoader.js";
 import { notifyError } from "../utils/toast.js";
 
 export const AddressSearchBox = ({
@@ -28,6 +28,7 @@ export const AddressSearchBox = ({
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
 
     const rootRef = useRef(null);
+    const postcodeLayerCloseRef = useRef(null);
     const lastSuggestedKeywordRef = useRef("");
     const generatedId = useId();
     const addressSearchId = useMemo(() => generatedId.replace(/:/g, ""), [generatedId]);
@@ -46,6 +47,11 @@ export const AddressSearchBox = ({
         };
         document.addEventListener("mousedown", onClickOutside);
         return () => document.removeEventListener("mousedown", onClickOutside);
+    }, []);
+
+    useEffect(() => () => {
+        postcodeLayerCloseRef.current?.();
+        postcodeLayerCloseRef.current = null;
     }, []);
 
     useEffect(() => {
@@ -141,8 +147,8 @@ export const AddressSearchBox = ({
 
         setLoadingPostcode(true);
         try {
-            await loadDaumPostcodeScript();
-            new window.daum.Postcode({
+            postcodeLayerCloseRef.current?.();
+            postcodeLayerCloseRef.current = await openDaumPostcodeLayer({
                 oncomplete: (data) => {
                     const selectedAddress = data?.roadAddress || data?.jibunAddress || data?.address || "";
                     if (!selectedAddress) {
@@ -159,7 +165,10 @@ export const AddressSearchBox = ({
                         zonecode: data?.zonecode || null,
                     });
                 },
-            }).open();
+                onclose: () => {
+                    postcodeLayerCloseRef.current = null;
+                },
+            });
         } catch (err) {
             notifyError("우편번호 서비스를 불러오지 못했습니다.");
         } finally {

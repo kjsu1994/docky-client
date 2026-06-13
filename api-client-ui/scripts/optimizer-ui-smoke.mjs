@@ -36,8 +36,10 @@ function assertOptimizerSourceBoundaries() {
     if (!loader.includes("DAUM_POSTCODE_LOAD_TIMEOUT_MS") || !loader.includes("setTimeout")) {
         throw new Error("optimizer source guard: Daum postcode loader must keep a bounded timeout");
     }
-    if (!optimizer.includes("../../utils/daumPostcodeLoader.js") || /const\s+loadDaumPostcodeScript\s*=/.test(optimizer)) {
-        throw new Error("optimizer source guard: MeetingOptimizer must use the shared Daum postcode loader");
+    if (!optimizer.includes("../../utils/daumPostcodeLoader.js")
+        || !optimizer.includes("openDaumPostcodeLayer")
+        || /const\s+(loadDaumPostcodeScript|openDaumPostcodeLayer)\s*=/.test(optimizer)) {
+        throw new Error("optimizer source guard: MeetingOptimizer must use the shared Daum postcode layer");
     }
     if (optimizer.includes("t1.daumcdn.net") || optimizer.includes("data-daum-postcode")) {
         throw new Error("optimizer source guard: MeetingOptimizer must not define its own postcode script tag");
@@ -479,7 +481,7 @@ async function main() {
                 window.daum = {
                     Postcode: class {
                         constructor(options = {}) { this.options = options; }
-                        open() {
+                        embed() {
                             const address = smokeAddresses[window.__smokePostcodeIndex % smokeAddresses.length];
                             window.__smokePostcodeIndex += 1;
                             this.options.oncomplete && this.options.oncomplete({ roadAddress: address, jibunAddress: address, address });

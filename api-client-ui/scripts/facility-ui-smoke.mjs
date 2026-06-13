@@ -111,14 +111,14 @@ function assertDaumPostcodeLoaderBoundary() {
         ["src/common/AddressSearchBox.jsx", addressSearch],
         ["src/pages/facility/MeetingOptimizer.jsx", optimizer],
     ]) {
-        if (!source.includes("loadDaumPostcodeScript")) {
-            throw new Error(`facility source guard: ${relativePath} must use the shared postcode loader`);
+        if (!source.includes("openDaumPostcodeLayer")) {
+            throw new Error(`facility source guard: ${relativePath} must use the shared postcode layer`);
         }
         if (source.includes("t1.daumcdn.net") || source.includes("data-daum-postcode")) {
             throw new Error(`facility source guard: ${relativePath} must not define its own postcode script tag`);
         }
-        if (/const\s+loadDaumPostcodeScript\s*=/.test(source)) {
-            throw new Error(`facility source guard: ${relativePath} must not redeclare loadDaumPostcodeScript`);
+        if (/const\s+(loadDaumPostcodeScript|openDaumPostcodeLayer)\s*=/.test(source)) {
+            throw new Error(`facility source guard: ${relativePath} must not redeclare postcode helpers`);
         }
     }
 }
