@@ -396,11 +396,34 @@ html[data-theme="dark"] {
     .tabletop-game {
       overflow-wrap: anywhere;
       padding-bottom: calc(env(safe-area-inset-bottom) + 4.75rem);
+      scroll-padding-bottom: calc(env(safe-area-inset-bottom) + 6rem);
+    }
+
+    .tabletop-game .tabletop-board-shell {
+      border-radius: 1rem;
+    }
+
+    .tabletop-game .tabletop-board-shell::before {
+      inset: -0.18rem;
+      border-radius: 1.15rem;
+      box-shadow: 0 14px 38px rgb(var(--tabletop-accent-rgb) / 0.1);
+    }
+
+    .tabletop-game .tabletop-mobile-jump-nav {
+      margin-inline: -0.125rem;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
 
     .tabletop-game .tabletop-mobile-action-strip {
-      max-height: min(54vh, 390px);
+      max-height: min(46vh, 350px);
       overflow: auto;
+    }
+
+    .tabletop-game .tabletop-mobile-action-strip button,
+    .tabletop-game .tabletop-mobile-action-strip select,
+    .tabletop-game .tabletop-mobile-action-strip input {
+      min-height: 2.5rem;
     }
   }
 

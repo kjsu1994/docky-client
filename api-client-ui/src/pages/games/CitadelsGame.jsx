@@ -21,6 +21,7 @@ import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
+import { canUseTabletopSoloAiStart } from "./tabletopStartPolicy.js";
 
 const GAME_CODE = "citadels";
 const ROOM_STORAGE_KEY = "citadels_last_room_id";
@@ -4259,9 +4260,18 @@ export const CitadelsGame = () => {
   const everyGuestReady = guestPlayers.every(isReady);
   const enoughPlayers = players.length >= minPlayers;
   const withinMaxPlayers = maxPlayers <= 0 || players.length <= maxPlayers;
-  const canStart = isHost && status === "WAITING" && enoughPlayers && withinMaxPlayers && everyGuestReady;
+  const soloAiStartAvailable = canUseTabletopSoloAiStart({ game: GAME_CODE, playerCount: players.length, minPlayers });
+  const startPlayerRequirementMet = (enoughPlayers || soloAiStartAvailable) && withinMaxPlayers;
+  const canStart = isHost && status === "WAITING" && startPlayerRequirementMet && everyGuestReady;
   const startChecks = [
-    { key: "players", label: "인원", done: enoughPlayers && withinMaxPlayers, detail: `${players.length}/${maxPlayers || "-"}명 · 최소 ${minPlayers}명` },
+    {
+      key: "players",
+      label: "인원",
+      done: startPlayerRequirementMet,
+      detail: soloAiStartAvailable
+        ? `${players.length}/${maxPlayers || "-"}명 · 공식 최소 ${minPlayers}명, 부족 좌석 AI 보충`
+        : `${players.length}/${maxPlayers || "-"}명 · 최소 ${minPlayers}명`,
+    },
     { key: "ready", label: "준비", done: everyGuestReady, detail: `${readyGuestCount}/${guestPlayers.length}명 준비` },
     { key: "host", label: "권한", done: isHost, detail: isHost ? "방장 시작 가능" : "방장만 시작 가능" },
   ];
@@ -4321,7 +4331,7 @@ export const CitadelsGame = () => {
     if (!selectedRoom) return null;
     const playerProgress = minPlayers > 0 ? (players.length / minPlayers) * 100 : 100;
     const guestProgress = guestPlayers.length > 0 ? (readyGuestCount / guestPlayers.length) * 100 : 100;
-    const startSignalReady = enoughPlayers && withinMaxPlayers && everyGuestReady;
+    const startSignalReady = startPlayerRequirementMet && everyGuestReady;
     return {
       canStart,
       statusText: isHost
@@ -4331,11 +4341,11 @@ export const CitadelsGame = () => {
         {
           label: "인원 조건",
           value: `${players.length}/${maxPlayers || "-"}명`,
-          detail: enoughPlayers && withinMaxPlayers
-            ? `최소 ${minPlayers}명 조건을 충족했습니다.`
+          detail: startPlayerRequirementMet
+            ? (soloAiStartAvailable ? `공식 최소 ${minPlayers}명 기준으로 부족 좌석은 AI가 채웁니다.` : `최소 ${minPlayers}명 조건을 충족했습니다.`)
             : `${Math.max(0, minPlayers - players.length)}명이 더 필요합니다.`,
           icon: "player",
-          tone: enoughPlayers && withinMaxPlayers ? "done" : "waiting",
+          tone: startPlayerRequirementMet ? "done" : "waiting",
           progress: playerProgress,
         },
         {
@@ -4343,7 +4353,7 @@ export const CitadelsGame = () => {
           value: guestPlayers.length ? `${readyGuestCount}/${guestPlayers.length}명 준비` : "게스트 없음",
           detail: guestPlayers.length
             ? (everyGuestReady ? "게스트 준비가 완료되었습니다." : "아직 준비하지 않은 게스트가 있습니다.")
-            : "방장 혼자 대기 중입니다. 최소 인원을 채워야 시작할 수 있습니다.",
+            : (soloAiStartAvailable ? "방장 단독 시작 시 부족 좌석은 AI가 채웁니다." : "방장 혼자 대기 중입니다. 최소 인원을 채워야 시작할 수 있습니다."),
           icon: "turn",
           tone: guestPlayers.length ? (everyGuestReady ? "done" : "waiting") : "neutral",
           progress: guestProgress,
@@ -4363,9 +4373,11 @@ export const CitadelsGame = () => {
           tone: "active",
         },
       ],
-      ruleHint: "시티델은 최소 인원, 게스트 준비, 방장 시작 권한이 맞을 때 시작합니다. 시작 후 캐릭터 선택, 건설, 점수 계산은 기존 서버 규칙을 그대로 따릅니다.",
+      ruleHint: soloAiStartAvailable
+        ? "시티델은 공식 최소 인원 표기를 유지하고, 방장 단독 시작 시 부족 좌석은 AI가 채웁니다. 시작 후 캐릭터 선택, 건설, 점수 계산은 기존 서버 규칙을 그대로 따릅니다."
+        : "시티델은 최소 인원, 게스트 준비, 방장 시작 권한이 맞을 때 시작합니다. 시작 후 캐릭터 선택, 건설, 점수 계산은 기존 서버 규칙을 그대로 따릅니다.",
     };
-  }, [canStart, enoughPlayers, everyGuestReady, guestPlayers.length, isHost, maxPlayers, minPlayers, players.length, readyGuestCount, selectedRoom, withinMaxPlayers]);
+  }, [canStart, everyGuestReady, guestPlayers.length, isHost, maxPlayers, minPlayers, players.length, readyGuestCount, selectedRoom, soloAiStartAvailable, startPlayerRequirementMet]);
   const selectedGuideVariant = useMemo(() => {
     const code = selectedRoom?.variantCode || createForm.variantCode || "BASE";
     return variants.find((variant) => variant.code === code) || {
@@ -5074,7 +5086,7 @@ export const CitadelsGame = () => {
                 )}
                 {status === "WAITING" && isHost && (
                   <button type="button" disabled={!canStart || busy} onClick={startGame} className="min-h-10 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white disabled:opacity-50">
-                    시작하기
+                    {soloAiStartAvailable ? "AI와 시작하기" : "시작하기"}
                   </button>
                 )}
                 {status === "PLAYING" && isHost && (
