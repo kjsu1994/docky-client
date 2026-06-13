@@ -28,6 +28,7 @@ import {
     truncateText,
 } from "../../utils/helpers.js";
 import { logClientError } from "../../utils/clientDiagnostics.js";
+import { publicImageSrcSet } from "../../utils/responsiveImage.js";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
 
 const isBoardNotice = (board) => {
@@ -270,6 +271,7 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
     const imgMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
     const resolvedThumbnailUrl = imgMatch ? resolveAssetUrl(imgMatch[1]) : null;
     const thumbnailUrl = resolvedThumbnailUrl && isSafeBoardContentImageUrl(resolvedThumbnailUrl) ? resolvedThumbnailUrl : null;
+    const thumbnailSrcSet = publicImageSrcSet(thumbnailUrl, [160, 320, 480]);
     const [imgError, setImgError] = useState(false);
 
     return (
@@ -278,6 +280,8 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
                 <div className="relative w-32 flex-shrink-0 border-r bg-slate-100 sm:w-40">
                     <img
                         src={thumbnailUrl}
+                        srcSet={thumbnailSrcSet || undefined}
+                        sizes="(max-width: 640px) 8rem, 10rem"
                         alt="게시글 이미지"
                         className="h-full w-full object-cover"
                         loading="lazy"

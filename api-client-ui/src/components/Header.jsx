@@ -9,6 +9,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { isAdminUser } from "../utils/authorization";
 import { BrandLogo } from "../common/BrandLogo.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
+import { NotificationCenterEntry } from "./NotificationCenterEntry.jsx";
 
 const HeaderMenuDialog = lazy(() =>
     import("./HeaderMenuDialog.jsx").then((module) => ({ default: module.HeaderMenuDialog }))
@@ -54,7 +55,7 @@ export const Header = () => {
                             <Menu className={`h-5 w-5 transition-transform duration-300 ${menuOpen ? "rotate-90 scale-110" : ""}`} />
                         </button>
 
-                        <Link to="/app" className="group flex items-center gap-3">
+                        <Link to="/app" className="group flex items-center gap-3" aria-label="게임 허브로 이동">
                             <BrandLogo
                                 className="transition-transform duration-500 group-hover:scale-[1.03]"
                                 markClassName="h-12 max-w-[10rem]"
@@ -76,6 +77,7 @@ export const Header = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <NotificationCenterEntry />
                         <NavLink
                             to="/app/todos"
                             className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 sm:hidden"
@@ -96,6 +98,7 @@ export const Header = () => {
                             <NavLink
                                 to="/app/mypage"
                                 className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[13px] font-bold text-slate-600 transition-all hover:bg-slate-50"
+                                aria-label="마이페이지로 이동"
                             >
                                 <UserAvatar
                                     name={user?.name || user?.email}
@@ -113,9 +116,11 @@ export const Header = () => {
                                 )}
                             </NavLink>
                             <button
+                                type="button"
                                 onClick={logout}
                                 className="rounded-2xl p-2.5 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-500"
                                 title="로그아웃"
+                                aria-label="로그아웃"
                             >
                                 <LogOut className="h-5 w-5" />
                             </button>

@@ -4,12 +4,15 @@ const FOCUSABLE_SELECTOR = [
     "textarea:not([disabled])",
     "input:not([disabled])",
     "select:not([disabled])",
+    "details:not([disabled]) > summary:first-of-type",
+    "[contenteditable='true']",
     "[tabindex]:not([tabindex='-1'])",
 ].join(", ");
 
 const isFocusableElement = (element) => {
     if (!(element instanceof HTMLElement)) return false;
     if (element.getAttribute("aria-hidden") === "true") return false;
+    if (element.closest("[aria-hidden='true'], [inert]")) return false;
     if ("disabled" in element && element.disabled) return false;
     return element.getClientRects().length > 0;
 };

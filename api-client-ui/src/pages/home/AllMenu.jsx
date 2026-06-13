@@ -18,6 +18,7 @@ import {
     HelpCircle,
     Film,
     Bot,
+    LifeBuoy,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
@@ -71,6 +72,7 @@ export const AllMenu = () => {
 
     const account = [
         { title: "마이페이지", to: "/app/mypage", icon: User, color: "bg-slate-100 text-slate-700" },
+        { title: "신고/문의 상태", to: "/app/support", icon: LifeBuoy, color: "bg-sky-50 text-sky-700" },
         { title: "설정", to: "/app/mypage/edit", icon: Settings, color: "bg-slate-100 text-slate-700" },
     ];
 
@@ -101,7 +103,9 @@ export const AllMenu = () => {
                     </div>
                 </div>
                 <button
+                    type="button"
                     onClick={logout}
+                    aria-label="로그아웃"
                     className="rounded-3xl bg-rose-50 p-4 text-rose-600 transition-colors hover:bg-rose-100"
                 >
                     <LogOut className="h-5 w-5" />

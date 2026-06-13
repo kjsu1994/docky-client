@@ -29,8 +29,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      // Write production assets directly to the compose-served static directory.
-      outDir: "C:/compose/minio-data/client/dist",
+      outDir: "dist",
       emptyOutDir: true,
       sourcemap: false,
       rollupOptions: {

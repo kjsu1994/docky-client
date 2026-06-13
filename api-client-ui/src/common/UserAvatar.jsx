@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { User } from "lucide-react";
 import { getLevelFrameMeta } from "../utils/levelFrame.js";
 import { normalizeProfileImageUrl } from "../utils/profileImage.js";
+import { publicImageSrcSet } from "../utils/responsiveImage.js";
 
 const SIZE_CLASSES = {
     xs: "h-6 w-6 text-[10px]",
@@ -21,6 +22,16 @@ const FRAME_PADDING_CLASSES = {
     xl: "p-[4px]",
     "2xl": "p-[5px]",
     "3xl": "p-[5px]",
+};
+
+const IMAGE_SIZES = {
+    xs: "24px",
+    sm: "32px",
+    md: "40px",
+    lg: "48px",
+    xl: "64px",
+    "2xl": "96px",
+    "3xl": "112px",
 };
 
 const fallbackInitial = (name) => {
@@ -44,6 +55,7 @@ export const UserAvatar = ({
     showLevelBadge = false,
 }) => {
     const imageUrl = useMemo(() => normalizeProfileImageUrl(profileUrl), [profileUrl]);
+    const imageSrcSet = useMemo(() => publicImageSrcSet(imageUrl, [96, 160, 240]), [imageUrl]);
     const [failed, setFailed] = useState(false);
     const sizeClass = SIZE_CLASSES[size] || SIZE_CLASSES.sm;
     const framePaddingClass = FRAME_PADDING_CLASSES[size] || FRAME_PADDING_CLASSES.sm;
@@ -81,6 +93,8 @@ export const UserAvatar = ({
         <span className={innerClass}>
             <img
                 src={imageUrl}
+                srcSet={imageSrcSet || undefined}
+                sizes={IMAGE_SIZES[size] || IMAGE_SIZES.sm}
                 alt=""
                 className={`h-full w-full object-cover ${imageClassName}`.trim()}
                 loading="lazy"

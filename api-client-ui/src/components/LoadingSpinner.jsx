@@ -21,7 +21,7 @@ export const LoadingSpinner = ({ size = "md", text = "" }) => {
 
 export const LoadingPage = () => {
     return (
-        <div className="flex min-h-screen items-center justify-center bg-white px-6">
+        <div className="flex min-h-screen items-center justify-center bg-white px-6" role="status" aria-live="polite" aria-label="로딩 중">
             <BrandMark
                 className="h-36 max-w-[min(88vw,34rem)]"
                 ratioClassName="aspect-[3/1]"

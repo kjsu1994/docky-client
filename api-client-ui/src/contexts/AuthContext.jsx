@@ -6,6 +6,7 @@ import {
     getStoredAccessToken,
     getStoredRefreshToken,
     getStoredUserRoles,
+    hasRefreshCookieHint,
     persistAuthSession,
 } from "../utils/authStorage.js";
 import { logClientError } from "../utils/clientDiagnostics.js";
@@ -57,9 +58,10 @@ export const AuthProvider = ({ children }) => {
         const initAuth = async () => {
             const token = getStoredAccessToken();
             const refreshToken = getStoredRefreshToken();
-            if (token || refreshToken) {
+            const refreshCookieHint = hasRefreshCookieHint();
+            if (token || refreshToken || refreshCookieHint) {
                 try {
-                    if (!token && refreshToken) {
+                    if (!token && (refreshToken || refreshCookieHint)) {
                         const { refreshAccessToken } = await loadApi();
                         await refreshAccessToken();
                     }

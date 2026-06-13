@@ -24,6 +24,7 @@ import { BannerTypeBadge } from "../../common/BannerTypeBadge.jsx";
 import { homeAdapter } from "../../adapters/homeAdapter.js";
 import { isAdsenseBanner, readStoredAdsConsent } from "../../utils/adsense.js";
 import { logClientError } from "../../utils/clientDiagnostics.js";
+import { publicImageBackgroundSet } from "../../utils/responsiveImage.js";
 
 const HomeAdsenseRuntime = lazy(() =>
     import("./HomeAdsenseRuntime.jsx").then((module) => ({ default: module.HomeAdsenseRuntime }))
@@ -629,7 +630,7 @@ export const Home = () => {
                                     // 운영 배너 규칙/ops rule: CONTENT + image_url는 배너 전체 배경으로 사용.
                                     const contentBannerStyle = hasImageBackground
                                         ? {
-                                            backgroundImage: `url("${imageUrl}")`,
+                                            backgroundImage: publicImageBackgroundSet(imageUrl, 960, 1600),
                                             backgroundSize: "cover",
                                             backgroundPosition: "center",
                                         }

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/deploy-static.mjs",
+    "build:bundle": "vite build",
     "preview": "vite preview",
     "smoke:auth-ui": "node scripts/auth-ui-smoke.mjs",
     "smoke:home-ui": "node scripts/home-ui-smoke.mjs",

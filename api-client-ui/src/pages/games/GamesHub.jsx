@@ -9,6 +9,7 @@ import { BannerTypeBadge } from "../../common/BannerTypeBadge.jsx";
 import { BusinessPrivacyFooter } from "../../components/BusinessPrivacyFooter.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { homeAdapter } from "../../adapters/homeAdapter.js";
+import { publicImageBackgroundSet } from "../../utils/responsiveImage.js";
 
 const videoGameManuals = {
   arena: {
@@ -3056,7 +3057,7 @@ const GameHubHeroBanner = ({
     const hasImageBackground = Boolean(imageUrl);
     const bannerStyle = hasImageBackground
       ? {
-          backgroundImage: `url("${imageUrl}")`,
+          backgroundImage: publicImageBackgroundSet(imageUrl, 960, 1600),
           backgroundSize: "cover",
           backgroundPosition: "center",
         }

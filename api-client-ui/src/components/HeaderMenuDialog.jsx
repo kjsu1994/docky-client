@@ -9,6 +9,7 @@ import {
     Film,
     HelpCircle,
     Home,
+    LifeBuoy,
     MapPin,
     MessageSquare,
     Newspaper,
@@ -73,6 +74,7 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
                 title: "계정",
                 items: [
                     { title: "내 정보", to: "/app/mypage", icon: User },
+                    { title: "신고/문의 상태", to: "/app/support", icon: LifeBuoy },
                     { title: "정보 수정", to: "/app/mypage/edit", icon: Settings },
                 ],
             },

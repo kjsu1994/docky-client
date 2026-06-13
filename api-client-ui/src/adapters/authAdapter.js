@@ -138,4 +138,35 @@ export const authAdapter = {
         });
         return unwrapAuthData(response);
     },
+
+    async fetchLoginSessions() {
+        const response = await api.get("/members/sessions");
+        const data = unwrapAuthData(response) || {};
+        return Array.isArray(data.sessions) ? data.sessions : [];
+    },
+
+    async logoutOtherSessions() {
+        const response = await api.post("/members/sessions/logout-others");
+        return unwrapAuthData(response);
+    },
+
+    async revokeLoginSession(sessionId) {
+        const response = await api.delete(`/members/sessions/${encodeURIComponent(sessionId)}`);
+        return unwrapAuthData(response);
+    },
+
+    async fetchAdminMfaStatus() {
+        const response = await api.get("/members/admin-mfa/status");
+        return unwrapAuthData(response);
+    },
+
+    async sendAdminMfaCode() {
+        const response = await api.post("/members/admin-mfa/send");
+        return unwrapAuthData(response);
+    },
+
+    async confirmAdminMfaCode(code) {
+        const response = await api.post("/members/admin-mfa/confirm", { code });
+        return unwrapAuthData(response);
+    },
 };

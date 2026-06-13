@@ -142,6 +142,100 @@ export const formatDuration = (seconds) => {
 
 export const streamingErrorMessage = (error, fallbackMessage) => getApiErrorMessage(error, fallbackMessage);
 
+const DIRECT_UPLOAD_THRESHOLD_BYTES = 50 * 1024 * 1024;
+
+const deriveTitleFromFileName = (fileName) => {
+    const name = String(fileName || "").trim();
+    if (!name) return "titleless-video";
+    const dotIndex = name.lastIndexOf(".");
+    return dotIndex > 0 ? name.slice(0, dotIndex) : name;
+};
+
+const normalizeDirectUploadTicket = (response) => {
+    const data = unwrapStreamingData(response);
+    return {
+        uploadUrl: data?.uploadUrl ?? data?.upload_url ?? "",
+        method: data?.method || "PUT",
+        objectKey: data?.objectKey ?? data?.object_key ?? "",
+        headers: data?.headers && typeof data.headers === "object" ? data.headers : {},
+    };
+};
+
+const putDirectUpload = ({ ticket, file, onUploadProgress, uploadedBytes, totalBytes }) => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(ticket.method || "PUT", ticket.uploadUrl, true);
+    xhr.withCredentials = false;
+    Object.entries(ticket.headers || {}).forEach(([key, value]) => {
+        if (value != null) xhr.setRequestHeader(key, String(value));
+    });
+    xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || !onUploadProgress) return;
+        onUploadProgress({
+            loaded: uploadedBytes + event.loaded,
+            total: totalBytes,
+        });
+    };
+    xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+            return;
+        }
+        reject(new Error(`direct upload failed with status ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error("direct upload network error"));
+    xhr.onabort = () => reject(new Error("direct upload aborted"));
+    xhr.send(file);
+});
+
+const uploadAdminVideosDirect = async ({ title, description, files, onUploadProgress }) => {
+    const fileList = Array.from(files || []);
+    const totalBytes = fileList.reduce((sum, file) => sum + (file?.size || 0), 0);
+    let uploadedBytes = 0;
+    const items = [];
+
+    for (const file of fileList) {
+        const resolvedTitle = fileList.length === 1 && title?.trim()
+            ? title.trim()
+            : deriveTitleFromFileName(file.name);
+        const initiateResponse = await api.post("/admin/streaming/videos/direct-upload", {
+            title: resolvedTitle,
+            description: description?.trim() || null,
+            file_name: file.name,
+            content_type: file.type || null,
+            file_size: file.size,
+        });
+        const ticket = normalizeDirectUploadTicket(initiateResponse);
+        if (!ticket.uploadUrl || !ticket.objectKey) {
+            throw new Error("direct upload ticket is invalid");
+        }
+
+        await putDirectUpload({
+            ticket,
+            file,
+            onUploadProgress,
+            uploadedBytes,
+            totalBytes,
+        });
+        uploadedBytes += file.size || 0;
+        onUploadProgress?.({ loaded: uploadedBytes, total: totalBytes });
+
+        const completeResponse = await api.post("/admin/streaming/videos/direct-upload/complete", {
+            object_key: ticket.objectKey,
+            title: resolvedTitle,
+            description: description?.trim() || null,
+            file_name: file.name,
+            content_type: file.type || null,
+            file_size: file.size,
+        });
+        const completed = normalizeStreamingVideo(unwrapStreamingData(completeResponse));
+        if (completed.videoId) {
+            items.push(completed);
+        }
+    }
+
+    return items;
+};
+
 export const streamingAdapter = {
     async fetchVideos({ page = 1, size = 24 } = {}) {
         const response = await api.get("/streaming/videos", {
@@ -171,12 +265,17 @@ export const streamingAdapter = {
     },
 
     async uploadAdminVideos({ title, description, files, onUploadProgress }) {
+        const fileList = Array.from(files || []);
+        if (fileList.some((file) => (file?.size || 0) > DIRECT_UPLOAD_THRESHOLD_BYTES)) {
+            return uploadAdminVideosDirect({ title, description, files: fileList, onUploadProgress });
+        }
+
         const formData = new FormData();
         if (title?.trim()) {
             formData.append("title", title.trim());
         }
         formData.append("description", description?.trim() || "");
-        files.forEach((file) => formData.append("files", file));
+        fileList.forEach((file) => formData.append("files", file));
 
         const response = await uploadFiles("/admin/streaming/videos/batch", formData, "post", {
             onUploadProgress,

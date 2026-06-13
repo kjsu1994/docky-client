@@ -132,6 +132,75 @@ export const normalizeLevelHistory = (response) => {
     });
 };
 
+const normalizeConsent = (raw = {}) => ({
+    consentType: getFirst(raw, ["consentType", "consent_type"], ""),
+    label: raw.label || "",
+    required: Boolean(raw.required),
+    granted: Boolean(raw.granted),
+    source: raw.source || "",
+    updatedAt: getFirst(raw, ["updatedAt", "updated_at"], ""),
+});
+
+const normalizeRetentionPolicyItem = (raw = {}) => ({
+    title: raw.title || "",
+    period: raw.period || "",
+    description: raw.description || "",
+});
+
+export const normalizePrivacySummary = (response) => {
+    const data = unwrapMypageData(response) || {};
+    const consents = Array.isArray(data.consents) ? data.consents : [];
+    const retentionPolicy = Array.isArray(getFirst(data, ["retentionPolicy", "retention_policy"], []))
+        ? getFirst(data, ["retentionPolicy", "retention_policy"], [])
+        : [];
+    const exportIncludes = Array.isArray(getFirst(data, ["exportIncludes", "export_includes"], []))
+        ? getFirst(data, ["exportIncludes", "export_includes"], [])
+        : [];
+
+    return {
+        generatedAt: getFirst(data, ["generatedAt", "generated_at"], ""),
+        consents: consents.map(normalizeConsent).filter((consent) => consent.consentType),
+        retentionPolicy: retentionPolicy.map(normalizeRetentionPolicyItem),
+        exportIncludes,
+    };
+};
+
+export const normalizeConsentUpdate = (response) => {
+    const data = unwrapMypageData(response) || {};
+    return {
+        consent: normalizeConsent(data.consent || {}),
+    };
+};
+
+const extractContentDispositionFilename = (contentDisposition = "") => {
+    const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+    if (utf8Match?.[1]) {
+        try {
+            return decodeURIComponent(utf8Match[1].replace(/"/g, ""));
+        } catch {
+            return utf8Match[1].replace(/"/g, "");
+        }
+    }
+
+    const plainMatch = /filename="?([^";]+)"?/i.exec(contentDisposition);
+    return plainMatch?.[1] || "";
+};
+
+const downloadBlob = (blob, filename) => {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+        return;
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+};
+
 export const extractMypageErrorMessage = (error, fallback) => getApiErrorMessage(error, fallback);
 
 export const isAccountReauthRequiredError = (error) => (
@@ -180,5 +249,33 @@ export const mypageAdapter = {
     async updateMember(memberId, payload) {
         const response = await api.patch(`/members/${memberId}`, payload);
         return normalizeMember(response);
+    },
+
+    async fetchPrivacySummary() {
+        const response = await api.get("/members/privacy/summary");
+        return normalizePrivacySummary(response);
+    },
+
+    async updatePrivacyConsent(consentType, granted) {
+        const response = await api.patch("/members/privacy/consents", {
+            consent_type: consentType,
+            granted,
+        });
+        return normalizeConsentUpdate(response);
+    },
+
+    async downloadPrivacyExport() {
+        const response = await api.get("/members/privacy/export", {
+            responseType: "blob",
+            meta: { trackNetwork: false },
+        });
+        const contentType = response.headers?.["content-type"] || "application/json";
+        const filename = extractContentDispositionFilename(response.headers?.["content-disposition"])
+            || `docky-privacy-export-${new Date().toISOString().slice(0, 10)}.json`;
+        const blob = response.data instanceof Blob
+            ? response.data
+            : new Blob([response.data], { type: contentType });
+        downloadBlob(blob, filename);
+        return { filename };
     },
 };

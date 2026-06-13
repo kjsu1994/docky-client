@@ -11,6 +11,8 @@ const getStorage = (type) => {
     }
 };
 
+const storageCandidates = () => [getStorage("session"), getStorage("local")].filter(Boolean);
+
 const safeGet = (storage, key) => {
     try {
         return storage?.getItem(key) || "";
@@ -39,23 +41,28 @@ const safeRemove = (storage, key) => {
     }
 };
 
-const authStorage = () => {
-    const local = getStorage("local");
-    const session = getStorage("session");
-    const localToken = safeGet(local, ACCESS_TOKEN_KEY);
-    const sessionToken = safeGet(session, ACCESS_TOKEN_KEY);
-    const localRefreshToken = safeGet(local, REFRESH_TOKEN_KEY);
-    const sessionRefreshToken = safeGet(session, REFRESH_TOKEN_KEY);
-    if (localToken || localRefreshToken) return local;
-    if (sessionToken || sessionRefreshToken) return session;
-    return local;
+const getFirstStoredValue = (key) => {
+    for (const storage of storageCandidates()) {
+        const value = safeGet(storage, key).trim();
+        if (value) return value;
+    }
+    return "";
 };
 
-export const getStoredAccessToken = () => safeGet(authStorage(), ACCESS_TOKEN_KEY).trim();
+export const getStoredAccessToken = () => getFirstStoredValue(ACCESS_TOKEN_KEY);
 
-export const getStoredRefreshToken = () => safeGet(authStorage(), REFRESH_TOKEN_KEY).trim();
+// Legacy fallback only. New refresh tokens live in an HttpOnly cookie.
+export const getStoredRefreshToken = () => getFirstStoredValue(REFRESH_TOKEN_KEY);
 
-export const getStoredUserRoles = () => safeGet(authStorage(), USER_ROLES_KEY);
+export const getStoredUserRoles = () => getFirstStoredValue(USER_ROLES_KEY);
+
+export const hasRefreshCookieHint = () => {
+    if (typeof document === "undefined") return false;
+    return document.cookie
+        .split(";")
+        .map((value) => value.trim())
+        .some((value) => value === "docky_refresh_hint=1");
+};
 
 export const clearAuthSession = () => {
     [getStorage("local"), getStorage("session")].forEach((storage) => {
@@ -67,18 +74,19 @@ export const clearAuthSession = () => {
 
 export const persistAuthSession = ({ accessToken, refreshToken, roles, remember = false } = {}) => {
     clearAuthSession();
-    const storage = getStorage(remember ? "local" : "session");
+    const storage = getStorage("session");
     safeSet(storage, ACCESS_TOKEN_KEY, accessToken);
-    safeSet(storage, REFRESH_TOKEN_KEY, refreshToken);
     if (Array.isArray(roles)) {
         safeSet(storage, USER_ROLES_KEY, JSON.stringify(roles));
     }
 };
 
 export const updateStoredAuthTokens = ({ accessToken, refreshToken } = {}) => {
-    const storage = authStorage();
+    const local = getStorage("local");
+    const session = getStorage("session");
+    safeRemove(local, ACCESS_TOKEN_KEY);
+    safeRemove(local, REFRESH_TOKEN_KEY);
+    safeRemove(session, REFRESH_TOKEN_KEY);
+    const storage = session;
     safeSet(storage, ACCESS_TOKEN_KEY, accessToken);
-    if (refreshToken) {
-        safeSet(storage, REFRESH_TOKEN_KEY, refreshToken);
-    }
 };

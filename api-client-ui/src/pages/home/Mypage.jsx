@@ -4,13 +4,20 @@ import {
     Award,
     BarChart3,
     Calendar,
+    CheckCircle2,
+    Download,
     Edit,
+    FileText,
     Heart,
+    LogOut,
     Mail,
     MessageSquare,
+    MonitorSmartphone,
     Phone,
+    RefreshCw,
     ShieldCheck,
     TrendingUp,
+    Trash2,
     User,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
@@ -21,6 +28,8 @@ import UserAvatar from "../../common/UserAvatar.jsx";
 import { formatNumber, formatRelativeTime } from "../../utils/helpers.js";
 import { trapFocus } from "../../utils/focusTrap.js";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
+import { writeStoredAdsConsent } from "../../utils/adsense.js";
+import { authAdapter, extractAuthErrorMessage } from "../../adapters/authAdapter.js";
 import { extractMypageErrorMessage, isAccountReauthRequiredError, isGoogleMember, mypageAdapter } from "../../adapters/mypageAdapter.js";
 
 const toDisplayDate = (value) => {
@@ -53,6 +62,13 @@ export const Mypage = () => {
     const [passwordChecking, setPasswordChecking] = useState(false);
     const [oauthWithdrawVerified, setOauthWithdrawVerified] = useState(false);
     const [oauthReauthLoading, setOauthReauthLoading] = useState(false);
+    const [sessions, setSessions] = useState([]);
+    const [sessionsLoading, setSessionsLoading] = useState(false);
+    const [sessionBusyKey, setSessionBusyKey] = useState("");
+    const [privacySummary, setPrivacySummary] = useState(null);
+    const [privacyLoading, setPrivacyLoading] = useState(false);
+    const [privacyBusyKey, setPrivacyBusyKey] = useState("");
+    const [privacyExporting, setPrivacyExporting] = useState(false);
 
     const level = member?.level || {};
     const tierLabel = level.tierName || level.frameLabel || level.rewardTier || "아이언";
@@ -94,6 +110,30 @@ export const Mypage = () => {
         }
     }, []);
 
+    const fetchSessions = useCallback(async () => {
+        setSessionsLoading(true);
+        try {
+            setSessions(await authAdapter.fetchLoginSessions());
+        } catch (err) {
+            notifyError(extractAuthErrorMessage(err, "Login sessions could not be loaded."));
+            setSessions([]);
+        } finally {
+            setSessionsLoading(false);
+        }
+    }, []);
+
+    const fetchPrivacySummary = useCallback(async () => {
+        setPrivacyLoading(true);
+        try {
+            setPrivacySummary(await mypageAdapter.fetchPrivacySummary());
+        } catch (err) {
+            notifyError(extractMypageErrorMessage(err, "개인정보 설정을 불러오지 못했습니다."));
+            setPrivacySummary(null);
+        } finally {
+            setPrivacyLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchMember();
     }, [fetchMember]);
@@ -103,8 +143,12 @@ export const Mypage = () => {
             fetchMyBoards();
         } else if (activeTab === "stats") {
             fetchLevelHistory();
+        } else if (activeTab === "security") {
+            fetchSessions();
+        } else if (activeTab === "privacy") {
+            fetchPrivacySummary();
         }
-    }, [activeTab, fetchLevelHistory, fetchMyBoards]);
+    }, [activeTab, fetchLevelHistory, fetchMyBoards, fetchPrivacySummary, fetchSessions]);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -195,6 +239,74 @@ export const Mypage = () => {
         }
     };
 
+    const handleLogoutOtherSessions = async () => {
+        if (sessionBusyKey) return;
+        setSessionBusyKey("others");
+        try {
+            const response = await authAdapter.logoutOtherSessions();
+            const revokedCount = Number(response?.revoked_count ?? response?.revokedCount ?? 0);
+            notifySuccess(revokedCount > 0 ? `${revokedCount} other sessions logged out.` : "No other active sessions.");
+            await fetchSessions();
+        } catch (err) {
+            notifyError(extractAuthErrorMessage(err, "Other sessions could not be logged out."));
+        } finally {
+            setSessionBusyKey("");
+        }
+    };
+
+    const handleRevokeSession = async (sessionId) => {
+        if (!sessionId || sessionBusyKey) return;
+        setSessionBusyKey(sessionId);
+        try {
+            await authAdapter.revokeLoginSession(sessionId);
+            notifySuccess("Session logged out.");
+            await fetchSessions();
+        } catch (err) {
+            notifyError(extractAuthErrorMessage(err, "Session could not be logged out."));
+        } finally {
+            setSessionBusyKey("");
+        }
+    };
+
+    const handleUpdatePrivacyConsent = async (consentType, granted) => {
+        if (!consentType || privacyBusyKey) return;
+        setPrivacyBusyKey(consentType);
+        try {
+            const response = await mypageAdapter.updatePrivacyConsent(consentType, granted);
+            const updatedConsent = response.consent;
+            setPrivacySummary((previous) => {
+                if (!previous || !updatedConsent?.consentType) return previous;
+                return {
+                    ...previous,
+                    consents: previous.consents.map((consent) => (
+                        consent.consentType === updatedConsent.consentType ? updatedConsent : consent
+                    )),
+                };
+            });
+            if (consentType === "ADS_PERSONALIZATION") {
+                writeStoredAdsConsent(granted ? "personalized" : "non_personalized");
+            }
+            notifySuccess("동의 설정이 저장되었습니다.");
+        } catch (err) {
+            notifyError(extractMypageErrorMessage(err, "동의 설정을 저장하지 못했습니다."));
+        } finally {
+            setPrivacyBusyKey("");
+        }
+    };
+
+    const handleDownloadPrivacyExport = async () => {
+        if (privacyExporting) return;
+        setPrivacyExporting(true);
+        try {
+            await mypageAdapter.downloadPrivacyExport();
+            notifySuccess("내 데이터 파일을 내려받았습니다.");
+        } catch (err) {
+            notifyError(extractMypageErrorMessage(err, "내 데이터 내보내기에 실패했습니다."));
+        } finally {
+            setPrivacyExporting(false);
+        }
+    };
+
     if (loading) {
         return <LoadingSpinner text="회원 정보를 불러오는 중입니다..." />;
     }
@@ -258,10 +370,12 @@ export const Mypage = () => {
             </section>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                     <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>프로필</TabButton>
                     <TabButton active={activeTab === "posts"} onClick={() => setActiveTab("posts")}>작성 글</TabButton>
                     <TabButton active={activeTab === "stats"} onClick={() => setActiveTab("stats")}>활동 통계</TabButton>
+                    <TabButton active={activeTab === "security"} onClick={() => setActiveTab("security")}>보안</TabButton>
+                    <TabButton active={activeTab === "privacy"} onClick={() => setActiveTab("privacy")}>개인정보</TabButton>
                 </div>
             </div>
 
@@ -273,6 +387,29 @@ export const Mypage = () => {
             ) : null}
             {activeTab === "stats" ? (
                 <StatsTab member={member} level={level} history={levelHistory} historyLoading={historyLoading} />
+            ) : null}
+            {activeTab === "security" ? (
+                <SecurityTab
+                    sessions={sessions}
+                    loading={sessionsLoading}
+                    busyKey={sessionBusyKey}
+                    onRefresh={fetchSessions}
+                    onLogoutOtherSessions={handleLogoutOtherSessions}
+                    onRevokeSession={handleRevokeSession}
+                />
+            ) : null}
+            {activeTab === "privacy" ? (
+                <PrivacyTab
+                    summary={privacySummary}
+                    loading={privacyLoading}
+                    busyKey={privacyBusyKey}
+                    exporting={privacyExporting}
+                    onRefresh={fetchPrivacySummary}
+                    onUpdateConsent={handleUpdatePrivacyConsent}
+                    onExport={handleDownloadPrivacyExport}
+                    onDeleteAccount={openDeleteModal}
+                    deleteBusy={deleteBusy}
+                />
             ) : null}
 
             {deleteModalOpen ? (
@@ -321,6 +458,294 @@ const TabButton = ({ active, onClick, children }) => (
         {children}
     </button>
 );
+
+const SecurityTab = ({
+    sessions,
+    loading,
+    busyKey,
+    onRefresh,
+    onLogoutOtherSessions,
+    onRevokeSession,
+}) => {
+    const hasOtherSessions = sessions.some((session) => !Boolean(session.current));
+
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                    <h2 className="flex items-center gap-2 text-lg font-black text-slate-900">
+                        <ShieldCheck className="h-5 w-5 text-sky-600" />
+                        로그인 기기 관리
+                    </h2>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                        현재 로그인된 기기를 확인하고 사용하지 않는 세션을 종료할 수 있습니다.
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={onRefresh}
+                        disabled={loading || Boolean(busyKey)}
+                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                        새로고침
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onLogoutOtherSessions}
+                        disabled={loading || Boolean(busyKey) || !hasOtherSessions}
+                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white hover:bg-slate-800 disabled:opacity-60"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        다른 기기 로그아웃
+                    </button>
+                </div>
+            </div>
+
+            {loading ? (
+                <LoadingSpinner text="로그인 기기 목록을 불러오는 중입니다..." />
+            ) : !sessions.length ? (
+                <EmptyState message="활성 로그인 기기가 없습니다." subMessage="다시 로그인하면 현재 기기가 표시됩니다." />
+            ) : (
+                <div className="space-y-3">
+                    {sessions.map((session) => {
+                        const sessionId = session.session_id || session.sessionId;
+                        const current = Boolean(session.current);
+                        const busy = busyKey === sessionId;
+                        return (
+                            <div
+                                key={sessionId}
+                                className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <MonitorSmartphone className="h-4 w-4 shrink-0 text-slate-500" />
+                                        <span className="break-words text-sm font-black text-slate-900">
+                                            {session.device_label || session.deviceLabel || "Unknown device"}
+                                        </span>
+                                        {current ? (
+                                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700">
+                                                현재 기기
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                                        <span>마지막 사용 {toDisplayDate(session.last_used_at || session.lastUsedAt) || "-"}</span>
+                                        <span>만료 {toDisplayDate(session.expires_at || session.expiresAt) || "-"}</span>
+                                        <span>{session.remember ? "자동 로그인" : "일반 로그인"}</span>
+                                    </div>
+                                </div>
+                                {current ? null : (
+                                    <button
+                                        type="button"
+                                        onClick={() => onRevokeSession(sessionId)}
+                                        disabled={Boolean(busyKey)}
+                                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                                    >
+                                        {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                        로그아웃
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </section>
+    );
+};
+
+const exportIncludeLabels = {
+    profile: "프로필",
+    consents: "동의 설정",
+    boards: "게시글",
+    comments: "댓글",
+    retentionPolicy: "보관 정책",
+};
+
+const consentSourceLabels = {
+    LEGACY_ACCOUNT: "기존 계정 기준",
+    DEFAULT: "기본값",
+    USER_SETTING: "직접 설정",
+};
+
+const PrivacyTab = ({
+    summary,
+    loading,
+    busyKey,
+    exporting,
+    onRefresh,
+    onUpdateConsent,
+    onExport,
+    onDeleteAccount,
+    deleteBusy,
+}) => {
+    const consents = summary?.consents || [];
+    const retentionPolicy = summary?.retentionPolicy || [];
+    const exportIncludes = summary?.exportIncludes || [];
+
+    if (loading) {
+        return <LoadingSpinner text="개인정보 설정을 불러오는 중입니다..." />;
+    }
+
+    if (!summary) {
+        return (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <EmptyState message="개인정보 설정을 불러오지 못했습니다." subMessage="잠시 후 다시 시도해 주세요." />
+                <div className="flex justify-center">
+                    <button type="button" onClick={onRefresh} className="btn-secondary">
+                        다시 불러오기
+                    </button>
+                </div>
+            </section>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                        <h2 className="flex items-center gap-2 text-lg font-black text-slate-900">
+                            <FileText className="h-5 w-5 text-sky-600" />
+                            내 데이터와 동의 설정
+                        </h2>
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                            저장된 계정 정보와 작성 콘텐츠 범위를 확인하고, 선택 동의를 변경할 수 있습니다.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={onRefresh}
+                            disabled={loading || Boolean(busyKey) || exporting}
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                            새로고침
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onExport}
+                            disabled={exporting || Boolean(busyKey)}
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white hover:bg-slate-800 disabled:opacity-60"
+                        >
+                            {exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                            내 데이터 받기
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    {consents.map((consent) => {
+                        const busy = busyKey === consent.consentType;
+                        const disabled = consent.required || Boolean(busyKey);
+                        return (
+                            <div key={consent.consentType} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="break-words text-sm font-black text-slate-900">{consent.label}</span>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-black ${
+                                                consent.required ? "bg-slate-200 text-slate-700" : "bg-sky-100 text-sky-700"
+                                            }`}>
+                                                {consent.required ? "필수" : "선택"}
+                                            </span>
+                                        </div>
+                                        <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                                            {consent.required
+                                                ? "서비스 이용을 위해 유지되는 필수 동의입니다."
+                                                : "원하면 언제든지 켜거나 끌 수 있습니다."}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={consent.granted}
+                                        aria-label={`${consent.label} ${consent.granted ? "동의함" : "동의하지 않음"}`}
+                                        onClick={() => onUpdateConsent(consent.consentType, !consent.granted)}
+                                        disabled={disabled}
+                                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${
+                                            consent.granted ? "bg-emerald-500" : "bg-slate-300"
+                                        } disabled:cursor-not-allowed disabled:opacity-70`}
+                                    >
+                                        <span
+                                            className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+                                                consent.granted ? "translate-x-6" : "translate-x-1"
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500">
+                                    {busy ? (
+                                        <span className="inline-flex items-center gap-1 text-sky-700">
+                                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                            저장 중
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1">
+                                            <CheckCircle2 className={`h-3.5 w-3.5 ${consent.granted ? "text-emerald-600" : "text-slate-400"}`} />
+                                            {consent.granted ? "동의" : "미동의"}
+                                        </span>
+                                    )}
+                                    <span>{consentSourceLabels[consent.source] || consent.source || "기록 없음"}</span>
+                                    {consent.updatedAt ? <span>{toDisplayDate(consent.updatedAt)}</span> : null}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-black text-slate-900">내보내기 포함 항목</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {exportIncludes.map((item) => (
+                            <span key={item} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700">
+                                {exportIncludeLabels[item] || item}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
+                    <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                    보관 및 삭제 기준
+                </h2>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {retentionPolicy.map((item) => (
+                        <div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="text-sm font-black text-slate-900">{item.title}</div>
+                            <div className="mt-2 text-xs font-black text-emerald-700">{item.period}</div>
+                            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{item.description}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            <section className="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm sm:p-6">
+                <h2 className="mb-3 flex items-center gap-2 text-lg font-black text-slate-900">
+                    <Trash2 className="h-5 w-5 text-rose-600" />
+                    계정 삭제 요청
+                </h2>
+                <p className="mb-4 text-sm font-semibold leading-6 text-slate-500">
+                    탈퇴하면 계정은 비활성화되며, 법령과 서비스 운영상 필요한 보관 기간이 끝난 정보는 삭제 대상이 됩니다.
+                </p>
+                <button
+                    type="button"
+                    onClick={onDeleteAccount}
+                    disabled={deleteBusy}
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700 hover:bg-rose-100 disabled:opacity-60 sm:w-auto"
+                >
+                    <Trash2 className="h-4 w-4" />
+                    {deleteBusy ? "탈퇴 처리 중..." : "회원 탈퇴 진행"}
+                </button>
+            </section>
+        </div>
+    );
+};
 
 const ProfileTab = ({ member, level, onDeleteAccount, deleteBusy }) => (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { DelayedLoadingPage, DelayedRouteFallback } from "./LoadingSpinner";
+import { AdminMfaGate } from "./AdminMfaGate.jsx";
 import { ProtectedAppLayout } from "./ProtectedAppLayout.jsx";
 const Home = lazy(() => import("../pages/home/Home.jsx").then((module) => ({ default: module.Home })));
 const BoardList = lazy(() => import("../pages/boards/BoardList.jsx").then((module) => ({ default: module.BoardList })));
@@ -18,6 +19,7 @@ const Ranks = lazy(() => import("../pages/home/Ranks.jsx").then((module) => ({ d
 const News = lazy(() => import("../pages/facility/News.jsx").then((module) => ({ default: module.News })));
 const Mypage = lazy(() => import("../pages/home/Mypage.jsx").then((module) => ({ default: module.Mypage })));
 const MypageEdit = lazy(() => import("../pages/home/MypageEdit.jsx").then((module) => ({ default: module.MypageEdit })));
+const SupportCenter = lazy(() => import("../pages/support/SupportCenter.jsx").then((module) => ({ default: module.SupportCenter })));
 const LasVegasGame = lazy(() => import("../pages/games/LasVegasGame.jsx").then((module) => ({ default: module.LasVegasGame })));
 const NoThanksGame = lazy(() => import("../pages/games/NoThanksGame.jsx").then((module) => ({ default: module.NoThanksGame })));
 const CatanGame = lazy(() => import("../pages/games/TabletopGame.jsx").then((module) => ({ default: module.CatanGame })));
@@ -36,6 +38,8 @@ const AdminCommandCenter = lazy(() => import("../pages/admin/AdminCommandCenter.
 const AdminAnomalies = lazy(() => import("../pages/admin/AdminAnomalies.jsx").then((module) => ({ default: module.AdminAnomalies })));
 const AdminOperations = lazy(() => import("../pages/admin/AdminOperations.jsx").then((module) => ({ default: module.AdminOperations })));
 const AdminStreamingStudio = lazy(() => import("../pages/admin/AdminStreamingStudio.jsx").then((module) => ({ default: module.AdminStreamingStudio })));
+
+const withAdminMfa = (element) => <AdminMfaGate>{element}</AdminMfaGate>;
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading, passwordResetRequired } = useAuth();
@@ -69,6 +73,7 @@ export const ProtectedRoutes = () => (
                     <Route path="statistics" element={<Statistics />} />
                     <Route path="ranks" element={<Ranks />} />
                     <Route path="news" element={<News />} />
+                    <Route path="support" element={<SupportCenter />} />
                     <Route path="mypage" element={<Mypage />} />
                     <Route path="mypage/edit" element={<MypageEdit />} />
                     <Route path="poker" element={<PokerGame />} />
@@ -87,10 +92,10 @@ export const ProtectedRoutes = () => (
                     <Route path="optimizer" element={<MeetingOptimizer />} />
                     <Route path="facility" element={<FacilityFinder />} />
                     <Route path="parking" element={<Navigate to="/app/facility" replace />} />
-                    <Route path="admin" element={<AdminCommandCenter />} />
-                    <Route path="admin/anomalies" element={<AdminAnomalies />} />
-                    <Route path="admin/operations" element={<AdminOperations />} />
-                    <Route path="admin/streaming" element={<AdminStreamingStudio />} />
+                    <Route path="admin" element={withAdminMfa(<AdminCommandCenter />)} />
+                    <Route path="admin/anomalies" element={withAdminMfa(<AdminAnomalies />)} />
+                    <Route path="admin/operations" element={withAdminMfa(<AdminOperations />)} />
+                    <Route path="admin/streaming" element={withAdminMfa(<AdminStreamingStudio />)} />
 
                     <Route path="*" element={<Navigate to="/app" replace />} />
                 </Routes>

@@ -1,10 +1,17 @@
 import axios from "axios";
-import { clearAuthSession, getStoredAccessToken, getStoredRefreshToken, updateStoredAuthTokens } from "./authStorage.js";
+import {
+    clearAuthSession,
+    getStoredAccessToken,
+    getStoredRefreshToken,
+    hasRefreshCookieHint,
+    updateStoredAuthTokens,
+} from "./authStorage.js";
 import { beginNetworkActivity, endNetworkActivity } from "./networkActivity.js";
 import { notifyError } from "./toast.js";
 
 const api = axios.create({
     baseURL: "/api",
+    withCredentials: true,
 });
 
 const PUBLIC_AUTH_PATHS = [
@@ -113,10 +120,6 @@ const extractBearerToken = (headers) => {
     return stripBearerToken(headers?.authorization || headers?.Authorization);
 };
 
-const extractRefreshToken = (headers) => {
-    return stripBearerToken(headers?.refresh || headers?.Refresh || headers?.refreshtoken || headers?.RefreshToken);
-};
-
 const clearStoredAuth = () => {
     clearAuthSession();
 };
@@ -213,25 +216,28 @@ export const refreshAccessToken = async () => {
     if (refreshPromise) return refreshPromise;
 
     const refreshToken = getStoredRefreshToken();
-    if (!refreshToken) {
+    if (!refreshToken && !hasRefreshCookieHint()) {
         throw new Error("리프레시 토큰이 없습니다.");
+    }
+
+    const headers = {};
+    if (refreshToken) {
+        headers.Refresh = refreshToken;
+        headers.Authorization = `Bearer ${refreshToken}`;
     }
 
     beginNetworkActivity();
     refreshPromise = axios
         .post("/api/auth/reissue", null, {
-            headers: {
-                Refresh: refreshToken,
-                Authorization: `Bearer ${refreshToken}`,
-            },
+            headers,
+            withCredentials: true,
         })
         .then((response) => {
             const accessToken = extractBearerToken(response.headers);
             if (!accessToken) {
                 throw new Error("재발급 토큰을 찾을 수 없습니다.");
             }
-            const nextRefreshToken = extractRefreshToken(response.headers);
-            updateStoredAuthTokens({ accessToken, refreshToken: nextRefreshToken });
+            updateStoredAuthTokens({ accessToken });
             sessionExpiredNotified = false;
             return accessToken;
         })
