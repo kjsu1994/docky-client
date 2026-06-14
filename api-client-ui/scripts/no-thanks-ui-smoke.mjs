@@ -351,6 +351,13 @@ class PipeCdp {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const encodeJson = (value) => Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 const encodeText = (value) => Buffer.from(value, "utf8").toString("base64");
+const parseJson = (value = "") => {
+    try {
+        return value ? JSON.parse(value) : {};
+    } catch {
+        return {};
+    }
+};
 
 const roomSummary = {
     room_id: 41,
@@ -452,9 +459,11 @@ let noThanksRoomsEmpty = false;
 const runtimeErrors = [];
 const unmockedRequests = [];
 const apiRequests = [];
+const apiRequestBodies = [];
 
-function routeMock(url, method) {
+function routeMock(url, method, postData = "") {
     const { hostname, pathname } = new URL(url);
+    const body = parseJson(postData);
 
     if (method === "GET" && hostname === "oapi.map.naver.com") {
         return { status: 200, contentType: "application/javascript; charset=utf-8", bodyText: "" };
@@ -528,6 +537,12 @@ function routeMock(url, method) {
         return { status: 200, bodyText: "" };
     }
 
+    if (method === "POST" && pathname === "/api/game/no-thanks/rooms/41/start") {
+        apiRequestBodies.push({ method, pathname, body });
+        noThanksStateMode = "playing";
+        return { status: 200, bodyText: "" };
+    }
+
     if (method === "GET" && pathname === "/api/game/no-thanks/rooms/41/state") {
         return { status: 200, body: noThanksStateMode === "finished" ? finishedState : waitingState };
     }
@@ -555,7 +570,7 @@ function routeMock(url, method) {
 async function handleFetchRequest(cdp, sessionId, event) {
     const { requestId, request } = event.params;
     apiRequests.push(`${request.method} ${request.url}`);
-    const mock = routeMock(request.url, request.method);
+    const mock = routeMock(request.url, request.method, request.postData || "");
     if (!mock) {
         unmockedRequests.push(`${request.method} ${request.url}`);
         await cdp.send("Fetch.continueRequest", { requestId }, sessionId);
@@ -1146,6 +1161,13 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
         await waitForText(cdp, sessionId, "방 설정 저장 완료");
         await waitForText(cdp, sessionId, "20초");
         await clickButtonByText(cdp, sessionId, "준비 토글");
+        await waitFor(cdp, sessionId, `document.querySelector('[aria-label="추가 AI 수"]')?.value === "1"`, "no thanks AI bot selector default");
+        await clickButtonByText(cdp, sessionId, "AI와 시작");
+        await delay(300);
+        const startRequest = apiRequestBodies.find((request) => request.pathname === "/api/game/no-thanks/rooms/41/start");
+        if (Number(startRequest?.body?.bot_count) !== 1) {
+            throw new Error(`no-thanks-ui-smoke: AI start must send bot_count 1 ${JSON.stringify(startRequest || null)}`);
+        }
         noThanksStateMode = "finished";
         await evaluate(cdp, sessionId, `localStorage.setItem("no_thanks_last_room_id", "41"); true`);
         await cdp.send("Page.navigate", { url: `${baseUrl}/app/games/no-thanks` }, sessionId);

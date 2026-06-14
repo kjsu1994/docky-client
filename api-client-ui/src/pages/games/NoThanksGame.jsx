@@ -2759,6 +2759,7 @@ export const NoThanksGame = () => {
   const [rematching, setRematching] = useState(false);
   const [createForm, setCreateForm] = useState({ title: "", startChipCount: "11", turnTimeSeconds: "15" });
   const [settingsForm, setSettingsForm] = useState({ startChipCount: "11", turnTimeSeconds: "15" });
+  const [startBotCount, setStartBotCount] = useState(0);
 
   const stompRef = useRef(null);
   const stompInitRef = useRef(null);
@@ -2778,6 +2779,14 @@ export const NoThanksGame = () => {
   const statePlayers = Array.isArray(gameState?.players) ? gameState.players : [];
   const roomPlayers = Array.isArray(selectedRoom?.players) ? selectedRoom.players : [];
   const players = statePlayers.length ? statePlayers : roomPlayers;
+  const startBotMax = selectedRoom && String(roomStatus || "WAITING").toUpperCase() === "WAITING"
+    ? Math.max(0, parseIntSafe(selectedRoom.maxPlayers, 6) - players.length)
+    : 0;
+  const effectiveStartBotCount = Math.min(
+    Math.max(0, parseIntSafe(startBotCount, 0)),
+    startBotMax
+  );
+  const startBotOptions = Array.from({ length: startBotMax + 1 }, (_, index) => index);
   const hostMemberId = Number(selectedRoom?.hostMemberId || 0);
   const isHost = Boolean(selectedRoom && hostMemberId === myMemberId);
   const turnMemberId = Number(gameState?.turnMemberId || 0);
@@ -2856,13 +2865,15 @@ export const NoThanksGame = () => {
     const maxPlayers = parseIntSafe(selectedRoom.maxPlayers, 6);
     const startChipCount = parseIntSafe(selectedRoom.startChipCount, 11);
     const turnTimeSeconds = parseIntSafe(selectedRoom.turnTimeSeconds, 15);
-    const enoughPlayers = roomPlayersForReadiness.length >= minPlayers;
-    const soloAiStartAvailable = roomPlayersForReadiness.length === 1 && minPlayers > 1;
-    const playerRequirementMet = enoughPlayers || soloAiStartAvailable;
-    const withinMaxPlayers = maxPlayers <= 0 || roomPlayersForReadiness.length <= maxPlayers;
+    const startPlayerCount = roomPlayersForReadiness.length + effectiveStartBotCount;
+    const startUsesBots = effectiveStartBotCount > 0;
+    const enoughPlayers = startPlayerCount >= minPlayers;
+    const soloAiStartAvailable = roomPlayersForReadiness.length === 1 && startUsesBots && minPlayers > 1;
+    const playerRequirementMet = enoughPlayers;
+    const withinMaxPlayers = maxPlayers <= 0 || startPlayerCount <= maxPlayers;
     const guestsReady = !guests.length || readyGuestCount === guests.length;
     const startSignalReady = roomStatusNormalized === "WAITING" && playerRequirementMet && withinMaxPlayers && guestsReady;
-    const playerProgress = soloAiStartAvailable ? 100 : minPlayers > 0 ? (roomPlayersForReadiness.length / minPlayers) * 100 : 100;
+    const playerProgress = minPlayers > 0 ? (startPlayerCount / minPlayers) * 100 : 100;
     const guestProgress = guests.length > 0 ? (readyGuestCount / guests.length) * 100 : 100;
     const waitingReason = roomStatusNormalized !== "WAITING"
       ? "대기 상태에서만 시작할 수 있습니다."
@@ -2875,7 +2886,10 @@ export const NoThanksGame = () => {
             : "시작 가능";
     return {
       canStart: Boolean(isHost && startSignalReady),
+      botCount: effectiveStartBotCount,
+      playerCount: startPlayerCount,
       soloAiStartAvailable,
+      startUsesBots,
       statusText: isHost
         ? (startSignalReady ? (soloAiStartAvailable ? "AI와 시작 가능" : "방장 시작 가능") : waitingReason)
         : (startSignalReady ? "방장 시작 대기" : waitingReason),
@@ -2921,7 +2935,7 @@ export const NoThanksGame = () => {
       ],
       ruleHint: "노땡스는 최소 인원과 게스트 준비가 맞으면 방장이 시작합니다. 시작 후 카드, 칩, 점수 계산은 기존 서버 상태를 그대로 따릅니다.",
     };
-  }, [hostMemberId, isHost, players, readyMemberIds, roomStatusNormalized, selectedRoom]);
+  }, [effectiveStartBotCount, hostMemberId, isHost, players, readyMemberIds, roomStatusNormalized, selectedRoom]);
   const canStart = Boolean(startReadiness?.canStart);
   const startStatusText = startReadiness?.statusText || "시작 대기";
   const winnerNickname = winnerMemberId ? players.find((player) => playerIdOf(player) === winnerMemberId)?.nickname || `플레이어 ${winnerMemberId}` : null;
@@ -3216,6 +3230,19 @@ export const NoThanksGame = () => {
   }, [selectedRoom]);
 
   useEffect(() => {
+    if (!selectedRoom) {
+      setStartBotCount(0);
+      return;
+    }
+    const humanCount = Array.isArray(selectedRoom.players) ? selectedRoom.players.length : 0;
+    const minPlayers = parseIntSafe(selectedRoom.minPlayers, 2);
+    const maxPlayers = parseIntSafe(selectedRoom.maxPlayers, 6);
+    const openSeats = Math.max(0, maxPlayers - humanCount);
+    const defaultBots = humanCount === 1 && minPlayers > 1 ? Math.max(0, minPlayers - humanCount) : 0;
+    setStartBotCount(Math.min(defaultBots, openSeats));
+  }, [selectedRoom]);
+
+  useEffect(() => {
     setActionFeedback(initialNoThanksActionFeedback());
   }, [selectedRoomId]);
 
@@ -3371,7 +3398,10 @@ export const NoThanksGame = () => {
     }
     try {
       const roomId = roomIdOf(selectedRoom);
-      await noThanksGameAdapter.startGame(roomId);
+      await noThanksGameAdapter.startGame(
+        roomId,
+        effectiveStartBotCount > 0 ? { botCount: effectiveStartBotCount } : undefined
+      );
       await fetchState(roomId);
       await fetchRooms();
     } catch (error) {
@@ -3663,10 +3693,10 @@ export const NoThanksGame = () => {
                     className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={startGame}
                     disabled={!canStart}
-                    aria-label={canStart ? `${selectedRoom.title} ${startReadiness?.soloAiStartAvailable ? "AI와 시작" : "게임 시작"}` : `${selectedRoom.title} 시작 대기: ${startStatusText}`}
-                    title={canStart ? (startReadiness?.soloAiStartAvailable ? "AI와 시작" : "게임 시작") : startStatusText}
+                    aria-label={canStart ? `${selectedRoom.title} ${startReadiness?.startUsesBots ? "AI와 시작" : "게임 시작"}` : `${selectedRoom.title} 시작 대기: ${startStatusText}`}
+                    title={canStart ? (startReadiness?.startUsesBots ? "AI와 시작" : "게임 시작") : startStatusText}
                   >
-                    {canStart ? (startReadiness?.soloAiStartAvailable ? "AI와 시작" : "시작") : "시작 대기"}
+                    {canStart ? (startReadiness?.startUsesBots ? "AI와 시작" : "시작") : "시작 대기"}
                   </button>
                 )}
                 <button className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" onClick={leaveRoom}>퇴장</button>
@@ -3687,9 +3717,20 @@ export const NoThanksGame = () => {
 
             {isHost && roomStatus === "WAITING" && (
               <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
+                <select
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700"
+                  value={effectiveStartBotCount}
+                  onChange={(event) => setStartBotCount(parseIntSafe(event.target.value, 0))}
+                  aria-label="추가 AI 수"
+                  title="추가 AI 수"
+                >
+                  {startBotOptions.map((count) => (
+                    <option key={count} value={count}>AI {count}명</option>
+                  ))}
+                </select>
                 <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.startChipCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, startChipCount: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("startChipCount", 5, 20, 11)} />
                 <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("turnTimeSeconds", 5, 60, 15)} />
-                <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white md:col-span-2" onClick={saveSettings}>설정 저장</button>
+                <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white" onClick={saveSettings}>설정 저장</button>
               </div>
             )}
           </div>

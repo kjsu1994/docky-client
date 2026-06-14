@@ -21,7 +21,7 @@ import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameStartReadinessPanel, GameUxGlyph } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
-import { canUseTabletopSoloAiStart } from "./tabletopStartPolicy.js";
+import { canUseTabletopSoloAiStart, supportsTabletopAiBotStart } from "./tabletopStartPolicy.js";
 
 const GAME_CODE = "citadels";
 const ROOM_STORAGE_KEY = "citadels_last_room_id";
@@ -254,6 +254,19 @@ const memberIdOf = (player) => Number(getTabletopMemberId(player) || 0);
 const seatNoOf = (player) => Number(getTabletopSeatNo(player) || 0);
 const isReady = isTabletopReadyPlayer;
 const currentMemberIdOf = (user) => Number(user?.member_id || user?.memberId || user?.id || getTabletopMemberId(user) || 0);
+const clampCitadelsBotCount = (value, minValue = 0, maxValue = 0) => {
+  const parsed = Math.floor(Number(value || 0));
+  const safeValue = Number.isFinite(parsed) ? parsed : 0;
+  return Math.max(minValue, Math.min(maxValue, safeValue));
+};
+const defaultCitadelsStartBotCount = (room) => {
+  const roomPlayers = Array.isArray(room?.players) ? room.players : [];
+  const playerCount = roomPlayers.length;
+  const minPlayers = Number(room?.minPlayers || 0);
+  const maxPlayers = Number(room?.maxPlayers || 0);
+  if (!supportsTabletopAiBotStart(GAME_CODE, minPlayers) || playerCount <= 0 || maxPlayers <= playerCount) return 0;
+  return Math.max(0, Math.min(maxPlayers - playerCount, minPlayers - playerCount));
+};
 const characterName = (code) => characterLabels[code] || code || "-";
 const playerName = (players, seatNo) => players.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `좌석 ${seatNo}`;
 const cardIdOf = (card) => get(card, "id", "id", "");
@@ -4251,12 +4264,14 @@ export const CitadelsGame = () => {
   const [pendingKeepIds, setPendingKeepIds] = useState([]);
   const [redrawIds, setRedrawIds] = useState([]);
   const [laboratoryCardId, setLaboratoryCardId] = useState("");
+  const [startBotCount, setStartBotCount] = useState(0);
 
   const mountedRef = useRef(false);
   const stompRef = useRef(null);
   const stompInitRef = useRef(null);
   const gameSubRef = useRef(null);
   const realtimeRoomRef = useRef(null);
+  const startRoomKeyRef = useRef("");
 
   const myMemberId = currentMemberIdOf(user);
   const players = selectedRoom?.players || [];
@@ -4273,15 +4288,26 @@ export const CitadelsGame = () => {
   const enoughPlayers = players.length >= minPlayers;
   const withinMaxPlayers = maxPlayers <= 0 || players.length <= maxPlayers;
   const soloAiStartAvailable = canUseTabletopSoloAiStart({ game: GAME_CODE, playerCount: players.length, minPlayers });
-  const startPlayerRequirementMet = (enoughPlayers || soloAiStartAvailable) && withinMaxPlayers;
+  const aiBotStartSupported = supportsTabletopAiBotStart(GAME_CODE, minPlayers);
+  const startBotMin = aiBotStartSupported ? Math.max(0, minPlayers - players.length) : 0;
+  const startBotMax = aiBotStartSupported && maxPlayers > players.length ? maxPlayers - players.length : 0;
+  const effectiveStartBotCount = aiBotStartSupported ? clampCitadelsBotCount(startBotCount, startBotMin, startBotMax) : 0;
+  const startPlayerCount = players.length + effectiveStartBotCount;
+  const startUsesBots = effectiveStartBotCount > 0;
+  const startBotOptions = aiBotStartSupported && startBotMax >= startBotMin
+    ? Array.from({ length: startBotMax - startBotMin + 1 }, (_, index) => startBotMin + index)
+    : [];
+  const showStartBotSelector = isHost && status === "WAITING" && startBotMax > 0 && startBotOptions.length > 0;
+  const startWithinMaxPlayers = maxPlayers <= 0 || startPlayerCount <= maxPlayers;
+  const startPlayerRequirementMet = startPlayerCount >= minPlayers && withinMaxPlayers && startWithinMaxPlayers;
   const canStart = isHost && status === "WAITING" && startPlayerRequirementMet && everyGuestReady;
   const startChecks = [
     {
       key: "players",
       label: "인원",
       done: startPlayerRequirementMet,
-      detail: soloAiStartAvailable
-        ? `${players.length}/${maxPlayers || "-"}명 · 공식 최소 ${minPlayers}명, 부족 좌석 AI 보충`
+      detail: startUsesBots
+        ? `${players.length}+AI ${effectiveStartBotCount}/${maxPlayers || "-"}명 · 최소 ${minPlayers}명`
         : `${players.length}/${maxPlayers || "-"}명 · 최소 ${minPlayers}명`,
     },
     { key: "ready", label: "준비", done: everyGuestReady, detail: `${readyGuestCount}/${guestPlayers.length}명 준비` },
@@ -4341,7 +4367,7 @@ export const CitadelsGame = () => {
   }, [createForm.title, createForm.turnTimeSeconds, createForm.variantCode, joinCode, rooms.length, variants]);
   const citadelsStartReadiness = useMemo(() => {
     if (!selectedRoom) return null;
-    const playerProgress = minPlayers > 0 ? (players.length / minPlayers) * 100 : 100;
+    const playerProgress = minPlayers > 0 ? (startPlayerCount / minPlayers) * 100 : 100;
     const guestProgress = guestPlayers.length > 0 ? (readyGuestCount / guestPlayers.length) * 100 : 100;
     const startSignalReady = startPlayerRequirementMet && everyGuestReady;
     return {
@@ -4352,9 +4378,9 @@ export const CitadelsGame = () => {
       items: [
         {
           label: "인원 조건",
-          value: `${players.length}/${maxPlayers || "-"}명`,
+          value: startUsesBots ? `${players.length}+AI ${effectiveStartBotCount}/${maxPlayers || "-"}명` : `${players.length}/${maxPlayers || "-"}명`,
           detail: startPlayerRequirementMet
-            ? (soloAiStartAvailable ? `공식 최소 ${minPlayers}명 기준으로 부족 좌석은 AI가 채웁니다.` : `최소 ${minPlayers}명 조건을 충족했습니다.`)
+            ? (startUsesBots ? `선택한 AI ${effectiveStartBotCount}명으로 최소 ${minPlayers}명 조건을 충족합니다.` : `최소 ${minPlayers}명 조건을 충족했습니다.`)
             : `${Math.max(0, minPlayers - players.length)}명이 더 필요합니다.`,
           icon: "player",
           tone: startPlayerRequirementMet ? "done" : "waiting",
@@ -4365,7 +4391,7 @@ export const CitadelsGame = () => {
           value: guestPlayers.length ? `${readyGuestCount}/${guestPlayers.length}명 준비` : "게스트 없음",
           detail: guestPlayers.length
             ? (everyGuestReady ? "게스트 준비가 완료되었습니다." : "아직 준비하지 않은 게스트가 있습니다.")
-            : (soloAiStartAvailable ? "방장 단독 시작 시 부족 좌석은 AI가 채웁니다." : "방장 혼자 대기 중입니다. 최소 인원을 채워야 시작할 수 있습니다."),
+            : (startUsesBots || soloAiStartAvailable ? "방장이 AI 좌석을 추가해 시작할 수 있습니다." : "방장 혼자 대기 중입니다. 최소 인원을 채워야 시작할 수 있습니다."),
           icon: "turn",
           tone: guestPlayers.length ? (everyGuestReady ? "done" : "waiting") : "neutral",
           progress: guestProgress,
@@ -4385,11 +4411,34 @@ export const CitadelsGame = () => {
           tone: "active",
         },
       ],
-      ruleHint: soloAiStartAvailable
+      ruleHint: startUsesBots || soloAiStartAvailable
         ? "시티델은 공식 최소 인원 표기를 유지하고, 방장 단독 시작 시 부족 좌석은 AI가 채웁니다. 시작 후 캐릭터 선택, 건설, 점수 계산은 기존 서버 규칙을 그대로 따릅니다."
         : "시티델은 최소 인원, 게스트 준비, 방장 시작 권한이 맞을 때 시작합니다. 시작 후 캐릭터 선택, 건설, 점수 계산은 기존 서버 규칙을 그대로 따릅니다.",
     };
-  }, [canStart, everyGuestReady, guestPlayers.length, isHost, maxPlayers, minPlayers, players.length, readyGuestCount, selectedRoom, soloAiStartAvailable, startPlayerRequirementMet]);
+  }, [canStart, effectiveStartBotCount, everyGuestReady, guestPlayers.length, isHost, maxPlayers, minPlayers, players.length, readyGuestCount, selectedRoom, soloAiStartAvailable, startPlayerCount, startPlayerRequirementMet, startUsesBots]);
+  useEffect(() => {
+    if (!selectedRoom || status !== "WAITING") {
+      startRoomKeyRef.current = "";
+      setStartBotCount(0);
+      return;
+    }
+    const roomKey = [
+      GAME_CODE,
+      roomIdOf(selectedRoom) || "",
+      selectedRoom?.variantCode || "",
+      players.length,
+      minPlayers,
+      maxPlayers,
+    ].join(":");
+    const nextBase = startRoomKeyRef.current === roomKey
+      ? startBotCount
+      : defaultCitadelsStartBotCount(selectedRoom);
+    startRoomKeyRef.current = roomKey;
+    const nextCount = clampCitadelsBotCount(nextBase, startBotMin, startBotMax);
+    if (nextCount !== startBotCount) {
+      setStartBotCount(nextCount);
+    }
+  }, [maxPlayers, minPlayers, players.length, selectedRoom, startBotCount, startBotMax, startBotMin, status]);
   const selectedGuideVariant = useMemo(() => {
     const code = selectedRoom?.variantCode || createForm.variantCode || "BASE";
     return variants.find((variant) => variant.code === code) || {
@@ -4746,7 +4795,11 @@ export const CitadelsGame = () => {
   }, "준비 상태 변경에 실패했습니다.");
 
   const startGame = () => withBusy(async () => {
-    await tabletopGameAdapter.startGame(GAME_CODE, roomIdOf(selectedRoom));
+    await tabletopGameAdapter.startGame(
+      GAME_CODE,
+      roomIdOf(selectedRoom),
+      startUsesBots ? { botCount: effectiveStartBotCount } : undefined
+    );
     await fetchState(roomIdOf(selectedRoom));
     notifySuccess("시티델을 시작했습니다.");
   }, "인원과 준비 상태를 확인해주세요.");
@@ -5054,7 +5107,7 @@ export const CitadelsGame = () => {
                   <span className="rounded-full bg-slate-100 px-2 py-1">방 코드 {roomCodeOf(selectedRoom)}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-1">{statusLabels[status] || status}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-1">{selectedRoom.variantName}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-1">{players.length}/{selectedRoom.maxPlayers}명</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1">{status === "WAITING" && startUsesBots ? `${players.length}+AI ${effectiveStartBotCount}/${selectedRoom.maxPlayers}명` : `${players.length}/${selectedRoom.maxPlayers}명`}</span>
                   {finalRound && <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">마지막 라운드</span>}
                 </div>
               </div>
@@ -5072,9 +5125,25 @@ export const CitadelsGame = () => {
                     </span>
                   </>
                 )}
+                {showStartBotSelector && (
+                  <label className="flex min-h-10 items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-black text-emerald-800">
+                    <span className="shrink-0">AI</span>
+                    <select
+                      className="min-h-7 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-black text-emerald-900"
+                      value={effectiveStartBotCount}
+                      aria-label="추가 AI 수"
+                      disabled={busy}
+                      onChange={(event) => setStartBotCount(clampCitadelsBotCount(event.target.value, startBotMin, startBotMax))}
+                    >
+                      {startBotOptions.map((count) => (
+                        <option key={count} value={count}>{count}명</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {status === "WAITING" && isHost && (
                   <button type="button" disabled={!canStart || busy} onClick={startGame} className="min-h-10 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white disabled:opacity-50">
-                    {soloAiStartAvailable ? "AI와 시작하기" : "시작하기"}
+                    {startUsesBots || soloAiStartAvailable ? "AI와 시작하기" : "시작하기"}
                   </button>
                 )}
                 {status === "PLAYING" && isHost && (

@@ -728,6 +728,24 @@ function routeMock(url, method) {
         const room = rooms.find((item) => Number(item.room_id) === Number(videoRoomStateMatch[2])) || rooms[0];
         return { status: 200, body: videoGameSmokeState(room) };
     }
+    const gameRoomChatMatch = pathname.match(/^\/api\/game\/([^/]+)\/rooms\/(\d+)\/chat\/messages$/);
+    if (method === "GET" && gameRoomChatMatch) {
+        return {
+            status: 200,
+            body: [
+                {
+                    message_id: `video-chat-${gameRoomChatMatch[1]}-${gameRoomChatMatch[2]}`,
+                    game_code: gameRoomChatMatch[1],
+                    room_id: Number(gameRoomChatMatch[2]),
+                    sender_id: 999,
+                    sender_name: "검증 관리자",
+                    message: "전용 비디오 채팅 확인",
+                    type: "TALK",
+                    created_at: "2026-06-14T12:00:00+09:00",
+                },
+            ],
+        };
+    }
     const videoRoomJoinMatch = pathname.match(/^\/api\/game\/video\/([^/]+)\/rooms\/(\d+)\/join$/);
     if (method === "POST" && videoRoomJoinMatch) {
         const rooms = buildVideoGameSmokeRooms(videoRoomJoinMatch[1]);
@@ -1743,6 +1761,8 @@ async function inspectVideoGameRoomFlow(ws, viewport) {
         mobileActionPad: document.querySelectorAll('[data-smoke="video-game-mobile-action-pad"]').length,
         mobileActionButtons: document.querySelectorAll('[data-smoke="video-game-mobile-action-button"]').length,
         mobileControlStatus: document.querySelectorAll('[data-smoke="video-game-mobile-control-status"]').length,
+        gameChatPanel: document.querySelectorAll('[data-smoke="game-room-chat-panel"][data-chat-game="arena"]').length,
+        gameChatMessages: document.querySelectorAll('[data-smoke="game-room-chat-panel"][data-chat-game="arena"] [data-smoke="game-chat-empty-state"]').length,
         text: document.body?.innerText || "",
     }))()`);
     if (
@@ -1766,9 +1786,13 @@ async function inspectVideoGameRoomFlow(ws, viewport) {
         selectedRoomState.resultBreakdownItems < 4 ||
         selectedRoomState.resultTraceArt < 1 ||
         selectedRoomState.resultTraceNodes < 2 ||
-        !selectedRoomState.resultWinner
+        !selectedRoomState.resultWinner ||
+        selectedRoomState.gameChatPanel < 1
     ) {
         throw new Error(`video-game-room ${viewport.name}: selected room panels missing ${JSON.stringify(selectedRoomState)}`);
+    }
+    if (!selectedRoomState.text.includes("전용 비디오 채팅 확인")) {
+        throw new Error(`video-game-room ${viewport.name}: selected room chat panel missing game-scoped message ${JSON.stringify(selectedRoomState.text.slice(0, 900))}`);
     }
     if (false) {
     if (selectedRoomState.stageShell < 1 || selectedRoomState.playRail !== 0 || selectedRoomState.flowMeter !== 0 || selectedRoomState.inputFeedback !== 0 || selectedRoomState.actionCue !== 0 || selectedRoomState.removedStageBrief !== 0 || selectedRoomState.removedStageGate !== 0 || selectedRoomState.removedInputDeck !== 0 || selectedRoomState.removedDesktopPad !== 0 || selectedRoomState.frameStandby < 1 || selectedRoomState.frameStandbyStatus !== "FINISHED" || selectedRoomState.frameStandbyReason !== "결과 검토" || selectedRoomState.frameStandbyArt < 1 || selectedRoomState.frameStandbyNodes < 4 || selectedRoomState.frameStandbyItems < 4 || selectedRoomState.artwork < 1 || selectedRoomState.resultSpotlight < 1 || selectedRoomState.resultBreakdown < 1 || selectedRoomState.resultBreakdownItems < 4 || selectedRoomState.resultTraceArt < 1 || selectedRoomState.resultTraceNodes < 2 || !selectedRoomState.resultWinner || selectedRoomState.mobileControlPanel < 1 || selectedRoomState.mobileControlVisible !== viewport.mobile || (viewport.mobile && (selectedRoomState.mobileDirectionPad < 1 || selectedRoomState.mobileDirectionButtons < 4 || selectedRoomState.mobileActionPad < 1 || selectedRoomState.mobileActionButtons < 2 || selectedRoomState.mobileControlStatus < 1))) {

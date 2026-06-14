@@ -2956,6 +2956,7 @@ export const LasVegasGame = () => {
         roundCount: "3",
         turnTimeSeconds: "50",
     });
+    const [startBotCount, setStartBotCount] = useState(0);
     const [hotCasinoNo, setHotCasinoNo] = useState(null);
     const [actionFeedback, setActionFeedback] = useState(initialLasVegasActionFeedback);
 
@@ -3011,6 +3012,14 @@ export const LasVegasGame = () => {
     const roomPlayers = Array.isArray(selectedRoom?.players) ? selectedRoom.players : [];
     const players = livePlayers.length > 0 ? livePlayers : roomPlayers;
     const readyMemberIds = useMemo(() => extractReadyMemberIds(players), [players]);
+    const startBotMax = selectedRoom && isWaiting
+        ? Math.max(0, toPlainInt(selectedRoom.maxPlayers, 6) - players.length)
+        : 0;
+    const effectiveStartBotCount = Math.min(
+        Math.max(0, toPlainInt(startBotCount, 0)),
+        startBotMax
+    );
+    const startBotOptions = Array.from({ length: startBotMax + 1 }, (_, index) => index);
     const lobbySetup = useMemo(() => {
         const title = String(createForm.title || "").trim();
         const roundCount = toPlainInt(createForm.roundCount, 4);
@@ -3065,13 +3074,15 @@ export const LasVegasGame = () => {
         const maxPlayers = toPlainInt(selectedRoom.maxPlayers, 6);
         const roundCount = toPlainInt(selectedRoom.roundCount, 4);
         const turnTimeSeconds = toPlainInt(selectedRoom.turnTimeSeconds, 30);
-        const enoughPlayers = roomPlayersForReadiness.length >= minPlayers;
-        const soloAiStartAvailable = roomPlayersForReadiness.length === 1 && minPlayers > 1;
-        const playerRequirementMet = enoughPlayers || soloAiStartAvailable;
-        const withinMaxPlayers = maxPlayers <= 0 || roomPlayersForReadiness.length <= maxPlayers;
+        const startPlayerCount = roomPlayersForReadiness.length + effectiveStartBotCount;
+        const startUsesBots = effectiveStartBotCount > 0;
+        const enoughPlayers = startPlayerCount >= minPlayers;
+        const soloAiStartAvailable = roomPlayersForReadiness.length === 1 && startUsesBots && minPlayers > 1;
+        const playerRequirementMet = enoughPlayers;
+        const withinMaxPlayers = maxPlayers <= 0 || startPlayerCount <= maxPlayers;
         const guestsReady = !guests.length || readyGuestCount === guests.length;
         const startSignalReady = isWaiting && playerRequirementMet && withinMaxPlayers && guestsReady;
-        const playerProgress = soloAiStartAvailable ? 100 : minPlayers > 0 ? (roomPlayersForReadiness.length / minPlayers) * 100 : 100;
+        const playerProgress = minPlayers > 0 ? (startPlayerCount / minPlayers) * 100 : 100;
         const guestProgress = guests.length > 0 ? (readyGuestCount / guests.length) * 100 : 100;
         const waitingReason = !isWaiting
             ? "대기 상태에서만 시작할 수 있습니다."
@@ -3084,7 +3095,10 @@ export const LasVegasGame = () => {
                         : "시작 가능";
         return {
             canStart: Boolean(isHost && startSignalReady),
+            botCount: effectiveStartBotCount,
+            playerCount: startPlayerCount,
             soloAiStartAvailable,
+            startUsesBots,
             statusText: isHost
                 ? (startSignalReady ? (soloAiStartAvailable ? "AI와 시작 가능" : "방장 시작 가능") : waitingReason)
                 : (startSignalReady ? "방장 시작 대기" : waitingReason),
@@ -3130,7 +3144,7 @@ export const LasVegasGame = () => {
             ],
             ruleHint: "라스베가스는 인원 조건과 게스트 준비가 맞으면 방장이 시작합니다. 시작 후에는 주사위 굴림, 카지노 배팅, 라운드 정산이 서버 규칙대로 진행됩니다.",
         };
-    }, [hostMemberId, isHost, isWaiting, players, readyMemberIds, selectedRoom]);
+    }, [effectiveStartBotCount, hostMemberId, isHost, isWaiting, players, readyMemberIds, selectedRoom]);
     const canStart = Boolean(startReadiness?.canStart);
     const startStatusText = startReadiness?.statusText || "시작 대기";
     const winnerMemberId = state?.winnerMemberId || null;
@@ -3366,6 +3380,19 @@ export const LasVegasGame = () => {
             roundCount: String(selectedRoom.roundCount || 4),
             turnTimeSeconds: String(selectedRoom.turnTimeSeconds || 25),
         });
+    }, [selectedRoom]);
+
+    useEffect(() => {
+        if (!selectedRoom) {
+            setStartBotCount(0);
+            return;
+        }
+        const humanCount = Array.isArray(selectedRoom.players) ? selectedRoom.players.length : 0;
+        const minPlayers = toPlainInt(selectedRoom.minPlayers, 2);
+        const maxPlayers = toPlainInt(selectedRoom.maxPlayers, 6);
+        const openSeats = Math.max(0, maxPlayers - humanCount);
+        const defaultBots = humanCount === 1 && minPlayers > 1 ? Math.max(0, minPlayers - humanCount) : 0;
+        setStartBotCount(Math.min(defaultBots, openSeats));
     }, [selectedRoom]);
 
     useEffect(() => {
@@ -3727,7 +3754,10 @@ export const LasVegasGame = () => {
         }
         const roomId = normalizeRoomId(selectedRoom);
         try {
-            await lasVegasGameAdapter.startGame(roomId);
+            await lasVegasGameAdapter.startGame(
+                roomId,
+                effectiveStartBotCount > 0 ? { botCount: effectiveStartBotCount } : undefined
+            );
             await fetchState(roomId);
             await fetchRooms();
             notifySuccess("게임 시작");
@@ -3969,10 +3999,10 @@ export const LasVegasGame = () => {
                                         className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
                                         onClick={startGame}
                                         disabled={!canStart || loading}
-                                        aria-label={canStart ? `${selectedRoom.title} ${startReadiness?.soloAiStartAvailable ? "AI와 시작" : "게임 시작"}` : `${selectedRoom.title} 시작 대기: ${startStatusText}`}
-                                        title={canStart ? (startReadiness?.soloAiStartAvailable ? "AI와 시작" : "게임 시작") : startStatusText}
+                                        aria-label={canStart ? `${selectedRoom.title} ${startReadiness?.startUsesBots ? "AI와 시작" : "게임 시작"}` : `${selectedRoom.title} 시작 대기: ${startStatusText}`}
+                                        title={canStart ? (startReadiness?.startUsesBots ? "AI와 시작" : "게임 시작") : startStatusText}
                                     >
-                                        {canStart ? (startReadiness?.soloAiStartAvailable ? "AI와 시작" : "시작") : "시작 대기"}
+                                        {canStart ? (startReadiness?.startUsesBots ? "AI와 시작" : "시작") : "시작 대기"}
                                     </button>
                                 )}
                                 {isHost && isPlaying && (
@@ -4000,9 +4030,20 @@ export const LasVegasGame = () => {
                         )}
                         {isHost && isWaiting && (
                             <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
+                                <select
+                                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700"
+                                    value={effectiveStartBotCount}
+                                    onChange={(event) => setStartBotCount(toPlainInt(event.target.value, 0))}
+                                    aria-label="추가 AI 수"
+                                    title="추가 AI 수"
+                                >
+                                    {startBotOptions.map((count) => (
+                                        <option key={count} value={count}>AI {count}명</option>
+                                    ))}
+                                </select>
                                 <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.roundCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, roundCount: normalizeNumericText(e.target.value, 1, 10) }))} />
                                 <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumericText(e.target.value, 5, 180) }))} />
-                                <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white md:col-span-2" onClick={updateSettings}>방 설정 저장</button>
+                                <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white" onClick={updateSettings}>방 설정 저장</button>
                             </div>
                         )}
                     </div>

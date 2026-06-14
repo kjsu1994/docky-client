@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Gavel, Skull, Sun, Timer, Users, Volume2 } from "lucide-react";
 import UserAvatar from "../../common/UserAvatar.jsx";
+import { confirmAction } from "../../common/confirmAction.jsx";
 import { notifyError } from "../../utils/toast.js";
 import { GameFlowMeter, GameResultSpotlight } from "./GameUxAssets.jsx";
 
@@ -1389,7 +1390,7 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
             )}
           </div>
 
-          {actionType ? (
+          {(actionType || mySubmitted) ? (
             <div data-smoke="mafia-primary-action" className="mt-3 rounded-2xl border border-rose-100 bg-rose-50/70 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1404,62 +1405,80 @@ const MafiaBoard = ({ gameState, players: roomPlayers = [], mySeatNo, isHost = f
                 </div>
               </div>
 
-              <div data-smoke="mafia-target-grid" className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {targetPlayers.map((player) => {
-                  const seatNo = Number(get(player, "seat_no", "seatNo", 0));
-                  const selected = selectedTargetSeatNo === seatNo;
-                  const levelMeta = playerLevelMetaBySeat(seatNo);
-                  return (
-                    <button
-                      key={seatNo}
-                      type="button"
-                      data-smoke="mafia-target-button"
-                      data-seat-no={seatNo}
-                      onClick={() => setSelectedTargetSeatNo(seatNo)}
-                      aria-pressed={selected}
-                      className={`min-h-16 rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${selected ? "border-slate-900 bg-slate-900 text-white shadow-lg" : "border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:bg-rose-50"}`}
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <UserAvatar
-                          name={playerNameBySeat(seatNo)}
-                          profileUrl={playerProfileBySeat(seatNo)}
-                          level={levelMeta.level}
-                          rewardTier={levelMeta.rewardTier}
-                          frameCode={levelMeta.frameCode}
-                          size="xs"
-                        />
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-black">{playerNameBySeat(seatNo)}</div>
-                          <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}</div>
+              {targetPlayers.length ? (
+                <div data-smoke="mafia-target-grid" className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {targetPlayers.map((player) => {
+                    const seatNo = Number(get(player, "seat_no", "seatNo", 0));
+                    const selected = selectedTargetSeatNo === seatNo;
+                    const levelMeta = playerLevelMetaBySeat(seatNo);
+                    return (
+                      <button
+                        key={seatNo}
+                        type="button"
+                        data-smoke="mafia-target-button"
+                        data-seat-no={seatNo}
+                        onClick={() => setSelectedTargetSeatNo(seatNo)}
+                        aria-pressed={selected}
+                        className={`min-h-16 rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${selected ? "border-slate-900 bg-slate-900 text-white shadow-lg" : "border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:bg-rose-50"}`}
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <UserAvatar
+                            name={playerNameBySeat(seatNo)}
+                            profileUrl={playerProfileBySeat(seatNo)}
+                            level={levelMeta.level}
+                            rewardTier={levelMeta.rewardTier}
+                            frameCode={levelMeta.frameCode}
+                            size="xs"
+                          />
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-black">{playerNameBySeat(seatNo)}</div>
+                            <div className="text-[11px] font-bold opacity-70">좌석 {seatNo}</div>
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-3">
+                  <MafiaTargetEmptyBrief
+                    actionType={actionType}
+                    phaseLabel={phaseLabel}
+                    mySubmitted={mySubmitted}
+                    myAlive={myAlive}
+                    aliveMafia={aliveMafia}
+                    aliveTown={aliveTown}
+                    profile={actionProfile}
+                  />
+                </div>
+              )}
 
-              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
-                <div className="rounded-xl border border-white bg-white/80 px-3 py-2">
-                  <div className="text-[10px] font-black text-slate-400">확정 전 확인</div>
-                  <div className="mt-0.5 text-sm font-black text-slate-900">
-                    {selectedTargetName ? `${selectedTargetName}에게 ${actionType === "VOTE" ? "투표합니다" : "행동합니다"}` : submitDisabledReason}
+              {actionType && (
+                <>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
+                    <div className="rounded-xl border border-white bg-white/80 px-3 py-2">
+                      <div className="text-[10px] font-black text-slate-400">확정 전 확인</div>
+                      <div className="mt-0.5 text-sm font-black text-slate-900">
+                        {selectedTargetName ? `${selectedTargetName}에게 ${actionType === "VOTE" ? "투표합니다" : "행동합니다"}` : submitDisabledReason}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canSubmitTarget}
+                      onClick={submitTarget}
+                      data-smoke="mafia-submit-action"
+                      aria-busy={submittingTarget ? "true" : "false"}
+                      className="min-h-12 rounded-xl bg-rose-600 px-4 text-sm font-black text-white shadow-lg shadow-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {submitButtonLabel}
+                    </button>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={!canSubmitTarget}
-                  onClick={submitTarget}
-                  data-smoke="mafia-submit-action"
-                  aria-busy={submittingTarget ? "true" : "false"}
-                  className="min-h-12 rounded-xl bg-rose-600 px-4 text-sm font-black text-white shadow-lg shadow-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {submitButtonLabel}
-                </button>
-              </div>
-              {!canSubmitTarget && submitDisabledReason && (
-                <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-500">
-                  {submitDisabledReason}
-                </div>
+                  {!canSubmitTarget && submitDisabledReason && (
+                    <div className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-500">
+                      {submitDisabledReason}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : (

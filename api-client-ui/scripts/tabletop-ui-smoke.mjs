@@ -201,6 +201,7 @@ const mockState = {
   dalmutiEmptyHand: false,
   mafiaEmptyTargets: false,
   mafiaFinishedResult: false,
+  mafiaSecondDayVoting: false,
   pokerActionTurn: false,
   pokerFiveCardDraw: false,
 };
@@ -1792,6 +1793,24 @@ function mafiaSmokeGameState(room = roomFor("mafia", "host", "PLAYING")) {
   const finishedMode = Boolean(mockState.mafiaFinishedResult);
   const phaseEndsAt = finishedMode ? Date.now() : Date.now() + 30000;
   const emptyTargetsMode = Boolean(mockState.mafiaEmptyTargets);
+  const secondDayVoteMode = Boolean(mockState.mafiaSecondDayVoting);
+  const activePhase = finishedMode ? "FINISHED" : secondDayVoteMode ? "VOTING" : "NIGHT_MAFIA";
+  const activeRoundNo = secondDayVoteMode ? 2 : 1;
+  const viewerRole = secondDayVoteMode ? "POLICE" : "MAFIA";
+  const viewerTeam = secondDayVoteMode ? "TOWN" : "MAFIA";
+  const narratorLine = finishedMode
+    ? "Town wins after the final vote."
+    : secondDayVoteMode
+      ? "Day 2 voting is open. Choose a player to execute."
+      : "Night 1. Mafia chooses a target.";
+  const myTask = finishedMode
+    ? "The game is finished. Review the final result."
+    : emptyTargetsMode
+      ? "Your action was submitted. Wait for the host to advance."
+      : secondDayVoteMode
+        ? "Choose a player for the day vote."
+        : "Choose a mafia target.";
+  const availableActions = finishedMode || emptyTargetsMode ? [] : secondDayVoteMode ? ["VOTE"] : ["MAFIA_KILL"];
   return {
     game: "MAFIA",
     variantCode: "BASE",
@@ -1808,9 +1827,9 @@ function mafiaSmokeGameState(room = roomFor("mafia", "host", "PLAYING")) {
     alive_mafia_count: finishedMode ? 0 : 1,
     aliveTownCount: 4,
     alive_town_count: 4,
-    roundNo: 1,
-    round_no: 1,
-    phase: finishedMode ? "FINISHED" : "NIGHT_MAFIA",
+    roundNo: activeRoundNo,
+    round_no: activeRoundNo,
+    phase: activePhase,
     phaseStartedAt: Date.now() - 3000,
     phase_started_at: Date.now() - 3000,
     phaseEndsAt,
@@ -1823,34 +1842,34 @@ function mafiaSmokeGameState(room = roomFor("mafia", "host", "PLAYING")) {
     police_enabled: true,
     doctorEnabled: true,
     doctor_enabled: true,
-    narratorLine: finishedMode ? "시민팀이 마지막 투표로 마피아를 찾아냈습니다." : "1번째 밤입니다. 마피아는 제거할 대상을 고르세요.",
-    narrator_line: finishedMode ? "시민팀이 마지막 투표로 마피아를 찾아냈습니다." : "1번째 밤입니다. 마피아는 제거할 대상을 고르세요.",
+    narratorLine,
+    narrator_line: narratorLine,
     viewerSeatNo: 1,
     viewer_seat_no: 1,
-    myRole: "MAFIA",
-    my_role: "MAFIA",
-    myTeam: "MAFIA",
-    my_team: "MAFIA",
+    myRole: viewerRole,
+    my_role: viewerRole,
+    myTeam: viewerTeam,
+    my_team: viewerTeam,
     myAlive: true,
     my_alive: true,
     mySubmitted: finishedMode || emptyTargetsMode,
     my_submitted: finishedMode || emptyTargetsMode,
-    myTask: finishedMode ? "게임이 종료되었습니다. 최종 결과 해설을 확인하세요." : emptyTargetsMode ? "행동을 제출했습니다. 사회자 진행을 기다리세요." : "마피아 대상을 선택하세요. 마피아끼리 같은 사람을 고르면 성공합니다.",
-    my_task: finishedMode ? "게임이 종료되었습니다. 최종 결과 해설을 확인하세요." : emptyTargetsMode ? "행동을 제출했습니다. 사회자 진행을 기다리세요." : "마피아 대상을 선택하세요. 마피아끼리 같은 사람을 고르면 성공합니다.",
-    availableActions: finishedMode || emptyTargetsMode ? [] : ["MAFIA_KILL"],
-    available_actions: finishedMode || emptyTargetsMode ? [] : ["MAFIA_KILL"],
+    myTask,
+    my_task: myTask,
+    availableActions,
+    available_actions: availableActions,
     winnerTeam: finishedMode ? "TOWN" : "",
     winner_team: finishedMode ? "TOWN" : "",
     outcomeMessage: finishedMode ? "시민팀이 마지막 투표에서 마피아를 모두 제거했습니다." : "",
     outcome_message: finishedMode ? "시민팀이 마지막 투표에서 마피아를 모두 제거했습니다." : "",
-    mafiaSeatNos: [1],
-    mafia_seat_nos: [1],
+    mafiaSeatNos: secondDayVoteMode ? [] : [1],
+    mafia_seat_nos: secondDayVoteMode ? [] : [1],
     completedSeatNos: emptyTargetsMode ? [1] : [],
     completed_seat_nos: emptyTargetsMode ? [1] : [],
     votedSeatNos: [],
     voted_seat_nos: [],
     players: [
-      { seatNo: 1, seat_no: 1, role: "MAFIA", team: "MAFIA", alive: !finishedMode },
+      { seatNo: 1, seat_no: 1, role: viewerRole, team: viewerTeam, alive: !finishedMode },
       { seatNo: 2, seat_no: 2, role: "", team: "", alive: true },
       { seatNo: 3, seat_no: 3, role: "", team: "", alive: true },
       { seatNo: 4, seat_no: 4, role: "", team: "", alive: true },
@@ -1860,11 +1879,11 @@ function mafiaSmokeGameState(room = roomFor("mafia", "host", "PLAYING")) {
       {
         eventNo: 1,
         event_no: 1,
-        eventType: finishedMode ? "GAME_FINISHED" : "PHASE_NIGHT_MAFIA",
-        event_type: finishedMode ? "GAME_FINISHED" : "PHASE_NIGHT_MAFIA",
+        eventType: finishedMode ? "GAME_FINISHED" : secondDayVoteMode ? "PHASE_VOTING" : "PHASE_NIGHT_MAFIA",
+        event_type: finishedMode ? "GAME_FINISHED" : secondDayVoteMode ? "PHASE_VOTING" : "PHASE_NIGHT_MAFIA",
         seatNo: 0,
         seat_no: 0,
-        message: finishedMode ? "시민팀이 마지막 투표에서 마피아를 모두 제거했습니다." : "1번째 밤입니다. 마피아는 제거할 대상을 고르세요.",
+        message: narratorLine,
       },
     ],
   };
@@ -2448,6 +2467,14 @@ function assertRequest(game, kind, predicate, description) {
   }
 }
 
+function expectedSoloAiBotCount(game) {
+  const selectedVariant = variantsByGame[game]?.[0] || {};
+  const minPlayers = Number(selectedVariant.minPlayers || selectedVariant.min_players || 1);
+  const maxPlayers = Number(selectedVariant.maxPlayers || selectedVariant.max_players || minPlayers);
+  if (game === "poker") return Math.min(3, Math.max(0, maxPlayers - 1));
+  return Math.max(0, Math.min(maxPlayers - 1, minPlayers - 1));
+}
+
 function resetRoomFlowMockFlags() {
   mockState.dalmutiEmptyHand = false;
   mockState.blokusEmptyPieces = false;
@@ -2459,6 +2486,7 @@ function resetRoomFlowMockFlags() {
   mockState.citadelsSelectionPhase = false;
   mockState.mafiaEmptyTargets = false;
   mockState.mafiaFinishedResult = false;
+  mockState.mafiaSecondDayVoting = false;
   mockState.pokerActionTurn = false;
   mockState.pokerFiveCardDraw = false;
 }
@@ -2781,6 +2809,49 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-candidate"]').length === 0`, "mafia empty-target state has no selectable candidates");
     mockState.mafiaEmptyTargets = false;
 
+    mockState.mafiaSecondDayVoting = true;
+    await navigateToGame(ws, game);
+    await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 2일차 투표 검증 방`);
+    await clickButtonByText(ws, "방 만들기");
+    await waitForText(ws, "방 코드");
+    await waitForEnabledButton(ws, startButtonText);
+    await clickButtonByText(ws, startButtonText);
+    await waitForExpression(ws, `document.querySelector('[data-smoke="mafia-board"]')?.textContent.includes("2")`, "mafia second-day board rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mafia-target-button"]').length >= 3`, "mafia second-day vote target buttons rendered");
+    const secondDayTargetClicked = await evaluate(ws, `(() => {
+      const button = Array.from(document.querySelectorAll('[data-smoke="mafia-target-button"]')).find((node) => !node.disabled);
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`);
+    if (!secondDayTargetClicked) throw new Error("mafia second-day vote: selectable target button not found");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mafia-submit-action"]:not(:disabled)'))`, "mafia second-day vote submit action enabled");
+    const secondDaySubmitClicked = await evaluate(ws, `(() => {
+      const button = document.querySelector('[data-smoke="mafia-submit-action"]:not(:disabled)');
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`);
+    if (!secondDaySubmitClicked) throw new Error("mafia second-day vote: submit action button not clickable");
+    await waitForExpression(ws, `Boolean(document.querySelector('[role="alertdialog"]'))`, "mafia second-day vote confirmation dialog rendered");
+    const secondDayConfirmClicked = await evaluate(ws, `(() => {
+      const dialog = document.querySelector('[role="alertdialog"]');
+      const buttons = Array.from(dialog?.querySelectorAll('button') || []);
+      const confirm = buttons[buttons.length - 1];
+      if (!confirm || confirm.disabled) return false;
+      confirm.click();
+      return true;
+    })()`);
+    if (!secondDayConfirmClicked) throw new Error("mafia second-day vote: confirmation button not clickable");
+    await delay(300);
+    assertRequest(
+      "mafia",
+      "action",
+      (request) => request.body?.action_type === "VOTE" && Number(request.body?.target_seat_no) > 0,
+      "mafia second-day vote action request after target confirmation"
+    );
+    mockState.mafiaSecondDayVoting = false;
+
     mockState.mafiaFinishedResult = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 결과 해설 검증 방`);
@@ -2920,6 +2991,11 @@ async function assertSoloAiFirstActionAvailable(ws, game) {
     );
     return;
   }
+  if (game === "citadels") {
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="citadels-empty-hand-panel"], [data-smoke="citadels-action-availability-panel"], [data-smoke="citadels-selection-route-panel"], [data-smoke="citadels-character-order-panel"]'))`, "citadels solo AI play panel rendered");
+    await waitForExpression(ws, `Array.from(document.querySelectorAll("button")).some((button) => !button.disabled && /금화|구역|턴 종료/.test(button.textContent || ""))`, "citadels solo AI action buttons enabled");
+    return;
+  }
   throw new Error(`Unsupported solo AI first-action smoke game: ${game}`);
 }
 
@@ -2938,13 +3014,16 @@ async function runSoloAiRoomFlowSmoke(ws, game) {
     await clickButtonByText(ws, "방 만들기");
     await waitForText(ws, "방 코드");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="${game}-waiting-player-roster-item"]').length === 1`, `${game} solo AI waiting roster contains only host`);
-    await waitForEnabledButton(ws, "AI와 시작");
+    const startButtonText = game === "citadels" ? "AI와 시작하기" : "AI와 시작";
+    await waitForEnabledButton(ws, startButtonText);
+    const expectedBotCount = expectedSoloAiBotCount(game);
+    await waitForExpression(ws, `document.querySelector('[aria-label="추가 AI 수"]')?.value === "${expectedBotCount}"`, `${game} solo AI bot selector default`);
     assertRequest(game, "create", (request) => request.body?.title === title, "solo AI create-room POST payload");
 
-    await clickButtonByText(ws, "AI와 시작");
+    await clickButtonByText(ws, startButtonText);
     await waitForText(ws, "진행 중");
     await assertSoloAiFirstActionAvailable(ws, game);
-    assertRequest(game, "start", null, "solo AI start POST request");
+    assertRequest(game, "start", (request) => Number(request.body?.bot_count) === expectedBotCount, "solo AI start POST payload");
     return `${game} solo AI flow: ok create/ai-start/first-action`;
   } finally {
     mockState.roomFlowGame = null;
@@ -3405,7 +3484,7 @@ async function main() {
       flowResults.push(await runRoomFlowSmoke(cdp, game));
     }
     const soloAiResults = [];
-    const soloAiFlowGames = ["poker", "catan", "six-nimmt", "mafia"];
+    const soloAiFlowGames = ["poker", "catan", "six-nimmt", "mafia", "citadels"];
     for (const game of soloAiFlowGames) {
       soloAiResults.push(await runSoloAiRoomFlowSmoke(cdp, game));
     }

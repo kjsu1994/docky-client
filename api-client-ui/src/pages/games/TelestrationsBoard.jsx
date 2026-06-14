@@ -227,10 +227,26 @@ const TelestrationsEntry = ({
   playerCount = 0,
 }) => {
   const imageData = entry ? get(entry, "image_data", "imageData", "") : "";
+  const [imageSrc, setImageSrc] = useState("");
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     setImageFailed(false);
+    setImageSrc("");
+    if (!imageData) return undefined;
+    const dataUrlMatch = String(imageData).match(/^data:(image\/(?:png|jpe?g|webp));base64,(.+)$/i);
+    if (!dataUrlMatch) {
+      setImageSrc(imageData);
+      return undefined;
+    }
+    const mimeType = dataUrlMatch[1].toLowerCase() === "image/jpg" ? "image/jpeg" : dataUrlMatch[1].toLowerCase();
+    const payload = dataUrlMatch[2].replace(/\s+/g, "");
+    if (!payload) {
+      setImageFailed(true);
+      return undefined;
+    }
+    setImageSrc(`data:${mimeType};base64,${payload}`);
+    return undefined;
   }, [imageData]);
 
   if (!entry) {
@@ -259,10 +275,10 @@ const TelestrationsEntry = ({
         </span>
         <span className="text-[11px] font-black text-slate-400">{playerNameBySeat(authorSeatNo)}</span>
       </div>
-      {imageData && !imageFailed ? (
+      {imageSrc && !imageFailed ? (
         <div className={`${imageFrameClass} w-full overflow-hidden rounded-lg border border-slate-100 bg-white`} data-smoke="telestrations-entry-image-frame">
           <img
-            src={imageData}
+            src={imageSrc}
             alt={`${playerNameBySeat(authorSeatNo)} 그림`}
             className="block h-full w-full object-contain"
             loading="lazy"
@@ -1271,17 +1287,35 @@ const TelestrationsBoard = ({ gameState, players: roomPlayers = [], mySeatNo, is
   const imageFromCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return "";
-    let imageData = canvas.toDataURL("image/jpeg", 0.72);
-    if (imageData.length <= 150000) return imageData;
-    const scaled = document.createElement("canvas");
-    scaled.width = 480;
-    scaled.height = 315;
-    const context = scaled.getContext("2d");
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, scaled.width, scaled.height);
-    context.drawImage(canvas, 0, 0, scaled.width, scaled.height);
-    imageData = scaled.toDataURL("image/jpeg", 0.62);
-    return imageData;
+    const targetLength = 150000;
+    const candidates = [
+      { width: canvas.width, height: canvas.height, quality: 0.72 },
+      { width: 560, height: 368, quality: 0.66 },
+      { width: 480, height: 315, quality: 0.58 },
+      { width: 400, height: 263, quality: 0.5 },
+      { width: 320, height: 210, quality: 0.46 },
+      { width: 260, height: 171, quality: 0.42 },
+    ];
+    let best = "";
+    for (const candidate of candidates) {
+      const source = candidate.width === canvas.width && candidate.height === canvas.height
+        ? canvas
+        : document.createElement("canvas");
+      if (source !== canvas) {
+        source.width = candidate.width;
+        source.height = candidate.height;
+        const context = source.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, source.width, source.height);
+        context.drawImage(canvas, 0, 0, source.width, source.height);
+      }
+      const imageData = source.toDataURL("image/jpeg", candidate.quality);
+      best = imageData;
+      if (imageData.length <= targetLength) {
+        return imageData;
+      }
+    }
+    return best;
   };
 
   const submitPrompt = async () => {

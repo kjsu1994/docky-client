@@ -26,6 +26,7 @@ import {
   videoGameErrorMessage,
 } from "../../adapters/videoGameAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
+import GameRoomChatPanel from "../../common/GameRoomChatPanel.jsx";
 import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
@@ -5074,6 +5075,13 @@ export const GoodEtcVideoGame = () => {
                 )}
               </div>
             </section>
+
+            <GameRoomChatPanel
+              gameCode={videoGameCode}
+              roomId={getVideoGameRoomId(selectedRoom)}
+              resetKey={`${status}-${getVideoGameRoomCode(selectedRoom) || ""}`}
+              title="방 채팅"
+            />
           </main>
         </div>
       )}

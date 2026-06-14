@@ -355,6 +355,13 @@ class PipeCdp {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const encodeJson = (value) => Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 const encodeText = (value) => Buffer.from(value, "utf8").toString("base64");
+const parseJson = (value = "") => {
+    try {
+        return value ? JSON.parse(value) : {};
+    } catch {
+        return {};
+    }
+};
 
 const roomSummary = {
     room_id: 51,
@@ -457,9 +464,11 @@ let lasVegasRoomsEmpty = false;
 const runtimeErrors = [];
 const unmockedRequests = [];
 const apiRequests = [];
+const apiRequestBodies = [];
 
-function routeMock(url, method) {
+function routeMock(url, method, postData = "") {
     const { hostname, pathname } = new URL(url);
+    const body = parseJson(postData);
 
     if (method === "GET" && hostname === "oapi.map.naver.com") {
         return { status: 200, contentType: "application/javascript; charset=utf-8", bodyText: "" };
@@ -537,6 +546,12 @@ function routeMock(url, method) {
         return { status: 200, bodyText: "" };
     }
 
+    if (method === "POST" && pathname === "/api/game/las-vegas/rooms/51/start") {
+        apiRequestBodies.push({ method, pathname, body });
+        lasVegasStateMode = "playing";
+        return { status: 200, bodyText: "" };
+    }
+
     if (method === "GET" && (
         pathname === "/api/chat/room/951/messages"
         || pathname === "/api/chat/room/51/messages"
@@ -560,7 +575,7 @@ function routeMock(url, method) {
 async function handleFetchRequest(cdp, sessionId, event) {
     const { requestId, request } = event.params;
     apiRequests.push(`${request.method} ${request.url}`);
-    const mock = routeMock(request.url, request.method);
+    const mock = routeMock(request.url, request.method, request.postData || "");
     if (!mock) {
         unmockedRequests.push(`${request.method} ${request.url}`);
         await cdp.send("Fetch.continueRequest", { requestId }, sessionId);
@@ -1139,6 +1154,13 @@ async function inspectLasVegas(cdp, sessionId, viewport) {
         await waitForText(cdp, sessionId, "설정 저장 완료");
         await waitForText(cdp, sessionId, "60초");
         await clickButtonByText(cdp, sessionId, "준비하기");
+        await waitFor(cdp, sessionId, `document.querySelector('[aria-label="추가 AI 수"]')?.value === "1"`, "las vegas AI bot selector default");
+        await clickButtonByText(cdp, sessionId, "AI와 시작");
+        await delay(300);
+        const startRequest = apiRequestBodies.find((request) => request.pathname === "/api/game/las-vegas/rooms/51/start");
+        if (Number(startRequest?.body?.bot_count) !== 1) {
+            throw new Error(`las-vegas-ui-smoke: AI start must send bot_count 1 ${JSON.stringify(startRequest || null)}`);
+        }
         lasVegasStateMode = "finished";
         await evaluate(cdp, sessionId, `localStorage.setItem("las_vegas_last_room_id", "51"); true`);
         await cdp.send("Page.navigate", { url: `${baseUrl}/app/games/las-vegas` }, sessionId);

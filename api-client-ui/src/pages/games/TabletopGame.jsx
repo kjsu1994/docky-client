@@ -37,7 +37,7 @@ import UserAvatar from "../../common/UserAvatar.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameUxGlyph, PlayingCardArt, playingCardSuitLabel } from "./GameUxAssets.jsx";
 import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
-import { canUseTabletopSoloAiStart } from "./tabletopStartPolicy.js";
+import { canUseTabletopSoloAiStart, supportsTabletopAiBotStart } from "./tabletopStartPolicy.js";
 
 const PokerBoard = lazy(() => import("./PokerBoard.jsx").then((module) => ({ default: module.PokerBoard })));
 const CatanBoard = lazy(() => import("./CatanBoard.jsx").then((module) => ({ default: module.CatanBoard })));
@@ -2380,6 +2380,21 @@ const maxPlayersOf = (room) => Number(room?.maxPlayers || 0);
 const minPlayersOf = (room) => Number(room?.minPlayers || 0);
 const hostMemberIdOf = (room) => Number(room?.hostMemberId || 0);
 const turnSecondsOf = (room) => Number(room?.turnTimeSeconds || 30);
+const clampTabletopBotCount = (value, minValue = 0, maxValue = 0) => {
+  const parsed = Math.floor(Number(value || 0));
+  const safeValue = Number.isFinite(parsed) ? parsed : 0;
+  return Math.max(minValue, Math.min(maxValue, safeValue));
+};
+const defaultStartBotCountForRoom = (game, room) => {
+  const playerCount = playersOf(room).length;
+  const minPlayers = minPlayersOf(room);
+  const maxPlayers = maxPlayersOf(room);
+  if (!supportsTabletopAiBotStart(game, minPlayers) || playerCount <= 0 || maxPlayers <= playerCount) return 0;
+  if (String(game || "").toLowerCase() === "poker" && playerCount === 1) {
+    return Math.min(3, maxPlayers - playerCount);
+  }
+  return Math.max(0, Math.min(maxPlayers - playerCount, minPlayers - playerCount));
+};
 
 const tabletopTurnSeatForSound = (game, gameState) => {
   if (!gameState || gameState.phase === "FINISHED") return 0;
@@ -2420,6 +2435,34 @@ const tabletopPlayerName = (players, seatNo) => {
   const normalizedSeatNo = Number(seatNo || 0);
   if (!normalizedSeatNo) return "-";
   return players.find((player) => seatNoOf(player) === normalizedSeatNo)?.nickname || `${normalizedSeatNo}번`;
+};
+
+const tabletopBotProfiles = (gameState) => listOf(get(gameState, "bot_profiles", "botProfiles", []))
+  .map((profile) => ({
+    seatNo: Number(get(profile, "seat_no", "seatNo", 0)),
+    name: String(get(profile, "name", "name", "") || ""),
+    archetype: String(get(profile, "archetype", "archetype", "") || ""),
+    styleSummary: String(get(profile, "style_summary", "styleSummary", "") || ""),
+  }))
+  .filter((profile) => profile.seatNo > 0);
+
+const tabletopPlayersWithBotProfiles = (players, gameState) => {
+  const realPlayers = Array.isArray(players) ? players : [];
+  const occupiedSeats = new Set(realPlayers.map(seatNoOf).filter(Boolean));
+  const botPlayers = tabletopBotProfiles(gameState)
+    .filter((profile) => !occupiedSeats.has(profile.seatNo))
+    .map((profile) => ({
+      memberId: 0,
+      seatNo: profile.seatNo,
+      nickname: profile.name || `AI ${profile.seatNo}`,
+      profileUrl: "",
+      level: 0,
+      rewardTier: "",
+      frameCode: "",
+      __bot: true,
+      __botProfile: profile,
+    }));
+  return [...realPlayers, ...botPlayers].sort((left, right) => seatNoOf(left) - seatNoOf(right));
 };
 
 const tabletopPhaseLabel = (game, gameState, status) => {
@@ -6216,11 +6259,13 @@ export const TabletopGame = ({ game }) => {
   const [loadError, setLoadError] = useState("");
   const [createForm, setCreateForm] = useState({ title: "", variantCode: "BASE", turnTimeSeconds: "30" });
   const [settingsForm, setSettingsForm] = useState({ variantCode: "BASE", turnTimeSeconds: "30" });
+  const [startBotCount, setStartBotCount] = useState(0);
   const stompRef = useRef(null);
   const stompInitRef = useRef(null);
   const gameSubRef = useRef(null);
   const busyRef = useRef(false);
   const actionBusyRef = useRef(false);
+  const startRoomKeyRef = useRef("");
   const lobbyLoadSeqRef = useRef(0);
   const roomOpenSeqRef = useRef(0);
   const mountedRef = useRef(false);
@@ -6237,6 +6282,7 @@ export const TabletopGame = ({ game }) => {
 
   const myMemberId = Number(user?.member_id || user?.memberId || user?.id || 0);
   const players = playersOf(selectedRoom);
+  const displayPlayers = useMemo(() => tabletopPlayersWithBotProfiles(players, gameState), [players, gameState]);
   const mySeatNo = seatNoOf(players.find((player) => memberIdOf(player) === myMemberId));
   const syncMySeatNoFromRoom = (room) => {
     const seatNo = seatNoOf(playersOf(room).find((player) => memberIdOf(player) === myMemberId));
@@ -6256,14 +6302,29 @@ export const TabletopGame = ({ game }) => {
   const enoughPlayers = roomPlayerCount >= roomMinPlayers;
   const withinMaxPlayers = roomMaxPlayers <= 0 || roomPlayerCount <= roomMaxPlayers;
   const soloAiStartAvailable = canUseTabletopSoloAiStart({ game, playerCount: roomPlayerCount, minPlayers: roomMinPlayers });
-  const startPlayerRequirementMet = (enoughPlayers || soloAiStartAvailable) && withinMaxPlayers;
+  const aiBotStartSupported = supportsTabletopAiBotStart(game, roomMinPlayers);
+  const startBotMin = aiBotStartSupported
+    ? Math.max(String(game || "").toLowerCase() === "poker" && roomPlayerCount === 1 ? 1 : 0, roomMinPlayers - roomPlayerCount)
+    : 0;
+  const startBotMax = aiBotStartSupported && roomMaxPlayers > roomPlayerCount ? roomMaxPlayers - roomPlayerCount : 0;
+  const effectiveStartBotCount = aiBotStartSupported
+    ? clampTabletopBotCount(startBotCount, startBotMin, startBotMax)
+    : 0;
+  const startPlayerCount = roomPlayerCount + effectiveStartBotCount;
+  const startUsesBots = effectiveStartBotCount > 0;
+  const startBotOptions = aiBotStartSupported && startBotMax >= startBotMin
+    ? Array.from({ length: startBotMax - startBotMin + 1 }, (_, index) => startBotMin + index)
+    : [];
+  const showStartBotSelector = isHost && status === "WAITING" && startBotMax > 0 && startBotOptions.length > 0;
+  const startWithinMaxPlayers = roomMaxPlayers <= 0 || startPlayerCount <= roomMaxPlayers;
+  const startPlayerRequirementMet = startPlayerCount >= roomMinPlayers && withinMaxPlayers && startWithinMaxPlayers;
   const startChecks = [
     {
       key: "players",
       done: startPlayerRequirementMet,
       label: "인원 조건",
-      detail: soloAiStartAvailable
-        ? `${roomPlayerCount}/${roomMaxPlayers || "-"}명 · 공식 최소 ${roomMinPlayers}명, 부족 좌석 AI 보충`
+      detail: startUsesBots
+        ? `${roomPlayerCount}+AI ${effectiveStartBotCount}/${roomMaxPlayers || "-"}명 · 최소 ${roomMinPlayers}명`
         : `${roomPlayerCount}/${roomMaxPlayers || "-"}명 · 최소 ${roomMinPlayers}명`,
     },
     {
@@ -6289,6 +6350,29 @@ export const TabletopGame = ({ game }) => {
   const selectedSettingsVariant = useMemo(() => variants.find((variant) => variant.code === settingsForm.variantCode), [variants, settingsForm.variantCode]);
   const selectedRoomVariant = useMemo(() => variantForRoom(selectedRoom, variants), [selectedRoom, variants]);
   useEffect(() => {
+    if (!selectedRoom || status !== "WAITING") {
+      startRoomKeyRef.current = "";
+      setStartBotCount(0);
+      return;
+    }
+    const roomKey = [
+      game,
+      idOf(selectedRoom) || "",
+      variantCodeOf(selectedRoom),
+      roomPlayerCount,
+      roomMinPlayers,
+      roomMaxPlayers,
+    ].join(":");
+    const nextBase = startRoomKeyRef.current === roomKey
+      ? startBotCount
+      : defaultStartBotCountForRoom(game, selectedRoom);
+    startRoomKeyRef.current = roomKey;
+    const nextCount = clampTabletopBotCount(nextBase, startBotMin, startBotMax);
+    if (nextCount !== startBotCount) {
+      setStartBotCount(nextCount);
+    }
+  }, [game, roomMaxPlayers, roomMinPlayers, roomPlayerCount, selectedRoom, startBotCount, startBotMax, startBotMin, status]);
+  useEffect(() => {
     const stateVariantCode = get(gameState, "variant_code", "variantCode", "");
     const stateMode = get(gameState, "mode", "mode", "");
     const roomVariantCode = selectedRoom ? variantCodeOf(selectedRoom) : "";
@@ -6313,8 +6397,8 @@ export const TabletopGame = ({ game }) => {
   const startRuleHint = `${selectedRoomVariantName}은 ${selectedRoomPlayerRangeText} 규칙입니다. ${
     selectedRoomVariantTags.length ? `핵심 규칙: ${selectedRoomVariantTags.join(" · ")}. ` : ""
   }게스트가 모두 준비하면 방장이 시작할 수 있습니다.`;
-  const effectiveStartRuleHint = soloAiStartAvailable
-    ? `${startRuleHint} 방장 단독 시작 시 부족 좌석은 AI가 채웁니다. 공식 인원 표기는 그대로 유지됩니다.`
+  const effectiveStartRuleHint = startUsesBots
+    ? `${startRuleHint} 선택한 AI ${effectiveStartBotCount}명을 추가해 ${startPlayerCount}명으로 시작합니다.`
     : startRuleHint;
   const settingsDisabledVariantCodes = useMemo(() => {
     const playerCount = players.length;
@@ -6896,7 +6980,8 @@ export const TabletopGame = ({ game }) => {
     try {
       setBusy(true);
       const roomId = idOf(selectedRoom);
-      await tabletopGameAdapter.startGame(game, roomId);
+      const startOptions = startUsesBots ? { botCount: effectiveStartBotCount } : undefined;
+      await tabletopGameAdapter.startGame(game, roomId, startOptions);
       try {
         await fetchState(roomId, roomOpenSeqRef.current);
       } catch (error) {
@@ -7287,9 +7372,25 @@ export const TabletopGame = ({ game }) => {
                     {myReady ? "준비 취소" : "준비하기"}
                   </button>
                 )}
+                {showStartBotSelector && (
+                  <label className="flex min-h-11 items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+                    <span className="shrink-0">AI</span>
+                    <select
+                      className="min-h-7 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-black text-emerald-900"
+                      value={effectiveStartBotCount}
+                      aria-label="추가 AI 수"
+                      disabled={busy}
+                      onChange={(event) => setStartBotCount(clampTabletopBotCount(event.target.value, startBotMin, startBotMax))}
+                    >
+                      {startBotOptions.map((count) => (
+                        <option key={count} value={count}>{count}명</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {isHost && status === "WAITING" && (
                   <button className="min-h-11 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white disabled:opacity-40" disabled={!canStart || busy} onClick={startGame} aria-label={canStart ? `${selectedRoom.title} 게임 시작` : `${selectedRoom.title} 시작 대기: ${startStatusText}`} title={canStart ? effectiveStartRuleHint : startStatusText}>
-                    {canStart ? (soloAiStartAvailable ? "AI와 시작" : "시작") : "시작 대기"}
+                    {canStart ? (startUsesBots || soloAiStartAvailable ? "AI와 시작" : "시작") : "시작 대기"}
                   </button>
                 )}
                 <button className="min-h-11 rounded-xl bg-rose-50 px-4 py-2 text-sm font-black text-rose-600 disabled:opacity-40" disabled={busy} onClick={leaveRoom} aria-label={`${selectedRoom.title} 방 퇴장`}>
@@ -7301,7 +7402,7 @@ export const TabletopGame = ({ game }) => {
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
               <div className="rounded-xl bg-slate-50 px-3 py-2" role="status" aria-live="polite" aria-atomic="true"><div className="font-black text-slate-700">상태</div><div className="font-bold text-slate-500">{statusLabels[status] || status}</div></div>
               <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">규칙</div><div className="font-bold text-slate-500">{variantGroupLabel(game, selectedRoomVariant)}</div></div>
-              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">인원</div><div className="font-bold text-slate-500">{players.length}/{maxPlayersOf(selectedRoom)}명</div></div>
+              <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">인원</div><div className="font-bold text-slate-500">{status === "WAITING" && startUsesBots ? `${players.length}+AI ${effectiveStartBotCount}/${maxPlayersOf(selectedRoom)}명` : `${players.length}/${maxPlayersOf(selectedRoom)}명`}</div></div>
             </div>
 
             {isHost && status === "WAITING" && (
@@ -7406,31 +7507,31 @@ export const TabletopGame = ({ game }) => {
               </Suspense>
             ) : game === "catan" && gameState ? (
               <Suspense fallback={<TabletopBoardFallback />}>
-                <CatanBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
+                <CatanBoard gameState={gameState} players={displayPlayers} mySeatNo={mySeatNo} onAction={sendAction} />
               </Suspense>
             ) : game === "mahe" && gameState ? (
               <Suspense fallback={<TabletopBoardFallback />}>
-                <MaheBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
+                <MaheBoard gameState={gameState} players={displayPlayers} mySeatNo={mySeatNo} onAction={sendAction} />
               </Suspense>
             ) : game === "dalmuti" && gameState ? (
               <Suspense fallback={<TabletopBoardFallback />}>
-                <DalmutiBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
+                <DalmutiBoard gameState={gameState} players={displayPlayers} mySeatNo={mySeatNo} onAction={sendAction} />
               </Suspense>
             ) : game === "six-nimmt" && gameState ? (
               <Suspense fallback={<TabletopBoardFallback />}>
-                <SixNimmtBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
+                <SixNimmtBoard gameState={gameState} players={displayPlayers} mySeatNo={mySeatNo} onAction={sendAction} />
               </Suspense>
             ) : game === "telestrations" && gameState ? (
               <Suspense fallback={<TabletopBoardFallback />}>
-                <TelestrationsBoard gameState={gameState} players={players} mySeatNo={mySeatNo} isHost={isHost} onAction={sendAction} />
+                <TelestrationsBoard gameState={gameState} players={displayPlayers} mySeatNo={mySeatNo} isHost={isHost} onAction={sendAction} />
               </Suspense>
             ) : game === "mafia" && gameState ? (
               <Suspense fallback={<TabletopBoardFallback />}>
-                <MafiaBoard gameState={gameState} players={players} mySeatNo={mySeatNo} isHost={isHost} onAction={sendAction} />
+                <MafiaBoard gameState={gameState} players={displayPlayers} mySeatNo={mySeatNo} isHost={isHost} onAction={sendAction} />
               </Suspense>
             ) : game === "poker" && gameState ? (
               <Suspense fallback={<TabletopBoardFallback />}>
-                <PokerBoard gameState={gameState} players={players} mySeatNo={mySeatNo} onAction={sendAction} />
+                <PokerBoard gameState={gameState} players={displayPlayers} mySeatNo={mySeatNo} onAction={sendAction} />
               </Suspense>
             ) : null}
 
@@ -7438,7 +7539,7 @@ export const TabletopGame = ({ game }) => {
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <div />
                 <aside className="space-y-4">
-                  <PlayersPanel game={game} gameState={gameState} players={players} selectedRoom={selectedRoom} status={status} mySeatNo={mySeatNo} />
+                  <PlayersPanel game={game} gameState={gameState} players={displayPlayers} selectedRoom={selectedRoom} status={status} mySeatNo={mySeatNo} />
                 </aside>
               </div>
             )}
@@ -7523,6 +7624,8 @@ const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo
           const mine = Number(mySeatNo) === seatNo;
           const winner = winnerSeatNos.has(seatNo);
           const scoreText = tabletopPlayerPanelScore(game, gameState, seatNo);
+          const botProfile = player.__botProfile || null;
+          const bot = Boolean(player.__bot || botProfile);
           const cardTone = winner
             ? "border-emerald-200 bg-emerald-50"
             : active
@@ -7534,6 +7637,7 @@ const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo
             winner ? { key: "winner", label: "승리", className: "bg-emerald-600 text-white" } : null,
             active && !winner ? { key: "active", label: "현재 차례", className: "bg-amber-100 text-amber-800" } : null,
             mine && !winner ? { key: "mine", label: "내 좌석", className: "bg-sky-100 text-sky-700" } : null,
+            bot && !winner ? { key: "bot", label: "AI", className: "bg-violet-100 text-violet-700" } : null,
           ].filter(Boolean);
           return (
             <div key={pid || seatNo} className={`rounded-xl border px-3 py-2 ${cardTone}`} data-smoke="tabletop-player-card">
@@ -7552,6 +7656,11 @@ const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo
                     <div className="truncate text-[11px] font-bold text-slate-500">
                       좌석 {seatNo || "-"}{host ? " · 방장" : ""}{scoreText ? ` · ${scoreText}` : ""}
                     </div>
+                    {botProfile && (
+                      <div className="mt-0.5 truncate text-[10px] font-bold text-violet-600" data-smoke="tabletop-bot-profile">
+                        {botProfile.archetype || "AI"}{botProfile.styleSummary ? ` - ${botProfile.styleSummary}` : ""}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {!!tags.length && (

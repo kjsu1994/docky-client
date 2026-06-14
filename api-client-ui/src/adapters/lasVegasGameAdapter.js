@@ -141,6 +141,15 @@ const toSettingsPayload = ({ title, roundCount, turnTimeSeconds } = {}) => ({
     turn_time_seconds: toNumber(turnTimeSeconds, 25),
 });
 
+const toStartPayload = (options = {}) => {
+    if (!options || typeof options !== "object") return undefined;
+    if (!Object.prototype.hasOwnProperty.call(options, "botCount")
+        && !Object.prototype.hasOwnProperty.call(options, "bot_count")) {
+        return undefined;
+    }
+    return { bot_count: Math.max(0, Math.floor(toNumber(pick(options, "botCount", "bot_count", 0)))) };
+};
+
 export const lasVegasGameAdapter = {
     async fetchRooms() {
         const response = await api.get("/game/las-vegas/rooms");
@@ -181,7 +190,12 @@ export const lasVegasGameAdapter = {
         await api.post(`/game/las-vegas/rooms/${roomId}/ready`);
     },
 
-    async startGame(roomId) {
+    async startGame(roomId, options) {
+        const payload = toStartPayload(options);
+        if (payload) {
+            await api.post(`/game/las-vegas/rooms/${roomId}/start`, payload);
+            return;
+        }
         await api.post(`/game/las-vegas/rooms/${roomId}/start`);
     },
 

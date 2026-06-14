@@ -156,6 +156,16 @@ export const buildTabletopRoomPayload = ({ title, variantCode, turnTimeSeconds }
     turn_time_seconds: toNumber(turnTimeSeconds, 30),
 });
 
+export const buildTabletopStartPayload = (options = {}) => {
+    if (!options || typeof options !== "object") return undefined;
+    if (!Object.prototype.hasOwnProperty.call(options, "botCount")
+        && !Object.prototype.hasOwnProperty.call(options, "bot_count")) {
+        return undefined;
+    }
+    const botCount = Math.max(0, Math.floor(toNumber(pick(options, "botCount", "bot_count", 0))));
+    return { bot_count: botCount };
+};
+
 export const buildTabletopActionPayload = (payload = {}) => {
     const next = {};
     assignIfPresent(next, "action_type", pick(payload, "actionType", "action_type"));
@@ -229,7 +239,12 @@ export const tabletopGameAdapter = {
         await api.post(`/game/${gameCode}/rooms/${roomId}/ready`);
     },
 
-    async startGame(gameCode, roomId) {
+    async startGame(gameCode, roomId, options) {
+        const payload = buildTabletopStartPayload(options);
+        if (payload) {
+            await api.post(`/game/${gameCode}/rooms/${roomId}/start`, payload);
+            return;
+        }
         await api.post(`/game/${gameCode}/rooms/${roomId}/start`);
     },
 
