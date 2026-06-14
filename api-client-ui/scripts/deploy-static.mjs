@@ -17,6 +17,11 @@ const preDeployAssertScript = path.resolve(
   projectRoot,
   process.env.STATIC_PRE_DEPLOY_ASSERT_SCRIPT || "../../compose-safe-repo/scripts/assert-pre-deploy-readiness.ps1"
 );
+const finalDeployInputEvidencePath = process.env.STATIC_FINAL_DEPLOY_INPUT_EVIDENCE_PATH || "C:/compose/logs/final-deploy-input-preflight.json";
+const finalDeployInputAssertScript = path.resolve(
+  projectRoot,
+  process.env.STATIC_FINAL_DEPLOY_INPUT_ASSERT_SCRIPT || "../../compose-safe-repo/scripts/assert-final-deploy-inputs.ps1"
+);
 const powershellExecutable = process.env.POWERSHELL_EXE || "powershell.exe";
 
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
@@ -85,6 +90,35 @@ const assertPreDeployReadiness = () => {
   }
   if (result.status !== 0) {
     throw new Error(`[deploy-static] pre-deploy readiness assertion failed with exit code ${result.status}.`);
+  }
+};
+
+const assertFinalDeployInputs = () => {
+  if (!fs.existsSync(finalDeployInputAssertScript)) {
+    throw new Error(`[deploy-static] final deploy input preflight script not found: ${finalDeployInputAssertScript}`);
+  }
+
+  const result = spawnSync(
+    powershellExecutable,
+    [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      finalDeployInputAssertScript,
+      "-ReadinessEvidencePath",
+      preDeployReadinessEvidencePath,
+      "-EvidencePath",
+      finalDeployInputEvidencePath,
+    ],
+    { stdio: "inherit" }
+  );
+
+  if (result.error) {
+    throw new Error(`[deploy-static] final deploy input preflight failed to start: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    throw new Error(`[deploy-static] final deploy input preflight failed with exit code ${result.status}.`);
   }
 };
 
@@ -185,6 +219,7 @@ if (!fs.existsSync(targetRoot)) {
 }
 
 assertPreDeployReadiness();
+assertFinalDeployInputs();
 assertSourceMatchesReadiness();
 rotateCurrent();
 pruneOldReleases();
