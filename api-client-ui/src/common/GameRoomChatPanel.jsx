@@ -8,7 +8,12 @@ import {
   normalizeGameRoomChatMessage,
 } from "../adapters/gameRoomChatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../adapters/realtimeAdapter.js";
-import { compareMessagesByChronology } from "../adapters/chatAdapter.js";
+import {
+  getLatestPersistentMessageId,
+  mergeIncomingMessage,
+  normalizeReplayMessageEvent,
+} from "../adapters/chatAdapter.js";
+import { realtimeReplayAdapter } from "../adapters/realtimeReplayAdapter.js";
 import { notifyError } from "../utils/toast.js";
 import UserAvatar from "./UserAvatar.jsx";
 
@@ -27,6 +32,7 @@ export const GameRoomChatPanel = ({
   const subRef = useRef(null);
   const scrollRef = useRef(null);
   const mountedRef = useRef(false);
+  const messagesRef = useRef([]);
 
   const normalizedRoomId = Number(roomId || 0);
   const canUseChat = Boolean(gameCode && normalizedRoomId > 0);
@@ -37,6 +43,10 @@ export const GameRoomChatPanel = ({
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     if (!canUseChat) {
@@ -99,9 +109,31 @@ export const GameRoomChatPanel = ({
             return;
           }
           if (payload) {
-            setMessages((prev) => [...prev, payload].sort(compareMessagesByChronology));
+            setMessages((prev) => mergeIncomingMessage(prev, payload));
           }
         });
+        const afterMessageId = getLatestPersistentMessageId(messagesRef.current);
+        if (afterMessageId) {
+          realtimeReplayAdapter.fetchGameRoomChat(gameCode, normalizedRoomId, { afterMessageId, limit: 50 })
+            .then((replay) => {
+              if (!active || !mountedRef.current) return;
+              if (replay.fullSyncRequired) {
+                gameRoomChatAdapter.fetchMessages(gameCode, normalizedRoomId)
+                  .then((items) => active && mountedRef.current && setMessages(items))
+                  .catch(() => {});
+                return;
+              }
+              const replayedMessages = replay.events.map(normalizeReplayMessageEvent).filter(Boolean);
+              if (replayedMessages.length) {
+                setMessages((prev) => replayedMessages.reduce(mergeIncomingMessage, prev));
+              }
+            })
+            .catch(() => {
+              gameRoomChatAdapter.fetchMessages(gameCode, normalizedRoomId)
+                .then((items) => active && mountedRef.current && setMessages(items))
+                .catch(() => {});
+            });
+        }
       };
       client.onDisconnect = () => {
         if (mountedRef.current) setConnected(false);

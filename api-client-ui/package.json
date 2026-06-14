@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/deploy-static.mjs",
+    "build": "vite build",
     "build:bundle": "vite build",
+    "build:deploy": "node scripts/deploy-static.mjs --confirm-current-switch",
+    "deploy:static": "node scripts/deploy-static.mjs --confirm-current-switch",
     "preview": "vite preview",
     "smoke:auth-ui": "node scripts/auth-ui-smoke.mjs",
     "smoke:home-ui": "node scripts/home-ui-smoke.mjs",

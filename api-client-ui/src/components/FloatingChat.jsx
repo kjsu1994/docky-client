@@ -43,14 +43,18 @@ import {
     getRoomKey,
     getRoomPreviewText,
     getUnreadCount,
+    MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
+    getLatestPersistentMessageId,
     hasPersistentMessageId,
     isMatchingOptimisticMessage,
     isSamePersistentMessage,
-    MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
+    mergeIncomingMessage,
     normalizeMessage,
+    normalizeReplayMessageEvent,
     isAiRoom,
 } from "../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../adapters/realtimeAdapter.js";
+import { realtimeReplayAdapter } from "../adapters/realtimeReplayAdapter.js";
 import AuthenticatedAttachmentImage from "./AuthenticatedAttachmentImage.jsx";
 
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
@@ -83,13 +87,22 @@ const hasOlderMessages = (pageInfo) =>
     Number(pageInfo?.totalPages || 0) > Number(pageInfo?.currentPage || 1);
 
 const mergeMessagePages = (olderMessages, currentMessages) => {
-    const seen = new Set();
     return [...olderMessages, ...currentMessages].reduce((acc, message) => {
         const normalized = normalizeMessage(message);
         if (!normalized) return acc;
-        const key = normalized.messageId || normalized.id || normalized.key;
-        if (seen.has(key)) return acc;
-        seen.add(key);
+
+        const duplicateIndex = acc.findIndex((existing) =>
+            isSamePersistentMessage(existing, normalized)
+            || isMatchingOptimisticMessage(existing, normalized)
+            || (!hasPersistentMessageId(normalized) && existing.key && existing.key === normalized.key)
+        );
+        if (duplicateIndex >= 0) {
+            if (isMatchingOptimisticMessage(acc[duplicateIndex], normalized)) {
+                acc[duplicateIndex] = normalized;
+            }
+            return acc;
+        }
+
         acc.push(normalized);
         return acc;
     }, []).sort(compareMessagesByChronology);
@@ -148,6 +161,7 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
     const modalDescriptionId = useId();
 
     const messagesEndRef = useRef(null);
+    const messagesRef = useRef([]);
     const fileInputRef = useRef(null);
     const chatRootRef = useRef(null);
     const launcherRef = useRef(null);
@@ -252,6 +266,10 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
     };
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     useEffect(() => {
         if (skipNextAutoScrollRef.current) {
@@ -474,6 +492,8 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
         const roomId = getRoomId(currentRoom);
         if (!client || !isConnected || !roomId) return;
 
+        let active = true;
+        const replayAfterMessageId = getLatestPersistentMessageId(messagesRef.current);
         fetchMessages(roomId);
         fetchCurrentMembers(roomId);
 
@@ -483,31 +503,37 @@ export const FloatingChat = ({ initialOpen = false } = {}) => {
             const receivedMessage = JSON.parse(message.body);
             const normalized = normalizeMessage(receivedMessage);
             if (normalized) {
-                setMessages((prev) => {
-                    // 1. 서버가 내려준 실제 ID가 이미 목록에 있는지 확인한다.
-                    const existsById = prev.find(m => isSamePersistentMessage(m, normalized));
-                    if (existsById) return prev;
-
-                    // 2. 내가 보낸 낙관적 메시지는 서버 응답으로 교체한다.
-                    const optimisticMatch = prev.find(m => isMatchingOptimisticMessage(m, normalized));
-                    if (optimisticMatch) {
-                        return prev
-                            .map(m => m.id === optimisticMatch.id ? normalized : m)
-                            .sort(compareMessagesByChronology);
-                    }
-
-                    // 3. 서버 ID가 없는 fallback 메시지만 fingerprint 기준으로 중복 제거한다.
-                    const isDuplicate = !hasPersistentMessageId(normalized) && prev.some(m => m.key === normalized.key);
-                    if (isDuplicate) return prev;
-
-                    return [...prev, normalized].sort(compareMessagesByChronology);
-                });
+                setMessages((prev) => mergeIncomingMessage(prev, normalized));
                 upsertRoomPreview(roomId, getLastMessagePreview(normalized), normalized.createdAt, 0);
                 markRoomAsRead(roomId);
             }
         });
 
-        return () => { subscription.unsubscribe(); };
+        if (replayAfterMessageId) {
+            realtimeReplayAdapter.fetchChatRoom(roomId, { afterMessageId: replayAfterMessageId, limit: 50 })
+                .then((replay) => {
+                    if (!active) return;
+                    if (replay.fullSyncRequired) {
+                        fetchMessages(roomId);
+                        return;
+                    }
+                    const replayedMessages = replay.events.map(normalizeReplayMessageEvent).filter(Boolean);
+                    if (replayedMessages.length) {
+                        setMessages((prev) => replayedMessages.reduce(mergeIncomingMessage, prev));
+                        const lastReplayed = replayedMessages[replayedMessages.length - 1];
+                        upsertRoomPreview(roomId, getLastMessagePreview(lastReplayed), lastReplayed.createdAt, 0);
+                        markRoomAsRead(roomId);
+                    }
+                })
+                .catch(() => {
+                    if (active) fetchMessages(roomId);
+                });
+        }
+
+        return () => {
+            active = false;
+            subscription.unsubscribe();
+        };
     }, [isConnected, currentRoom, user]);
 
     useEffect(() => {

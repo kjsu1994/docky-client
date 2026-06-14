@@ -62,6 +62,7 @@ const ROLE_LABELS = {
 };
 
 const SOURCE_LABELS = {
+    realtimeOperations: "Realtime",
     summary: "통계",
     events: "이벤트",
     kpi: "KPI",
@@ -84,6 +85,7 @@ const SOURCE_LABELS = {
 const EMPTY_PAGE = Object.freeze({ items: [], totalElements: 0, unreadCount: 0 });
 
 const DEFAULT_DASHBOARD = Object.freeze({
+    realtimeOperations: null,
     summary: null,
     events: [],
     kpi: null,
@@ -261,7 +263,7 @@ const SectionHeader = ({ icon: Icon, title, count, action }) => (
     </div>
 );
 
-const MetricTile = ({ icon: Icon, label, value, tone = "slate", title }) => {
+const MetricTile = ({ icon: Icon, label, value, tone = "slate", title, hint = "" }) => {
     const tones = {
         slate: "border-slate-200 bg-white text-slate-900",
         sky: "border-sky-200 bg-sky-50 text-sky-900",
@@ -278,6 +280,7 @@ const MetricTile = ({ icon: Icon, label, value, tone = "slate", title }) => {
                 <Icon className="h-4 w-4 opacity-70" />
             </div>
             <div className="mt-2 text-2xl font-black tracking-tight">{value}</div>
+            {hint ? <div className="mt-1 text-[10px] font-black uppercase tracking-wide opacity-70">{hint}</div> : null}
         </div>
     );
 };
@@ -626,7 +629,10 @@ export const AdminCommandCenter = () => {
         await runAction(`release:${parsed.sanctionId}`, async () => {
             const loadingToast = await notifyLoading("제재를 해제하는 중입니다...");
             try {
-                await adminAnomaliesAdapter.releaseSanction(parsed.sanctionId, { reason });
+                await adminAnomaliesAdapter.releaseSanction(parsed.sanctionId, {
+                    reason,
+                    notificationId: parsed.notificationId,
+                });
                 if (parsed.notificationId) {
                     await adminAnomaliesAdapter.markNotificationRead(parsed.notificationId).catch(() => {});
                 }
@@ -936,7 +942,34 @@ export const AdminCommandCenter = () => {
     const metricTiles = useMemo(() => {
         const summary = dashboard.summary || {};
         const kpi = dashboard.kpi || {};
+        const realtimeHasData = Boolean(dashboard.realtimeOperations);
+        const realtime = dashboard.realtimeOperations || {};
+        const realtimeCounters = Array.isArray(realtime.counters) ? realtime.counters : [];
+        const realtimeNonSuccessFromCounters = realtimeCounters
+            .filter((counter) => String(pick(counter, "outcome") || "").toLowerCase() !== "success")
+            .reduce((sum, counter) => sum + toNumber(pick(counter, "count")), 0);
+        const realtimeFullSyncFromCounters = realtimeCounters
+            .filter((counter) => String(pick(counter, "operation") || "") === "replay_sync"
+                && String(pick(counter, "outcome") || "") === "full_sync_required")
+            .reduce((sum, counter) => sum + toNumber(pick(counter, "count")), 0);
+        const realtimeNonSuccessValue = pick(realtime, "nonSuccessEvents", "non_success_events");
+        const realtimeFailures = realtimeNonSuccessValue === undefined
+            ? realtimeNonSuccessFromCounters
+            : toNumber(realtimeNonSuccessValue, realtimeNonSuccessFromCounters);
+        const realtimeFullSyncValue = pick(realtime, "fullSyncRequiredEvents", "full_sync_required_events");
+        const realtimeFullSyncEvents = realtimeFullSyncValue === undefined
+            ? realtimeFullSyncFromCounters
+            : toNumber(realtimeFullSyncValue, realtimeFullSyncFromCounters);
+        const realtimeRedisAvailable = realtimeHasData && pick(realtime, "redisAvailable", "redis_available") !== false;
+        const realtimeSource = sources?.realtimeOperations;
+        const realtimeSourceUnavailable = !realtimeSource?.ok || !realtimeRedisAvailable;
+        const realtimeUnavailableHint = realtimeSourceUnavailable ? "source unavailable" : "";
+        const realtimeRecoveryHint = realtimeFullSyncEvents > 0 ? "needs review" : realtimeUnavailableHint;
+        const realtimeSourceTitle = realtimeSource?.message
+            || (!realtimeRedisAvailable ? "Realtime operations Redis unavailable" : "Realtime operations source is unavailable");
         return [
+            { icon: Activity, label: "Realtime", value: formatNumber(realtimeFailures), tone: realtimeSourceUnavailable || realtimeFailures > 0 ? "rose" : "emerald", title: realtimeSourceUnavailable ? realtimeSourceTitle : "Realtime operations non-success events in the last 60 minutes", hint: realtimeUnavailableHint },
+            { icon: RefreshCw, label: "Resync", value: formatNumber(realtimeFullSyncEvents), tone: realtimeSourceUnavailable ? "rose" : realtimeFullSyncEvents > 0 ? "amber" : "slate", title: realtimeSourceUnavailable ? realtimeSourceTitle : "Realtime replay full-sync recoveries in the last 60 minutes", hint: realtimeRecoveryHint },
             { icon: Users, label: "회원", value: formatNumber(pick(summary, "totalMembers", "total_members") || 0), tone: "sky", title: "전체 회원 수" },
             { icon: Activity, label: "오늘 방문", value: formatNumber(pick(summary, "todayVisitors", "today_visitors") || 0), tone: "emerald", title: "오늘 방문자 수" },
             { icon: AlertTriangle, label: "처리 큐", value: formatNumber(queueItems.length), tone: queueItems.length ? "rose" : "slate", title: "현재 커맨드 센터에 표시된 처리 항목" },
@@ -946,7 +979,7 @@ export const AdminCommandCenter = () => {
             { icon: Activity, label: "KPI", value: formatNumber(pick(kpi, "incidentCount", "incident_count", "totalIncidents", "total_incidents") || totalOf(dashboard.incidents)), tone: "sky", title: "최근 7일 이상징후 사건" },
             { icon: Film, label: "변환 중", value: formatNumber(processingVideos.length), tone: processingVideos.length ? "amber" : "slate", title: "업로드 또는 변환 중인 영상" },
         ];
-    }, [activeSanctions.length, dashboard, processingVideos.length, queueItems.length]);
+    }, [activeSanctions.length, dashboard, processingVideos.length, queueItems.length, sources]);
 
     const renderQueueActions = (item) => {
         const busy = actionKey.startsWith(`${item.type}:`) || actionKey.includes(item.key);

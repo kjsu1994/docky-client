@@ -692,9 +692,12 @@ const PokerCommunityStandbyPanel = ({ isFiveCardDraw = false, maxDrawCards = 3, 
               ? "이 변형은 중앙 공개 카드 대신 각자 받은 5장과 교체 선택으로 승부를 봅니다. 중앙이 비어 있는 것은 오류가 아니라 규칙에 맞는 상태입니다."
               : "프리플랍 구간에서는 중앙 카드가 비어 있습니다. 다음 공개 전까지 홀카드, 팟 비용, 상대 행동을 먼저 읽으세요."}
           </div>
-          <div data-smoke="poker-community-standby-art" className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black text-emerald-100">
-            <span className="rounded-full bg-white/10 px-2 py-1">{isFiveCardDraw ? `최대 ${maxDrawCards}장 교체` : phaseLabel || "공개 대기"}</span>
-            <span className="rounded-full bg-white/10 px-2 py-1">{visibleCount}장 정보</span>
+          <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-emerald-950/40">
+            <PokerCommunityStandbyArt
+              isFiveCardDraw={isFiveCardDraw}
+              maxDrawCards={maxDrawCards}
+              phaseLabel={phaseLabel}
+            />
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {items.map((item) => (

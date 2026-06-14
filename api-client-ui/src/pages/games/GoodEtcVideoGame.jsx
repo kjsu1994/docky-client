@@ -26,6 +26,7 @@ import {
   videoGameErrorMessage,
 } from "../../adapters/videoGameAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
+import { realtimeReplayAdapter } from "../../adapters/realtimeReplayAdapter.js";
 import GameRoomChatPanel from "../../common/GameRoomChatPanel.jsx";
 import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
@@ -4448,6 +4449,8 @@ export const GoodEtcVideoGame = () => {
   const signalSubRef = useRef(null);
   const iframeRef = useRef(null);
   const roomSeqRef = useRef(0);
+  const lastGameEventIdRef = useRef(null);
+  const lastGameServerSentAtRef = useRef(0);
 
   const myMemberId = Number(user?.member_id || user?.memberId || user?.id || 0);
   const players = roomPlayers(selectedRoom);
@@ -4550,6 +4553,33 @@ export const GoodEtcVideoGame = () => {
     loadLobby();
   }, [loadLobby]);
 
+  const applyVideoRealtimePayload = (payload) => {
+    if (!payload) return false;
+    const sentAt = Date.parse(payload.serverSentAt || "");
+    if (Number.isFinite(sentAt) && sentAt < lastGameServerSentAtRef.current) return false;
+    if (Number.isFinite(sentAt)) lastGameServerSentAtRef.current = sentAt;
+    if (payload.eventId) lastGameEventIdRef.current = payload.eventId;
+    if (payload.room) setSelectedRoom(payload.room);
+    setGameState(payload.gameState || null);
+    if (payload.message) notify(payload.message);
+    return true;
+  };
+
+  const replayVideoGameRoomEvents = async () => {
+    const afterMessageId = lastGameEventIdRef.current;
+    if (!afterMessageId || !roomId) return;
+    const replay = await realtimeReplayAdapter.fetchVideoGameRoom(videoGameCode, roomId, { afterMessageId, limit: 50 });
+    if (replay.fullSyncRequired) {
+      await loadSelectedRoom(roomId);
+      return;
+    }
+    replay.events.forEach((event) => {
+      const payload = normalizeVideoGameStatePayload(event.payload);
+      if (!payload?.eventId && event.messageId) payload.eventId = event.messageId;
+      applyVideoRealtimePayload(payload);
+    });
+  };
+
   useEffect(() => {
     if (!profile || !roomId) return undefined;
     let cancelled = false;
@@ -4565,10 +4595,14 @@ export const GoodEtcVideoGame = () => {
             gameSubRef.current?.unsubscribe?.();
             signalSubRef.current?.unsubscribe?.();
             gameSubRef.current = client.subscribe(`/sub/game/video/${videoGameCode}/room/${roomId}`, (message) => {
-              const payload = normalizeVideoGameStatePayload(JSON.parse(message.body || "{}"));
-              if (payload.room) setSelectedRoom(payload.room);
-              setGameState(payload.gameState || null);
-              if (payload.message) notify(payload.message);
+              try {
+                applyVideoRealtimePayload(normalizeVideoGameStatePayload(JSON.parse(message.body || "{}")));
+              } catch {
+                loadSelectedRoom(roomId).catch(() => {});
+              }
+            });
+            replayVideoGameRoomEvents().catch(() => {
+              loadSelectedRoom(roomId).catch(() => {});
             });
             signalSubRef.current = client.subscribe(`/sub/game/video/${videoGameCode}/room/${roomId}/signal`, (message) => {
               const signal = JSON.parse(message.body || "{}");

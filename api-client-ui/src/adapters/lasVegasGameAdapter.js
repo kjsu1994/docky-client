@@ -106,6 +106,8 @@ export const normalizeLasVegasState = (state) => {
     const roomStatus = normalizeText(pick(state, "roomStatus", "room_status", ""), "").toUpperCase();
 
     return {
+        eventId: normalizeText(pick(state, "eventId", "event_id", "")),
+        serverSentAt: pick(state, "serverSentAt", "server_sent_at", null),
         eventType: pick(state, "eventType", "event_type", ""),
         roomId: toNullableNumber(pick(state, "roomId", "room_id", null)),
         roomCode: normalizeText(pick(state, "roomCode", "room_code", "")),

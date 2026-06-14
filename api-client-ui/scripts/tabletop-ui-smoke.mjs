@@ -2429,6 +2429,32 @@ async function clickButtonByText(ws, text) {
   if (!result) throw new Error(`Enabled button ${text} not found`);
 }
 
+async function clickCreateRoomSubmit(ws) {
+  const result = await evaluate(ws, `(() => {
+    const button = document.querySelector('button[data-smoke="tabletop-create-room-submit"]:not(:disabled)');
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  if (result) return;
+  await clickButtonByText(ws, "방 만들기");
+}
+
+async function clickConfirmActionButton(ws, text) {
+  await waitForExpression(
+    ws,
+    `Array.from(document.querySelectorAll('[role="alertdialog"] button')).some((button) => button.innerText.trim() === ${JSON.stringify(text)} && !button.disabled)`,
+    `confirm action button ${text}`
+  );
+  const result = await evaluate(ws, `(() => {
+    const button = Array.from(document.querySelectorAll('[role="alertdialog"] button')).find((node) => node.innerText.trim() === ${JSON.stringify(text)} && !node.disabled);
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  if (!result) throw new Error(`Confirm action button ${text} not found`);
+}
+
 async function resetGameStorage(ws) {
   await evaluate(ws, `(() => {
     localStorage.setItem("accessToken", "smoke-access-token");
@@ -2495,7 +2521,7 @@ async function runRoomFlowSmoke(ws, game) {
   await navigateToGame(ws, game);
   const title = `${gameNames[game]} 자동 검증 방`;
   await setInputByAriaLabel(ws, "방 제목", title);
-  await clickButtonByText(ws, "방 만들기");
+  await clickCreateRoomSubmit(ws);
   await waitForText(ws, "방 코드");
   const startButtonText = game === "citadels" ? "시작하기" : "시작";
   await waitForEnabledButton(ws, startButtonText);
@@ -2549,7 +2575,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.catanDiscardPhase = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 버리기 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2574,7 +2600,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.catanProgressDiscardPhase = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 진행 카드 버리기 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2599,7 +2625,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.catanDomesticTradePending = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 거래 응답 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2622,7 +2648,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.catanWeddingGivePhase = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 혼례 응답 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2663,7 +2689,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.blokusEmptyPieces = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 빈 조각 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2716,7 +2742,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.dalmutiEmptyHand = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 빈 손패 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2786,7 +2812,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.mafiaEmptyTargets = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 빈 대상 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2802,7 +2828,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.mafiaSecondDayVoting = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 2일차 투표 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2845,7 +2871,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.mafiaFinishedResult = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 결과 해설 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2877,7 +2903,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.citadelsSelectionPhase = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 선택 루트 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2889,7 +2915,7 @@ async function runRoomFlowSmoke(ws, game) {
     mockState.citadelsBlockedBuild = true;
     await navigateToGame(ws, game);
     await setInputByAriaLabel(ws, "방 제목", `${gameNames[game]} 건설 막힘 검증 방`);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForEnabledButton(ws, startButtonText);
     await clickButtonByText(ws, startButtonText);
@@ -2901,15 +2927,13 @@ async function runRoomFlowSmoke(ws, game) {
   }
   if (game === "citadels") {
     await clickButtonByText(ws, "강제 종료");
-    await waitForEnabledButton(ws, "종료");
-    await clickButtonByText(ws, "종료");
+    await clickConfirmActionButton(ws, "종료");
     await waitForText(ws, "종료");
     assertRequest(game, "forceFinish", null, "force-finish POST request");
   }
   if (game !== "citadels") {
     await clickButtonByText(ws, "강제 종료");
-    await waitForEnabledButton(ws, "종료");
-    await clickButtonByText(ws, "종료");
+    await clickConfirmActionButton(ws, "종료");
     await waitForText(ws, "종료");
     await waitForEnabledButton(ws, "다시 하기");
     assertRequest(game, "forceFinish", null, "force-finish POST request");
@@ -3001,7 +3025,7 @@ async function runSoloAiRoomFlowSmoke(ws, game) {
     await navigateToGame(ws, game);
     const title = `${gameNames[game]} solo AI smoke room`;
     await setInputByAriaLabel(ws, "방 제목", title);
-    await clickButtonByText(ws, "방 만들기");
+    await clickCreateRoomSubmit(ws);
     await waitForText(ws, "방 코드");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="${game}-waiting-player-roster-item"]').length === 1`, `${game} solo AI waiting roster contains only host`);
     const startButtonText = game === "citadels" ? "AI와 시작하기" : "AI와 시작";
@@ -3030,7 +3054,7 @@ async function runVariantCreateSmoke(ws, { game, variantCode }) {
   await setSelectByAriaLabel(ws, `${gameNames[game]} 규칙 선택`, variantCode);
   const title = `${gameNames[game]} ${variantCode} 검증 방`;
   await setInputByAriaLabel(ws, "방 제목", title);
-  await clickButtonByText(ws, "방 만들기");
+  await clickCreateRoomSubmit(ws);
   await waitForText(ws, "방 코드");
   assertRequest(
     game,

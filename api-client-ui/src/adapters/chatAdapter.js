@@ -285,6 +285,58 @@ export const normalizeMessage = (msg = {}) => {
     return normalized;
 };
 
+export const normalizeReplayMessageEvent = (event = {}) => {
+    const payload = event?.payload && typeof event.payload === "object" ? event.payload : event;
+    const normalized = normalizeMessage(payload);
+    const replayMessageId = getFirst(event, ["messageId", "message_id"], null);
+    if (normalized && !hasPersistentMessageId(normalized) && hasStableValue(replayMessageId)) {
+        normalized.id = replayMessageId;
+        normalized.messageId = replayMessageId;
+    }
+    return normalized;
+};
+
+export const mergeIncomingMessage = (currentMessages, incomingMessage) => {
+    const normalized = normalizeMessage(incomingMessage);
+    if (!normalized) return currentMessages;
+    const previousMessages = Array.isArray(currentMessages) ? currentMessages : [];
+    if (previousMessages.some((message) => isSamePersistentMessage(message, normalized))) return previousMessages;
+
+    const optimisticMatch = previousMessages.find((message) => isMatchingOptimisticMessage(message, normalized));
+    if (optimisticMatch) {
+        return previousMessages
+            .map((message) => message.id === optimisticMatch.id ? normalized : message)
+            .sort(compareMessagesByChronology);
+    }
+
+    if (!hasPersistentMessageId(normalized) && previousMessages.some((message) => message.key && message.key === normalized.key)) {
+        return previousMessages;
+    }
+
+    const hasSameFile = !hasPersistentMessageId(normalized) && normalized.type === "FILE" && previousMessages.some((message) =>
+        message.type === "FILE"
+        && Number(message.senderId) === Number(normalized.senderId)
+        && String(message.fileUrl || message.message) === String(normalized.fileUrl || normalized.message)
+    );
+    if (hasSameFile) return previousMessages;
+
+    return [...previousMessages, normalized].sort(compareMessagesByChronology);
+};
+
+export const getLatestPersistentMessageId = (currentMessages = []) => {
+    const sorted = (Array.isArray(currentMessages) ? currentMessages : [])
+        .map(normalizeMessage)
+        .filter(Boolean)
+        .sort(compareMessagesByChronology);
+    for (let index = sorted.length - 1; index >= 0; index -= 1) {
+        const message = sorted[index];
+        if (hasPersistentMessageId(message)) {
+            return String(message.messageId || message.id);
+        }
+    }
+    return null;
+};
+
 export const normalizeMessages = (response) => toArray(unwrapChatData(response))
     .map(normalizeMessage)
     .filter(Boolean)

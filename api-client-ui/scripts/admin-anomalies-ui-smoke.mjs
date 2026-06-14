@@ -37,6 +37,8 @@ const requiredTexts = [
     "탐지 규칙 관리",
     "관리자",
     "회원",
+    "REALTIME RESYNC",
+    "NEEDS REVIEW",
 ];
 const blockedTexts = ["Loading", "Error", "undefined", "NaN", "ROLE_USER", "ROLE_ADMIN", "ROLE_MASTER", "NEW", "REVIEWING", "ACTIVE", "OPEN"];
 
@@ -195,6 +197,7 @@ function assertStaticSanctionListStates() {
 
 function assertStaticReleaseRequestStates() {
     const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    const adapterSource = readFileSync("src/adapters/adminAnomaliesAdapter.js", "utf8");
     if (!pageSource.includes("releaseRequestLoading") || !pageSource.includes("releaseRequestError")) {
         throw new Error("admin-anomalies-ui-smoke: release requests must expose loading and error states.");
     }
@@ -206,6 +209,14 @@ function assertStaticReleaseRequestStates() {
     }
     if (!pageSource.includes("disabled={!Number.isFinite(notificationId) || notificationId <= 0 || markingNotification || markingAllNotifications}")) {
         throw new Error("admin-anomalies-ui-smoke: release request read buttons must respect mark-all processing.");
+    }
+    if (!pageSource.includes("notificationId: releaseDialog.notificationId")
+        || !pageSource.includes("markNotificationRead(notificationId, { quietMissing: true })")) {
+        throw new Error("admin-anomalies-ui-smoke: release requests must carry notification ids through release and stale-read cleanup.");
+    }
+    if (!adapterSource.includes("async releaseSanction(sanctionId, { reason, notificationId } = {})")
+        || !adapterSource.includes("notification_id: Math.trunc(normalizedNotificationId)")) {
+        throw new Error("admin-anomalies-ui-smoke: release sanction adapter must send notification_id when a release request notification is present.");
     }
     const dialogSnippets = [
         "import { trapFocus } from \"../../utils/focusTrap.js\"",
@@ -269,6 +280,37 @@ function assertStaticSafeDiagnostics() {
     }
     if (pageSource.includes("Math.random()")) {
         throw new Error("admin-anomalies-ui-smoke: AdminAnomalies list keys must be deterministic.");
+    }
+}
+
+function assertStaticRealtimeOperationsPanel() {
+    const adapterSource = readFileSync("src/adapters/adminAnomaliesAdapter.js", "utf8");
+    const pageSource = readFileSync("src/pages/admin/AdminAnomalies.jsx", "utf8");
+    const smokeSource = readFileSync("scripts/admin-anomalies-ui-smoke.mjs", "utf8");
+    if (!adapterSource.includes("key: \"realtimeOperations\"") || !adapterSource.includes("/admin/anomalies/operations/realtime")) {
+        throw new Error("admin-anomalies-ui-smoke: dashboard fetch must include realtime operations.");
+    }
+    const requiredPageSnippets = [
+        "const [realtimeOperations, setRealtimeOperations] = useState(null)",
+        "dashboard.realtimeOperations || null",
+        "setRealtimeOperations(nextRealtimeOperations)",
+        "realtimeFullSyncFromCounters",
+        "realtimeOperationsError",
+        "realtimeOperationsUnavailable",
+        "redis_available",
+        "source unavailable",
+        "Realtime operations Redis unavailable",
+        "fullSyncRequiredEvents",
+        "full_sync_required_events",
+        "Realtime resync",
+    ];
+    for (const snippet of requiredPageSnippets) {
+        if (!pageSource.includes(snippet)) {
+            throw new Error(`admin-anomalies-ui-smoke: realtime operations panel is missing ${snippet}.`);
+        }
+    }
+    if (!smokeSource.includes("/api/admin/anomalies/operations/realtime") || !smokeSource.includes("full_sync_required_events: 2")) {
+        throw new Error("admin-anomalies-ui-smoke: realtime operations mock must cover full-sync recovery data.");
     }
 }
 
@@ -370,6 +412,28 @@ function routeMock(url, method) {
             },
         };
     }
+    if (method === "GET" && pathname === "/api/admin/anomalies/operations/realtime") {
+        return {
+            status: 200,
+            body: {
+                data: {
+                    minutes: 60,
+                    redis_available: true,
+                    total_events: 12,
+                    non_success_events: 3,
+                    full_sync_required_events: 2,
+                    counters: [
+                        {
+                            operation: "replay_sync",
+                            outcome: "full_sync_required",
+                            destination: "chat.room.7",
+                            count: 2,
+                        },
+                    ],
+                },
+            },
+        };
+    }
     if (method === "GET" && pathname === "/api/admin/anomalies/kpi") {
         return {
             status: 200,
@@ -437,7 +501,20 @@ function routeMock(url, method) {
                     linkUrl: "/app/admin/anomalies",
                     createdAt: "2026-06-01 10:00",
                 },
-            ], 8, { unreadCount: 1 }),
+                {
+                    notificationId: 8,
+                    notification_id: 8,
+                    notificationType: "REALTIME_OPERATIONS_SUMMARY_FAILURE",
+                    notification_type: "REALTIME_OPERATIONS_SUMMARY_FAILURE",
+                    title: "Realtime operations summary unavailable.",
+                    message: "window=60, exception=IllegalStateException",
+                    severity: "MEDIUM",
+                    linkUrl: "/app/admin",
+                    link_url: "/app/admin",
+                    createdAt: "2026-06-01 10:01",
+                    created_at: "2026-06-01 10:01",
+                },
+            ], 8, { unreadCount: 2 }),
         };
     }
     if (method === "PATCH" && pathname === "/api/admin/notifications/7/read") {
@@ -449,6 +526,9 @@ function routeMock(url, method) {
                 message: "알림을 찾을 수 없습니다.",
             },
         };
+    }
+    if (method === "PATCH" && pathname === "/api/admin/notifications/8/read") {
+        return { status: 200, body: { data: true } };
     }
     if (method === "POST" && pathname === "/api/admin/notifications/read-all") {
         return { status: 200, body: { data: true } };
@@ -710,6 +790,12 @@ async function inspectAdminAnomalies(ws, viewport) {
         if (await clickNotificationReadButton(ws) !== "clicked") {
             throw new Error("admin anomalies desktop: notification read button missing");
         }
+        await waitForText(ws, "\uc774\ubbf8 \ucc98\ub9ac\ub418\uc5c8\uac70\ub098 \uc0ad\uc81c\ub41c \uc54c\ub9bc\uc785\ub2c8\ub2e4.");
+        await waitForText(ws, "Realtime operations summary unavailable.");
+        await waitForText(ws, "window=60, exception=IllegalStateException");
+        if (await clickNotificationReadButton(ws) !== "clicked") {
+            throw new Error("admin anomalies desktop: realtime operation notification read button missing");
+        }
         await waitForText(ws, "이미 처리되었거나 삭제된 알림입니다.");
         await waitForText(ws, "읽지 않은 알림이 없습니다.");
     }
@@ -721,6 +807,7 @@ async function inspectAdminAnomalies(ws, viewport) {
 async function main() {
     assertStaticToastRuntimeSplit();
     assertStaticSafeDiagnostics();
+    assertStaticRealtimeOperationsPanel();
     assertStaticMemberSearchBounds();
     assertStaticSanctionMemberFinder();
     assertStaticActionTextBounds();

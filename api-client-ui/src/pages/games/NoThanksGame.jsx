@@ -6,6 +6,7 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
+import { realtimeReplayAdapter } from "../../adapters/realtimeReplayAdapter.js";
 import {
   buildNoThanksActionPayload,
   getNoThanksChatRoomId,
@@ -2763,6 +2764,8 @@ export const NoThanksGame = () => {
   const gameSubRef = useRef(null);
   const chatSubRef = useRef(null);
   const realtimeRoomRef = useRef(null);
+  const lastGameEventIdRef = useRef(null);
+  const lastGameServerSentAtRef = useRef(0);
   const mountedRef = useRef(false);
   const chatScrollRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -3159,13 +3162,38 @@ export const NoThanksGame = () => {
     gameSubRef.current = client.subscribe(`/sub/game/no-thanks/room/${roomId}`, (message) => {
       let payload;
       try {
-        payload = JSON.parse(message.body || "{}");
+        payload = normalizeNoThanksState(JSON.parse(message.body || "{}"));
       } catch {
         fetchState(roomId).catch(() => {});
         return;
       }
-      setGameState(normalizeNoThanksState(payload));
-      refreshSelectedRoom(roomId).catch(() => {});
+      applyGameRealtimePayload(payload, roomId);
+    });
+  };
+
+  const applyGameRealtimePayload = (payload, roomId) => {
+    if (!payload) return false;
+    const sentAt = Date.parse(payload.serverSentAt || "");
+    if (Number.isFinite(sentAt) && sentAt < lastGameServerSentAtRef.current) return false;
+    if (Number.isFinite(sentAt)) lastGameServerSentAtRef.current = sentAt;
+    if (payload.eventId) lastGameEventIdRef.current = payload.eventId;
+    setGameState(payload);
+    refreshSelectedRoom(roomId).catch(() => {});
+    return true;
+  };
+
+  const replayGameRoomEvents = async (roomId) => {
+    const afterMessageId = lastGameEventIdRef.current;
+    if (!afterMessageId) return;
+    const replay = await realtimeReplayAdapter.fetchGameRoom("no-thanks", roomId, { afterMessageId, limit: 50 });
+    if (replay.fullSyncRequired) {
+      await fetchState(roomId);
+      return;
+    }
+    replay.events.forEach((event) => {
+      const payload = normalizeNoThanksState(event.payload);
+      if (!payload?.eventId && event.messageId) payload.eventId = event.messageId;
+      applyGameRealtimePayload(payload, roomId);
     });
   };
 
@@ -3174,6 +3202,9 @@ export const NoThanksGame = () => {
   const bindRealtimeRoom = (client, roomId, targetChatRoomId) => {
     if (!client?.connected || !roomId) return;
     subscribeGameRoom(client, roomId);
+    replayGameRoomEvents(roomId).catch(() => {
+      fetchState(roomId).catch(() => {});
+    });
   };
 
   const bindLatestRealtimeRoom = (client) => {

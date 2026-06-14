@@ -33,14 +33,18 @@ import {
     getMemberId,
     getRoomId,
     getRoomKey,
+    MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
+    getLatestPersistentMessageId,
     hasPersistentMessageId,
     isMatchingOptimisticMessage,
     isSamePersistentMessage,
-    MEMBER_SEARCH_KEYWORD_MAX_LENGTH,
+    mergeIncomingMessage,
     normalizeMessage,
+    normalizeReplayMessageEvent,
     isAiRoom,
 } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
+import { realtimeReplayAdapter } from "../../adapters/realtimeReplayAdapter.js";
 import { logClientError } from "../../utils/clientDiagnostics.js";
 import { trapFocus } from "../../utils/focusTrap.js";
 import { notifyError, notifySuccess } from "../../utils/toast.js";
@@ -62,13 +66,22 @@ const hasOlderMessages = (pageInfo) =>
     Number(pageInfo?.totalPages || 0) > Number(pageInfo?.currentPage || 1);
 
 const mergeMessagePages = (olderMessages, currentMessages) => {
-    const seen = new Set();
     return [...olderMessages, ...currentMessages].reduce((acc, message) => {
         const normalized = normalizeMessage(message);
         if (!normalized) return acc;
-        const key = normalized.messageId || normalized.id || normalized.key;
-        if (seen.has(key)) return acc;
-        seen.add(key);
+
+        const duplicateIndex = acc.findIndex((existing) =>
+            isSamePersistentMessage(existing, normalized)
+            || isMatchingOptimisticMessage(existing, normalized)
+            || (!hasPersistentMessageId(normalized) && existing.key && existing.key === normalized.key)
+        );
+        if (duplicateIndex >= 0) {
+            if (isMatchingOptimisticMessage(acc[duplicateIndex], normalized)) {
+                acc[duplicateIndex] = normalized;
+            }
+            return acc;
+        }
+
         acc.push(normalized);
         return acc;
     }, []).sort(compareMessagesByChronology);
@@ -114,6 +127,7 @@ export const Chat = () => {
     const memberSearchInputId = useId();
 
     const messagesEndRef = useRef(null);
+    const messagesRef = useRef([]);
     const fileInputRef = useRef(null);
     const skipNextAutoScrollRef = useRef(false);
     const modalPanelRef = useRef(null);
@@ -140,6 +154,10 @@ export const Chat = () => {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
     };
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     useEffect(() => {
         if (skipNextAutoScrollRef.current) {
@@ -338,33 +356,39 @@ export const Chat = () => {
         const roomId = getRoomId(currentRoom);
         if (!client || !isConnected || !roomId) return;
 
+        let active = true;
         const subscription = client.subscribe(`/sub/chat/room/${roomId}`, (message) => {
             const receivedMessage = JSON.parse(message.body);
             const normalized = normalizeMessage(receivedMessage);
             if (normalized) {
-                setMessages((prev) => {
-                    if (prev.some((message) => isSamePersistentMessage(message, normalized))) return prev;
-                    const optimisticMatch = prev.find((message) => isMatchingOptimisticMessage(message, normalized));
-                    if (optimisticMatch) {
-                        return prev
-                            .map((message) => message.id === optimisticMatch.id ? normalized : message)
-                            .sort(compareMessagesByChronology);
-                    }
-                    if (!hasPersistentMessageId(normalized) && prev.some((m) => m.key && m.key === normalized.key)) return prev;
-
-                    const hasSameFile = !hasPersistentMessageId(normalized) && normalized.type === "FILE" && prev.find((m) =>
-                        m.type === "FILE" &&
-                        Number(m.senderId) === Number(normalized.senderId) &&
-                        String(m.fileUrl || m.message) === String(normalized.fileUrl || normalized.message)
-                    );
-                    if (hasSameFile) return prev;
-
-                    return [...prev, normalized].sort(compareMessagesByChronology);
-                });
+                setMessages((prev) => mergeIncomingMessage(prev, normalized));
             }
         });
 
-        return () => { subscription.unsubscribe(); };
+        const afterMessageId = getLatestPersistentMessageId(messagesRef.current);
+        if (afterMessageId) {
+            realtimeReplayAdapter.fetchChatRoom(roomId, { afterMessageId, limit: 50 })
+                .then((replay) => {
+                    if (!active) return;
+                    if (replay.fullSyncRequired) {
+                        fetchMessages(roomId);
+                        return;
+                    }
+                    const replayedMessages = replay.events.map(normalizeReplayMessageEvent).filter(Boolean);
+                    if (replayedMessages.length) {
+                        setMessages((prev) => replayedMessages.reduce(mergeIncomingMessage, prev));
+                        chatAdapter.markRoomRead(roomId).catch(() => undefined);
+                    }
+                })
+                .catch(() => {
+                    if (active) fetchMessages(roomId);
+                });
+        }
+
+        return () => {
+            active = false;
+            subscription.unsubscribe();
+        };
     }, [isConnected, currentRoom]);
 
     const handleSendMessage = (e) => {

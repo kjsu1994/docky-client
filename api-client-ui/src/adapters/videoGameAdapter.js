@@ -118,6 +118,8 @@ export const normalizeVideoGameStatePayload = (payload) => {
         };
     }
     return {
+        eventId: normalizeText(pick(payload, "eventId", "event_id", "")),
+        serverSentAt: pick(payload, "serverSentAt", "server_sent_at", null),
         eventType: normalizeText(pick(payload, "eventType", "event_type", "")),
         message: normalizeText(pick(payload, "message", "message", "")),
         room: normalizeVideoGameRoom(pick(payload, "room", "room", null)),

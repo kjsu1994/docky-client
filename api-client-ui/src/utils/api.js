@@ -14,6 +14,8 @@ const api = axios.create({
     withCredentials: true,
 });
 
+export const REQUEST_ID_HEADER = "X-Request-Id";
+
 const PUBLIC_AUTH_PATHS = [
     "/members/login",
     "/members/email-verification/send",
@@ -94,6 +96,28 @@ const combineBaseAndRequestUrl = (baseURL = "", requestUrl = "") => {
         return rawRequestUrl;
     }
     return `${rawBaseUrl.replace(/\/+$/, "")}/${rawRequestUrl.replace(/^\/+/, "")}`;
+};
+
+export const getHeaderValue = (headers, name) => {
+    if (!headers || !name) return undefined;
+    if (typeof headers.get === "function") {
+        return headers.get(name) || headers.get(name.toLowerCase()) || undefined;
+    }
+    const lowerName = name.toLowerCase();
+    const entry = Object.entries(headers).find(([key]) => String(key).toLowerCase() === lowerName);
+    return entry ? entry[1] : undefined;
+};
+
+const hasHeaderValue = (headers, name) => {
+    const value = getHeaderValue(headers, name);
+    return value !== undefined && value !== null && String(value).trim() !== "";
+};
+
+const createRequestId = () => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `web-${crypto.randomUUID()}`;
+    }
+    return `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 };
 
 export const isSameOriginApiRequest = (config = {}) => {
@@ -267,7 +291,11 @@ api.interceptors.request.use(
         }
 
         const token = getStoredAccessToken();
-        if (token && isSameOriginApiRequest(config) && !isPublicAuthRequest(config)) {
+        const sameOriginApiRequest = isSameOriginApiRequest(config);
+        if (sameOriginApiRequest && !hasHeaderValue(config.headers, REQUEST_ID_HEADER)) {
+            config.headers[REQUEST_ID_HEADER] = createRequestId();
+        }
+        if (token && sameOriginApiRequest && !isPublicAuthRequest(config)) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;

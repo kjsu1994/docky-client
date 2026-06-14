@@ -16,7 +16,7 @@ export const ADMIN_ANOMALY_TEXT_LIMITS = Object.freeze({
 
 export const ADMIN_AUDIT_PAGE_SIZE_MAX = 200;
 
-const ADMIN_AUDIT_TYPES = new Set(["ALL", "ROLE", "REPORT", "MODERATION", "SANCTION", "ANOMALY"]);
+const ADMIN_AUDIT_TYPES = new Set(["ALL", "ROLE", "REPORT", "MODERATION", "SANCTION", "ANOMALY", "BANNER"]);
 
 export const unwrapAdminData = (payload) => payload?.data?.data ?? payload?.data ?? payload ?? null;
 
@@ -232,6 +232,11 @@ export const adminAnomaliesAdapter = {
         return Array.isArray(rules) ? rules : [];
     },
 
+    async fetchRealtimeOperations({ minutes = 60 } = {}) {
+        const response = await api.get("/admin/anomalies/operations/realtime", { params: { minutes } });
+        return unwrapAdminData(response.data);
+    },
+
     async fetchDashboard({
         isMaster,
         roleKeyword,
@@ -251,55 +256,136 @@ export const adminAnomaliesAdapter = {
             ? api.get("/admin/roles/audits", { params: { page: 1, size: 10 } })
             : Promise.resolve(emptyMasterPageResponse(10));
 
-        const [
-            summaryRes,
-            eventsRes,
-            kpiRes,
-            rulesRes,
-            incidentsRes,
-            notificationsRes,
-            reportsRes,
-            sanctionsRes,
-            releaseRequestsRes,
-            moderationBoardsRes,
-            moderationCommentsRes,
-            auditsRes,
-            roleMembersRes,
-            roleAuditsRes,
-        ] = await Promise.all([
-            api.get("/stats/summary"),
-            api.get("/stats/anomalies", { params: { limit: 50 } }),
-            api.get("/admin/anomalies/kpi", { params: { days: 7 } }),
-            api.get("/admin/anomalies/rules"),
-            api.get("/admin/anomalies/incidents", { params: { status: incidentStatus, page: incidentPage, size: 20 } }),
-            api.get("/admin/notifications", { params: { readYn: false, page: 1, size: 8 } }),
-            api.get("/admin/reports", { params: { status: reportStatus, page: 1, size: 10 } }),
-            api.get("/admin/sanctions", { params: { status: sanctionStatus, page: 1, size: 10 } }),
-            api.get("/admin/sanctions/release-requests", { params: { page: 1, size: 50 } }),
-            api.get("/admin/moderation/boards", { params: { hiddenYn: hiddenYnParam(moderationHidden), page: 1, size: 8 } }),
-            api.get("/admin/moderation/comments", { params: { hiddenYn: hiddenYnParam(moderationHidden), page: 1, size: 8 } }),
-            api.get("/admin/audits", { params: { type: normalizedAuditType, page: 1, size: 10 } }),
-            roleMembersPromise,
-            roleAuditsPromise,
-        ]);
+        const sectionSpecs = [
+            {
+                key: "summary",
+                label: "summary",
+                fallback: null,
+                load: async () => unwrapAdminData((await api.get("/stats/summary")).data),
+            },
+            {
+                key: "events",
+                label: "anomaly events",
+                fallback: [],
+                load: async () => normalizeAnomalyEvents((await api.get("/stats/anomalies", { params: { limit: 50 } })).data),
+            },
+            {
+                key: "kpi",
+                label: "anomaly kpi",
+                fallback: null,
+                load: async () => unwrapAdminData((await api.get("/admin/anomalies/kpi", { params: { days: 7 } })).data),
+            },
+            {
+                key: "rules",
+                label: "anomaly rules",
+                fallback: [],
+                load: async () => {
+                    const rules = unwrapAdminData((await api.get("/admin/anomalies/rules")).data);
+                    return Array.isArray(rules) ? rules : [];
+                },
+            },
+            {
+                key: "incidents",
+                label: "anomaly incidents",
+                fallback: emptyAdminPage(20),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/anomalies/incidents", { params: { status: incidentStatus, page: incidentPage, size: 20 } })).data,
+                    20,
+                ),
+            },
+            {
+                key: "notifications",
+                label: "admin notifications",
+                fallback: emptyAdminPage(8),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/notifications", { params: { readYn: false, page: 1, size: 8 } })).data,
+                    8,
+                ),
+            },
+            {
+                key: "reports",
+                label: "reports",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/reports", { params: { status: reportStatus, page: 1, size: 10 } })).data,
+                    10,
+                ),
+            },
+            {
+                key: "sanctions",
+                label: "sanctions",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/sanctions", { params: { status: sanctionStatus, page: 1, size: 10 } })).data,
+                    10,
+                ),
+            },
+            {
+                key: "releaseRequests",
+                label: "release requests",
+                fallback: emptyAdminPage(50),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/sanctions/release-requests", { params: { page: 1, size: 50 } })).data,
+                    50,
+                ),
+            },
+            {
+                key: "moderationBoards",
+                label: "moderation boards",
+                fallback: emptyAdminPage(8),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/moderation/boards", { params: { hiddenYn: hiddenYnParam(moderationHidden), page: 1, size: 8 } })).data,
+                    8,
+                ),
+            },
+            {
+                key: "moderationComments",
+                label: "moderation comments",
+                fallback: emptyAdminPage(8),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/moderation/comments", { params: { hiddenYn: hiddenYnParam(moderationHidden), page: 1, size: 8 } })).data,
+                    8,
+                ),
+            },
+            {
+                key: "audits",
+                label: "admin audits",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage(
+                    (await api.get("/admin/audits", { params: { type: normalizedAuditType, page: 1, size: 10 } })).data,
+                    10,
+                ),
+            },
+            {
+                key: "roleMembers",
+                label: "role members",
+                enabled: isMaster,
+                disabledMessage: "Master role required.",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage((await roleMembersPromise).data, 10),
+            },
+            {
+                key: "roleAudits",
+                label: "role audits",
+                enabled: isMaster,
+                disabledMessage: "Master role required.",
+                fallback: emptyAdminPage(10),
+                load: async () => normalizeAdminPage((await roleAuditsPromise).data, 10),
+            },
+            {
+                key: "realtimeOperations",
+                label: "realtime operations",
+                fallback: null,
+                load: async () => unwrapAdminData((await api.get("/admin/anomalies/operations/realtime", { params: { minutes: 60 } })).data),
+            },
+        ];
 
-        const rules = unwrapAdminData(rulesRes.data);
-        return {
-            summary: unwrapAdminData(summaryRes.data),
-            events: normalizeAnomalyEvents(eventsRes.data),
-            kpi: unwrapAdminData(kpiRes.data),
-            rules: Array.isArray(rules) ? rules : [],
-            incidents: normalizeAdminPage(incidentsRes.data, 20),
-            notifications: normalizeAdminPage(notificationsRes.data, 8),
-            reports: normalizeAdminPage(reportsRes.data, 10),
-            sanctions: normalizeAdminPage(sanctionsRes.data, 10),
-            releaseRequests: normalizeAdminPage(releaseRequestsRes.data, 50),
-            moderationBoards: normalizeAdminPage(moderationBoardsRes.data, 8),
-            moderationComments: normalizeAdminPage(moderationCommentsRes.data, 8),
-            audits: normalizeAdminPage(auditsRes.data, 10),
-            roleMembers: normalizeAdminPage(roleMembersRes.data, 10),
-            roleAudits: normalizeAdminPage(roleAuditsRes.data, 10),
-        };
+        const sections = await Promise.all(sectionSpecs.map(commandCenterSection));
+        return sections.reduce((acc, section) => {
+            acc[section.key] = section.data;
+            acc.sources[section.key] = section.source;
+            return acc;
+        }, { sources: {} });
     },
 
     async fetchCommandCenter({ isMaster = false } = {}) {
@@ -321,6 +407,12 @@ export const adminAnomaliesAdapter = {
                 label: "이상징후 KPI",
                 fallback: null,
                 load: async () => unwrapAdminData((await api.get("/admin/anomalies/kpi", { params: { days: 7 } })).data),
+            },
+            {
+                key: "realtimeOperations",
+                label: "Realtime operations",
+                fallback: null,
+                load: async () => unwrapAdminData((await api.get("/admin/anomalies/operations/realtime", { params: { minutes: 60 } })).data),
             },
             {
                 key: "rules",
@@ -466,9 +558,13 @@ export const adminAnomaliesAdapter = {
         });
     },
 
-    async releaseSanction(sanctionId, { reason }) {
+    async releaseSanction(sanctionId, { reason, notificationId } = {}) {
+        const normalizedNotificationId = Number(notificationId);
         await api.patch(`/admin/sanctions/${sanctionId}/release`, {
             reason: toLimitedText(reason, ADMIN_ANOMALY_TEXT_LIMITS.sanctionReason),
+            ...(Number.isFinite(normalizedNotificationId) && normalizedNotificationId > 0
+                ? { notification_id: Math.trunc(normalizedNotificationId) }
+                : {}),
         });
     },
 

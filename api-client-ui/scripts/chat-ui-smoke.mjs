@@ -123,6 +123,111 @@ function assertStaticChatAuthWiring() {
     }
 }
 
+function assertStaticRealtimeReplayReconnectWiring() {
+    const replayAdapterSource = readFileSync("src/adapters/realtimeReplayAdapter.js", "utf8");
+    const requiredAdapterSnippets = [
+        "event?.message_id",
+        "event?.published_at",
+        "data?.after_message_id",
+        "data?.after_message_id_found",
+        "data?.full_sync_required",
+        "fullSyncRequired: normalizeOptionalBoolean",
+        "after_message_id: afterMessageId",
+        "event.messageId && event.payload && typeof event.payload === \"object\"",
+        "api.get(`/realtime/replay/chat/rooms/${roomId}`, paramsFor(options))",
+        "api.get(`/realtime/replay/game/${gameCode}/rooms/${roomId}/chat`, paramsFor(options))",
+    ];
+    const missingAdapterSnippets = requiredAdapterSnippets.filter((snippet) => !replayAdapterSource.includes(snippet));
+    if (missingAdapterSnippets.length) {
+        throw new Error(`chat-ui-smoke: realtime replay adapter must keep reconnect snake_case cursor normalization: ${missingAdapterSnippets.join(", ")}`);
+    }
+
+    const reconnectSources = [
+        {
+            path: "src/pages/chat/Chat.jsx",
+            snippets: [
+                "getLatestPersistentMessageId(messagesRef.current)",
+                "realtimeReplayAdapter.fetchChatRoom(roomId, { afterMessageId, limit: 50 })",
+                "if (replay.fullSyncRequired)",
+                "replay.events.map(normalizeReplayMessageEvent).filter(Boolean)",
+                "replayedMessages.reduce(mergeIncomingMessage, prev)",
+                "if (active) fetchMessages(roomId);",
+            ],
+        },
+        {
+            path: "src/components/FloatingChat.jsx",
+            snippets: [
+                "const replayAfterMessageId = getLatestPersistentMessageId(messagesRef.current);",
+                "realtimeReplayAdapter.fetchChatRoom(roomId, { afterMessageId: replayAfterMessageId, limit: 50 })",
+                "if (replay.fullSyncRequired)",
+                "replay.events.map(normalizeReplayMessageEvent).filter(Boolean)",
+                "replayedMessages.reduce(mergeIncomingMessage, prev)",
+                "if (active) fetchMessages(roomId);",
+            ],
+        },
+        {
+            path: "src/common/GameRoomChatPanel.jsx",
+            snippets: [
+                "getLatestPersistentMessageId(messagesRef.current)",
+                "realtimeReplayAdapter.fetchGameRoomChat(gameCode, normalizedRoomId, { afterMessageId, limit: 50 })",
+                "if (replay.fullSyncRequired)",
+                "replay.events.map(normalizeReplayMessageEvent).filter(Boolean)",
+                "replayedMessages.reduce(mergeIncomingMessage, prev)",
+                "gameRoomChatAdapter.fetchMessages(gameCode, normalizedRoomId)",
+            ],
+        },
+    ];
+    for (const { path: sourcePath, snippets } of reconnectSources) {
+        const source = readFileSync(sourcePath, "utf8");
+        const missing = snippets.filter((snippet) => !source.includes(snippet));
+        if (missing.length) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must keep replay-based reconnect recovery: ${missing.join(", ")}`);
+        }
+    }
+
+    const gameStateReplaySources = [
+        {
+            path: "src/pages/games/LasVegasGame.jsx",
+            snippets: [
+                "realtimeReplayAdapter.fetchGameRoom(\"las-vegas\", roomId, { afterMessageId, limit: 50 })",
+                "if (replay.fullSyncRequired)",
+                "await fetchState(roomId);",
+            ],
+        },
+        {
+            path: "src/pages/games/NoThanksGame.jsx",
+            snippets: [
+                "realtimeReplayAdapter.fetchGameRoom(\"no-thanks\", roomId, { afterMessageId, limit: 50 })",
+                "if (replay.fullSyncRequired)",
+                "await fetchState(roomId);",
+            ],
+        },
+        {
+            path: "src/pages/games/TabletopGame.jsx",
+            snippets: [
+                "realtimeReplayAdapter.fetchGameRoom(game, roomId, { afterMessageId, limit: 50 })",
+                "if (replay.fullSyncRequired)",
+                "await fetchState(roomId, roomSeq);",
+            ],
+        },
+        {
+            path: "src/pages/games/GoodEtcVideoGame.jsx",
+            snippets: [
+                "realtimeReplayAdapter.fetchVideoGameRoom(videoGameCode, roomId, { afterMessageId, limit: 50 })",
+                "if (replay.fullSyncRequired)",
+                "await loadSelectedRoom(roomId);",
+            ],
+        },
+    ];
+    for (const { path: sourcePath, snippets } of gameStateReplaySources) {
+        const source = readFileSync(sourcePath, "utf8");
+        const missing = snippets.filter((snippet) => !source.includes(snippet));
+        if (missing.length) {
+            throw new Error(`chat-ui-smoke: ${sourcePath} must fall back to full state sync when replay cursor is outside the retained window: ${missing.join(", ")}`);
+        }
+    }
+}
+
 function assertStaticChatToastRuntimeBoundary() {
     for (const sourcePath of [
         "src/pages/chat/Chat.jsx",
@@ -551,6 +656,7 @@ async function inspectChat(ws, viewport) {
 
 async function main() {
     assertStaticChatAuthWiring();
+    assertStaticRealtimeReplayReconnectWiring();
     assertStaticChatToastRuntimeBoundary();
     assertStaticChatSendFailureUx();
     assertStaticFloatingChatAccessibility();

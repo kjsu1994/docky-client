@@ -11,6 +11,7 @@ import UserAvatar from "../../common/UserAvatar.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
+import { realtimeReplayAdapter } from "../../adapters/realtimeReplayAdapter.js";
 import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
 import {
     buildLasVegasActionPayload,
@@ -2968,6 +2969,8 @@ export const LasVegasGame = () => {
     const gameSubRef = useRef(null);
     const chatSubRef = useRef(null);
     const realtimeRoomRef = useRef(null);
+    const lastGameEventIdRef = useRef(null);
+    const lastGameServerSentAtRef = useRef(0);
     const mountedRef = useRef(false);
     const chatScrollRef = useRef(null);
     const prevCasinoSignatureRef = useRef("");
@@ -3282,9 +3285,34 @@ export const LasVegasGame = () => {
                 fetchState(roomId).catch(() => {});
                 return;
             }
-            setState(payload);
-            refreshSelectedRoom(roomId).catch(() => {});
-            if (payload.message) notify(payload.message);
+            applyGameRealtimePayload(payload, roomId);
+        });
+    };
+
+    const applyGameRealtimePayload = (payload, roomId, { notifyMessage = true } = {}) => {
+        if (!payload) return false;
+        const sentAt = Date.parse(payload.serverSentAt || "");
+        if (Number.isFinite(sentAt) && sentAt < lastGameServerSentAtRef.current) return false;
+        if (Number.isFinite(sentAt)) lastGameServerSentAtRef.current = sentAt;
+        if (payload.eventId) lastGameEventIdRef.current = payload.eventId;
+        setState(payload);
+        refreshSelectedRoom(roomId).catch(() => {});
+        if (notifyMessage && payload.message) notify(payload.message);
+        return true;
+    };
+
+    const replayGameRoomEvents = async (roomId) => {
+        const afterMessageId = lastGameEventIdRef.current;
+        if (!afterMessageId) return;
+        const replay = await realtimeReplayAdapter.fetchGameRoom("las-vegas", roomId, { afterMessageId, limit: 50 });
+        if (replay.fullSyncRequired) {
+            await fetchState(roomId);
+            return;
+        }
+        replay.events.forEach((event) => {
+            const payload = normalizeLasVegasState(event.payload);
+            if (!payload?.eventId && event.messageId) payload.eventId = event.messageId;
+            applyGameRealtimePayload(payload, roomId);
         });
     };
 
@@ -3327,6 +3355,9 @@ export const LasVegasGame = () => {
     const bindRealtimeRoom = (client, roomId, targetChatRoomId) => {
         if (!client?.connected || !roomId) return;
         subscribeGameRoom(client, roomId);
+        replayGameRoomEvents(roomId).catch(() => {
+            fetchState(roomId).catch(() => {});
+        });
     };
 
     const bindLatestRealtimeRoom = (client) => {

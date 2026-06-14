@@ -115,6 +115,7 @@ const AUDIT_TYPE_LABELS = {
     MODERATION: "검토",
     SANCTION: "제재",
     ANOMALY: "이상징후",
+    BANNER: "배너",
 };
 const TARGET_TYPE_LABELS = {
     BOARD: "게시글",
@@ -167,16 +168,17 @@ const toIncidentActionKey = (incidentId, actionType) => `${Number(incidentId) ||
 const compactKeyPart = (value) => String(value ?? "").trim().replace(/\s+/g, " ").slice(0, 120);
 const fallbackKey = (prefix, ...parts) => `${prefix}-${parts.map(compactKeyPart).join("-")}`;
 
-const StatCard = ({ icon: Icon, label, value, tone = "slate" }) => {
+const StatCard = ({ icon: Icon, label, value, tone = "slate", hint = "", title = "" }) => {
     const toneClass = {
         slate: "text-slate-600 bg-slate-50/50 border-slate-100",
         blue: "text-primary-600 bg-primary-50/50 border-primary-100",
         emerald: "text-emerald-600 bg-emerald-50/50 border-emerald-100",
         amber: "text-amber-600 bg-amber-50/50 border-amber-100",
+        rose: "text-rose-600 bg-rose-50/50 border-rose-100",
     };
 
     return (
-        <div className={`card p-6 flex flex-col items-center justify-center text-center ${toneClass[tone] || toneClass.slate}`}>
+        <div className={`card p-6 flex flex-col items-center justify-center text-center ${toneClass[tone] || toneClass.slate}`} title={title || undefined}>
             <div className="mb-3 p-3 rounded-2xl bg-white shadow-sm">
                 <Icon className="h-6 w-6" />
             </div>
@@ -184,6 +186,11 @@ const StatCard = ({ icon: Icon, label, value, tone = "slate" }) => {
                 {label}
             </div>
             <div className="text-3xl font-black tracking-tight text-slate-900">{value.toLocaleString()}</div>
+            {hint ? (
+                <div className="mt-2 text-[11px] font-black uppercase tracking-widest opacity-70">
+                    {hint}
+                </div>
+            ) : null}
         </div>
     );
 };
@@ -217,6 +224,8 @@ export const AdminAnomalies = () => {
     const [releaseRequestError, setReleaseRequestError] = useState("");
     const [reportDownloading, setReportDownloading] = useState(false);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+    const [realtimeOperations, setRealtimeOperations] = useState(null);
+    const [realtimeOperationsError, setRealtimeOperationsError] = useState("");
     const [markingNotificationIds, setMarkingNotificationIds] = useState(() => new Set());
     const [markingAllNotifications, setMarkingAllNotifications] = useState(false);
     const [reportList, setReportList] = useState({ items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 });
@@ -272,7 +281,7 @@ export const AdminAnomalies = () => {
 
     const REPORT_STATUS_OPTIONS = ["ALL", "OPEN", "IN_REVIEW", "RESOLVED", "REJECTED"];
     const SANCTION_STATUS_OPTIONS = ["ALL", "ACTIVE", "RELEASED"];
-    const AUDIT_TYPE_OPTIONS = ["ALL", "ROLE", "REPORT", "MODERATION", "SANCTION", "ANOMALY"];
+    const AUDIT_TYPE_OPTIONS = ["ALL", "ROLE", "REPORT", "MODERATION", "SANCTION", "ANOMALY", "BANNER"];
     const activeSanctionMemberIds = useMemo(() => {
         const ids = new Set();
         (sanctions.items || []).forEach((item) => {
@@ -494,6 +503,10 @@ export const AdminAnomalies = () => {
                 incidentStatus: nextStatus,
                 incidentPage: nextPage,
             });
+            const sectionError = (key) => {
+                const source = dashboard.sources?.[key];
+                return source && source.ok === false ? source.message : "";
+            };
 
             const nextRules = dashboard.rules || [];
             const nextIncidents = dashboard.incidents || { items: [], page: 1, size: 20, totalElements: 0, totalPages: 0 };
@@ -511,21 +524,30 @@ export const AdminAnomalies = () => {
             const nextAudits = dashboard.audits || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
             const nextRoleMembers = dashboard.roleMembers || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
             const nextRoleAudits = dashboard.roleAudits || { items: [], page: 1, size: 10, totalElements: 0, totalPages: 0 };
+            const nextRealtimeOperations = dashboard.realtimeOperations || null;
             setNotifications(nextNotifications.items || []);
             setNotificationUnreadCount(nextNotifications.unreadCount || 0);
+            setRealtimeOperations(nextRealtimeOperations);
+            setRealtimeOperationsError(sectionError("realtimeOperations"));
             setReportList(nextReports);
-            setReportError("");
+            setReportError(sectionError("reports"));
             setSanctions(nextSanctions);
-            setSanctionError("");
+            setSanctionError(sectionError("sanctions"));
             setReleaseRequests(nextReleaseRequests);
-            setReleaseRequestError("");
+            setReleaseRequestError(sectionError("releaseRequests"));
             setModerationBoards(nextModerationBoards);
             setModerationComments(nextModerationComments);
-            setModerationError("");
+            setModerationError([sectionError("moderationBoards"), sectionError("moderationComments")].filter(Boolean).join(" "));
             setAuditItems(nextAudits);
+            setAuditError(sectionError("audits"));
             if (isMaster) {
                 setRoleMembers(nextRoleMembers);
                 setRoleAudits(nextRoleAudits);
+                setRoleMemberError(sectionError("roleMembers"));
+                setRoleAuditError(sectionError("roleAudits"));
+            } else {
+                setRoleMemberError("");
+                setRoleAuditError("");
             }
             setRuleDrafts(
                 nextRules.reduce((acc, rule) => {
@@ -842,8 +864,11 @@ export const AdminAnomalies = () => {
         setReleasingSanctionId(normalizedSanctionId);
         const loadingToast = await notifyLoading("제재를 해제하는 중입니다...");
         try {
-            await adminAnomaliesAdapter.releaseSanction(normalizedSanctionId, { reason });
             const notificationId = Number(options.notificationId);
+            await adminAnomaliesAdapter.releaseSanction(normalizedSanctionId, {
+                reason,
+                notificationId,
+            });
             if (Number.isFinite(notificationId) && notificationId > 0) {
                 await markNotificationRead(notificationId, { quietMissing: true });
             }
@@ -1081,6 +1106,24 @@ export const AdminAnomalies = () => {
         }
     };
 
+    const realtimeCounters = Array.isArray(realtimeOperations?.counters) ? realtimeOperations.counters : [];
+    const realtimeFullSyncFromCounters = realtimeCounters
+        .filter((counter) => String(counter?.operation || "") === "replay_sync"
+            && String(counter?.outcome || "") === "full_sync_required")
+        .reduce((sum, counter) => sum + toNumber(counter?.count), 0);
+    const realtimeFullSyncValue = realtimeOperations?.fullSyncRequiredEvents ?? realtimeOperations?.full_sync_required_events;
+    const realtimeFullSyncEvents = realtimeFullSyncValue === undefined
+        ? realtimeFullSyncFromCounters
+        : toNumber(realtimeFullSyncValue);
+    const realtimeRedisAvailable = !realtimeOperations
+        || (realtimeOperations.redisAvailable ?? realtimeOperations.redis_available) !== false;
+    const realtimeOperationsUnavailable = Boolean(realtimeOperationsError) || !realtimeRedisAvailable;
+    const realtimeOperationsHint = realtimeOperationsUnavailable
+        ? "source unavailable"
+        : realtimeFullSyncEvents > 0 ? "needs review" : "";
+    const realtimeOperationsTitle = realtimeOperationsError
+        || (!realtimeRedisAvailable ? "Realtime operations Redis unavailable" : "Realtime replay full-sync recoveries in the last 60 minutes");
+
     if (!isAdmin) {
         return (
             <div className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-rose-800 text-center space-y-4">
@@ -1138,11 +1181,19 @@ export const AdminAnomalies = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
                 <StatCard icon={Users} label="전체 회원" value={toNumber(summary?.total_members ?? summary?.totalMembers)} tone="blue" />
                 <StatCard icon={MessageSquare} label="전체 게시글" value={toNumber(summary?.total_boards ?? summary?.totalBoards)} tone="emerald" />
                 <StatCard icon={Eye} label="오늘 방문자" value={toNumber(summary?.today_visitors ?? summary?.todayVisitors)} tone="amber" />
                 <StatCard icon={Activity} label="이상징후 이벤트" value={events.length} tone="slate" />
+                <StatCard
+                    icon={RefreshCw}
+                    label="Realtime resync"
+                    value={realtimeFullSyncEvents}
+                    tone={realtimeOperationsUnavailable ? "rose" : realtimeFullSyncEvents > 0 ? "amber" : "slate"}
+                    hint={realtimeOperationsHint}
+                    title={realtimeOperationsTitle}
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">

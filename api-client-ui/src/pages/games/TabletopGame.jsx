@@ -28,6 +28,7 @@ import {
   tabletopGameAdapter,
 } from "../../adapters/tabletopGameAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
+import { realtimeReplayAdapter } from "../../adapters/realtimeReplayAdapter.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useGameSound } from "../../hooks/useGameSound.js";
 import { confirmAction } from "../../common/confirmAction.jsx";
@@ -4581,7 +4582,7 @@ const TabletopLobbyBriefPanel = ({
     {
       key: "decision",
       icon: "decision",
-      label: "첫 판단",
+      label: game === "poker" ? "추천 판단" : "첫 판단",
       value: brief.firstDecision || "규칙과 인원 확인",
       detail: brief.objective || "방에 들어가기 전 규칙, 인원, 시작 조건을 먼저 확인하세요.",
     },
@@ -6283,6 +6284,8 @@ export const TabletopGame = ({ game }) => {
   const roomOpenSeqRef = useRef(0);
   const mountedRef = useRef(false);
   const gameStateRef = useRef(null);
+  const lastGameEventIdRef = useRef(null);
+  const lastGameServerSentAtRef = useRef(0);
   const mySeatNoRef = useRef(0);
   const sixNimmtReplayQueueRef = useRef([]);
   const sixNimmtQueuedEventNosRef = useRef(new Set());
@@ -6436,6 +6439,11 @@ export const TabletopGame = ({ game }) => {
   const isLatestLobbyLoad = (seq) => mountedRef.current && seq === lobbyLoadSeqRef.current;
   const isLatestRoomOpen = (seq) => mountedRef.current && seq === roomOpenSeqRef.current;
   const realtimeRoomRef = useRef(null);
+
+  const resetRealtimeReplayCursor = () => {
+    lastGameEventIdRef.current = null;
+    lastGameServerSentAtRef.current = 0;
+  };
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -6607,6 +6615,7 @@ export const TabletopGame = ({ game }) => {
 
   const clearRoomSelection = (roomId) => {
     roomOpenSeqRef.current += 1;
+    resetRealtimeReplayCursor();
     clearSixNimmtReplay();
     sixNimmtHandRefreshInFlightRef.current = null;
     realtimeRoomRef.current = null;
@@ -6671,6 +6680,68 @@ export const TabletopGame = ({ game }) => {
       });
   };
 
+  const applyTabletopRealtimePayload = (payload, roomId, roomSeq, { notifyMessage = true } = {}) => {
+    if (!payload || !isLatestRoomOpen(roomSeq)) return false;
+    const sentAt = Date.parse(payload.serverSentAt || "");
+    if (Number.isFinite(sentAt) && sentAt < lastGameServerSentAtRef.current) return false;
+    if (Number.isFinite(sentAt)) lastGameServerSentAtRef.current = sentAt;
+    if (payload.eventId) lastGameEventIdRef.current = payload.eventId;
+
+    if (payload.room) {
+      syncMySeatNoFromRoom(payload.room);
+      setSelectedRoom(payload.room);
+    }
+    if (game === "six-nimmt" && payload.gameState) {
+      const eventType = String(get(payload, "event_type", "eventType", "") || "").toLowerCase();
+      const viewerSeatNo = mySeatNoRef.current || mySeatNo;
+      const needsViewerHandRefresh = sixNimmtNeedsViewerHandRefresh(payload.gameState, viewerSeatNo);
+      let viewerRefreshRequested = false;
+      const requestViewerRefresh = () => {
+        viewerRefreshRequested = true;
+        refreshSixNimmtViewerHand(roomId, roomSeq);
+      };
+      if (eventType === "six_nimmt_resolution_step") {
+        enqueueSixNimmtReplayStep(payload.gameState);
+      } else if (sixNimmtHasNewPlacementEvents(gameStateRef.current, payload.gameState)
+        || sixNimmtReplayRunningRef.current
+        || sixNimmtReplayQueueRef.current.length > 0
+        || sixNimmtReplayTimerRef.current) {
+        deferSixNimmtFinalState(payload.gameState);
+      } else {
+        requestViewerRefresh();
+      }
+      if (needsViewerHandRefresh && !viewerRefreshRequested) {
+        requestViewerRefresh();
+      }
+    } else if ((game === "dalmuti" || game === "catan" || game === "poker" || game === "telestrations" || game === "mafia") && payload.gameState) {
+      fetchState(roomId, roomSeq).catch((error) => {
+        if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "Failed to refresh private game state.");
+      });
+    } else {
+      const nextGameState = payload.gameState || null;
+      gameStateRef.current = nextGameState;
+      setGameState(nextGameState);
+    }
+    if (notifyMessage && payload.message) notify(payload.message);
+    return true;
+  };
+
+  const replayTabletopRoomEvents = async (roomId, roomSeq) => {
+    const afterMessageId = lastGameEventIdRef.current;
+    if (!afterMessageId || !isLatestRoomOpen(roomSeq)) return;
+    const replay = await realtimeReplayAdapter.fetchGameRoom(game, roomId, { afterMessageId, limit: 50 });
+    if (replay.fullSyncRequired) {
+      await fetchState(roomId, roomSeq);
+      return;
+    }
+    replay.events.forEach((event) => {
+      if (!isLatestRoomOpen(roomSeq)) return;
+      const payload = normalizeTabletopStatePayload(event.payload);
+      if (!payload?.eventId && event.messageId) payload.eventId = event.messageId;
+      applyTabletopRealtimePayload(payload, roomId, roomSeq);
+    });
+  };
+
   const bindRealtimeRoom = async (client, roomId, roomSeq) => {
     if (!client?.connected || !isLatestRoomOpen(roomSeq)) return;
     if (gameSubRef.current) gameSubRef.current.unsubscribe();
@@ -6685,42 +6756,10 @@ export const TabletopGame = ({ game }) => {
         });
         return;
       }
-      if (payload.room) {
-        syncMySeatNoFromRoom(payload.room);
-        setSelectedRoom(payload.room);
-      }
-      if (game === "six-nimmt" && payload.gameState) {
-        const eventType = String(get(payload, "event_type", "eventType", "") || "").toLowerCase();
-        const viewerSeatNo = mySeatNoRef.current || mySeatNo;
-        const needsViewerHandRefresh = sixNimmtNeedsViewerHandRefresh(payload.gameState, viewerSeatNo);
-        let viewerRefreshRequested = false;
-        const requestViewerRefresh = () => {
-          viewerRefreshRequested = true;
-          refreshSixNimmtViewerHand(roomId, roomSeq);
-        };
-        if (eventType === "six_nimmt_resolution_step") {
-          enqueueSixNimmtReplayStep(payload.gameState);
-        } else if (sixNimmtHasNewPlacementEvents(gameStateRef.current, payload.gameState)
-          || sixNimmtReplayRunningRef.current
-          || sixNimmtReplayQueueRef.current.length > 0
-          || sixNimmtReplayTimerRef.current) {
-          deferSixNimmtFinalState(payload.gameState);
-        } else {
-          requestViewerRefresh();
-        }
-        if (needsViewerHandRefresh && !viewerRefreshRequested) {
-          requestViewerRefresh();
-        }
-      } else if ((game === "dalmuti" || game === "catan" || game === "poker" || game === "telestrations" || game === "mafia") && payload.gameState) {
-        fetchState(roomId, roomSeq).catch((error) => {
-          if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "비공개 정보를 갱신하지 못했습니다.");
-        });
-      } else {
-        const nextGameState = payload.gameState || null;
-        gameStateRef.current = nextGameState;
-        setGameState(nextGameState);
-      }
-      if (payload.message) notify(payload.message);
+      applyTabletopRealtimePayload(payload, roomId, roomSeq);
+    });
+    await replayTabletopRoomEvents(roomId, roomSeq).catch((error) => {
+      if (isLatestRoomOpen(roomSeq)) handleStateLoadError(error, roomId, "Failed to replay missed room events.");
     });
     await fetchState(roomId, roomSeq);
   };
@@ -6774,6 +6813,7 @@ export const TabletopGame = ({ game }) => {
   const openRoom = async (room) => {
     if (!mountedRef.current) return;
     const roomSeq = ++roomOpenSeqRef.current;
+    resetRealtimeReplayCursor();
     syncMySeatNoFromRoom(room);
     setSelectedRoom(room);
     const roomId = idOf(room);
@@ -7231,7 +7271,7 @@ export const TabletopGame = ({ game }) => {
                   </span>
                 </div>
               )}
-              <button type="submit" className="min-h-11 rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:opacity-50" disabled={busy || initialLoading || !variants.length} aria-label={`${config.title} ${variantDisplayName(selectedVariant)} 방 만들기`}>
+              <button type="submit" data-smoke="tabletop-create-room-submit" className="min-h-11 rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:opacity-50" disabled={busy || initialLoading || !variants.length} aria-label={`${config.title} ${variantDisplayName(selectedVariant)} 방 만들기`}>
                 {initialLoading ? "준비 중" : "방 만들기"}
               </button>
             </div>
