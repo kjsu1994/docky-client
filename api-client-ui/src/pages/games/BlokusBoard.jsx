@@ -460,16 +460,7 @@ const BlokusActionRoutePanel = ({
       data-total-legal={Number(totalLegalPlacementCount || 0)}
       className="mt-3 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
     >
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
-        <div className="min-h-[132px]">
-          <BlokusActionRouteArt
-            currentColor={currentColor || "BLUE"}
-            items={items}
-            myTurn={myTurn}
-            canPass={canPass}
-            placeButtonEnabled={placeButtonEnabled}
-          />
-        </div>
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -480,12 +471,19 @@ const BlokusActionRoutePanel = ({
               {currentColorLabel || currentColor || "색상 대기"}
             </div>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div data-smoke="blokus-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
             {items.map((item) => (
-              <div key={item.key} data-smoke="blokus-action-route-item" data-route-key={item.key} className={`min-h-[102px] rounded-xl border px-3 py-2.5 ${item.tone}`}>
+              <span key={`route-chip-${item.key}`} data-smoke="blokus-action-route-node" data-route-key={item.key} className="rounded-full bg-white px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {items.map((item) => (
+              <div key={item.key} data-smoke="blokus-action-route-item" data-route-key={item.key} className={`rounded-xl border px-3 py-2 ${item.tone}`}>
                 <div className="text-[10px] font-black opacity-70">{item.label}</div>
                 <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
               </div>
             ))}
           </div>

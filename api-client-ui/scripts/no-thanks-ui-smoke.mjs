@@ -37,7 +37,7 @@ function assertNoThanksRealtimeSource() {
         ["NoThanksPlayerStateCard", "keep visible player chip/card state cards"],
         ["GameRoomPlayersPanel", "keep the selected-room player list"],
         ["GameRoomChatPanel", "keep room chat in the selected room"],
-        ["TabletopGameArtwork", "keep route artwork without a setup briefing"],
+        ['data-smoke="no-thanks-route-artwork"', "keep compact route metadata without a setup briefing"],
     ];
     for (const [snippet, description] of requiredCurrentUiSnippets) {
         if (!source.includes(snippet)) {
@@ -191,8 +191,8 @@ function assertNoThanksRealtimeSource() {
         ['data-smoke="no-thanks-lobby-empty-refresh"', "mark empty No Thanks lobby refresh action"],
         ['data-joinable={joinable ? "true" : "false"}', "expose enhanced lobby room joinable state"],
         ['data-smoke="no-thanks-lobby-room-primary"', "mark lobby primary action"],
-        ["TabletopGameArtwork", "render local tabletop artwork inside the standalone route"],
-        ['data-smoke="no-thanks-route-artwork"', "mark the route artwork"],
+        ['data-smoke="tabletop-game-artwork"', "render compact tabletop metadata inside the standalone route"],
+        ['data-smoke="no-thanks-route-artwork"', "mark the route metadata"],
         ["NoThanksJoinCodePanel", "render the standalone No Thanks join-code bridge"],
         ["NoThanksJoinCodeArt", "render the No Thanks join-code bridge through local SVG artwork"],
         ['data-smoke="no-thanks-join-code-panel"', "mark the No Thanks join-code panel"],
@@ -865,9 +865,9 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
         return `no thanks ${viewport.name}: ok`;
     }
 
-    await setInputValue(cdp, sessionId, "input[placeholder='방 제목']", "스모크 노땡스");
-    await setInputValue(cdp, sessionId, "input[placeholder='토큰 개수']", "12");
-    await setInputValue(cdp, sessionId, "input[placeholder='제한 시간(초)']", "20");
+    await setInputValue(cdp, sessionId, "input[name='title']", "스모크 노땡스");
+    await setInputValue(cdp, sessionId, "input[name='startChipCount']", "12");
+    await setInputValue(cdp, sessionId, "input[name='turnTimeSeconds']", "20");
     await clickClosestFormSubmit(cdp, sessionId, "main form input");
     await waitForText(cdp, sessionId, "방 코드 NT2026");
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="no-thanks"]'))`, "no thanks chat empty state rendered");
@@ -984,9 +984,9 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
     }
 
     if (viewport.interactive) {
-        await setInputValue(cdp, sessionId, "input[placeholder='방 제목']", "스모크 노땡스");
-        await setInputValue(cdp, sessionId, "input[placeholder='토큰 개수']", "12");
-        await setInputValue(cdp, sessionId, "input[placeholder='제한 시간(초)']", "20");
+        await setInputValue(cdp, sessionId, "input[name='title']", "스모크 노땡스");
+        await setInputValue(cdp, sessionId, "input[name='startChipCount']", "12");
+        await setInputValue(cdp, sessionId, "input[name='turnTimeSeconds']", "20");
         await clickButtonByText(cdp, sessionId, "노땡스 방 만들기");
         await waitForText(cdp, sessionId, "방 코드 NT2026");
         await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="no-thanks"]'))`, "no thanks chat empty state rendered");

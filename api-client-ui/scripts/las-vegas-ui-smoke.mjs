@@ -37,7 +37,7 @@ function assertLasVegasRealtimeSource() {
         ["CasinoPanel", "keep the actual casino board"],
         ["LasVegasPlayerRosterPanel", "keep the player roster"],
         ["GameRoomChatPanel", "keep room chat in the selected room"],
-        ["TabletopGameArtwork", "keep route artwork without a setup briefing"],
+        ['data-smoke="las-vegas-route-artwork"', "keep compact route metadata without a setup briefing"],
     ];
     for (const [snippet, description] of requiredCurrentUiSnippets) {
         if (!source.includes(snippet)) {
@@ -190,8 +190,8 @@ function assertLasVegasRealtimeSource() {
         ['data-smoke="las-vegas-lobby-empty-refresh"', "mark empty Las Vegas lobby refresh action"],
         ['data-joinable={joinable ? "true" : "false"}', "expose enhanced lobby room joinable state"],
         ['data-smoke="las-vegas-lobby-room-primary"', "mark lobby primary action"],
-        ["TabletopGameArtwork", "render local tabletop artwork inside the standalone route"],
-        ['data-smoke="las-vegas-route-artwork"', "mark the route artwork"],
+        ['data-smoke="tabletop-game-artwork"', "render compact tabletop metadata inside the standalone route"],
+        ['data-smoke="las-vegas-route-artwork"', "mark the route metadata"],
         ["LasVegasJoinCodePanel", "render the standalone Las Vegas join-code bridge"],
         ["LasVegasJoinCodeArt", "render the Las Vegas join-code bridge through local SVG artwork"],
         ['data-smoke="las-vegas-join-code-panel"', "mark the Las Vegas join-code panel"],

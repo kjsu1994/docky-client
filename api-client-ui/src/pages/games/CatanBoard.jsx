@@ -739,7 +739,6 @@ const CatanActionRoutePanel = ({
     className="mb-3 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-teal-50 p-3 shadow-sm sm:rounded-[1.5rem]"
   >
     <div className="grid gap-3">
-      <CatanActionRouteArt items={items} />
       <div>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
@@ -750,6 +749,13 @@ const CatanActionRoutePanel = ({
           <span className="rounded-full border border-sky-100 bg-white px-3 py-1 text-[11px] font-black text-sky-700">
             {items.filter((item) => item.ready).length}/{items.length} 준비
           </span>
+        </div>
+        <div data-smoke="catan-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+          {items.map((item) => (
+            <span key={`route-chip-${item.key}`} data-smoke="catan-action-route-node" data-route-key={item.key} className={`rounded-full px-2.5 py-1 ${item.ready ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"}`}>
+              {item.label}: {item.value}
+            </span>
+          ))}
         </div>
         <div className="mt-3 grid gap-2">
           {items.map((item) => (
@@ -763,7 +769,7 @@ const CatanActionRoutePanel = ({
                   {item.ready ? "준비" : "확인"}
                 </span>
               </div>
-              <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
             </div>
           ))}
         </div>

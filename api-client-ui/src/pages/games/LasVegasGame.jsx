@@ -12,7 +12,6 @@ import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGui
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
-import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 import {
     buildLasVegasActionPayload,
     getLasVegasChatRoomId,
@@ -2241,13 +2240,7 @@ const LasVegasSessionRoutePanel = ({ roomStatus, isHost, startReadiness, selecte
             data-force-finishing={forceFinishing ? "true" : "false"}
             data-rematching={rematching ? "true" : "false"}
         >
-            <div className="grid gap-4 lg:grid-cols-[minmax(250px,0.9fr)_minmax(0,1.1fr)] lg:items-center">
-                <LasVegasSessionRouteArt
-                    items={routeItems}
-                    roomStatus={normalizedStatus}
-                    isHost={isHost}
-                    canStart={canStart}
-                />
+            <div className="space-y-3">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-black text-amber-700">실제 버튼 안내</span>
@@ -2257,15 +2250,22 @@ const LasVegasSessionRoutePanel = ({ roomStatus, isHost, startReadiness, selecte
                     <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">
                         준비, 시작, 강제 종료, 한 판 더 하기, 퇴장 버튼이 현재 방 상태에서 어떤 의미인지 먼저 보여줍니다. 실제 클릭 동작과 권한 조건은 기존 버튼을 그대로 따릅니다.
                     </p>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <div data-smoke="las-vegas-session-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
                         {routeItems.map((item) => (
-                            <div key={item.key} className={`min-h-[108px] rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="las-vegas-session-route-item" data-route-key={item.key}>
+                            <span key={`route-chip-${item.key}`} data-smoke="las-vegas-session-route-node" data-route-key={item.key} className="rounded-full bg-slate-100 px-2.5 py-1">
+                                {item.label}: {item.value}
+                            </span>
+                        ))}
+                    </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        {routeItems.map((item) => (
+                            <div key={item.key} className={`rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="las-vegas-session-route-item" data-route-key={item.key}>
                                 <div className="flex items-center gap-1.5 text-[10px] font-black opacity-70">
                                     <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
                                     {item.label}
                                 </div>
                                 <div className="mt-1 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
-                                <div className="mt-1 line-clamp-3 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
+                                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
                             </div>
                         ))}
                     </div>
@@ -2679,19 +2679,20 @@ const LasVegasActionRoutePanel = ({
                     {statusLabel}
                 </span>
             </div>
-            <LasVegasActionRouteArt
-                items={items}
-                currentRollCountByFace={currentRollCountByFace}
-                canRoll={canRoll}
-                canBet={canBet}
-            />
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div data-smoke="las-vegas-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-emerald-100">
+                {items.map((item) => (
+                    <span key={`route-chip-${item.key}`} data-smoke="las-vegas-action-route-node" data-route-key={item.key} className="rounded-full bg-white/10 px-2.5 py-1">
+                        {item.label}: {item.value}
+                    </span>
+                ))}
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {items.map((item) => (
                     <div
                         key={item.key}
                         data-smoke="las-vegas-action-route-item"
                         data-route-key={item.key}
-                        className={`min-h-[92px] rounded-xl border px-3 py-2 ${lasVegasActionRouteTone(item.state)}`}
+                        className={`rounded-xl border px-3 py-2 ${lasVegasActionRouteTone(item.state)}`}
                     >
                         <div className="text-[10px] font-black opacity-70">{item.label}</div>
                         <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
@@ -2816,30 +2817,31 @@ const LasVegasRollStandbyPanel = ({
 
     return (
         <section className="mb-3 overflow-hidden rounded-2xl border border-white/20 bg-white/10 p-3 shadow-inner" data-smoke="las-vegas-roll-standby-panel" data-roll-ready={canRoll ? "true" : "false"} data-room-status={normalizedStatus}>
-            <div className="grid gap-3 lg:grid-cols-[minmax(220px,340px)_minmax(0,1fr)] lg:items-stretch">
-                <div className="rounded-xl border border-white/10 bg-slate-950/40">
-                    <LasVegasRollStandbyArt roomStatus={roomStatus} myTurn={myTurn} canRoll={canRoll} roundNo={roundNo} roundCount={roundCount} casinoCount={casinoCount} />
-                </div>
-                <div className="rounded-xl border border-white/10 bg-slate-950/20 p-3">
+            <div className="rounded-xl border border-white/10 bg-slate-950/20 p-3">
                     <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-black text-cyan-100">
                         <GameUxGlyph type="decision" className="h-3.5 w-3.5" />
                         공개 주사위 없음
                     </div>
                     <h3 className="mt-3 text-lg font-black text-white">굴림 전 보드 상태</h3>
                     <p className="mt-2 text-sm font-bold leading-relaxed text-cyan-50/80">{headline}</p>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div data-smoke="las-vegas-roll-standby-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-cyan-100">
+                        <span data-smoke="las-vegas-roll-standby-node" className="rounded-full bg-white/10 px-2.5 py-1">{roundNo || 0}/{roundCount || "-"}R</span>
+                        <span data-smoke="las-vegas-roll-standby-node" className="rounded-full bg-white/10 px-2.5 py-1">{canRoll ? "굴림 가능" : "대기"}</span>
+                        <span data-smoke="las-vegas-roll-standby-node" className="rounded-full bg-white/10 px-2.5 py-1">카지노 {casinoCount || 0}</span>
+                        <span data-smoke="las-vegas-roll-standby-node" className="rounded-full bg-white/10 px-2.5 py-1">{myTurn ? "내 차례" : "관찰"}</span>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                         {items.map((item) => (
-                            <div key={item.key} className={`min-h-[98px] rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="las-vegas-roll-standby-item" data-standby-key={item.key}>
+                            <div key={item.key} className={`rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="las-vegas-roll-standby-item" data-standby-key={item.key}>
                                 <div className="flex items-center gap-2 text-[11px] font-black">
                                     <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
                                     {item.label}
                                 </div>
                                 <div className="mt-1 text-sm font-black">{item.value}</div>
-                                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
+                                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
                             </div>
                         ))}
                     </div>
-                </div>
             </div>
         </section>
     );
@@ -3866,8 +3868,10 @@ export const LasVegasGame = () => {
                         게임 목록
                     </Link>
                 </div>
-                <div className="mb-4" data-smoke="las-vegas-route-artwork">
-                    <TabletopGameArtwork type="dice" compact className="h-32 w-full" />
+                <div className="mb-4 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-200" data-smoke="las-vegas-route-artwork">
+                    <span data-smoke="tabletop-game-artwork" className="rounded-full bg-white/10 px-2.5 py-1">Las Vegas</span>
+                    <span className="rounded-full bg-white/10 px-2.5 py-1">{createForm.roundCount}R</span>
+                    <span className="rounded-full bg-white/10 px-2.5 py-1">{createForm.turnTimeSeconds}초</span>
                 </div>
                 <form className="grid grid-cols-1 gap-3 md:grid-cols-4" onSubmit={createRoom}>
                     <label className="space-y-1.5">

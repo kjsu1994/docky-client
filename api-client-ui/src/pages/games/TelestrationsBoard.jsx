@@ -206,7 +206,7 @@ const TelestrationsEntryEmptyState = ({
               <div key={item.key} data-smoke="telestrations-entry-empty-item" data-entry-key={item.key} className="rounded-lg border border-white/80 bg-white/85 px-3 py-2">
                 <div className="text-[10px] font-black text-slate-400">{item.label}</div>
                 <div className="mt-0.5 text-xs font-black leading-snug text-slate-900">{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
               </div>
             ))}
           </div>
@@ -456,14 +456,7 @@ const TelestrationsInputGuidePanel = ({
 
   return (
     <section data-smoke="telestrations-input-guide-panel" className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-violet-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4">
-      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <TelestrationsClueLensArt
-          phase={phase}
-          previousType={previousType}
-          hasPrevious={hasPrevious}
-          progress={progress}
-          submitted={mySubmitted}
-        />
+      <div className="space-y-3">
         <div>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -475,7 +468,12 @@ const TelestrationsInputGuidePanel = ({
               {profile.label}
             </span>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div data-smoke="telestrations-clue-lens-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+            <span className="rounded-full bg-white px-2.5 py-1">{phaseLabel || profile.label}</span>
+            <span className="rounded-full bg-white px-2.5 py-1">{hasPrevious ? previousEntryLabel || "단서 있음" : "단서 대기"}</span>
+            <span className="rounded-full bg-white px-2.5 py-1">{mySubmitted ? "제출 완료" : `${completedCount}/${playerCount || "-"}명`}</span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {guideItems.map((item) => (
               <div key={item.label} data-smoke="telestrations-input-guide-item" className="rounded-xl border border-slate-100 bg-white px-3 py-2">
                 <div className="text-[10px] font-black text-slate-400">{item.label}</div>
@@ -891,13 +889,7 @@ const TelestrationsActionRoutePanel = ({
       data-progress={`${safeCompletedCount}/${safePlayerCount}`}
       className="mt-4 overflow-hidden rounded-2xl border border-sky-100 bg-white p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
     >
-      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <TelestrationsActionRouteArt
-          items={routeItems}
-          phase={phase}
-          mySubmitted={mySubmitted}
-          awaitingPreviousEntry={awaitingPreviousEntry}
-        />
+      <div className="space-y-3">
         <div>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -909,13 +901,20 @@ const TelestrationsActionRoutePanel = ({
               {statusLabel}
             </span>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div data-smoke="telestrations-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+            {routeItems.map((item) => (
+              <span key={`route-chip-${item.key}`} data-smoke="telestrations-action-route-node" data-route-key={item.key} className="rounded-full bg-sky-50 px-2.5 py-1 text-sky-700">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {routeItems.map((item) => (
               <div
                 key={item.key}
                 data-smoke="telestrations-action-route-item"
                 data-route-key={item.key}
-                className={`min-h-[96px] rounded-xl border px-3 py-2 ${telestrationsActionRouteTone(item.state)}`}
+                className={`rounded-xl border px-3 py-2 ${telestrationsActionRouteTone(item.state)}`}
               >
                 <div className="text-[10px] font-black opacity-70">{item.label}</div>
                 <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>

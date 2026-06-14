@@ -24,7 +24,6 @@ import UserAvatar from "../../common/UserAvatar.jsx";
 import { NoThanksCardFace, NoThanksChipToken } from "../../common/NoThanksVisuals.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
-import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 const ROOM_TITLE_STORAGE_KEY = "no_thanks_last_room_title";
@@ -1262,18 +1261,13 @@ const NoThanksScoreLensPanel = ({ currentCard, potChips, myChips, myCards, roomS
           {recommendation}
         </div>
       </div>
+      <div data-smoke="no-thanks-score-lens-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+        <span data-smoke="no-thanks-score-lens-node" className="rounded-full bg-slate-100 px-2.5 py-1">현재 {currentScore}점</span>
+        <span data-smoke="no-thanks-score-lens-node" className="rounded-full bg-slate-100 px-2.5 py-1">받으면 {nextScore}점</span>
+        <span data-smoke="no-thanks-score-lens-node" className="rounded-full bg-slate-100 px-2.5 py-1">칩 {potChips || 0}</span>
+        <span data-smoke="no-thanks-score-lens-node" className="rounded-full bg-slate-100 px-2.5 py-1">{connectsRun ? "연속 카드" : "단독 카드"}</span>
+      </div>
       <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-        <div className="col-span-2 sm:col-span-4">
-          <NoThanksScoreLensArt
-            currentCard={currentCard}
-            currentScore={currentScore}
-            nextScore={nextScore}
-            potChips={potChips}
-            netDelta={netDelta}
-            connectsRun={connectsRun}
-            myChips={myChips}
-          />
-        </div>
         {guideItems.map((item) => (
           <div key={item.label} data-smoke="no-thanks-score-lens-item" className={`min-h-[58px] rounded-xl border px-2.5 py-1.5 sm:min-h-[72px] sm:px-3 sm:py-2 ${item.tone}`}>
             <div className="truncate text-[10px] font-black opacity-70">{item.label}</div>
@@ -1383,30 +1377,31 @@ const NoThanksCardStandbyPanel = ({ roomStatus, isMyTurn, turnName, potChips, de
 
   return (
     <section className="mt-4 overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-3 shadow-inner" data-smoke="no-thanks-card-standby-panel" data-room-status={normalizedStatus} data-my-turn={isMyTurn ? "true" : "false"}>
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,320px)_minmax(0,1fr)] lg:items-stretch">
-        <div className="rounded-xl border border-white/10 bg-slate-950/35">
-          <NoThanksCardStandbyArt roomStatus={roomStatus} isMyTurn={isMyTurn} potChips={potChips} deckRemaining={deckRemaining} />
-        </div>
-        <div className="rounded-xl border border-white/10 bg-slate-950/25 p-3">
+      <div className="rounded-xl border border-white/10 bg-slate-950/25 p-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-black text-amber-100">
             <GameUxGlyph type="decision" className="h-3.5 w-3.5" />
             공개 카드 없음
           </div>
           <h3 className="mt-3 text-lg font-black text-white">카드 공개 전 판단 준비</h3>
           <p className="mt-2 text-sm font-bold leading-relaxed text-slate-200">{headline}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div data-smoke="no-thanks-card-standby-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-amber-100">
+            <span data-smoke="no-thanks-card-standby-node" className="rounded-full bg-white/10 px-2.5 py-1">덱 {deckRemaining || "-"}</span>
+            <span data-smoke="no-thanks-card-standby-node" className="rounded-full bg-white/10 px-2.5 py-1">{isMyTurn ? "내 차례" : "대기"}</span>
+            <span data-smoke="no-thanks-card-standby-node" className="rounded-full bg-white/10 px-2.5 py-1">칩 {potChips || 0}</span>
+            <span data-smoke="no-thanks-card-standby-node" className="rounded-full bg-white/10 px-2.5 py-1">보정 {myScore}점</span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {items.map((item) => (
-              <div key={item.key} className={`min-h-[98px] rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="no-thanks-card-standby-item" data-standby-key={item.key}>
+              <div key={item.key} className={`rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="no-thanks-card-standby-item" data-standby-key={item.key}>
                 <div className="flex items-center gap-2 text-[11px] font-black">
                   <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
                   {item.label}
                 </div>
                 <div className="mt-1 text-sm font-black">{item.value}</div>
-                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
+                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
               </div>
             ))}
           </div>
-        </div>
       </div>
     </section>
   );
@@ -1877,7 +1872,7 @@ const NoThanksProgressDigestPanel = ({ gameState, players, roomStatus, currentCa
                   {item.label}
                 </div>
                 <div className="mt-1 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
-                <div className="mt-1 line-clamp-3 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
               </div>
             ))}
           </div>
@@ -2199,13 +2194,7 @@ const NoThanksSessionRoutePanel = ({ roomStatus, isHost, startReadiness, selecte
       data-host={isHost ? "true" : "false"}
       data-rematching={rematching ? "true" : "false"}
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(250px,0.9fr)_minmax(0,1.1fr)] lg:items-center">
-        <NoThanksSessionRouteArt
-          items={routeItems}
-          roomStatus={normalizedStatus}
-          isHost={isHost}
-          canStart={canStart}
-        />
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-black text-orange-700">실제 버튼 안내</span>
@@ -2215,9 +2204,16 @@ const NoThanksSessionRoutePanel = ({ roomStatus, isHost, startReadiness, selecte
           <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">
             준비, 시작, 강제 종료, 한 판 더 하기, 퇴장 버튼이 현재 카드방 상태에서 어떤 의미인지 먼저 보여줍니다. 실제 클릭 동작과 권한 조건은 기존 버튼을 그대로 따릅니다.
           </p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <div data-smoke="no-thanks-session-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
             {routeItems.map((item) => (
-              <div key={item.key} className={`min-h-[108px] rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="no-thanks-session-route-item" data-route-key={item.key}>
+              <span key={`route-chip-${item.key}`} data-smoke="no-thanks-session-route-node" data-route-key={item.key} className="rounded-full bg-slate-100 px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {routeItems.map((item) => (
+              <div key={item.key} className={`rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="no-thanks-session-route-item" data-route-key={item.key}>
                 <div className="flex items-center gap-1.5 text-[10px] font-black opacity-70">
                   <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
                   {item.label}
@@ -2634,19 +2630,20 @@ const NoThanksActionRoutePanel = ({
           {statusLabel}
         </span>
       </div>
-      <NoThanksActionRouteArt
-        items={routeItems}
-        currentCard={currentCard}
-        potChips={potChips}
-        isMyTurn={isMyTurn}
-      />
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div data-smoke="no-thanks-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+        {routeItems.map((item) => (
+          <span key={`route-chip-${item.key}`} data-smoke="no-thanks-action-route-node" data-route-key={item.key} className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">
+            {item.label}: {item.value}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {routeItems.map((item) => (
           <div
             key={item.key}
             data-smoke="no-thanks-action-route-item"
             data-route-key={item.key}
-            className={`min-h-[92px] rounded-xl border px-3 py-2 ${noThanksActionRouteTone(item.state)}`}
+            className={`rounded-xl border px-3 py-2 ${noThanksActionRouteTone(item.state)}`}
           >
             <div className="text-[10px] font-black opacity-70">{item.label}</div>
             <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
@@ -3556,8 +3553,10 @@ export const NoThanksGame = () => {
               게임 목록
             </Link>
           </div>
-          <div className="mt-4" data-smoke="no-thanks-route-artwork">
-            <TabletopGameArtwork type="cards" compact className="h-32 w-full" />
+          <div className="mt-4 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600" data-smoke="no-thanks-route-artwork">
+            <span data-smoke="tabletop-game-artwork" className="rounded-full bg-slate-100 px-2.5 py-1">No Thanks</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1">칩 {createForm.startChipCount}</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1">{createForm.turnTimeSeconds}초</span>
           </div>
           <div className="mt-4 flex items-center gap-2">
             <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">노땡스</h1>

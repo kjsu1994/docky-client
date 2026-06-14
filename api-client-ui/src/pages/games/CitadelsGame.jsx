@@ -1443,13 +1443,7 @@ const CitadelsSessionRoutePanel = ({
       data-busy={busy ? "true" : "false"}
       data-my-ready={myReady ? "true" : "false"}
     >
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,380px)_1fr] xl:items-center">
-        <CitadelsSessionRouteArt
-          items={routeItems}
-          status={normalizedStatus}
-          isHost={isHost}
-          canStart={canStart}
-        />
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">실제 버튼 안내</span>
@@ -1459,15 +1453,22 @@ const CitadelsSessionRoutePanel = ({
           <p className="mt-1 text-sm font-bold leading-relaxed text-slate-600">
             준비, 시작하기, 강제 종료, 다시 하기, 나가기 버튼이 현재 궁정 상태에서 어떤 의미인지 먼저 보여줍니다. 실제 클릭 동작과 권한 조건은 기존 버튼을 그대로 따릅니다.
           </p>
-          <div className="mt-4 grid gap-2 md:grid-cols-2">
+          <div data-smoke="citadels-session-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
             {routeItems.map((item) => (
-              <div key={item.key} className={`min-h-[108px] rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="citadels-session-route-item" data-route-key={item.key}>
+              <span key={`route-chip-${item.key}`} data-smoke="citadels-session-route-node" data-route-key={item.key} className="rounded-full bg-slate-100 px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {routeItems.map((item) => (
+              <div key={item.key} className={`rounded-xl border px-3 py-2 ${toneClass[item.tone] || toneClass.neutral}`} data-smoke="citadels-session-route-item" data-route-key={item.key}>
                 <div className="flex items-center gap-1.5 text-[10px] font-black opacity-70">
                   <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
                   {item.label}
                 </div>
                 <div className="mt-1 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>
-                <div className="mt-1 line-clamp-3 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-75">{item.detail}</div>
               </div>
             ))}
           </div>
@@ -1853,10 +1854,7 @@ const CitadelsSelectionRoutePanel = ({
       data-removed-count={removedCount}
       data-action-busy={actionBusy ? "true" : "false"}
     >
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_1fr]">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
-          <CitadelsSelectionRouteArt items={items} selectionStep={selectionStep} isMySelection={isMySelection} />
-        </div>
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1872,17 +1870,24 @@ const CitadelsSelectionRoutePanel = ({
               {modeText}
             </span>
           </div>
+          <div data-smoke="citadels-selection-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+            {items.map((item) => (
+              <span key={`selection-chip-${item.key}`} data-smoke="citadels-selection-route-node" data-selection-key={item.key} className="rounded-full bg-white px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {items.map((item) => (
               <div
                 key={item.key}
-                className={`min-h-[112px] rounded-xl border p-3 ${item.tone}`}
+                className={`rounded-xl border p-3 ${item.tone}`}
                 data-smoke="citadels-selection-route-item"
                 data-selection-key={item.key}
               >
                 <div className="text-[11px] font-black">{item.label}</div>
                 <div className="mt-2 truncate text-sm font-black">{item.value}</div>
-                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
+                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
               </div>
             ))}
           </div>
@@ -2073,22 +2078,19 @@ const CitadelsBuildBlockedBrief = ({
   ];
 
   return (
-    <div data-smoke="citadels-build-blocked-brief" className="mt-3 grid gap-2 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-sky-50 p-2.5 lg:grid-cols-[220px_minmax(0,1fr)]">
-      <CitadelsBuildBlockedBriefArt
-        myGold={myGold}
-        handCount={handCount}
-        tooExpensiveCount={tooExpensiveCount}
-        duplicateCount={duplicateCount}
-        builtThisTurn={builtThisTurn}
-        buildLimit={buildLimit}
-        canBuild={canBuild}
-      />
+    <div data-smoke="citadels-build-blocked-brief" className="mt-3 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-sky-50 p-2.5">
+      <div data-smoke="citadels-build-blocked-art" className="mb-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+        <span data-smoke="citadels-build-blocked-node" className="rounded-full bg-white px-2.5 py-1">금화 {myGold}</span>
+        <span data-smoke="citadels-build-blocked-node" className="rounded-full bg-white px-2.5 py-1">손패 {handCount}</span>
+        <span data-smoke="citadels-build-blocked-node" className="rounded-full bg-white px-2.5 py-1">중복 {duplicateCount}</span>
+        <span data-smoke="citadels-build-blocked-node" className="rounded-full bg-white px-2.5 py-1">건설 {builtThisTurn}/{buildLimit}</span>
+      </div>
       <div className="grid gap-2 md:grid-cols-3">
         {items.map((item) => (
           <div key={item.key} data-smoke="citadels-build-blocked-item" data-build-block-key={item.key} className="rounded-xl border border-white/80 bg-white/85 px-3 py-2">
             <div className="text-[10px] font-black text-amber-600">{item.label}</div>
             <div className="mt-1 text-sm font-black text-slate-950">{item.value}</div>
-            <div className="mt-1 text-[11px] font-bold leading-snug text-slate-600">{item.detail}</div>
+            <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-slate-600">{item.detail}</div>
           </div>
         ))}
       </div>
@@ -2196,19 +2198,7 @@ const CitadelsEconomyLensPanel = ({
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-lg" data-smoke="citadels-economy-lens-panel">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_1fr]">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
-          <CitadelsEconomyLensArt
-            gold={myGold}
-            handCount={handCount}
-            cityCount={cityCount}
-            buildableCount={buildableCardList.length}
-            bestCardName={bestCardName}
-            colorProgress={colorProgress}
-            incomeColor={incomeColor}
-            incomePreview={incomePreview}
-          />
-        </div>
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -2222,15 +2212,21 @@ const CitadelsEconomyLensPanel = ({
               후보 선택 {pendingChoiceFit ? `${pendingChoiceFit}장 참고` : "대기"}
             </span>
           </div>
+          <div data-smoke="citadels-economy-lens-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+            <span data-smoke="citadels-economy-lens-node" className="rounded-full bg-slate-100 px-2.5 py-1">금화 {myGold}</span>
+            <span data-smoke="citadels-economy-lens-node" className="rounded-full bg-slate-100 px-2.5 py-1">손패 {handCount}</span>
+            <span data-smoke="citadels-economy-lens-node" className="rounded-full bg-slate-100 px-2.5 py-1">건설 가능 {buildableCardList.length}</span>
+            <span data-smoke="citadels-economy-lens-node" className="rounded-full bg-slate-100 px-2.5 py-1">{bestCardName}</span>
+          </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {tiles.map((tile) => (
-              <div key={tile.key} className={`min-h-[112px] rounded-xl border p-3 ${tileToneClass[tile.tone]}`} data-smoke="citadels-economy-lens-item">
+              <div key={tile.key} className={`rounded-xl border p-3 ${tileToneClass[tile.tone]}`} data-smoke="citadels-economy-lens-item">
                 <div className="flex items-center gap-2 text-[11px] font-black">
                   <GameUxGlyph type={tile.icon} className="h-3.5 w-3.5" />
                   {tile.label}
                 </div>
                 <div className="mt-2 truncate text-sm font-black">{tile.value}</div>
-                <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{tile.detail}</div>
+                <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed opacity-80">{tile.detail}</div>
               </div>
             ))}
           </div>
@@ -2726,11 +2722,8 @@ const CitadelsActionRoutePanel = ({
       data-can-end-turn={canEndTurn}
       data-buildable-cards={buildableCards}
     >
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
-          <CitadelsActionRouteArt items={items} phase={phase} myGold={myGold} handCount={handCount} buildableCards={buildableCards} />
-        </div>
-        <div className="flex min-h-[160px] flex-col justify-center">
+      <div>
+        <div>
           <div className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black text-white">
             <GameUxGlyph type="decision" className="h-3.5 w-3.5" />
             실제 버튼 순서
@@ -2739,19 +2732,26 @@ const CitadelsActionRoutePanel = ({
           <p className="mt-2 text-sm font-bold leading-relaxed text-slate-600">
             현재 버튼들이 왜 열렸는지, 어떤 순서로 처리하면 되는지 한 번에 확인합니다.
           </p>
+          <div data-smoke="citadels-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+            {items.map((item) => (
+              <span key={`route-chip-${item.key}`} data-smoke="citadels-action-route-node" data-route-key={item.key} className="rounded-full bg-slate-100 px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => {
           const tone = citadelsActionRouteTone[item.state] || citadelsActionRouteTone.wait;
           return (
-            <div key={item.key} className={`min-h-[108px] rounded-xl border p-3 ${tone.card}`} data-smoke="citadels-action-route-item" data-route-key={item.key} data-route-state={item.state}>
+            <div key={item.key} className={`rounded-xl border p-3 ${tone.card}`} data-smoke="citadels-action-route-item" data-route-key={item.key} data-route-state={item.state}>
               <div className="flex items-center gap-2 text-[11px] font-black">
                 <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
                 {item.label}
               </div>
               <div className="mt-1 text-sm font-black text-slate-950">{item.value}</div>
-              <div className="mt-1 line-clamp-3 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
+              <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed opacity-80">{item.detail}</div>
             </div>
           );
         })}

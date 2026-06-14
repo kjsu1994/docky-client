@@ -521,17 +521,17 @@ const SixNimmtTurnPressurePanel = ({
           <div className="mt-0.5 text-sm font-black text-slate-900">{phaseLabel}</div>
         </div>
       </div>
-      <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(260px,0.82fr)_minmax(0,1.18fr)]">
-        <SixNimmtTurnPressureArt
-          playerSignals={playerSignals}
-          selectedCount={selectedCount}
-          playerCount={playerCount}
-          phase={phase}
-          pendingCardValue={pendingValue}
-          activeSeatNo={activeSeatNo}
-          mySeatNo={mySeatNo}
-        />
-        <div className="grid gap-2 md:grid-cols-4 xl:grid-cols-2">
+      <div data-smoke="six-nimmt-turn-pressure-art" className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+        <span className="rounded-full bg-slate-100 px-2.5 py-1">{selectedCount}/{playerCount || "-"}명 잠금</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1">{pendingValue ? `${pendingValue} 처리` : phaseLabel}</span>
+        {playerSignals.slice(0, 4).map((signal) => (
+          <span key={signal.seatNo} data-smoke="six-nimmt-turn-pressure-node" className={`rounded-full px-2.5 py-1 ${Number(signal.seatNo) === Number(mySeatNo) ? "bg-sky-50 text-sky-700" : Number(signal.seatNo) === Number(activeSeatNo) ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+            {signal.seatNo}번 {signal.selected ? "잠금" : "대기"}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3">
+        <div className="grid gap-2 md:grid-cols-4">
           {pressureItems.map((item) => (
             <div key={item.label} data-smoke="six-nimmt-turn-pressure-item" className={`rounded-xl border px-3 py-2 ${item.className}`}>
               <div className="text-[10px] font-black text-slate-500">{item.label}</div>
@@ -732,18 +732,7 @@ const SixNimmtActionRoutePanel = ({
       data-selected-card={selectedCardValue || ""}
       className="mt-3 overflow-hidden rounded-2xl border border-red-100 bg-gradient-to-br from-white via-red-50 to-amber-50 p-3 shadow-sm sm:mt-4 sm:rounded-[1.5rem] sm:p-4"
     >
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
-        <div className="min-h-[132px]">
-          <SixNimmtActionRouteArt
-            phase={phase}
-            waitingSelection={waitingSelection}
-            needsRowChoice={needsRowChoice}
-            mySelected={mySelected}
-            selectedCardValue={selectedCardValue}
-            pendingCardValue={pendingCardValue}
-            previewPenalty={previewPenalty}
-          />
-        </div>
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -753,6 +742,13 @@ const SixNimmtActionRoutePanel = ({
             <div className="rounded-full border border-red-100 bg-white px-3 py-1 text-[11px] font-black text-red-700">
               {selectedCount}/{playerCount || "-"}명 잠금
             </div>
+          </div>
+          <div data-smoke="six-nimmt-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+            {items.map((item) => (
+              <span key={`route-chip-${item.key}`} data-smoke="six-nimmt-action-route-node" data-route-key={item.key} className="rounded-full bg-white px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {items.map((item) => (

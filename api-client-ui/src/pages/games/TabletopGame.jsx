@@ -36,7 +36,6 @@ import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameFlowMeter, GameResultSpotlight, GameUxGlyph, PlayingCardArt, playingCardSuitLabel } from "./GameUxAssets.jsx";
-import { TabletopGameArtwork } from "./TabletopGameArtwork.jsx";
 import { canUseTabletopSoloAiStart, supportsTabletopAiBotStart } from "./tabletopStartPolicy.js";
 
 const PokerBoard = lazy(() => import("./PokerBoard.jsx").then((module) => ({ default: module.PokerBoard })));
@@ -997,7 +996,6 @@ const CatanActionRoutePanel = ({
     className="mb-3 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-teal-50 p-3 shadow-sm sm:rounded-[1.5rem]"
   >
     <div className="grid gap-3">
-      <CatanActionRouteArt items={items} />
       <div>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
@@ -1008,6 +1006,13 @@ const CatanActionRoutePanel = ({
           <span className="rounded-full border border-sky-100 bg-white px-3 py-1 text-[11px] font-black text-sky-700">
             {items.filter((item) => item.ready).length}/{items.length} 준비
           </span>
+        </div>
+        <div data-smoke="catan-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+          {items.map((item) => (
+            <span key={`route-chip-${item.key}`} data-smoke="catan-action-route-node" data-route-key={item.key} className={`rounded-full px-2.5 py-1 ${item.ready ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"}`}>
+              {item.label}: {item.value}
+            </span>
+          ))}
         </div>
         <div className="mt-3 grid gap-2">
           {items.map((item) => (
@@ -1021,7 +1026,7 @@ const CatanActionRoutePanel = ({
                   {item.ready ? "준비" : "확인"}
                 </span>
               </div>
-              <div className="mt-1 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
+              <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-slate-500">{item.detail}</div>
             </div>
           ))}
         </div>
@@ -4093,10 +4098,14 @@ const TabletopRoomBriefPanel = ({
 
   return (
     <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-smoke="tabletop-room-brief-panel" data-room-status={status || ""} data-can-start={canStart ? "true" : "false"}>
-      <TabletopRoomBriefArt tiles={tiles} status={status} canStart={canStart} className="mb-3 h-44 w-full" />
+      <div data-smoke="tabletop-room-brief-art" className="mb-3 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+        <span className="rounded-full bg-slate-100 px-2.5 py-1">{startSummary}</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1">{playerSummary}</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1">{variantName}</span>
+      </div>
       <div className="grid gap-2 md:grid-cols-4">
         {tiles.map((tile) => (
-          <div key={tile.key} className="min-h-[104px] rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-room-brief-tile">
+          <div key={tile.key} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2" data-smoke="tabletop-room-brief-tile">
             <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500">
               <GameUxGlyph type={tile.icon} className="h-3.5 w-3.5" />
               {tile.label}
@@ -4291,10 +4300,7 @@ const TabletopSessionRoutePanel = ({
       data-busy={busy ? "true" : "false"}
       data-ready={myReady ? "true" : "false"}
     >
-      <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="min-h-[150px] overflow-hidden rounded-2xl bg-slate-950">
-          <TabletopSessionRouteArt items={routeItems} status={status} canStart={canStart} isHost={isHost} />
-        </div>
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
@@ -4310,11 +4316,18 @@ const TabletopSessionRoutePanel = ({
               {summary}
             </span>
           </div>
+          <div data-smoke="tabletop-session-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+            {routeItems.map((item) => (
+              <span key={`route-chip-${item.key}`} data-smoke="tabletop-session-route-node" data-route-key={item.key} className="rounded-full bg-white px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {routeItems.map((item) => (
               <div
                 key={item.key}
-                className="min-h-[98px] rounded-xl border border-slate-200 bg-white px-3 py-2"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2"
                 data-smoke="tabletop-session-route-item"
                 data-route-key={item.key}
               >
@@ -7134,7 +7147,7 @@ export const TabletopGame = ({ game }) => {
     <div className={`tabletop-game tabletop-${game} animate-fade-in space-y-6`}>
       <section className={`overflow-hidden rounded-2xl bg-gradient-to-br ${config.accent} p-[1px] shadow-2xl sm:rounded-[2rem]`}>
         <div className="bg-white p-5 sm:p-8">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+          <div className="grid gap-5">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1 text-[11px] font-black text-slate-500">
@@ -7147,8 +7160,9 @@ export const TabletopGame = ({ game }) => {
               </div>
               <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">{config.title}</h1>
             </div>
-            <div className="w-full" data-smoke="tabletop-route-artwork">
-              <TabletopGameArtwork type={config.board} compact className="h-36 w-full" />
+            <div className="flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600" data-smoke="tabletop-route-artwork">
+              <span data-smoke="tabletop-game-artwork" className="rounded-full bg-slate-100 px-2.5 py-1">{config.title}</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1">{config.eyebrow}</span>
             </div>
           </div>
         </div>
@@ -7799,17 +7813,22 @@ const GuidePanel = ({ lines }) => {
         <div className="text-sm font-black text-slate-900">도움말</div>
         <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">서버 판정</div>
       </div>
-      <TabletopGuideBriefArt sectionCount={entries.length} ruleCount={guideBrief.ruleCount} />
+      <div data-smoke="tabletop-guide-art" className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+        <span className="rounded-full bg-slate-100 px-2.5 py-1">규칙 묶음 {entries.length}</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1">문장 {guideBrief.ruleCount}</span>
+      </div>
       <div className="mt-3 grid gap-2">
         {guideBrief.items.map((item) => (
           <div key={item.key} className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2" data-smoke="tabletop-guide-item" data-guide-key={item.key}>
             <div className="text-[10px] font-black text-blue-700">{item.label}</div>
             <div className="mt-1 text-sm font-black text-slate-950">{item.value}</div>
-            <div className="mt-1 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
+            <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-600">{item.detail}</div>
           </div>
         ))}
       </div>
-      <div className="mt-3 space-y-2">
+      <details className="mt-3 rounded-xl bg-slate-50 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-black text-slate-700">상세 규칙 열기</summary>
+        <div className="mt-2 space-y-2">
         {entries.map((entry) => (
           entry.flat ? (
             <div key={entry.key} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-relaxed text-slate-500">
@@ -7829,7 +7848,8 @@ const GuidePanel = ({ lines }) => {
             </div>
           )
         ))}
-      </div>
+        </div>
+      </details>
     </div>
   );
 };

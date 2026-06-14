@@ -522,7 +522,6 @@ const PokerHiddenCardsBrief = ({ item, isFiveCardDraw = false }) => {
 
   return (
     <div className="w-full rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2" data-smoke="poker-hidden-cards-brief" data-hidden-state={folded ? "folded" : "hidden"}>
-      <PokerHiddenCardsBriefArt isFiveCardDraw={isFiveCardDraw} folded={folded} />
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {items.map((entry) => (
           <div key={entry.key} data-smoke="poker-hidden-cards-brief-item" data-hidden-key={entry.key} className="rounded-lg bg-slate-50 px-2.5 py-2">
@@ -539,16 +538,25 @@ const PokerHiddenCardsBrief = ({ item, isFiveCardDraw = false }) => {
 const PokerShowdownBreakdownPanel = ({ breakdown, isFiveCardDraw = false }) => {
   if (!breakdown?.items?.length) return null;
   const communityCards = listOf(breakdown.communityCards);
+  const visibleItems = breakdown.items.slice(0, 6);
   return (
-    <section data-smoke="poker-showdown-breakdown-panel" className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-emerald-50 shadow-sm">
-      <div className="grid gap-3 p-3 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <PokerShowdownTraceArt breakdown={breakdown} />
+    <section data-smoke="poker-showdown-breakdown-panel" className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="space-y-3">
+        <div data-smoke="poker-showdown-trace-art" className="flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+          <span className="rounded-full bg-slate-100 px-2.5 py-1">비교 {breakdown.showdownCount || 0}명</span>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1">폴드 {breakdown.foldedCount || 0}명</span>
+          {breakdown.items.slice(0, 4).map((item) => (
+            <span key={`trace-${item.seatNo}`} data-smoke="poker-showdown-trace-node" className={`rounded-full px-2.5 py-1 ${item.state === "winner" ? "bg-amber-100 text-amber-800" : item.state === "folded" ? "bg-slate-100 text-slate-500" : "bg-sky-50 text-sky-700"}`}>
+              {item.seatNo}번 {item.stateLabel}
+            </span>
+          ))}
+        </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <div className="text-xs font-black text-amber-700">쇼다운 해설</div>
-              <div className="mt-1 text-lg font-black text-slate-950">{breakdown.title}</div>
-              <div className="mt-1 text-xs font-bold leading-relaxed text-slate-600">{breakdown.reason}</div>
+              <div className="mt-1 text-base font-black text-slate-950">{breakdown.title}</div>
+              <div className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-slate-600">{breakdown.reason}</div>
             </div>
             <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black text-amber-800">
               팟 {Number(breakdown.potValue || 0).toLocaleString("ko-KR")}칩
@@ -560,8 +568,8 @@ const PokerShowdownBreakdownPanel = ({ breakdown, isFiveCardDraw = false }) => {
               {communityCards.map((card, index) => <PokerCard key={`${pokerCardId(card)}-${index}`} card={card} compact />)}
             </div>
           )}
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {breakdown.items.map((item) => (
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {visibleItems.map((item) => (
               <div key={item.seatNo} data-smoke="poker-showdown-breakdown-item" className={`rounded-xl border px-3 py-2 ${item.state === "winner" ? "border-amber-200 bg-amber-50" : item.state === "folded" ? "border-slate-200 bg-slate-50" : "border-sky-100 bg-sky-50"}`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -576,14 +584,24 @@ const PokerShowdownBreakdownPanel = ({ breakdown, isFiveCardDraw = false }) => {
                   {item.holeCards.slice(0, isFiveCardDraw ? 5 : 2).map((card, index) => (
                     <PokerCard key={`${item.seatNo}-${pokerCardId(card)}-${index}`} card={card} compact />
                   ))}
-                  {!item.holeCards.length && <PokerHiddenCardsBrief item={item} isFiveCardDraw={isFiveCardDraw} />}
+                  {!item.holeCards.length && (
+                    <div data-smoke="poker-hidden-cards-brief" data-hidden-state={item.state === "folded" ? "folded" : "hidden"} className="rounded-lg border border-dashed border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-500">
+                      {item.state === "folded" ? "폴드 · 비교 제외" : "비공개 카드"}
+                    </div>
+                  )}
+                  {item.rankText && <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-600">비교 카드 {item.rankText}</span>}
                 </div>
-                <div className="mt-2 text-[11px] font-bold leading-relaxed text-slate-600">
+                <div className="mt-2 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-600">
                   {item.detail}
                   {item.rankText ? ` 비교 카드: ${item.rankText}` : ""}
                 </div>
               </div>
             ))}
+            {breakdown.items.length > visibleItems.length && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">
+                나머지 {breakdown.items.length - visibleItems.length}명은 결과 목록에서 생략했습니다.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -665,8 +683,7 @@ const PokerCommunityStandbyPanel = ({ isFiveCardDraw = false, maxDrawCards = 3, 
       data-community-mode={isFiveCardDraw ? "five-card-draw" : "holdem"}
       data-phase-label={phaseLabel || ""}
     >
-      <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
-        <PokerCommunityStandbyArt isFiveCardDraw={isFiveCardDraw} maxDrawCards={maxDrawCards} phaseLabel={phaseLabel} />
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black text-emerald-800">공용 카드 브리핑</div>
           <div className="mt-2 text-sm font-black text-white">{isFiveCardDraw ? "공용 카드가 없습니다" : "아직 공용 카드가 열리지 않았습니다"}</div>
@@ -675,12 +692,16 @@ const PokerCommunityStandbyPanel = ({ isFiveCardDraw = false, maxDrawCards = 3, 
               ? "이 변형은 중앙 공개 카드 대신 각자 받은 5장과 교체 선택으로 승부를 봅니다. 중앙이 비어 있는 것은 오류가 아니라 규칙에 맞는 상태입니다."
               : "프리플랍 구간에서는 중앙 카드가 비어 있습니다. 다음 공개 전까지 홀카드, 팟 비용, 상대 행동을 먼저 읽으세요."}
           </div>
+          <div data-smoke="poker-community-standby-art" className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black text-emerald-100">
+            <span className="rounded-full bg-white/10 px-2 py-1">{isFiveCardDraw ? `최대 ${maxDrawCards}장 교체` : phaseLabel || "공개 대기"}</span>
+            <span className="rounded-full bg-white/10 px-2 py-1">{visibleCount}장 정보</span>
+          </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {items.map((item) => (
               <div key={item.key} data-smoke="poker-community-standby-item" data-community-key={item.key} className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
                 <div className="text-[10px] font-black text-emerald-100/65">{item.label}</div>
                 <div className="mt-1 text-xs font-black text-white">{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-relaxed text-emerald-100/75">{item.detail}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed text-emerald-100/75">{item.detail}</div>
               </div>
             ))}
           </div>
@@ -895,19 +916,7 @@ const PokerActionRoutePanel = ({
       data-available-actions={normalizedActions.join(",")}
       className="mt-3 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-sky-50 p-3 shadow-sm sm:rounded-[1.5rem] sm:p-4"
     >
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.82fr)_minmax(0,1fr)] lg:items-center">
-        <div className="min-h-[132px]">
-          <PokerActionRouteArt
-            phase={phase}
-            phaseLabel={phaseLabel}
-            myTurn={myTurn}
-            callAmount={callAmount}
-            drawSelectionCount={drawSelection.length}
-            maxDrawCards={maxDrawCards}
-            isFinished={isFinished}
-            items={items}
-          />
-        </div>
+      <div className="space-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -918,12 +927,19 @@ const PokerActionRoutePanel = ({
               {isFinished ? "결과 확인" : myTurn ? "내 차례" : `${activePlayerName || "상대"} 차례`}
             </div>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div data-smoke="poker-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
             {items.map((item) => (
-              <div key={item.key} data-smoke="poker-action-route-item" data-route-key={item.key} className={`min-h-[102px] rounded-xl border px-3 py-2.5 ${item.tone}`}>
+              <span key={`route-chip-${item.key}`} data-smoke="poker-action-route-node" data-route-key={item.key} className="rounded-full bg-white px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {items.map((item) => (
+              <div key={item.key} data-smoke="poker-action-route-item" data-route-key={item.key} className={`rounded-xl border px-3 py-2 ${item.tone}`}>
                 <div className="text-[10px] font-black opacity-70">{item.label}</div>
                 <div className="mt-0.5 text-sm font-black leading-snug">{item.value}</div>
-                <div className="mt-1 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-relaxed opacity-80">{item.detail}</div>
               </div>
             ))}
           </div>

@@ -282,21 +282,18 @@ const MafiaTargetEmptyBrief = ({
   ];
 
   return (
-    <div data-smoke="mafia-target-empty-brief" className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 sm:grid-cols-[180px_minmax(0,1fr)]">
-      <MafiaTargetEmptyBriefArt
-        reasonLabel={emptyReason}
-        actionType={actionType}
-        mySubmitted={mySubmitted}
-        myAlive={myAlive}
-        aliveMafia={aliveMafia}
-        aliveTown={aliveTown}
-      />
-      <div className="grid gap-2">
+    <div data-smoke="mafia-target-empty-brief" className="rounded-2xl border border-slate-200 bg-white p-2.5">
+      <div data-smoke="mafia-target-empty-art" className="mb-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+        <span data-smoke="mafia-target-empty-node" className="rounded-full bg-slate-100 px-2.5 py-1">{emptyReason}</span>
+        <span data-smoke="mafia-target-empty-node" className="rounded-full bg-slate-100 px-2.5 py-1">{phaseLabel || profile?.label || "대기"}</span>
+        <span data-smoke="mafia-target-empty-node" className="rounded-full bg-slate-100 px-2.5 py-1">마피아 {aliveMafia} · 시민 {aliveTown}</span>
+      </div>
+      <div className="grid gap-2 md:grid-cols-3">
         {items.map((item) => (
           <div key={item.label} data-smoke="mafia-target-empty-item" className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
             <div className="text-[10px] font-black text-slate-400">{item.label}</div>
             <div className="mt-0.5 text-sm font-black text-slate-950">{item.value}</div>
-            <div className="mt-1 text-[11px] font-bold leading-snug text-slate-600">{item.detail}</div>
+            <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-snug text-slate-600">{item.detail}</div>
           </div>
         ))}
       </div>
@@ -787,13 +784,7 @@ const MafiaActionRoutePanel = ({
       data-progress={`${Math.max(Number(completedCount) || 0, Number(votedCount) || 0)}/${Math.max(Number(aliveCount) || 0, 0)}`}
       className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm"
     >
-      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <MafiaActionRouteArt
-          items={routeItems}
-          actionType={actionType}
-          mySubmitted={mySubmitted}
-          selectedTargetSeatNo={selectedTargetSeatNo}
-        />
+      <div className="space-y-3">
         <div>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -805,13 +796,20 @@ const MafiaActionRoutePanel = ({
               {statusLabel} · {selectedLabel}
             </span>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div data-smoke="mafia-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
+            {routeItems.map((item) => (
+              <span key={`route-chip-${item.key}`} data-smoke="mafia-action-route-node" data-route-key={item.key} className="rounded-full bg-zinc-50 px-2.5 py-1">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {routeItems.map((item) => (
               <div
                 key={item.key}
                 data-smoke="mafia-action-route-item"
                 data-route-key={item.key}
-                className={`min-h-[96px] rounded-xl border px-3 py-2 ${mafiaActionRouteTone(item.state)}`}
+                className={`rounded-xl border px-3 py-2 ${mafiaActionRouteTone(item.state)}`}
               >
                 <div className="text-[10px] font-black opacity-70">{item.label}</div>
                 <div className="mt-0.5 line-clamp-2 text-sm font-black leading-snug">{item.value}</div>

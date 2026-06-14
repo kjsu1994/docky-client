@@ -540,25 +540,18 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="poker-community-standby-node"', "marks Poker community standby SVG nodes"],
     ['data-smoke="poker-community-standby-item"', "marks Poker community standby explanation tiles"],
     ["공용 카드 브리핑", "explains why Poker community cards can be empty"],
-    ["PokerHiddenCardsBrief", "renders Poker hidden/folded card guidance in showdown rows"],
-    ["PokerHiddenCardsBriefArt", "renders Poker hidden/folded card guidance through local SVG artwork"],
-    ['data-smoke="poker-hidden-cards-brief"', "marks Poker hidden/folded card guidance"],
-    ['data-smoke="poker-hidden-cards-brief-art"', "marks Poker hidden/folded card SVG artwork"],
-    ['data-smoke="poker-hidden-cards-brief-node"', "marks Poker hidden/folded card SVG nodes"],
-    ['data-smoke="poker-hidden-cards-brief-item"', "marks Poker hidden/folded card explanation tiles"],
+    ['data-smoke="poker-hidden-cards-brief"', "marks compact Poker hidden/folded card guidance"],
+    ['data-hidden-state={item.state === "folded" ? "folded" : "hidden"}', "keeps compact Poker hidden/folded state addressable"],
     ["폴드로 비공개", "explains folded Poker cards are intentionally hidden"],
     ["비교 제외", "explains folded Poker cards are excluded from showdown comparison"],
     ["PokerShowdownBreakdownPanel", "renders Poker showdown result guidance from loaded hand state"],
-    ["PokerShowdownTraceArt", "renders Poker showdown result guidance through reusable SVG artwork"],
     ['data-smoke="poker-showdown-breakdown-panel"', "marks the Poker showdown breakdown panel"],
-    ['data-smoke="poker-showdown-trace-art"', "marks reusable Poker showdown trace SVG artwork"],
+    ['data-smoke="poker-showdown-trace-art"', "marks compact Poker showdown trace chips"],
     ["tabletopPlayerPanelScore", "derives player panel score and state labels from loaded room/game state"],
     ['data-smoke="tabletop-players-panel"', "marks the enhanced tabletop players panel"],
     ['data-smoke="tabletop-player-card"', "marks enhanced tabletop player cards"],
-    ["TabletopGuideBriefArt", "renders shared tabletop rule guidance through local SVG artwork"],
     ['data-smoke="tabletop-guide-panel"', "marks the shared tabletop rule guide panel"],
-    ['data-smoke="tabletop-guide-art"', "marks the shared tabletop rule guide SVG artwork"],
-    ['data-smoke="tabletop-guide-node"', "marks the shared tabletop rule guide SVG nodes"],
+    ['data-smoke="tabletop-guide-art"', "marks compact shared tabletop rule guide chips"],
     ['data-smoke="tabletop-guide-item"', "marks the shared tabletop rule guide briefing tiles"],
     ["규칙 브리핑", "labels the shared tabletop rule guide artwork"],
     ["판정과 행동 연결", "explains that rule reading connects server judgment and player action"],
@@ -570,7 +563,7 @@ function assertTabletopRealtimeSource() {
     ["tabletopPhaseLabel", "normalizes each game phase into a player-facing Korean label"],
     ['from "./GameUxAssets.jsx"', "uses the custom game UX SVG asset set in tabletop screens"],
     ['GameUxGlyph type="turn"', "uses the custom turn glyph in the shared status ribbon"],
-    ['from "./TabletopGameArtwork.jsx"', "uses the custom tabletop game artwork asset set in room screens"],
+    ['data-smoke="tabletop-game-artwork"', "keeps compact tabletop route metadata addressable"],
     ['data-smoke="tabletop-route-artwork"', "marks the route-intro artwork frame for UI smoke coverage"],
     ["buildPokerResultExplanation", "builds a local poker winner explanation when the server does not provide result detail"],
     ["resultDetail || pokerResultExplanation", "prefers server poker result detail but falls back to local hand comparison"],
@@ -2759,14 +2752,11 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `Boolean(document.querySelector('#poker-action-panel'))`, "poker action panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('#poker-players-panel'))`, "poker chip/player status panel rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-showdown-breakdown-panel"]'))`, "poker showdown breakdown panel rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-showdown-trace-art"]'))`, "poker showdown trace SVG rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-showdown-trace-art"]'))`, "poker showdown trace summary rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-showdown-breakdown-item"]').length >= 2`, "poker showdown breakdown items rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-showdown-trace-node"]').length >= 2`, "poker showdown trace nodes rendered");
     await waitForExpression(ws, `/쇼다운 해설|승리 근거|비교 카드/.test(document.querySelector('[data-smoke="poker-showdown-breakdown-panel"]')?.textContent || "")`, "poker showdown copy rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-hidden-cards-brief"][data-hidden-state="folded"]'))`, "poker folded hidden-card guidance rendered");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-hidden-cards-brief-art"]'))`, "poker hidden-card SVG rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-hidden-cards-brief-node"]').length >= 2`, "poker hidden-card SVG nodes rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-hidden-cards-brief-item"]').length >= 2`, "poker hidden-card explanation items rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-hidden-cards-brief"][data-hidden-state="folded"]'))`, "poker folded compact hidden-card guidance rendered");
     await waitForExpression(ws, `/카드 상태|폴드로 비공개|비교 제외/.test(document.querySelector('[data-smoke="poker-hidden-cards-brief"]')?.textContent || "")`, "poker hidden-card guidance copy rendered");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="poker-card-art"]').length >= 7`, "poker reusable SVG cards rendered");
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="poker-community-standby-panel"][data-community-mode="five-card-draw"]'))`, "poker five-card draw community standby panel rendered");
