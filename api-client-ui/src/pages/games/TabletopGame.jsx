@@ -6855,13 +6855,17 @@ export const TabletopGame = ({ game }) => {
       notify("이전 방 요청을 처리하는 중입니다.");
       return;
     }
+    const formData = new FormData(event.currentTarget);
+    const title = String(formData.get("title") ?? createForm.title ?? "");
+    const variantCode = String(formData.get("variantCode") || createForm.variantCode || "");
+    const turnTimeSeconds = Number(formData.get("turnTimeSeconds") || createForm.turnTimeSeconds || 30);
     busyRef.current = true;
     try {
       setBusy(true);
       const room = await tabletopGameAdapter.createRoom(game, {
-        title: createForm.title,
-        variantCode: createForm.variantCode,
-        turnTimeSeconds: Number(createForm.turnTimeSeconds || 30),
+        title,
+        variantCode,
+        turnTimeSeconds,
       });
       await openRoom(room);
       await fetchRooms();
@@ -7159,15 +7163,19 @@ export const TabletopGame = ({ game }) => {
               {initialLoading && <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-black text-sky-700">불러오는 중</span>}
             </div>
             <div className="mt-4 grid grid-cols-1 gap-3">
+              <div className="text-[11px] font-black text-ink-muted">방 제목</div>
               <input
-                className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                name="title"
+                className="min-h-11 rounded-xl border border-line bg-control px-3 py-2 text-sm font-bold text-ink placeholder:text-ink-subtle focus:border-primary-500 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-focus/20"
                 placeholder="방 제목"
                 aria-label="방 제목"
                 value={createForm.title}
                 onChange={(event) => setCreateForm((prev) => ({ ...prev, title: event.target.value }))}
               />
+              <div className="text-[11px] font-black text-ink-muted">규칙</div>
               <select
-                className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
+                name="variantCode"
+                className="min-h-11 rounded-xl border border-line bg-control px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-focus/20"
                 value={createForm.variantCode}
                 aria-label={`${config.title} 규칙 선택`}
                 disabled={initialLoading || !variants.length}
@@ -7187,10 +7195,12 @@ export const TabletopGame = ({ game }) => {
                   {initialLoading ? "선택 가능한 규칙을 불러오는 중입니다." : "선택 가능한 규칙을 불러오지 못했습니다. 잠시 후 새로고침해주세요."}
                 </div>
               )}
+              <div className="text-[11px] font-black text-ink-muted">턴 제한 시간</div>
               <input
+                name="turnTimeSeconds"
                 type="text"
                 inputMode="numeric"
-                className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="min-h-11 rounded-xl border border-line bg-control px-3 py-2 text-sm font-bold text-ink placeholder:text-ink-subtle focus:border-primary-500 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-focus/20"
                 placeholder="턴 시간(초)"
                 aria-label="턴 시간 초"
                 value={createForm.turnTimeSeconds}
@@ -7373,10 +7383,10 @@ export const TabletopGame = ({ game }) => {
                   </button>
                 )}
                 {showStartBotSelector && (
-                  <label className="flex min-h-11 items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
-                    <span className="shrink-0">AI</span>
+                  <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-control px-3 py-2 text-xs font-black text-ink">
+                    <span className="shrink-0">추가 AI</span>
                     <select
-                      className="min-h-7 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-black text-emerald-900"
+                      className="min-h-7 rounded-lg border border-line bg-surface px-2 py-1 text-xs font-black text-ink focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-focus/20"
                       value={effectiveStartBotCount}
                       aria-label="추가 AI 수"
                       disabled={busy}
@@ -7406,24 +7416,30 @@ export const TabletopGame = ({ game }) => {
             </div>
 
             {isHost && status === "WAITING" && (
-              <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-[1fr_140px_140px]">
+              <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-line bg-control p-3 md:grid-cols-[minmax(0,1fr)_160px_140px]">
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-black text-ink-muted">규칙</span>
                 <select
-                  className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
+                  className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-focus/20"
                   value={settingsForm.variantCode}
                   aria-label="방 규칙 변경"
                   onChange={(event) => setSettingsForm((prev) => ({ ...prev, variantCode: event.target.value }))}
                 >
                   <VariantOptions game={game} variants={variants} disabledCodes={settingsDisabledVariantCodes} />
                 </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-black text-ink-muted">턴 제한</span>
                 <input
                   type="text"
                   inputMode="numeric"
-                  className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-focus/20"
                   value={settingsForm.turnTimeSeconds}
                   aria-label="방 턴 시간 초 변경"
                   onChange={(event) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: event.target.value.replace(/[^\d]/g, "") }))}
                   onBlur={() => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: clampDigits(prev.turnTimeSeconds, 5, 180, 30) }))}
                 />
+                </label>
                 <button className="min-h-11 rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40" disabled={selectedSettingsTooManyPlayers || busy} onClick={saveSettings} type="button" aria-label={selectedSettingsTooManyPlayers ? "현재 인원 때문에 방 설정 저장 불가" : "방 설정 저장"} title={selectedSettingsTooManyPlayers ? "현재 인원이 선택한 규칙의 최대 인원을 초과합니다." : "방 설정 저장"}>
                   설정 저장
                 </button>

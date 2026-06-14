@@ -127,6 +127,14 @@ html[data-theme="dark"] {
   textarea,
   select {
     @apply transition-colors duration-200;
+    color: rgb(var(--color-text));
+    background-color: rgb(var(--color-control));
+    border-color: rgb(var(--color-border));
+  }
+
+  select option {
+    color: rgb(var(--color-text));
+    background-color: rgb(var(--color-surface));
   }
 
   button {

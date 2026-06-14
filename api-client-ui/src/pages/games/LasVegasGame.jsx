@@ -6,6 +6,7 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 import { CasinoEmptyLaneArt, CasinoTableSign, DiceCountBadge, DiceFace, MoneyCard } from "../../common/LasVegasVisuals.jsx";
 import { confirmAction } from "../../common/confirmAction.jsx";
 import GameRoomChatPanel from "../../common/GameRoomChatPanel.jsx";
+import GameRoomPlayersPanel from "../../common/GameRoomPlayersPanel.jsx";
 import UserAvatar from "../../common/UserAvatar.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId, normalizeMessage } from "../../adapters/chatAdapter.js";
@@ -3480,12 +3481,16 @@ export const LasVegasGame = () => {
 
     const createRoom = async (e) => {
         e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const title = String(formData.get("title") ?? createForm.title ?? "");
+        const roundCount = toPlainInt(formData.get("roundCount") || createForm.roundCount, 4);
+        const turnTimeSeconds = toPlainInt(formData.get("turnTimeSeconds") || createForm.turnTimeSeconds, 25);
         try {
             setCreating(true);
             const room = await lasVegasGameAdapter.createRoom({
-                title: createForm.title,
-                roundCount: toPlainInt(createForm.roundCount, 4),
-                turnTimeSeconds: toPlainInt(createForm.turnTimeSeconds, 25),
+                title,
+                roundCount,
+                turnTimeSeconds,
             });
             await hydrateRoomContext(room);
             await fetchRooms();
@@ -3865,27 +3870,39 @@ export const LasVegasGame = () => {
                     <TabletopGameArtwork type="dice" compact className="h-32 w-full" />
                 </div>
                 <form className="grid grid-cols-1 gap-3 md:grid-cols-4" onSubmit={createRoom}>
+                    <label className="space-y-1.5">
+                        <span className="block text-[11px] font-black text-slate-200">방 제목</span>
                     <input
-                        className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300"
+                        name="title"
+                        className="min-h-11 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-bold text-white placeholder:text-slate-300"
                         placeholder="새 방 제목"
                         value={createForm.title}
                         onChange={(e) => setCreateForm((prev) => ({ ...prev, title: e.target.value }))}
                     />
+                    </label>
+                    <label className="space-y-1.5">
+                        <span className="block text-[11px] font-black text-slate-200">라운드</span>
                     <input
-                        className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                        name="roundCount"
+                        className="min-h-11 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-bold text-white"
                         type="text"
                         inputMode="numeric"
                         value={createForm.roundCount}
                         onChange={(e) => setCreateForm((prev) => ({ ...prev, roundCount: normalizeNumericText(e.target.value, 1, 10) }))}
                     />
+                    </label>
+                    <label className="space-y-1.5">
+                        <span className="block text-[11px] font-black text-slate-200">턴 제한</span>
                     <input
-                        className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white"
+                        name="turnTimeSeconds"
+                        className="min-h-11 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-bold text-white"
                         type="text"
                         inputMode="numeric"
                         value={createForm.turnTimeSeconds}
                         onChange={(e) => setCreateForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumericText(e.target.value, 5, 180) }))}
                     />
-                    <button type="submit" className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={creating}>
+                    </label>
+                    <button type="submit" className="min-h-11 self-end rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white disabled:opacity-50" disabled={creating}>
                         {creating ? "생성 중..." : "방 만들기"}
                     </button>
                 </form>
@@ -3989,7 +4006,7 @@ export const LasVegasGame = () => {
                                 <Link to="/app/games" className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
                                     게임 목록
                                 </Link>
-                                {isWaiting && (
+                                {isWaiting && !isHost && (
                                     <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>
                                         준비하기
                                     </button>
@@ -4029,9 +4046,11 @@ export const LasVegasGame = () => {
                             </div>
                         )}
                         {isHost && isWaiting && (
-                            <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
+                            <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-line bg-control p-3 md:grid-cols-4">
+                                <label className="space-y-1.5">
+                                    <span className="block text-[11px] font-black text-ink-muted">추가 AI</span>
                                 <select
-                                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700"
+                                    className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-focus/20"
                                     value={effectiveStartBotCount}
                                     onChange={(event) => setStartBotCount(toPlainInt(event.target.value, 0))}
                                     aria-label="추가 AI 수"
@@ -4041,13 +4060,41 @@ export const LasVegasGame = () => {
                                         <option key={count} value={count}>AI {count}명</option>
                                     ))}
                                 </select>
-                                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.roundCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, roundCount: normalizeNumericText(e.target.value, 1, 10) }))} />
-                                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumericText(e.target.value, 5, 180) }))} />
+                                </label>
+                                <label className="space-y-1.5">
+                                    <span className="block text-[11px] font-black text-ink-muted">라운드</span>
+                                    <input type="text" inputMode="numeric" className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-focus/20" value={settingsForm.roundCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, roundCount: normalizeNumericText(e.target.value, 1, 10) }))} />
+                                </label>
+                                <label className="space-y-1.5">
+                                    <span className="block text-[11px] font-black text-ink-muted">턴 제한</span>
+                                    <input type="text" inputMode="numeric" className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-focus/20" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumericText(e.target.value, 5, 180) }))} />
+                                </label>
                                 <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white" onClick={updateSettings}>방 설정 저장</button>
                             </div>
                         )}
                     </div>
 
+                    {isWaiting ? (
+                        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+                            <GameRoomPlayersPanel
+                                players={players}
+                                selectedRoom={selectedRoom}
+                                roomStatus={roomStatus}
+                                myMemberId={myMemberId}
+                                hostMemberId={hostMemberId}
+                                maxPlayers={toPlainInt(selectedRoom?.maxPlayers, 6)}
+                                getMemberId={getLasVegasPlayerId}
+                                getReady={(player) => readyMemberIds.has(Number(getLasVegasPlayerId(player) || 0)) || isReadyPlayer(player)}
+                                dataSmoke="las-vegas-player-roster"
+                            />
+                            <GameRoomChatPanel
+                                gameCode="las-vegas"
+                                roomId={gameChatRoomId}
+                                resetKey={normalizedRoomStatus}
+                                title="방 채팅"
+                            />
+                        </div>
+                    ) : (
                     <div className={`grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] ${myTurn ? "rounded-[1.8rem] bg-sky-100/70 p-3 ring-2 ring-sky-300/70" : ""}`}>
                         <div className="space-y-4">
                             {showGameBoard ? (
@@ -4137,6 +4184,7 @@ export const LasVegasGame = () => {
                             title="방 채팅"
                         />
                     </div>
+                    )}
                 </section>
             )}
 

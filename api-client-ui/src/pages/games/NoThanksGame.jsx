@@ -3323,11 +3323,15 @@ export const NoThanksGame = () => {
 
   const createRoom = async (event) => {
     event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const title = String(formData.get("title") ?? createForm.title ?? "");
+    const startChipCount = parseIntSafe(formData.get("startChipCount") || createForm.startChipCount, 11);
+    const turnTimeSeconds = parseIntSafe(formData.get("turnTimeSeconds") || createForm.turnTimeSeconds, 15);
     try {
       const room = await noThanksGameAdapter.createRoom({
-        title: createForm.title,
-        startChipCount: parseIntSafe(createForm.startChipCount, 11),
-        turnTimeSeconds: parseIntSafe(createForm.turnTimeSeconds, 15),
+        title,
+        startChipCount,
+        turnTimeSeconds,
       });
       await openRoom(room);
       await fetchRooms();
@@ -3568,10 +3572,19 @@ export const NoThanksGame = () => {
               <div className="text-lg font-black text-slate-900">방 만들기</div>
             </div>
             <div className="mt-4 space-y-3">
-              <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="방 제목" value={createForm.title} onChange={(e) => setCreateForm((prev) => ({ ...prev, title: e.target.value }))} />
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-black text-ink-muted">방 제목</span>
+                <input name="title" className="w-full rounded-xl border border-line bg-control px-3 py-2 text-sm font-bold text-ink placeholder:text-ink-subtle focus:border-primary-500 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-focus/20" placeholder="방 제목" value={createForm.title} onChange={(e) => setCreateForm((prev) => ({ ...prev, title: e.target.value }))} />
+              </label>
               <div className="grid grid-cols-2 gap-3">
-                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="토큰 개수" value={createForm.startChipCount} onChange={(e) => setCreateForm((prev) => ({ ...prev, startChipCount: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeCreateField("startChipCount", 5, 20, 11)} />
-                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="제한 시간(초)" value={createForm.turnTimeSeconds} onChange={(e) => setCreateForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeCreateField("turnTimeSeconds", 5, 60, 15)} />
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-black text-ink-muted">시작 칩</span>
+                  <input name="startChipCount" type="text" inputMode="numeric" className="w-full rounded-xl border border-line bg-control px-3 py-2 text-sm font-bold text-ink placeholder:text-ink-subtle focus:border-primary-500 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-focus/20" placeholder="개수" value={createForm.startChipCount} onChange={(e) => setCreateForm((prev) => ({ ...prev, startChipCount: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeCreateField("startChipCount", 5, 20, 11)} />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-black text-ink-muted">턴 제한</span>
+                  <input name="turnTimeSeconds" type="text" inputMode="numeric" className="w-full rounded-xl border border-line bg-control px-3 py-2 text-sm font-bold text-ink placeholder:text-ink-subtle focus:border-primary-500 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-focus/20" placeholder="초 단위" value={createForm.turnTimeSeconds} onChange={(e) => setCreateForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeCreateField("turnTimeSeconds", 5, 60, 15)} />
+                </label>
               </div>
               <button type="submit" className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white">노땡스 방 만들기</button>
             </div>
@@ -3681,14 +3694,14 @@ export const NoThanksGame = () => {
                 <Link to="/app/games" className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-900 hover:text-white sm:inline-flex">
                   게임 목록
                 </Link>
-                {isHost && roomStatus === "PLAYING" && <button className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700" onClick={forceFinishGame}>강제 종료</button>}
-                {roomStatus === "WAITING" && (
+                {isHost && roomStatusNormalized === "PLAYING" && <button className="rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700" onClick={forceFinishGame}>강제 종료</button>}
+                {roomStatusNormalized === "WAITING" && !isHost && (
                   <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={toggleReady}>
                     <span className="sr-only">준비 토글</span>
                     {readyMemberIds.has(myMemberId) ? "준비 취소" : "준비하기"}
                   </button>
                 )}
-                {isHost && roomStatus === "WAITING" && (
+                {isHost && roomStatusNormalized === "WAITING" && (
                   <button
                     className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={startGame}
@@ -3703,7 +3716,7 @@ export const NoThanksGame = () => {
               </div>
             </div>
 
-            {isHost && roomStatus === "FINISHED" && (
+            {isHost && roomStatusNormalized === "FINISHED" && (
               <div className="mt-3 flex justify-end">
                 <button className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-black text-white" onClick={rematchGame}>한 판 더 하기</button>
               </div>
@@ -3715,26 +3728,57 @@ export const NoThanksGame = () => {
               <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="font-black text-slate-700">상태</div><div className="text-slate-500">{noThanksRoomStatusLabel(roomStatus)}</div></div>
             </div>
 
-            {isHost && roomStatus === "WAITING" && (
-              <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-4">
-                <select
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700"
-                  value={effectiveStartBotCount}
-                  onChange={(event) => setStartBotCount(parseIntSafe(event.target.value, 0))}
-                  aria-label="추가 AI 수"
-                  title="추가 AI 수"
-                >
-                  {startBotOptions.map((count) => (
-                    <option key={count} value={count}>AI {count}명</option>
-                  ))}
-                </select>
-                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.startChipCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, startChipCount: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("startChipCount", 5, 20, 11)} />
-                <input type="text" inputMode="numeric" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("turnTimeSeconds", 5, 60, 15)} />
-                <button className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white" onClick={saveSettings}>설정 저장</button>
+            {isHost && roomStatusNormalized === "WAITING" && (
+              <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-line bg-control p-3 md:grid-cols-4">
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-black text-ink-muted">추가 AI</span>
+                  <select
+                    className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-focus/20"
+                    value={effectiveStartBotCount}
+                    onChange={(event) => setStartBotCount(parseIntSafe(event.target.value, 0))}
+                    aria-label="추가 AI 수"
+                    title="추가 AI 수"
+                  >
+                    {startBotOptions.map((count) => (
+                      <option key={count} value={count}>AI {count}명</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-black text-ink-muted">시작 칩</span>
+                  <input type="text" inputMode="numeric" className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-focus/20" value={settingsForm.startChipCount} onChange={(e) => setSettingsForm((prev) => ({ ...prev, startChipCount: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("startChipCount", 5, 20, 11)} />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-black text-ink-muted">턴 제한</span>
+                  <input type="text" inputMode="numeric" className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-focus/20" value={settingsForm.turnTimeSeconds} onChange={(e) => setSettingsForm((prev) => ({ ...prev, turnTimeSeconds: normalizeNumberDraft(e.target.value) }))} onBlur={() => normalizeSettingsField("turnTimeSeconds", 5, 60, 15)} />
+                </label>
+                <button className="min-h-11 self-end rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white" onClick={saveSettings}>설정 저장</button>
               </div>
             )}
           </div>
 
+          {roomStatusNormalized === "WAITING" ? (
+            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+              <GameRoomPlayersPanel
+                players={players}
+                selectedRoom={selectedRoom}
+                roomStatus={roomStatus}
+                myMemberId={myMemberId}
+                hostMemberId={hostMemberId}
+                maxPlayers={parseIntSafe(selectedRoom.maxPlayers, 6)}
+                getMemberId={playerIdOf}
+                getReady={(player) => readyMemberIds.has(playerIdOf(player)) || isReadyPlayer(player)}
+                dataSmoke="no-thanks-player-roster"
+              />
+
+              <GameRoomChatPanel
+                gameCode="no-thanks"
+                roomId={gameChatRoomId}
+                resetKey={roomStatusNormalized}
+                title="방 채팅"
+              />
+            </div>
+          ) : (
           <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <div className="space-y-4">
               <div className={`rounded-[1.8rem] border p-5 shadow-xl ${isMyTurn ? "border-sky-200 bg-sky-50" : "border-slate-200 bg-white"}`}>
@@ -3864,6 +3908,7 @@ export const NoThanksGame = () => {
               title="방 채팅"
             />
           </div>
+          )}
         </section>
       )}
     </div>
