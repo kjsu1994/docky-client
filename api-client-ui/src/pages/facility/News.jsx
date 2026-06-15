@@ -89,7 +89,7 @@ export const News = () => {
 
     return (
         <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="surface-card p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <div className="flex items-center gap-3">
@@ -97,22 +97,22 @@ export const News = () => {
                                 <Newspaper className="h-6 w-6" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">환경 뉴스</h1>
-                                <p className="text-sm font-medium text-slate-500">환경, 에너지, 지속가능성 이슈를 빠르게 확인하세요.</p>
+                                <h1 className="text-2xl font-black text-ink sm:text-3xl">환경 뉴스</h1>
+                                <p className="text-sm font-medium text-ink-muted">환경, 에너지, 지속가능성 이슈를 빠르게 확인하세요.</p>
                             </div>
                         </div>
                     </div>
-                    <div className="inline-flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
+                    <div className="inline-flex items-center gap-2 rounded-xl bg-control px-3 py-2 text-sm font-bold text-ink-muted">
                         <TrendingUp className="h-4 w-4 text-emerald-500" />
                         {total ? `검색 결과 ${Math.min(news.length, total).toLocaleString()} / ${total.toLocaleString()}건` : "실시간 뉴스 검색"}
                     </div>
                 </div>
             </div>
 
-            <div className="card p-6 space-y-4">
+            <div className="surface-card space-y-4 p-6">
                 <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
                         <input
                             type="search"
                             value={searchInput}
@@ -129,11 +129,11 @@ export const News = () => {
 
                 <div className="flex flex-wrap items-center gap-3">
                     <label className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">정렬</span>
+                        <span className="text-sm font-semibold text-ink-muted">정렬</span>
                         <select
                             value={sortBy}
                             onChange={(event) => handleSortChange(event.target.value)}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="input-base w-auto px-3 py-2"
                             disabled={loading}
                         >
                             <option value="sim">정확도순</option>
@@ -142,11 +142,11 @@ export const News = () => {
                     </label>
 
                     <label className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">결과 수</span>
+                        <span className="text-sm font-semibold text-ink-muted">결과 수</span>
                         <select
                             value={display}
                             onChange={(event) => handleDisplayChange(Number(event.target.value))}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="input-base w-auto px-3 py-2"
                             disabled={loading}
                         >
                             <option value={10}>10개</option>
@@ -158,7 +158,7 @@ export const News = () => {
                 </div>
 
                 <div>
-                    <div className="mb-2 text-sm font-semibold text-slate-700">빠른 검색어</div>
+                    <div className="mb-2 text-sm font-semibold text-ink-muted">빠른 검색어</div>
                     <div className="flex flex-wrap gap-2">
                         {quickKeywords.map((keyword) => (
                             <button
@@ -187,10 +187,10 @@ export const News = () => {
             ) : null}
 
             {!loading && !error && news.length === 0 ? (
-                <div className="card p-12 text-center">
-                    <Newspaper className="mx-auto mb-4 h-16 w-16 text-slate-300" />
-                    <h3 className="mb-2 text-lg font-semibold text-slate-900">뉴스를 검색해보세요</h3>
-                    <p className="text-slate-600">관심 있는 환경 키워드로 최신 뉴스를 찾아볼 수 있습니다.</p>
+                <div className="surface-card p-12 text-center">
+                    <Newspaper className="mx-auto mb-4 h-16 w-16 text-ink-subtle" />
+                    <h3 className="mb-2 text-lg font-semibold text-ink">뉴스를 검색해보세요</h3>
+                    <p className="text-ink-muted">관심 있는 환경 키워드로 최신 뉴스를 찾아볼 수 있습니다.</p>
                 </div>
             ) : null}
         </div>
@@ -205,16 +205,16 @@ const formatDate = (dateString) => {
 };
 
 const NewsCard = ({ item }) => (
-    <article className="card p-6 transition-all hover:shadow-lg">
+    <article className="surface-card p-6 transition-all hover:shadow-panel">
         <div className="flex flex-col gap-4 sm:flex-row">
             <div className="min-w-0 flex-1">
-                <h3 className="mb-2 line-clamp-2 text-lg font-bold text-slate-900 transition-colors hover:text-emerald-700">
+                <h3 className="mb-2 line-clamp-2 text-lg font-bold text-ink transition-colors hover:text-emerald-700">
                     <a href={item.link} target="_blank" rel="noopener noreferrer">
                         {item.title}
                     </a>
                 </h3>
-                <p className="mb-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{item.description}</p>
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                <p className="mb-3 line-clamp-3 text-sm leading-relaxed text-ink-muted">{item.description}</p>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-ink-muted">
                     <span className="flex items-center gap-1">
                         <Calendar className="h-3.5 w-3.5" />
                         {formatDate(item.pubDate)}

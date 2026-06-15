@@ -401,7 +401,7 @@ export const AdminOperations = () => {
 
     if (!isAdmin) {
         return (
-            <section className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-rose-800 text-center space-y-4">
+            <section className="surface-panel space-y-4 p-6 text-center text-rose-800 sm:p-10">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
                     <ShieldAlert className="h-8 w-8 text-rose-500" />
                 </div>
@@ -419,24 +419,24 @@ export const AdminOperations = () => {
     const madeReports = memberDetail?.madeReports || [];
 
     return (
-        <section className="space-y-8 animate-fade-in pb-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+        <section className="space-y-6 animate-fade-in pb-10 sm:space-y-8">
+            <div className="surface-panel flex flex-col gap-3 p-5 sm:p-8">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-slate-900">관리자 운영 도구</h1>
                     <p className="text-sm font-medium text-slate-400">콘텐츠 일괄 조치와 회원 상세 정보를 한 화면에서 처리합니다.</p>
                 </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-6">
+            <div className="surface-panel p-5 sm:p-6">
                 <h2 className="text-base font-black text-slate-900">사용 방법</h2>
                 <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div className="rounded-2xl bg-white p-4">
+                    <div className="surface-card p-4">
                         <div className="text-xs font-black tracking-widest text-primary-600">일괄 검토</div>
                         <p className="mt-2 text-sm text-slate-600">
                             게시글/댓글을 검색하고 여러 대상을 선택한 뒤 숨김 또는 복구를 한 번에 실행합니다.
                         </p>
                     </div>
-                    <div className="rounded-2xl bg-white p-4">
+                    <div className="surface-card p-4">
                         <div className="text-xs font-black tracking-widest text-primary-600">회원 360 상세</div>
                         <p className="mt-2 text-sm text-slate-600">
                             회원을 검색해 프로필, 최근 활동, 제재, 신고 이력을 한 화면에서 확인합니다.
@@ -449,7 +449,7 @@ export const AdminOperations = () => {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <div className="card p-8 space-y-5">
+                <div className="surface-panel space-y-5 p-5 sm:p-8">
                     <h2 className="text-lg font-black text-slate-900">콘텐츠 일괄 검토</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <select className="input-base" value={targetType} onChange={(e) => setTargetType(e.target.value)}>
@@ -489,7 +489,7 @@ export const AdminOperations = () => {
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                         <button
                             type="button"
-                            className="rounded-xl bg-slate-100 px-3 py-1.5 font-black text-slate-700 hover:bg-slate-200"
+                            className="btn-secondary min-h-9 px-3 py-1.5 text-xs"
                             onClick={selectAllFiltered}
                             disabled={!filteredModerationItems.length}
                         >
@@ -497,7 +497,7 @@ export const AdminOperations = () => {
                         </button>
                         <button
                             type="button"
-                            className="rounded-xl bg-slate-100 px-3 py-1.5 font-black text-slate-700 hover:bg-slate-200"
+                            className="btn-secondary min-h-9 px-3 py-1.5 text-xs"
                             onClick={clearSelected}
                             disabled={!selectedIds.length}
                         >
@@ -578,7 +578,7 @@ export const AdminOperations = () => {
                     )}
                 </div>
 
-                <div className="card p-8 space-y-5">
+                <div className="surface-panel space-y-5 p-5 sm:p-8">
                     <h2 className="text-lg font-black text-slate-900">회원 360 상세</h2>
                     <div className="space-y-2">
                         <input
@@ -624,7 +624,7 @@ export const AdminOperations = () => {
                             </div>
                         ) : null}
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row">
                         <input
                             className="input-base flex-1"
                             value={memberIdInput}
@@ -651,12 +651,12 @@ export const AdminOperations = () => {
                 </div>
             </div>
 
-            <div className="card p-8 space-y-6">
-                <div className="flex items-center justify-between">
+            <div className="surface-panel space-y-6 p-5 sm:p-8">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h2 className="text-lg font-black text-slate-900">배너 관리</h2>
                     <button
                         type="button"
-                        className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200"
+                        className="btn-secondary min-h-9 px-3 py-1.5 text-xs"
                         onClick={fetchAdminBanners}
                         disabled={bannerLoading}
                         aria-busy={bannerLoading}
@@ -667,7 +667,7 @@ export const AdminOperations = () => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <label className={`md:col-span-2 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 text-sm font-black transition ${bannerImageUploading ? "bg-slate-100 text-slate-400" : "bg-slate-900 text-white hover:bg-primary-600"}`}>
+                    <label className={`md:col-span-2 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-control px-4 text-sm font-black transition ${bannerImageUploading ? "bg-control text-ink-muted" : "bg-primary-600 text-white shadow-card hover:bg-primary-700"}`}>
                         {bannerImageUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
                         <span>{bannerImageUploading ? "업로드 중..." : "내 기기에서 배너 이미지 선택"}</span>
                         <input
@@ -761,8 +761,8 @@ export const AdminOperations = () => {
                                         </div>
                                     ) : null}
                                     <div className="mt-3 flex flex-wrap gap-2">
-                                        <button type="button" className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-black text-white hover:bg-primary-600" onClick={(e) => { e.stopPropagation(); startEditBanner(banner); }}>수정</button>
-                                        <button type="button" className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200" onClick={(e) => { e.stopPropagation(); toggleBannerActive(banner); }}>
+                                        <button type="button" className="btn-primary min-h-9 px-3 py-1.5 text-xs" onClick={(e) => { e.stopPropagation(); startEditBanner(banner); }}>수정</button>
+                                        <button type="button" className="btn-secondary min-h-9 px-3 py-1.5 text-xs" onClick={(e) => { e.stopPropagation(); toggleBannerActive(banner); }}>
                                             {activeYn ? "비활성화" : "활성화"}
                                         </button>
                                         <button type="button" className="rounded-xl bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 hover:bg-rose-200" onClick={(e) => { e.stopPropagation(); removeBanner(banner); }}>삭제</button>
@@ -776,7 +776,7 @@ export const AdminOperations = () => {
 
             {memberDetail ? (
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    <div className="card p-6 xl:col-span-1 space-y-3">
+                    <div className="surface-panel space-y-3 p-5 sm:p-6 xl:col-span-1">
                         <h3 className="text-base font-black text-slate-900">기본 정보</h3>
                         <div className="flex flex-wrap items-center gap-2 text-sm">
                             <span><b>ID:</b> {memberInfo.memberId || "-"}</span>
@@ -800,7 +800,7 @@ export const AdminOperations = () => {
                         <div className="text-sm"><b>댓글:</b> {memberInfo.commentCount || 0}</div>
                     </div>
 
-                    <div className="card p-6 xl:col-span-2">
+                    <div className="surface-panel p-5 sm:p-6 xl:col-span-2">
                         <h3 className="mb-3 text-base font-black text-slate-900">최근 게시글 / 댓글</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="rounded-2xl bg-slate-50/50 p-4">
@@ -836,7 +836,7 @@ export const AdminOperations = () => {
                         </div>
                     </div>
 
-                    <div className="card p-6 xl:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="surface-panel grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-3 xl:col-span-3">
                         <div className="rounded-2xl bg-slate-50/50 p-4">
                             <div className="mb-2 text-xs font-black text-slate-500">제재 이력</div>
                             {!sanctions.length ? <div className="text-xs text-slate-400">데이터 없음</div> : (

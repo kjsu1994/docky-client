@@ -20,7 +20,9 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "admin-anomalies-ui-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false, interactive: true },
-    { name: "mobile", width: 390, height: 844, mobile: true, interactive: false },
+    { name: "tablet", width: 768, height: 1024, mobile: false, interactive: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3, interactive: false },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3, interactive: false },
 ];
 const requiredTexts = [
     "관리자 대시보드",
@@ -746,7 +748,7 @@ async function clickButtonByTitle(ws, title) {
 async function clickNotificationReadButton(ws) {
     const rect = await evaluate(ws, `(() => {
         const heading = Array.from(document.querySelectorAll("h2")).find((node) => (node.innerText || "").trim() === "관리자 알림");
-        const card = heading?.closest(".card");
+        const card = heading?.closest(".surface-panel, .card");
         const button = Array.from(card?.querySelectorAll("button") || []).find((node) => (node.innerText || "").trim() === "읽음 처리" && !node.disabled);
         if (!button) return null;
         button.scrollIntoView({ block: "center", inline: "center" });
@@ -767,7 +769,7 @@ async function inspectAdminAnomalies(ws, viewport) {
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     });
     await send(ws, "Page.navigate", { url: `${baseUrl}/app/admin/anomalies` });
@@ -790,7 +792,7 @@ async function inspectAdminAnomalies(ws, viewport) {
         if (await clickNotificationReadButton(ws) !== "clicked") {
             throw new Error("admin anomalies desktop: notification read button missing");
         }
-        await waitForText(ws, "\uc774\ubbf8 \ucc98\ub9ac\ub418\uc5c8\uac70\ub098 \uc0ad\uc81c\ub41c \uc54c\ub9bc\uc785\ub2c8\ub2e4.");
+        await waitForText(ws, "이미 처리되었거나 삭제된 알림입니다.");
         await waitForText(ws, "Realtime operations summary unavailable.");
         await waitForText(ws, "window=60, exception=IllegalStateException");
         if (await clickNotificationReadButton(ws) !== "clicked") {

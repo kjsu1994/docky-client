@@ -60,7 +60,7 @@ const PromptToast = ({
     return (
         <form
             onSubmit={submit}
-            className={`pointer-events-auto w-[min(92vw,420px)] rounded-2xl border border-line bg-surface p-4 shadow-2xl ${
+            className={`modal-panel pointer-events-auto w-[min(92vw,420px)] p-4 ${
                 item.visible ? "animate-enter" : "animate-leave"
             }`}
             role="dialog"
@@ -74,7 +74,7 @@ const PromptToast = ({
             <input
                 id={inputId}
                 ref={inputRef}
-                className="mt-2 w-full rounded-xl border border-line bg-control px-3 py-2 text-sm font-bold text-ink outline-none transition focus:border-primary-500 focus:bg-surface focus:ring-4 focus:ring-primary-100"
+                className="input-base mt-2 py-2 font-bold"
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 placeholder={placeholder}
@@ -88,7 +88,7 @@ const PromptToast = ({
                 <button
                     ref={cancelRef}
                     type="button"
-                    className="min-h-10 rounded-xl bg-control px-3 text-sm font-black text-ink-muted transition hover:bg-control-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus/20"
+                    className="btn-secondary min-h-10 px-3 py-2"
                     onClick={() => settle(null, item.id)}
                 >
                     {cancelText}
@@ -96,7 +96,7 @@ const PromptToast = ({
                 <button
                     ref={submitRef}
                     type="submit"
-                    className="min-h-10 rounded-xl bg-ink px-3 text-sm font-black text-ink-inverse transition hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus/20 disabled:bg-line-strong"
+                    className="min-h-10 rounded-control bg-ink px-3 text-sm font-black text-ink-inverse transition hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus/20 disabled:bg-line-strong"
                     disabled={!canSubmit}
                 >
                     {confirmText}

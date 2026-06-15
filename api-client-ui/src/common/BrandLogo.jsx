@@ -18,7 +18,7 @@ export const BrandLogo = ({ className = "", markClassName = "h-12", showText = f
         <BrandMark className={markClassName} />
         {showText && (
             <span className="min-w-0 leading-tight">
-                <span className="block text-lg font-black tracking-tight text-slate-900">Docky</span>
+                <span className="block text-lg font-black tracking-tight text-ink">Docky</span>
                 <span className="block text-[10px] font-bold uppercase tracking-widest text-primary-500">
                     docky.co.kr
                 </span>

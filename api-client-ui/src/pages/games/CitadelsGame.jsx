@@ -5031,7 +5031,7 @@ export const CitadelsGame = () => {
   );
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="game-shell animate-fade-in space-y-6">
       <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-red-900 to-amber-600 p-[1px] shadow-2xl sm:rounded-[2rem]">
         <div className="bg-white p-5 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5052,7 +5052,7 @@ export const CitadelsGame = () => {
       {!selectedRoom && (
         <>
         <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-          <form onSubmit={createRoom} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+          <form onSubmit={createRoom} className="surface-panel p-5">
             <div className="flex items-center gap-2">
               <div className="text-lg font-black text-slate-900">방 만들기</div>
             </div>
@@ -5068,7 +5068,7 @@ export const CitadelsGame = () => {
             </div>
           </form>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+          <section className="surface-panel p-5">
             <div className="flex items-center justify-between gap-3">
               <div className="text-lg font-black text-slate-900">대기 중인 방</div>
               <button type="button" onClick={() => fetchRooms().catch(() => notifyError("목록을 불러오지 못했습니다."))} className="inline-flex min-h-10 items-center gap-1 rounded-xl bg-slate-100 px-3 text-xs font-black text-slate-700">
@@ -5097,7 +5097,7 @@ export const CitadelsGame = () => {
 
       {selectedRoom && (
         <section className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+          <div className="surface-panel p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -5217,7 +5217,7 @@ export const CitadelsGame = () => {
                 </section>
 
                 {phase === "CHARACTER_SELECTION" && (
-                  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+                  <section className="surface-panel p-5">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <div className="text-lg font-black text-slate-900">캐릭터 선택</div>
                       <div className="text-xs font-bold text-slate-500">{isMySelection ? "내가 처리할 차례입니다." : "선택 차례를 기다리는 중입니다."}</div>
@@ -5250,7 +5250,7 @@ export const CitadelsGame = () => {
                 )}
 
                 {phase === "DISTRICT_CHOICE" && (
-                  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+                  <section className="surface-panel p-5">
                     <div className="mb-3 text-lg font-black text-slate-900">구역 카드 보관</div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {pendingChoices.map((card) => {
@@ -5279,7 +5279,7 @@ export const CitadelsGame = () => {
 
                 {phase === "TURN_ACTION" && renderActionPanel()}
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+                <section className="surface-panel p-5">
                   <div className="mb-3 flex items-center gap-2 text-lg font-black text-slate-900"><Users className="h-5 w-5" />도시 현황</div>
                   <div className="grid gap-3 md:grid-cols-2">
                     {citadelsPlayers.map((player) => {
@@ -5325,7 +5325,7 @@ export const CitadelsGame = () => {
               </main>
 
               <aside className="space-y-4">
-                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-lg">
+                <section className="surface-panel p-4">
                   <div className="mb-3 text-sm font-black text-slate-900">최근 기록</div>
                   <div className="max-h-[420px] space-y-2 overflow-auto pr-1">
                     {[...events].slice(-12).reverse().map((event) => {

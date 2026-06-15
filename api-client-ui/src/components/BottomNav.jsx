@@ -17,8 +17,8 @@ const NavItem = ({ to, icon: Icon, end = false, hiddenFromA11y = false, children
             className={({ isActive }) =>
                 `flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-2xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus/25 ${
                     isActive
-                        ? "scale-110 font-bold text-primary-600"
-                        : "text-ink-subtle hover:text-ink-muted"
+                        ? "bg-primary-500/10 font-bold text-primary-700"
+                        : "text-ink-subtle hover:bg-control/70 hover:text-ink-muted"
                 }`
             }
         >
@@ -100,7 +100,7 @@ export const BottomNav = () => {
                 visible ? "translate-y-0" : "translate-y-full"
             } glass`}
         >
-            <div className="mx-auto grid h-full max-w-lg grid-cols-4 items-center">
+            <div className="mx-auto grid h-full max-w-lg grid-cols-4 items-center gap-1.5">
                 <NavItem to="/app" icon={Dices} end hiddenFromA11y={!visible}>게임</NavItem>
                 <NavItem to="/app/boards/FREE_BOARD" icon={LayoutGrid} hiddenFromA11y={!visible}>게시판</NavItem>
                 <NavItem to="/app/chat" icon={MessageCircle} hiddenFromA11y={!visible}>채팅</NavItem>

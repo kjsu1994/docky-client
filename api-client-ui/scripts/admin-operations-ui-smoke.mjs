@@ -34,7 +34,9 @@ const blockedTexts = [
 ];
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false, interactive: true },
-    { name: "mobile", width: 390, height: 844, mobile: true, interactive: false },
+    { name: "tablet", width: 768, height: 1024, mobile: false, interactive: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3, interactive: false },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3, interactive: false },
 ];
 
 class PipeCdp {
@@ -503,7 +505,7 @@ async function inspectAdminOperations(cdp, sessionId, viewport) {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     }, sessionId);
 

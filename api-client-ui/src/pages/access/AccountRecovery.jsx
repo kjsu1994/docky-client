@@ -121,21 +121,22 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-transparent flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+            <div className="bg-vibe" />
             <div className="w-full max-w-md relative z-10 py-8">
                 <div className="text-center mb-8">
                     <BrandMark className="mx-auto mb-5 h-20 sm:h-24 max-w-[17rem]" />
-                    <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-3">{title}</h1>
-                    <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.24em]">Docky account</p>
+                    <h1 className="text-3xl sm:text-4xl font-black text-ink tracking-tight mb-3">{title}</h1>
+                    <p className="text-ink-subtle font-bold uppercase text-[11px] tracking-[0.24em]">Docky account</p>
                 </div>
 
-                <div className="card p-6 sm:p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50 shadow-2xl shadow-slate-200">
-                    <div className="mb-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+                <div className="surface-panel motion-panel-in p-6 sm:p-10">
+                    <div className="mb-6 grid grid-cols-2 rounded-panel bg-control p-1">
                         <button
                             type="button"
                             onClick={() => switchMode("find-id")}
                             className={`h-11 rounded-xl text-sm font-black transition ${
-                                mode === "find-id" ? "bg-white text-primary-600 shadow-sm" : "text-slate-500"
+                                mode === "find-id" ? "bg-surface text-primary-600 shadow-card" : "text-ink-muted"
                             }`}
                         >
                             아이디 찾기
@@ -144,7 +145,7 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
                             type="button"
                             onClick={() => switchMode("password-reset")}
                             className={`h-11 rounded-xl text-sm font-black transition ${
-                                mode === "password-reset" ? "bg-white text-primary-600 shadow-sm" : "text-slate-500"
+                                mode === "password-reset" ? "bg-surface text-primary-600 shadow-card" : "text-ink-muted"
                             }`}
                         >
                             비밀번호 찾기
@@ -154,28 +155,28 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
                     {mode === "find-id" ? (
                         <form onSubmit={handleFindSubmit} className="space-y-5">
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">이름</label>
+                                <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">이름</label>
                                 <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         type="text"
                                         value={findForm.name}
                                         onChange={(event) => setFindForm((prev) => ({ ...prev, name: event.target.value }))}
-                                        className="input-base pl-12 h-14 bg-white font-bold"
+                                        className="input-base pl-12 h-14 font-bold"
                                         placeholder="가입한 이름"
                                         autoComplete="name"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">전화번호</label>
+                                <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">전화번호</label>
                                 <div className="relative group">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         type="tel"
                                         value={findForm.phone}
                                         onChange={(event) => setFindForm((prev) => ({ ...prev, phone: formatPhoneNumber(event.target.value) }))}
-                                        className="input-base pl-12 h-14 bg-white font-bold"
+                                        className="input-base pl-12 h-14 font-bold"
                                         placeholder="010-0000-0000"
                                         inputMode="numeric"
                                     />
@@ -191,12 +192,12 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
                             </button>
 
                             {findResult && (
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                                    <p className="text-sm font-bold text-slate-600">{findResult.message}</p>
+                                <div className="surface-card p-4">
+                                    <p className="text-sm font-bold text-ink-muted">{findResult.message}</p>
                                     {findResult.maskedEmails.length > 0 && (
                                         <div className="mt-3 space-y-2">
                                             {findResult.maskedEmails.map((maskedEmail) => (
-                                                <div key={maskedEmail} className="rounded-xl bg-white px-4 py-3 text-sm font-black text-slate-800 shadow-sm">
+                                                <div key={maskedEmail} className="rounded-card bg-surface px-4 py-3 text-sm font-black text-ink shadow-card">
                                                     {maskedEmail}
                                                 </div>
                                             ))}
@@ -208,9 +209,9 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
                     ) : (
                         <form onSubmit={resetStep === "email" ? handleSendResetCode : handleConfirmResetCode} className="space-y-5">
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">이메일</label>
+                                <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">이메일</label>
                                 <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         type="email"
                                         value={resetEmail}
@@ -220,7 +221,7 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
                                             setResetCode("");
                                             setResetStatus("");
                                         }}
-                                        className="input-base pl-12 h-14 bg-white font-bold"
+                                        className="input-base pl-12 h-14 font-bold"
                                         placeholder="가입한 이메일"
                                         autoComplete="email"
                                     />
@@ -229,14 +230,14 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
 
                             {resetStep !== "email" && (
                                 <div className="space-y-2">
-                                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">인증번호</label>
+                                    <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">인증번호</label>
                                     <div className="relative group">
-                                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                         <input
                                             type="text"
                                             value={resetCode}
                                             onChange={(event) => setResetCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                                            className="input-base pl-12 h-14 bg-white font-bold tracking-[0.3em]"
+                                            className="input-base pl-12 h-14 font-bold tracking-[0.3em]"
                                             placeholder="123456"
                                             inputMode="numeric"
                                             disabled={resetStep === "done"}
@@ -246,7 +247,7 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
                             )}
 
                             {resetStatus && (
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-bold text-slate-600">
+                                <div className="surface-card p-4 text-sm font-bold text-ink-muted">
                                     {resetStatus}
                                 </div>
                             )}
@@ -274,8 +275,8 @@ export const AccountRecovery = ({ initialMode = "find-id" }) => {
                         </form>
                     )}
 
-                    <div className="mt-8 pt-6 border-t border-slate-100">
-                        <Link to="/login" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-100 text-sm font-black text-slate-600 hover:bg-slate-200">
+                    <div className="mt-8 pt-6 border-t border-line">
+                        <Link to="/login" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-control bg-control text-sm font-black text-ink-muted hover:bg-control-hover">
                             <ArrowLeft className="h-4 w-4" />
                             로그인으로 돌아가기
                         </Link>

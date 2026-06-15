@@ -329,27 +329,28 @@ export const Register = () => {
             : "인증번호를 요청해 이메일 인증을 시작해 주세요.";
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-transparent flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+            <div className="bg-vibe" />
             <div className="w-full max-w-md relative z-10 py-10">
                 <div className="text-center mb-10">
                     <BrandMark className="mx-auto mb-6 h-24 max-w-[18rem] transition-transform duration-500 hover:scale-105" />
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">회원가입</h1>
-                    <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">이메일 인증 회원가입</p>
+                    <h1 className="text-4xl font-black text-ink tracking-tight mb-3">회원가입</h1>
+                    <p className="text-ink-subtle font-bold uppercase text-[11px] tracking-[0.3em]">이메일 인증 회원가입</p>
                 </div>
 
-                <div className="card p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50 shadow-2xl shadow-slate-200">
+                <div className="surface-panel motion-panel-in p-6 sm:p-10">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">이메일</label>
+                            <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">이메일</label>
                             <div className="flex gap-2">
                                 <div className="relative group flex-1">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         type="email"
                                         name="email"
                                         value={formData.email}
                                         onChange={handleChange}
-                                        className={`input-base pl-12 h-14 bg-white font-bold ${errors.email ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                        className={`input-base pl-12 h-14 font-bold ${errors.email ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
                                         placeholder="이메일 주소"
                                     />
                                 </div>
@@ -369,13 +370,13 @@ export const Register = () => {
                             )}
                         </div>
 
-                        <div className="space-y-3 rounded-3xl border border-slate-100 bg-slate-50/70 p-5">
+                        <div className="surface-card space-y-3 p-4 sm:p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-3">
-                                    <ShieldCheck className={`h-5 w-5 ${emailVerified ? "text-emerald-500" : "text-slate-300"}`} />
+                                    <ShieldCheck className={`h-5 w-5 ${emailVerified ? "text-emerald-500" : "text-ink-subtle"}`} />
                                     <div>
-                                        <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">이메일 인증</p>
-                                        <p className="text-sm font-bold text-slate-700">
+                                        <p className="text-xs font-black uppercase tracking-[0.2em] text-ink-muted">이메일 인증</p>
+                                        <p className="text-sm font-bold text-ink-muted">
                                             {emailVerified ? "인증이 완료되었습니다." : "회원가입을 완료하려면 6자리 인증번호를 입력해 주세요."}
                                         </p>
                                     </div>
@@ -384,7 +385,7 @@ export const Register = () => {
                                     type="button"
                                     onClick={handleSendVerification}
                                     disabled={loading || sendingVerification || !emailChecked || resendCooldown > 0}
-                                    className="rounded-xl bg-slate-900 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-white disabled:bg-slate-300"
+                                    className="rounded-control bg-ink px-4 py-3 text-[11px] font-black uppercase tracking-wider text-ink-inverse disabled:bg-line-strong"
                                 >
                                     {sendingVerification ? "전송 중..." : resendCooldown > 0 ? `${resendCooldown}초` : "인증번호 전송"}
                                 </button>
@@ -392,7 +393,7 @@ export const Register = () => {
 
                             <div className="flex gap-2">
                                 <div className="relative group flex-1">
-                                    <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         type="text"
                                         name="verificationCode"
@@ -403,7 +404,7 @@ export const Register = () => {
                                                 setErrors((prev) => ({ ...prev, verificationCode: "" }));
                                             }
                                         }}
-                                        className={`input-base pl-12 h-14 bg-white font-bold tracking-[0.3em] ${errors.verificationCode ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                        className={`input-base pl-12 h-14 font-bold tracking-[0.3em] ${errors.verificationCode ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
                                         placeholder="123456"
                                         inputMode="numeric"
                                     />
@@ -420,39 +421,39 @@ export const Register = () => {
                             {errors.verificationCode && (
                                 <p className="text-[10px] font-black uppercase tracking-wider text-rose-500">{errors.verificationCode}</p>
                             )}
-                            <p className={`text-[10px] font-black uppercase tracking-wider ${emailVerified ? "text-emerald-600" : "text-slate-500"}`}>
+                            <p className={`text-[10px] font-black uppercase tracking-wider ${emailVerified ? "text-emerald-600" : "text-ink-muted"}`}>
                                 {confirmHelpText}
                             </p>
                             {!!verificationStatus && (
-                                <p className="text-[10px] font-bold text-slate-500">{verificationStatus}</p>
+                                <p className="text-[10px] font-bold text-ink-muted">{verificationStatus}</p>
                             )}
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">비밀번호</label>
+                                <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">비밀번호</label>
                                 <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         type="password"
                                         name="password"
                                         value={formData.password}
                                         onChange={handleChange}
-                                        className={`input-base pl-12 h-14 bg-white font-bold text-xs ${errors.password ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                        className={`input-base pl-12 h-14 font-bold text-xs ${errors.password ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
                                         placeholder="8자 이상 입력"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">비밀번호 확인</label>
+                                <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">비밀번호 확인</label>
                                 <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         type="password"
                                         name="confirmPassword"
                                         value={formData.confirmPassword}
                                         onChange={handleChange}
-                                        className={`input-base pl-12 h-14 bg-white font-bold text-xs ${
+                                        className={`input-base pl-12 h-14 font-bold text-xs ${
                                             errors.confirmPassword || passwordsMismatch
                                                 ? "border-rose-300 ring-4 ring-rose-100"
                                                 : passwordsMatch
@@ -475,15 +476,15 @@ export const Register = () => {
                         )}
 
                         <div className="space-y-2">
-                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">이름</label>
+                            <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">이름</label>
                             <div className="relative group">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                 <input
                                     type="text"
                                     name="name"
                                     value={formData.name}
                                     onChange={handleChange}
-                                    className={`input-base pl-12 h-14 bg-white font-bold ${errors.name ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                    className={`input-base pl-12 h-14 font-bold ${errors.name ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
                                     placeholder="이름을 입력해 주세요"
                                 />
                             </div>
@@ -491,15 +492,15 @@ export const Register = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">전화번호</label>
+                            <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">전화번호</label>
                             <div className="relative group">
-                                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                 <input
                                     type="tel"
                                     name="phone"
                                     value={formData.phone}
                                     onChange={handleChange}
-                                    className={`input-base pl-12 h-14 bg-white font-bold ${errors.phone ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
+                                    className={`input-base pl-12 h-14 font-bold ${errors.phone ? "border-rose-300 ring-4 ring-rose-100" : ""}`}
                                     placeholder="010-0000-0000"
                                 />
                             </div>
@@ -507,16 +508,16 @@ export const Register = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">주소 (선택)</label>
+                            <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">주소 (선택)</label>
                             <div className="flex gap-2">
                                 <div className="relative group flex-1">
-                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         type="text"
                                         name="address"
                                         value={formData.address}
                                         onChange={handleChange}
-                                        className="input-base pl-12 h-14 bg-white font-bold"
+                                        className="input-base pl-12 h-14 font-bold"
                                         placeholder="주소 검색"
                                         readOnly
                                     />
@@ -524,23 +525,23 @@ export const Register = () => {
                                 <button
                                     type="button"
                                     onClick={() => setAddressModalOpen(true)}
-                                    className="h-14 rounded-xl bg-slate-900 px-4 text-xs font-black text-white hover:bg-slate-800"
+                                    className="h-14 rounded-control bg-ink px-4 text-xs font-black text-ink-inverse hover:bg-primary-600"
                                 >
                                     주소 검색
                                 </button>
                             </div>
                             <div className="relative group">
-                                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                 <input
                                     type="text"
                                     name="addressDetail"
                                     value={formData.addressDetail}
                                     onChange={handleChange}
-                                    className="input-base pl-12 h-14 bg-white font-bold"
+                                    className="input-base pl-12 h-14 font-bold"
                                     placeholder="상세 주소 입력"
                                 />
                             </div>
-                            <p className="mt-1 ml-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">선택 입력 항목입니다.</p>
+                            <p className="mt-1 ml-1 text-[10px] font-black text-ink-subtle uppercase tracking-wider">선택 입력 항목입니다.</p>
                         </div>
 
                         <button
@@ -559,14 +560,14 @@ export const Register = () => {
                             )}
                         </button>
                         {!!submitBlockMessage && (
-                            <p className="mt-1 text-center text-[11px] font-bold text-slate-500" aria-live="polite">
+                            <p className="mt-1 text-center text-[11px] font-bold text-ink-muted" aria-live="polite">
                                 {submitBlockMessage}
                             </p>
                         )}
                     </form>
 
-                    <div className="mt-10 pt-8 border-t border-slate-50 text-center">
-                        <p className="text-sm font-medium text-slate-400">
+                    <div className="mt-10 pt-8 border-t border-line text-center">
+                        <p className="text-sm font-medium text-ink-subtle">
                             이미 계정이 있으신가요?{" "}
                             <Link
                                 to="/login"
@@ -580,14 +581,14 @@ export const Register = () => {
             </div>
 
             {addressModalOpen && (
-                <div className="fixed inset-0 z-[90] bg-slate-900/45 p-4">
-                    <div className="mx-auto mt-20 w-full max-w-xl rounded-3xl bg-white p-5 shadow-2xl">
+                <div className="fixed inset-0 z-[90] bg-slate-900/45 p-4 backdrop-blur-sm">
+                    <div className="modal-panel mx-auto mt-20 w-full max-w-xl p-5">
                         <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-black text-slate-900">주소 검색</h3>
+                            <h3 className="text-lg font-black text-ink">주소 검색</h3>
                             <button
                                 type="button"
                                 onClick={() => setAddressModalOpen(false)}
-                                className="rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+                                className="icon-button"
                                 aria-label="주소 검색 닫기"
                             >
                                 <X className="h-4 w-4" />
@@ -597,7 +598,7 @@ export const Register = () => {
                             onResolved={handleAddressResolved}
                             placeholder="예: 서울시청, 서울역, 강남역"
                         />
-                        <div className="mt-3 text-xs font-semibold text-slate-500">
+                        <div className="mt-3 text-xs font-semibold text-ink-muted">
                             검색 결과를 선택하면 회원가입 주소 입력칸에 자동으로 반영됩니다.
                         </div>
                     </div>

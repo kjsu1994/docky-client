@@ -4,6 +4,26 @@ export default {
   theme: {
     extend: {
       colors: {
+        brand: {
+          50: "#eef6ff",
+          100: "#d9ebff",
+          200: "#b6d8ff",
+          300: "#8bc0ff",
+          400: "#5b9fff",
+          500: "#3b82f6",
+          600: "#2667dc",
+          700: "#1e4fae",
+          800: "#1c3f88",
+          900: "#172f65",
+        },
+        game: {
+          bg: "rgb(var(--color-game-bg) / <alpha-value>)",
+          panel: "rgb(var(--color-game-panel) / <alpha-value>)",
+          elevated: "rgb(var(--color-game-elevated) / <alpha-value>)",
+          line: "rgb(var(--color-game-line) / <alpha-value>)",
+          accent: "rgb(var(--color-game-accent) / <alpha-value>)",
+          glow: "rgb(var(--color-game-glow) / <alpha-value>)",
+        },
         primary: {
           50: "#eff6ff",
           100: "#dbeafe",
@@ -48,6 +68,17 @@ export default {
           hover: "rgb(var(--color-control-hover) / <alpha-value>)",
         },
         focus: "rgb(var(--color-focus) / <alpha-value>)",
+      },
+      borderRadius: {
+        panel: "var(--radius-panel)",
+        control: "var(--radius-control)",
+        card: "var(--radius-card)",
+        modal: "var(--radius-modal)",
+      },
+      boxShadow: {
+        card: "var(--shadow-card)",
+        panel: "var(--shadow-panel)",
+        modal: "var(--shadow-modal)",
       },
       animation: {
         "fade-in": "fadeIn 0.3s ease-in-out",

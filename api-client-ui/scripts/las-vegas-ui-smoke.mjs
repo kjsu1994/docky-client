@@ -21,7 +21,8 @@ const blockedTexts = ["Error", "undefined", "NaN", "room_code", "round_count", "
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false, interactive: true },
     { name: "tablet", width: 820, height: 1180, mobile: true, interactive: true },
-    { name: "mobile", width: 390, height: 844, mobile: true, interactive: true },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3, interactive: true },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3, interactive: false },
 ];
 
 function assertLasVegasRealtimeSource() {
@@ -34,6 +35,10 @@ function assertLasVegasRealtimeSource() {
         ["LasVegasLobbyRoomCardArt", "render lobby rooms as direct room cards"],
         ["LasVegasLobbyEmptyState", "render the direct empty lobby state"],
         ["LasVegasActionAvailabilityPanel", "keep real roll/bet action availability beside the buttons"],
+        ["refreshRoomStateIfCurrent", "refresh the active room state after realtime action sends"],
+        ["scheduleRoomStateRefresh", "schedule short state refreshes after roll and dice placement"],
+        ["actionType === \"PLACE_DICE\" ? [300, 1200, 2400, 3600] : [300, 1000]", "use longer follow-up refreshes after placing dice"],
+        ["const pollDelay = myTurn ? 3500 : 1600", "poll active games so missed realtime events do not strand the turn UI"],
         ["CasinoPanel", "keep the actual casino board"],
         ["LasVegasPlayerRosterPanel", "keep the player roster"],
         ["GameRoomChatPanel", "keep room chat in the selected room"],
@@ -761,7 +766,7 @@ async function inspectLasVegasEmptyLobby(cdp, sessionId, viewport) {
         await cdp.send("Emulation.setDeviceMetricsOverride", {
             width: viewport.width,
             height: viewport.height,
-            deviceScaleFactor: viewport.mobile ? 2 : 1,
+            deviceScaleFactor: viewport.deviceScaleFactor ?? (viewport.mobile ? 2 : 1),
             mobile: viewport.mobile,
         }, sessionId);
         await evaluate(cdp, sessionId, `localStorage.removeItem("las_vegas_last_room_id"); true`);
@@ -852,7 +857,7 @@ async function inspectLasVegas(cdp, sessionId, viewport) {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor ?? (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     }, sessionId);
 
@@ -884,6 +889,11 @@ async function inspectLasVegas(cdp, sessionId, viewport) {
     await cdp.send("Page.navigate", { url: `${baseUrl}/app/games/las-vegas` }, sessionId);
     await waitForText(cdp, sessionId, "검증 플레이어");
     await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="las-vegas-casino-panel"]').length >= 6`, "las vegas casino board rendered");
+    await waitFor(cdp, sessionId, `(() => {
+        const layer = document.querySelector('[data-smoke="las-vegas-pixi-board-layer"]');
+        return !layer && !document.querySelector('[data-gsap="las-vegas-pixi"]');
+    })()`, "las vegas duplicate Pixi board layer removed", 15000);
+    await waitFor(cdp, sessionId, `document.querySelectorAll('[data-gsap="las-vegas-casino"], [data-gsap="las-vegas-dice-stack"]').length >= 6`, "las vegas GSAP motion anchors rendered");
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="las-vegas"]')) || Boolean(document.querySelector('[data-smoke="game-room-chat-panel"], [data-smoke="game-chat-panel"]')) || document.body.innerText.includes("방 채팅")`, "las vegas selected room chat rendered");
     await assertNoRemovedLasVegasPanels(cdp, sessionId, `las vegas gameplay ${viewport.name}`);
     await assertPageQuality(cdp, sessionId, `las vegas ${viewport.name}`);

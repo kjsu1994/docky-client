@@ -32,7 +32,7 @@ const MenuSection = ({ title, items }) => (
                 <Link
                     key={item.to}
                     to={item.to}
-                    className="flex items-center justify-between rounded-3xl border border-line bg-surface p-4 shadow-sm transition-all active:scale-[0.98]"
+                    className="surface-card flex items-center justify-between p-4 transition-all active:scale-[0.98]"
                 >
                     <div className="flex items-center gap-4">
                         <div className={`rounded-2xl p-2.5 ${item.color || "bg-control text-ink-muted"}`}>
@@ -67,13 +67,13 @@ export const AllMenu = () => {
         { title: "중간장소 찾기", to: "/app/optimizer", icon: MapPin, color: "bg-rose-50 text-rose-600" },
         { title: "주변 찾기", to: "/app/facility", icon: Car, color: "bg-cyan-50 text-cyan-700" },
         { title: "순위", to: "/app/ranks", icon: Trophy, color: "bg-amber-50 text-amber-600" },
-        { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-slate-50 text-slate-600" },
+        { title: "뉴스", to: "/app/news", icon: Newspaper, color: "bg-control text-ink-muted" },
     ];
 
     const account = [
-        { title: "마이페이지", to: "/app/mypage", icon: User, color: "bg-slate-100 text-slate-700" },
+        { title: "마이페이지", to: "/app/mypage", icon: User, color: "bg-control text-ink-muted" },
         { title: "신고/문의 상태", to: "/app/support", icon: LifeBuoy, color: "bg-sky-50 text-sky-700" },
-        { title: "설정", to: "/app/mypage/edit", icon: Settings, color: "bg-slate-100 text-slate-700" },
+        { title: "설정", to: "/app/mypage/edit", icon: Settings, color: "bg-control text-ink-muted" },
     ];
 
     const admin = [
@@ -85,7 +85,7 @@ export const AllMenu = () => {
 
     return (
         <div className="animate-fade-in space-y-8 pb-20">
-            <div className="flex items-center justify-between rounded-[2.5rem] border border-line bg-surface p-8 shadow-xl shadow-slate-200/20">
+            <div className="surface-panel flex items-center justify-between p-6 sm:p-8">
                 <div className="flex items-center gap-5">
                     <UserAvatar
                         name={user?.name || user?.email}
@@ -94,7 +94,7 @@ export const AllMenu = () => {
                         rewardTier={userLevel.rewardTier || userLevel.reward_tier}
                         frameCode={userLevel.frameCode || userLevel.frame_code}
                         size="xl"
-                        className="rounded-[1.5rem] shadow-lg shadow-primary-200"
+                        className="rounded-2xl border border-line shadow-lg shadow-primary-200/40"
                         showLevelBadge
                     />
                     <div>
@@ -106,7 +106,7 @@ export const AllMenu = () => {
                     type="button"
                     onClick={logout}
                     aria-label="로그아웃"
-                    className="rounded-3xl bg-rose-50 p-4 text-rose-600 transition-colors hover:bg-rose-100"
+                    className="icon-button h-12 w-12 border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700"
                 >
                     <LogOut className="h-5 w-5" />
                 </button>

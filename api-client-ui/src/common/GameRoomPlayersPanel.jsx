@@ -95,7 +95,7 @@ const GameRoomPlayersPanel = ({
     : statusLabel(normalizedStatus);
 
   return (
-    <section className={`rounded-[1.5rem] border border-line bg-surface p-4 shadow-lg ${className}`} data-smoke={dataSmoke} data-room-status={normalizedStatus}>
+    <section className={`surface-panel bg-surface/85 p-4 ${className}`} data-smoke={dataSmoke} data-room-status={normalizedStatus}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-black text-ink">
           <UserRound className="h-4 w-4 text-primary-600" />
@@ -124,10 +124,10 @@ const GameRoomPlayersPanel = ({
                 ? "border-sky-500/30 bg-sky-500/10"
                 : row.ready && waiting && !isHost
                   ? "border-emerald-500/30 bg-emerald-500/10"
-                  : "border-line bg-control";
+                  : "border-line bg-control/80";
 
           return (
-            <div key={`${row.memberId || "seat"}-${row.seatNo}-${row.index}`} className={`rounded-xl border px-3 py-2 ${cardTone}`} data-smoke={`${dataSmoke}-item`} data-ready={row.ready ? "true" : "false"} data-host={isHost ? "true" : "false"}>
+            <div key={`${row.memberId || "seat"}-${row.seatNo}-${row.index}`} className={`rounded-card border px-3 py-2 ${cardTone}`} data-smoke={`${dataSmoke}-item`} data-ready={row.ready ? "true" : "false"} data-host={isHost ? "true" : "false"}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <UserAvatar
@@ -157,7 +157,7 @@ const GameRoomPlayersPanel = ({
       </div>
 
       {!rows.length && (
-        <div className="rounded-xl border border-dashed border-line bg-control px-3 py-4 text-center text-xs font-bold text-ink-muted">
+        <div className="rounded-card border border-dashed border-line bg-control/80 px-3 py-4 text-center text-xs font-bold text-ink-muted">
           참가자 정보가 도착하면 프로필과 준비 상태가 표시됩니다.
         </div>
       )}

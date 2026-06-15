@@ -244,9 +244,9 @@ const sourceStatusClass = (source) => {
     return "border-rose-200 bg-rose-50 text-rose-700";
 };
 
-const iconButtonClass = "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:opacity-50";
-const primaryButtonClass = "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 text-xs font-black text-white hover:bg-primary-700 disabled:opacity-50";
-const dangerButtonClass = "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 text-xs font-black text-white hover:bg-rose-700 disabled:opacity-50";
+const iconButtonClass = "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-control border border-line bg-surface/85 px-3 text-xs font-black text-ink shadow-card backdrop-blur-md transition hover:border-primary-200 hover:bg-control hover:text-primary-700 disabled:opacity-50";
+const primaryButtonClass = "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-control bg-primary-600 px-3 text-xs font-black text-white shadow-card transition hover:bg-primary-700 disabled:opacity-50";
+const dangerButtonClass = "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-control bg-rose-600 px-3 text-xs font-black text-white shadow-card transition hover:bg-rose-700 disabled:opacity-50";
 
 const SectionHeader = ({ icon: Icon, title, count, action }) => (
     <div className="flex items-center justify-between gap-3">
@@ -274,7 +274,7 @@ const MetricTile = ({ icon: Icon, label, value, tone = "slate", title, hint = ""
     };
 
     return (
-        <div className={`rounded-lg border p-4 ${tones[tone] || tones.slate}`} title={title || label}>
+        <div className={`rounded-card border p-4 shadow-card ${tones[tone] || tones.slate}`} title={title || label}>
             <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] font-black uppercase text-slate-500">{label}</span>
                 <Icon className="h-4 w-4 opacity-70" />
@@ -286,7 +286,7 @@ const MetricTile = ({ icon: Icon, label, value, tone = "slate", title, hint = ""
 };
 
 const EmptyState = ({ icon: Icon = CheckCircle2, title, text }) => (
-    <div className="flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-5 text-center">
+    <div className="flex min-h-28 flex-col items-center justify-center rounded-card border border-dashed border-line bg-control/70 p-5 text-center">
         <Icon className="h-6 w-6 text-slate-400" />
         <div className="mt-2 text-sm font-black text-slate-700">{title}</div>
         {text ? <div className="mt-1 text-xs font-bold text-slate-500">{text}</div> : null}
@@ -301,7 +301,7 @@ const SourceHealth = ({ sources }) => {
     }));
 
     return (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="surface-panel p-4">
             <SectionHeader icon={Activity} title="데이터 상태" />
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                 {entries.map(({ key, label, source }) => (
@@ -1049,11 +1049,11 @@ export const AdminCommandCenter = () => {
     if (!isAdmin) {
         return (
             <div className="flex min-h-[60vh] items-center justify-center px-4">
-                <div className="w-full max-w-md rounded-lg border border-rose-100 bg-white p-8 text-center shadow-sm">
+                <div className="surface-panel w-full max-w-md p-6 text-center sm:p-8">
                     <ShieldCheck className="mx-auto h-10 w-10 text-rose-500" />
                     <h1 className="mt-4 text-xl font-black text-slate-950">관리자 권한이 필요합니다</h1>
                     <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">운영 커맨드 센터는 관리자 또는 마스터 권한에서만 열립니다.</p>
-                    <Link className="mt-5 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-black text-white" to="/app">
+                    <Link className="btn-primary mt-5 inline-flex px-4 py-2 text-sm" to="/app">
                         홈으로 이동
                     </Link>
                 </div>
@@ -1062,9 +1062,9 @@ export const AdminCommandCenter = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 px-3 pb-24 pt-5 text-slate-950 sm:px-6 lg:px-8">
+        <div className="min-h-screen px-3 pb-24 pt-5 text-ink sm:px-6 lg:px-8">
             <div className="mx-auto max-w-[1600px] space-y-5">
-                <header className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <header className="surface-panel p-5">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
@@ -1086,7 +1086,7 @@ export const AdminCommandCenter = () => {
                                 <span className="rounded-lg bg-sky-50 px-2.5 py-1 text-sky-700">상시: 콘텐츠/시스템</span>
                             </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                             <button
                                 className={primaryButtonClass}
                                 onClick={() => loadCommandCenter({ silent: true })}
@@ -1117,7 +1117,7 @@ export const AdminCommandCenter = () => {
                 {loading ? (
                     <div className="grid gap-3 md:grid-cols-4">
                         {Array.from({ length: 8 }).map((_, index) => (
-                            <div key={index} className="h-28 animate-pulse rounded-lg border border-slate-200 bg-white" />
+                            <div key={index} className="h-28 animate-pulse rounded-card border border-line bg-surface/80" />
                         ))}
                     </div>
                 ) : (
@@ -1128,7 +1128,7 @@ export const AdminCommandCenter = () => {
 
                         <main className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,0.9fr)]">
                             <section className="space-y-5">
-                                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="surface-panel p-4">
                                     <SectionHeader
                                         icon={ClipboardCheck}
                                         title="통합 처리 큐"
@@ -1139,7 +1139,7 @@ export const AdminCommandCenter = () => {
                                         {queueItems.length ? queueItems.map((item) => {
                                             const Icon = item.icon;
                                             return (
-                                                <article key={item.key} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                                                <article key={item.key} className="surface-card p-4">
                                                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                                         <div className="min-w-0 flex-1">
                                                             <div className="flex flex-wrap items-center gap-2">
@@ -1163,7 +1163,7 @@ export const AdminCommandCenter = () => {
                                 </div>
 
                                 <div className="grid gap-5 lg:grid-cols-2">
-                                    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                                    <div className="surface-panel p-4">
                                         <SectionHeader icon={Megaphone} title="배너 노출" count={banners.length} action={<Link className={iconButtonClass} to="/app/admin/operations">편집</Link>} />
                                         <div className="mt-4 space-y-2">
                                             {banners.length ? banners.slice(0, 6).map((banner) => (
@@ -1185,7 +1185,7 @@ export const AdminCommandCenter = () => {
                                         </div>
                                     </div>
 
-                                    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                                    <div className="surface-panel p-4">
                                         <SectionHeader icon={Film} title="스트리밍 큐" count={videos.length} action={<Link className={iconButtonClass} to="/app/admin/streaming">스튜디오</Link>} />
                                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                                             <MetricTile icon={Clock} label="변환 중" value={formatNumber(processingVideos.length)} tone={processingVideos.length ? "amber" : "slate"} />
@@ -1212,7 +1212,7 @@ export const AdminCommandCenter = () => {
                             </section>
 
                             <aside className="space-y-5">
-                                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="surface-panel p-4">
                                     <SectionHeader icon={UserRound} title="회원 360" />
                                     <div className="mt-4 flex gap-2">
                                         <label className="relative flex-1">
@@ -1236,7 +1236,7 @@ export const AdminCommandCenter = () => {
                                             {memberCandidates.map((member) => (
                                                 <button
                                                     key={member.memberId}
-                                                    className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-primary-200 hover:bg-primary-50"
+                                                    className="w-full rounded-card border border-line bg-surface/80 p-3 text-left hover:border-primary-200 hover:bg-control"
                                                     onClick={() => reloadMemberDetail(member.memberId)}
                                                 >
                                                     <div className="text-sm font-black text-slate-900">{member.name || "이름 없음"}</div>
@@ -1261,7 +1261,7 @@ export const AdminCommandCenter = () => {
                                                     </div>
                                                     <div className="mt-3 flex flex-wrap gap-2">
                                                         {roleLabels(memberDetail.memberInfo.roles).map((role) => (
-                                                            <span key={role} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-black text-slate-700">{role}</span>
+                                                            <span key={role} className="rounded-control border border-line bg-surface/80 px-2.5 py-1 text-xs font-black text-ink">{role}</span>
                                                         ))}
                                                         <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">{memberDetail.memberInfo.memberStatusLabel}</span>
                                                     </div>
@@ -1317,7 +1317,7 @@ export const AdminCommandCenter = () => {
                                     </div>
                                 </div>
 
-                                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="surface-panel p-4">
                                     <SectionHeader icon={Clock} title="최근 감사 이력" count={totalOf(dashboard.audits)} action={<Link className={iconButtonClass} to="/app/admin/anomalies">감사</Link>} />
                                     <div className="mt-4 space-y-2">
                                         {itemsOf(dashboard.audits).slice(0, 8).map((audit, index) => (

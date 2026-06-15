@@ -178,7 +178,7 @@ const StatCard = ({ icon: Icon, label, value, tone = "slate", hint = "", title =
     };
 
     return (
-        <div className={`card p-6 flex flex-col items-center justify-center text-center ${toneClass[tone] || toneClass.slate}`} title={title || undefined}>
+        <div className={`surface-card flex flex-col items-center justify-center p-5 text-center sm:p-6 ${toneClass[tone] || toneClass.slate}`} title={title || undefined}>
             <div className="mb-3 p-3 rounded-2xl bg-white shadow-sm">
                 <Icon className="h-6 w-6" />
             </div>
@@ -1126,7 +1126,7 @@ export const AdminAnomalies = () => {
 
     if (!isAdmin) {
         return (
-            <div className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-rose-800 text-center space-y-4">
+            <div className="surface-panel space-y-4 p-6 text-center text-rose-800 sm:p-10">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
                     <ShieldAlert className="h-8 w-8 text-rose-500" />
                 </div>
@@ -1140,7 +1140,7 @@ export const AdminAnomalies = () => {
 
     if (error) {
         return (
-            <div className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-rose-800 text-center space-y-4">
+            <div className="surface-panel space-y-4 p-6 text-center text-rose-800 sm:p-10">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
                     <AlertTriangle className="h-8 w-8 text-rose-500" />
                 </div>
@@ -1197,7 +1197,7 @@ export const AdminAnomalies = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <div className="card p-8">
+                <div className="surface-panel p-5 sm:p-8">
                     <h2 className="mb-6 flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
                         <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
                             <ClipboardList className="h-5 w-5" />
@@ -1220,7 +1220,7 @@ export const AdminAnomalies = () => {
                     </div>
                 </div>
 
-                <div className="card p-8 xl:col-span-2">
+                <div className="surface-panel p-5 sm:p-8 xl:col-span-2">
                     <h2 className="mb-6 flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
                         <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
                             <BellRing className="h-5 w-5" />
@@ -1259,7 +1259,7 @@ export const AdminAnomalies = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <div className="card p-8">
+                <div className="surface-panel p-5 sm:p-8">
                     <div className="mb-8 flex items-center justify-between">
                         <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
                             <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
@@ -1526,7 +1526,7 @@ export const AdminAnomalies = () => {
                     )}
                 </div>
 
-                <div className="card p-8 xl:col-span-2">
+                <div className="surface-panel p-5 sm:p-8 xl:col-span-2">
                     <div className="mb-8 flex items-center justify-between">
                         <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
                             <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
@@ -1631,7 +1631,7 @@ export const AdminAnomalies = () => {
                 </div>
             </div>
 
-            <div className="card p-8">
+            <div className="surface-panel p-5 sm:p-8">
                 <div className="mb-8 flex items-center justify-between">
                     <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
                         <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
@@ -1690,7 +1690,7 @@ export const AdminAnomalies = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <div className="card p-8">
+                <div className="surface-panel p-5 sm:p-8">
                     <div className="mb-8 flex items-center justify-between">
                         <h2 className="text-lg font-black text-slate-900 tracking-tight">관리자 알림</h2>
                         <div className="flex items-center gap-3">
@@ -1750,7 +1750,7 @@ export const AdminAnomalies = () => {
                         </div>
                     )}
                 </div>
-                <div className="card p-8">
+                <div className="surface-panel p-5 sm:p-8">
                     <div className="mb-8 flex items-center justify-between">
                         <h2 className="text-lg font-black text-slate-900 tracking-tight">사용자 신고</h2>
                         <select
@@ -1823,7 +1823,7 @@ export const AdminAnomalies = () => {
                 </div>
             </div>
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <div className="card p-8">
+                <div className="surface-panel p-5 sm:p-8">
                     <div className="mb-8 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <h2 className="text-lg font-black text-slate-900 tracking-tight">권한 관리</h2>
@@ -1913,7 +1913,7 @@ export const AdminAnomalies = () => {
                     )}
                 </div>
 
-                <div className="card p-8">
+                <div className="surface-panel p-5 sm:p-8">
                     <div className="mb-8 flex items-center justify-between">
                         <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 tracking-tight">
                             <History className="h-5 w-5 text-primary-600" />
@@ -1963,7 +1963,7 @@ export const AdminAnomalies = () => {
                 </div>
             </div>
 
-            <div className="card p-8 overflow-hidden">
+            <div className="surface-panel overflow-hidden p-5 sm:p-8">
                 <div className="mb-10 flex flex-wrap items-center justify-between gap-6">
                     <div className="space-y-1">
                         <h2 className="text-2xl font-black text-slate-900 tracking-tight">이상징후 사건함</h2>
@@ -2111,7 +2111,7 @@ export const AdminAnomalies = () => {
             </div>
 
             {selectedDetail?.incident && (
-                <div className="card p-10 bg-slate-900 text-white animate-slide-up">
+                <div className="card animate-slide-up bg-slate-900 p-6 text-white sm:p-10">
                     <div className="mb-10 flex flex-wrap items-center justify-between gap-6">
                         <div className="space-y-2">
                             <h2 className="text-3xl font-black tracking-tight">사건 상세 분석 <span className="text-primary-400">#{selectedDetail.incident.incidentId}</span></h2>
@@ -2190,7 +2190,7 @@ export const AdminAnomalies = () => {
                 </div>
             )}
 
-            <div className="card p-8">
+            <div className="surface-panel p-5 sm:p-8">
                 <div className="mb-10 flex items-center gap-3 px-2">
                     <div className="p-2 rounded-xl bg-slate-900 text-white shadow-xl shadow-slate-200">
                         <Settings className="h-5 w-5" />

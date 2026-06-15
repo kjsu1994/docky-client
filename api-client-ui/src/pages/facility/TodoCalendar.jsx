@@ -550,7 +550,7 @@ export const TodoCalendar = () => {
 
     return (
         <div className="animate-fade-in space-y-6 pb-10">
-            <section className="overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/60">
+            <section className="surface-panel overflow-hidden">
                 <div className="bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_38%),linear-gradient(135deg,#ffffff,_#f8fafc)] p-6 sm:p-8">
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                         <div>
@@ -564,13 +564,13 @@ export const TodoCalendar = () => {
                             </p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-[1.75rem] border border-slate-200 bg-white/80 px-4 py-3">
+                            <div className="surface-card bg-white/80 px-4 py-3">
                                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">현재 보기</div>
                                 <div className="mt-1 text-base font-black text-slate-900">
                                     {viewMode === VIEW_MODE.WEEK ? "주간 리스트" : viewMode === VIEW_MODE.MONTH ? "월간 캘린더" : "일간 리스트"}
                                 </div>
                             </div>
-                            <div className="rounded-[1.75rem] border border-slate-200 bg-white/80 px-4 py-3">
+                            <div className="surface-card bg-white/80 px-4 py-3">
                                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">남은 할 일</div>
                                 <div className="mt-1 text-base font-black text-slate-900">
                                     {todos.filter((todo) => todo.status !== TODO_STATUS.DONE).length} 개
@@ -581,10 +581,10 @@ export const TodoCalendar = () => {
                 </div>
             </section>
 
-            <section className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50">
+            <section className="surface-panel p-4 sm:p-6">
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="inline-flex rounded-2xl bg-slate-100 p-1">
+                        <div className="grid grid-cols-3 rounded-control bg-control p-1">
                             {[
                                 { key: VIEW_MODE.WEEK, label: "주간", icon: CalendarRange },
                                 { key: VIEW_MODE.MONTH, label: "월간", icon: CalendarDays },
@@ -594,8 +594,8 @@ export const TodoCalendar = () => {
                                     key={key}
                                     type="button"
                                     onClick={() => setViewMode(key)}
-                                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-all ${
-                                        viewMode === key ? "bg-white text-primary-700 shadow-sm" : "text-slate-500"
+                                    className={`inline-flex items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-black transition-all sm:px-4 ${
+                                        viewMode === key ? "bg-surface text-primary-700 shadow-card" : "text-slate-500 hover:bg-control-hover"
                                     }`}
                                 >
                                     <Icon className="h-4 w-4" />
@@ -608,7 +608,7 @@ export const TodoCalendar = () => {
                             <button
                                 type="button"
                                 onClick={() => setAnchorDate((current) => moveAnchorDate(current, viewMode, -1))}
-                                className="rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-500 transition-colors hover:text-slate-900"
+                                className="icon-button"
                                 aria-label="이전 기간"
                             >
                                 <ChevronLeft className="h-4 w-4" />
@@ -616,14 +616,14 @@ export const TodoCalendar = () => {
                             <button
                                 type="button"
                                 onClick={() => setAnchorDate(new Date())}
-                                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition-colors hover:border-primary-200 hover:text-primary-700"
+                                className="btn-secondary px-4 py-2.5"
                             >
                                 오늘
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setAnchorDate((current) => moveAnchorDate(current, viewMode, 1))}
-                                className="rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-500 transition-colors hover:text-slate-900"
+                                className="icon-button"
                                 aria-label="다음 기간"
                             >
                                 <ChevronRight className="h-4 w-4" />
@@ -652,14 +652,14 @@ export const TodoCalendar = () => {
                             placeholder="무엇을 해야 하나요?"
                             maxLength={TODO_TITLE_MAX_LENGTH}
                             disabled={creating}
-                            className="w-full rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition-colors focus:border-primary-300 focus:bg-white"
+                            className="input-base px-4 py-3"
                         />
                         <button
                             type="button"
                             onClick={handleCreateTodo}
                             disabled={creating}
                             aria-busy={creating}
-                            className="inline-flex items-center justify-center gap-2 rounded-[1.75rem] bg-primary-600 px-5 py-3 text-sm font-black text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-primary-300"
+                            className="btn-primary"
                         >
                             <Plus className="h-4 w-4" />
                             {creating ? "추가 중..." : "추가"}
@@ -674,7 +674,7 @@ export const TodoCalendar = () => {
                             <button
                                 type="button"
                                 onClick={() => setDateChoice("today")}
-                                className={`rounded-2xl px-4 py-2 text-sm font-black transition-all ${
+                                className={`rounded-control px-4 py-2 text-sm font-black transition-all ${
                                     dateChoice === "today" ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600"
                                 }`}
                             >
@@ -683,7 +683,7 @@ export const TodoCalendar = () => {
                             <button
                                 type="button"
                                 onClick={() => setDateChoice("tomorrow")}
-                                className={`rounded-2xl px-4 py-2 text-sm font-black transition-all ${
+                                className={`rounded-control px-4 py-2 text-sm font-black transition-all ${
                                     dateChoice === "tomorrow" ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600"
                                 }`}
                             >
@@ -695,7 +695,7 @@ export const TodoCalendar = () => {
                                     setDateChoice("custom");
                                     setDraftDueDate(selectedDate);
                                 }}
-                                className={`rounded-2xl px-4 py-2 text-sm font-black transition-all ${
+                                className={`rounded-control px-4 py-2 text-sm font-black transition-all ${
                                     dateChoice === "custom" ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600"
                                 }`}
                             >
@@ -711,7 +711,7 @@ export const TodoCalendar = () => {
                                 setDraftDueDate(event.target.value);
                             }}
                             disabled={creating}
-                            className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-primary-300"
+                            className="input-base px-4 py-2.5"
                         />
                     </div>
                     {rangeMeta.truncated && (
@@ -731,10 +731,10 @@ export const TodoCalendar = () => {
                         return (
                             <div
                                 key={date.toISOString()}
-                                className={`min-w-0 rounded-[2rem] border bg-white p-4 shadow-sm transition-all ${
+                                className={`surface-card min-w-0 p-4 transition-all ${
                                     isCurrentDay
-                                        ? "border-primary-400 ring-2 ring-primary-200 shadow-lg shadow-primary-100/60"
-                                        : "border-slate-200"
+                                        ? "border-primary-400 ring-2 ring-primary-200 shadow-panel"
+                                        : ""
                                 } ${isEmptyDay ? "xl:self-start" : "h-full"}`}
                             >
                                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -759,7 +759,7 @@ export const TodoCalendar = () => {
                                             setAnchorDate(date);
                                             setViewMode(VIEW_MODE.DAY);
                                         }}
-                                        className="flex-shrink-0 rounded-2xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-600 transition-colors hover:border-primary-200 hover:text-primary-700"
+                                        className="flex-shrink-0 rounded-control border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-slate-600 transition-colors hover:border-primary-200 hover:text-primary-700"
                                     >
                                         하루 보기
                                     </button>
@@ -771,7 +771,7 @@ export const TodoCalendar = () => {
                 </section>
             )}
             {viewMode === VIEW_MODE.DAY && (
-                <section className="rounded-[2.25rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="surface-panel p-5 sm:p-6">
                     <div className="mb-5 flex items-center justify-between">
                         <div>
                             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">선택한 날짜</div>
@@ -780,7 +780,7 @@ export const TodoCalendar = () => {
                         <button
                             type="button"
                             onClick={() => setViewMode(VIEW_MODE.WEEK)}
-                            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition-colors hover:border-primary-200 hover:text-primary-700"
+                            className="btn-secondary px-4 py-2"
                         >
                             주간으로 돌아가기
                         </button>
@@ -791,7 +791,7 @@ export const TodoCalendar = () => {
 
             {viewMode === VIEW_MODE.MONTH && (
                 <section className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
-                    <div className="rounded-[2.25rem] border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="surface-panel p-4 sm:p-5">
                         <div className="mb-4 grid grid-cols-7 gap-2 text-center">
                             {DAY_LABELS.map((label) => (
                                 <div key={label} className="py-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
@@ -866,7 +866,7 @@ export const TodoCalendar = () => {
                         </div>
                     </div>
 
-                    <div className="rounded-[2.25rem] border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="surface-panel p-4 sm:p-5">
                         <div className="mb-4">
                             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">날짜 미리보기</div>
                             <div className="mt-1 text-xl font-black text-slate-900">{format(anchorDate, "M월 d일")}</div>

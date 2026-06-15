@@ -367,9 +367,9 @@ export const MeetingOptimizer = () => {
 
     return (
         <div className="space-y-8 animate-fade-in pb-20">
-            <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white shadow-2xl border border-white/5">
-                <div className="relative z-10 flex items-center gap-4">
-                    <div className="p-3 bg-primary-600 rounded-2xl">
+            <div className="surface-panel relative overflow-hidden bg-slate-950 p-5 text-white shadow-panel sm:p-8">
+                <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="w-fit rounded-card bg-primary-600 p-3 shadow-card">
                         <MapPin className="h-8 w-8 text-white" />
                     </div>
                     <div>
@@ -381,7 +381,7 @@ export const MeetingOptimizer = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div className="lg:col-span-4 space-y-6">
-                    <div className="card p-6 bg-white border-2 border-slate-100 shadow-xl rounded-[2rem]">
+                    <div className="surface-panel p-5 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                                 <Users className="h-5 w-5 text-primary-600" />
@@ -392,7 +392,7 @@ export const MeetingOptimizer = () => {
                                 onClick={addAddress}
                                 disabled={addresses.length >= OPTIMIZER_MAX_PARTICIPANTS || loading || loadingPostcodeIndex !== null}
                                 title="참여자 추가"
-                                className="p-2 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="icon-button"
                             >
                                 <Plus className="h-5 w-5" />
                             </button>
@@ -401,9 +401,9 @@ export const MeetingOptimizer = () => {
                             최대 {OPTIMIZER_MAX_PARTICIPANTS}명, 주소 {OPTIMIZER_ADDRESS_MAX_LENGTH}자 이하까지 계산합니다.
                         </div>
 
-                        <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="mb-3 rounded-control border border-line bg-control/70 p-3">
                             <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1">지도 입력 대상</label>
-                            <select value={mapTargetIndex} onChange={(e) => setMapTargetIndex(Number(e.target.value))} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold">
+                            <select value={mapTargetIndex} onChange={(e) => setMapTargetIndex(Number(e.target.value))} className="input-base px-3 py-2">
                                 {addresses.map((_, idx) => (
                                     <option key={`target-${idx}`} value={idx}>
                                         참여자 {idx + 1}
@@ -415,17 +415,17 @@ export const MeetingOptimizer = () => {
 
                         <form onSubmit={handleOptimize} className="space-y-3">
                             {addresses.map((address, idx) => (
-                                <div key={`addr-${idx}`} className={`rounded-xl border ${idx === mapTargetIndex ? "border-primary-300 bg-primary-50/40" : "border-transparent"}`}>
-                                    <div className="flex items-center gap-2 p-1">
-                                        <input type="text" value={address} readOnly maxLength={OPTIMIZER_ADDRESS_MAX_LENGTH} onClick={() => handleDaumPostcode(idx)} placeholder={`참여자 ${idx + 1} 주소`} className="w-full cursor-pointer px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl" />
-                                        <button type="button" onClick={() => handleMyLocation(idx)} className="p-2 text-slate-500 hover:text-primary-600" title="현재 위치 사용"><Navigation className="h-4 w-4" /></button>
-                                        <button type="button" onClick={() => removeAddress(idx)} className="p-2 text-slate-400 hover:text-red-500" title="삭제"><X className="h-4 w-4" /></button>
+                                <div key={`addr-${idx}`} className={`rounded-control border ${idx === mapTargetIndex ? "border-primary-300 bg-primary-50/50" : "border-transparent"}`}>
+                                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 p-1">
+                                        <input type="text" value={address} readOnly maxLength={OPTIMIZER_ADDRESS_MAX_LENGTH} onClick={() => handleDaumPostcode(idx)} placeholder={`참여자 ${idx + 1} 주소`} className="input-base cursor-pointer px-4 py-3" />
+                                        <button type="button" onClick={() => handleMyLocation(idx)} className="icon-button" title="현재 위치 사용"><Navigation className="h-4 w-4" /></button>
+                                        <button type="button" onClick={() => removeAddress(idx)} className="icon-button hover:text-rose-600" title="삭제"><X className="h-4 w-4" /></button>
                                     </div>
                                     {!addressMeta[idx]?.valid && <div className="px-3 pb-2 text-[11px] font-semibold text-red-500">{addressMeta[idx]?.reason}</div>}
                                 </div>
                             ))}
 
-                            <button type="submit" disabled={!canSubmit} className="w-full mt-4 py-3 bg-primary-600 text-white rounded-xl font-bold disabled:opacity-60">
+                            <button type="submit" disabled={!canSubmit} className="btn-primary mt-4 w-full">
                                 {loading ? loadingStep : "중간장소 찾기"}
                             </button>
                         </form>
@@ -433,9 +433,9 @@ export const MeetingOptimizer = () => {
                 </div>
 
                 <div className="lg:col-span-8 space-y-6">
-                    <div className="card bg-slate-900 rounded-[2rem] overflow-hidden relative h-[520px]">
-                        <div className="absolute top-3 left-3 z-10 rounded-lg bg-white/90 px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow">대상: 참여자 {mapTargetIndex + 1}</div>
-                        <div className="absolute top-3 right-3 z-10 rounded-lg bg-white/90 px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow">우클릭 / 길게 누르기로 주소 입력</div>
+                    <div className="surface-panel relative h-[420px] overflow-hidden bg-slate-900 p-0 sm:h-[520px]">
+                        <div className="absolute left-3 top-3 z-10 rounded-control bg-white/90 px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow-card">대상: 참여자 {mapTargetIndex + 1}</div>
+                        <div className="absolute bottom-3 left-3 right-3 z-10 rounded-control bg-white/90 px-3 py-1.5 text-center text-[11px] font-bold text-slate-700 shadow-card sm:bottom-auto sm:left-auto sm:right-3 sm:top-3">우클릭 / 길게 누르기로 주소 입력</div>
                         {mapsError && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/95 text-center p-8">
                                 <AlertCircle className="h-9 w-9 text-red-400 mb-2" />
@@ -452,7 +452,7 @@ export const MeetingOptimizer = () => {
 
                     {result ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="card p-6 bg-white border-2 border-slate-100 rounded-[2rem] shadow-xl">
+                            <div className="surface-panel p-5 sm:p-6">
                                 <h3 className="text-lg font-black text-slate-900 mb-4 flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-green-500" />추천 후보 3곳</h3>
                                 <div className="space-y-2 mb-4">
                                     {(result.candidates || []).slice(0, 3).map((candidate, idx) => (
@@ -462,7 +462,7 @@ export const MeetingOptimizer = () => {
                                                 {selectedCandidateIndex === idx && <span className="rounded-full bg-primary-600 px-2 py-0.5 text-[10px] font-black text-white">선택됨</span>}
                                             </div>
                                             <div className="text-sm font-bold text-slate-900">{candidate.name || "중간지점"}</div>
-                                            <div className="text-xs text-slate-600 mt-1">{candidate.address || "주소 정보 없음"}</div>
+                                            <div className="mt-1 break-keep text-xs text-slate-600">{candidate.address || "주소 정보 없음"}</div>
                                         </button>
                                     ))}
                                 </div>
@@ -490,7 +490,7 @@ export const MeetingOptimizer = () => {
                                 </div>
                             </div>
 
-                            <div className="card p-6 bg-white border-2 border-slate-100 rounded-[2rem] shadow-xl overflow-hidden">
+                            <div className="surface-panel overflow-hidden p-5 sm:p-6">
                                 <h3 className="text-lg font-black text-slate-900 mb-4">참여자별 이동시간</h3>
                                 <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
                                     {result.user_results?.map((user, idx) => (
@@ -505,7 +505,7 @@ export const MeetingOptimizer = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="card p-12 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center text-center">
+                        <div className="surface-panel flex flex-col items-center border-dashed bg-control/50 p-8 text-center sm:p-12">
                             <div className="p-5 bg-white rounded-2xl shadow-sm mb-4"><MapIcon className="h-10 w-10 text-slate-300" /></div>
                             <h4 className="text-xl font-black text-slate-500">아직 계산 결과가 없습니다</h4>
                             <p className="text-sm text-slate-400 mt-2">주소 입력칸을 눌러 주소를 선택한 뒤 중간장소 찾기를 실행해 주세요.</p>

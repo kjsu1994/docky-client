@@ -20,7 +20,8 @@ const userDataDir = mkdtempSync(path.join(tmpdir(), "tabletop-ui-smoke-"));
 const viewports = [
   { name: "desktop", width: 1366, height: 900, mobile: false },
   { name: "tablet", width: 820, height: 1180, mobile: true },
-  { name: "mobile", width: 390, height: 844, mobile: true },
+  { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
+  { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3 },
 ];
 const cases = [
   {
@@ -468,6 +469,9 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="mahe-turtle-art"', "marks reusable Mahe turtle artwork"],
     ["DalmutiCardArt", "renders Dalmuti cards through reusable SVG artwork"],
     ['data-smoke="dalmuti-card-art"', "marks reusable Dalmuti card artwork"],
+    ["dalmutiRankNumberLabel", "renders Dalmuti card rank numbers for beginner readability"],
+    ["DalmutiTrickStack", "renders Dalmuti current-trick card stacks"],
+    ['data-smoke="dalmuti-current-trick-stack"', "marks Dalmuti current-trick stack graphics"],
     ["DalmutiPlayPileEmptyState", "renders Dalmuti current-pile empty guidance from loaded game state"],
     ["DalmutiPlayPileEmptyArt", "renders Dalmuti current-pile empty guidance through reusable SVG artwork"],
     ['data-smoke="dalmuti-play-pile-empty-state"', "marks the Dalmuti current-pile empty guidance panel"],
@@ -482,9 +486,9 @@ function assertTabletopRealtimeSource() {
     ['data-smoke="dalmuti-empty-hand-item"', "marks Dalmuti empty-hand explanation tiles"],
     ["SixNimmtCardArt", "renders Six Nimmt cards through reusable SVG artwork"],
     ['data-smoke="six-nimmt-card-art"', "marks reusable Six Nimmt card artwork"],
-    ['data-smoke="six-nimmt-compact-summary"', "marks the compact Six Nimmt gameplay summary"],
-    ['data-smoke="six-nimmt-compact-summary-item"', "marks compact Six Nimmt summary items"],
-    ["핵심 요약", "renders concise Six Nimmt gameplay summary copy"],
+    ['data-smoke="six-nimmt-hand-panel"', "marks the enlarged Six Nimmt hand panel"],
+    ['data-smoke="six-nimmt-hand-grid"', "marks the enlarged Six Nimmt hand card grid"],
+    ["내 손패", "renders the Six Nimmt hand area headline"],
     ['data-smoke="telestrations-support-panel"', "marks the compact Telestrations gameplay summary"],
     ['data-smoke="telestrations-compact-summary-item"', "marks compact Telestrations summary items"],
     ["TelestrationsRevealInsightPanel", "renders Telestrations reveal interpretation from loaded book entries"],
@@ -608,7 +612,7 @@ function assertTabletopRealtimeSource() {
   }
   const artworkSource = readFileSync("src/pages/games/TabletopGameArtwork.jsx", "utf8");
   const requiredArtworkLabels = ["포커", "라스베가스", "노땡스", "카탄", "블로커스", "마헤", "달무티", "젝스님트", "텔레스트레이션", "마피아", "시티델", "게임 아트워크"];
-  const requiredSourceLabels = ["턴 순서", "계급 압력", 'jester ? "광대"', "`${rank}장`"];
+  const requiredSourceLabels = ["턴 순서", "계급 압력", 'jester ? "광대"', "dalmutiRankNumberLabel", "DalmutiTrickStack"];
   if (!requiredSourceLabels.every((label) => source.includes(label)) || !requiredArtworkLabels.every((label) => artworkSource.includes(label))) {
     throw new Error("tabletop-ui-smoke: tabletop SVG labels must use Korean turn-order and Dalmuti card copy.");
   }
@@ -1564,8 +1568,8 @@ function dalmutiSmokeGameState(room) {
     current_trick: currentTrick,
     taxExchanges: [],
     tax_exchanges: [],
-    playPile: emptyHandMode ? [{ seatNo: mySeatNo, seat_no: mySeatNo, rankName: "대주교", rank_name: "대주교", count: 1 }] : [],
-    play_pile: emptyHandMode ? [{ seatNo: mySeatNo, seat_no: mySeatNo, rankName: "대주교", rank_name: "대주교", count: 1 }] : [],
+    playPile: emptyHandMode ? [{ seatNo: mySeatNo, seat_no: mySeatNo, rank: 3, rankName: "대주교", rank_name: "대주교", count: 1 }] : [],
+    play_pile: emptyHandMode ? [{ seatNo: mySeatNo, seat_no: mySeatNo, rank: 3, rankName: "대주교", rank_name: "대주교", count: 1 }] : [],
     events: [
       {
         eventNo: 1,
@@ -2726,10 +2730,23 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="mahe-bottom-summary"]'))`, "mahe compact bottom summary rendered", 15000);
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="mahe-bottom-summary-item"]').length >= 4`, "mahe compact bottom summary items rendered");
     await waitForExpression(ws, `/마헤 흐름 요약|하단 참고|현재 보상|선두/.test(document.querySelector('[data-smoke="mahe-bottom-summary"]')?.textContent || "")`, "mahe compact bottom summary copy rendered");
+    await waitForExpression(ws, `(() => {
+      const layer = document.querySelector('[data-smoke="mahe-pixi-board-layer"]');
+      const canvas = layer?.querySelector("canvas");
+      return Boolean(
+        layer
+        && layer.getAttribute("data-pixi-ready") === "true"
+        && Number(layer.getAttribute("data-pixi-object-count") || 0) >= 1
+        && canvas
+        && canvas.width > 20
+        && canvas.height > 20
+      );
+    })()`, "mahe Pixi board layer rendered", 15000);
+    await waitForExpression(ws, `document.querySelectorAll('[data-gsap="mahe-dice-face"], [data-gsap="mahe-score-row"]').length >= 2`, "mahe GSAP motion anchors rendered");
     await send(ws, "Emulation.setDeviceMetricsOverride", {
-      width: 390,
-      height: 844,
-      deviceScaleFactor: 2,
+      width: 360,
+      height: 780,
+      deviceScaleFactor: 3,
       mobile: true,
     });
     await waitForExpression(
@@ -2773,14 +2790,16 @@ async function runRoomFlowSmoke(ws, game) {
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="dalmuti-empty-hand-item"]').length >= 4`, "dalmuti empty-hand guidance items rendered");
     await waitForExpression(ws, `/손패 완료 상태|이번 손 위치|관전 대기/.test(document.querySelector('[data-smoke="dalmuti-empty-hand-panel"]')?.textContent || "")`, "dalmuti empty-hand guidance copy rendered");
     await waitForExpression(ws, `document.querySelector('[data-smoke="dalmuti-empty-hand-panel"]')?.getAttribute("data-phase") === "PLAYING"`, "dalmuti empty-hand state marker rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="dalmuti-current-trick-stack"]'))`, "dalmuti current trick stack rendered");
+    await waitForExpression(ws, `/No\\.3|대주교|1장 기준/.test(document.querySelector('[data-smoke="dalmuti-current-trick-stack"]')?.textContent || "")`, "dalmuti rank-number current trick stack copy rendered");
     mockState.dalmutiEmptyHand = false;
   }
   if (game === "six-nimmt") {
     await waitForText(ws, "내 손패");
     await waitForText(ws, "선택한 카드 제출");
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-compact-summary"]'))`, "six-nimmt compact summary rendered");
-    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-compact-summary-item"]').length === 4`, "six-nimmt compact summary items rendered");
-    await waitForExpression(ws, `/핵심 요약|현재 단계|주의 행|내 예측/.test(document.querySelector('[data-smoke="six-nimmt-compact-summary"]')?.textContent || "")`, "six-nimmt compact summary copy rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-hand-panel"]'))`, "six-nimmt hand panel rendered");
+    await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-hand-grid"] [data-smoke="six-nimmt-card-art"]').length >= 8`, "six-nimmt enlarged hand card grid rendered");
+    await waitForExpression(ws, `!document.querySelector('[data-smoke="six-nimmt-compact-summary"]')`, "six-nimmt compact summary removed");
     await waitForExpression(ws, `document.querySelectorAll('[data-smoke="six-nimmt-card-art"]').length >= 8`, "six-nimmt card SVG assets rendered");
   }
   if (game === "telestrations") {
@@ -2988,7 +3007,7 @@ async function assertSoloAiFirstActionAvailable(ws, game) {
     return;
   }
   if (game === "six-nimmt") {
-    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-compact-summary"]'))`, "six-nimmt solo AI compact summary rendered");
+    await waitForExpression(ws, `Boolean(document.querySelector('[data-smoke="six-nimmt-hand-panel"]'))`, "six-nimmt solo AI hand panel rendered");
     const clicked = await evaluate(ws, `(() => {
       const button = Array.from(document.querySelectorAll("button")).find((node) => !node.disabled && (node.getAttribute("aria-label") || "").includes("카드"));
       if (!button) return false;
@@ -3092,7 +3111,7 @@ async function inspectPage(ws, testCase, viewport) {
   await send(ws, "Emulation.setDeviceMetricsOverride", {
     width: viewport.width,
     height: viewport.height,
-    deviceScaleFactor: viewport.mobile ? 2 : 1,
+    deviceScaleFactor: viewport.deviceScaleFactor ?? (viewport.mobile ? 2 : 1),
     mobile: viewport.mobile,
   });
   await send(ws, "Page.navigate", { url: `${baseUrl}${testCase.path}` });

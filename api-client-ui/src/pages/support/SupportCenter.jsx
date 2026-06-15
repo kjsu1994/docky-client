@@ -98,19 +98,19 @@ const ReportCard = ({ report }) => {
     const handledText = report.handledAt ? formatDate(report.handledAt) : "";
 
     return (
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <article className="surface-card p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={report.status} />
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                        <span className="rounded-full bg-control px-3 py-1 text-xs font-black text-ink-muted">
                             {targetLabel} #{report.targetId || "-"}
                         </span>
                     </div>
-                    <h2 className="break-words text-base font-black leading-6 text-slate-900 sm:text-lg">
+                    <h2 className="break-words text-base font-black leading-6 text-ink sm:text-lg">
                         {report.reason || "신고 사유 없음"}
                     </h2>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-ink-muted">
                         <span>접수 {formatRelativeTime(report.createdAt) || "-"}</span>
                         {handledText ? <span>처리 {handledText}</span> : null}
                     </div>
@@ -118,7 +118,7 @@ const ReportCard = ({ report }) => {
             </div>
 
             {report.detail ? (
-                <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-600">
+                <div className="mt-4 rounded-xl bg-control/70 p-3 text-sm font-semibold leading-6 text-ink-muted">
                     {report.detail}
                 </div>
             ) : null}
@@ -195,14 +195,14 @@ export const SupportCenter = () => {
 
     return (
         <div className="space-y-5 pb-20">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <section className="surface-card p-5 sm:p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                         <div className="mb-2 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
                             <LifeBuoy className="h-5 w-5" />
                         </div>
-                        <h1 className="text-2xl font-black text-slate-900">신고/문의 상태</h1>
-                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                        <h1 className="text-2xl font-black text-ink">신고/문의 상태</h1>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-ink-muted">
                             접수한 신고의 처리 상태와 운영 답변을 확인할 수 있습니다.
                         </p>
                     </div>
@@ -211,14 +211,14 @@ export const SupportCenter = () => {
                             type="button"
                             onClick={() => fetchReports({ silent: true })}
                             disabled={loading || refreshing}
-                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                            className="btn-secondary min-h-11 px-4 py-2"
                         >
                             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                             새로고침
                         </button>
                         <Link
                             to="/app/boards/QUESTION_ANSWER"
-                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white hover:bg-slate-800"
+                            className="btn-primary min-h-11 px-4 py-2"
                         >
                             <ExternalLink className="h-4 w-4" />
                             Q&A
@@ -227,7 +227,7 @@ export const SupportCenter = () => {
                 </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <section className="surface-card p-3">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                     {STATUS_OPTIONS.map((option) => {
                         const active = option.value === status;
@@ -240,8 +240,8 @@ export const SupportCenter = () => {
                                 disabled={loading || refreshing}
                                 className={`min-h-11 rounded-xl px-3 py-2 text-sm font-black transition-colors disabled:opacity-60 ${
                                     active
-                                        ? "bg-slate-900 text-white"
-                                        : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                                        ? "bg-ink text-ink-inverse"
+                                        : "bg-control text-ink-muted hover:bg-control-hover"
                                 }`}
                             >
                                 {option.label}
@@ -256,7 +256,7 @@ export const SupportCenter = () => {
             ) : error ? (
                 <ErrorMessage message={error} onRetry={fetchReports} />
             ) : !normalizedReports.length ? (
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="surface-card p-6">
                     <EmptyState
                         message="표시할 신고 내역이 없습니다."
                         subMessage="신고를 접수하면 이 화면에서 처리 상태를 확인할 수 있습니다."
@@ -270,18 +270,18 @@ export const SupportCenter = () => {
                         ))}
                     </section>
 
-                    <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2 text-sm font-black text-slate-700">
-                            <Flag className="h-4 w-4 text-slate-500" />
+                    <section className="surface-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-2 text-sm font-black text-ink-muted">
+                            <Flag className="h-4 w-4 text-ink-subtle" />
                             {reports.page} / {totalPages}
-                            <span className="font-semibold text-slate-400">총 {reports.totalElements}건</span>
+                            <span className="font-semibold text-ink-subtle">총 {reports.totalElements}건</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 sm:flex">
                             <button
                                 type="button"
                                 onClick={() => movePage(page - 1)}
                                 disabled={page <= 1 || loading || refreshing}
-                                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                                className="btn-secondary min-h-10 px-4 py-2"
                             >
                                 <ChevronLeft className="h-4 w-4" />
                                 이전
@@ -290,7 +290,7 @@ export const SupportCenter = () => {
                                 type="button"
                                 onClick={() => movePage(page + 1)}
                                 disabled={page >= totalPages || loading || refreshing}
-                                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                                className="btn-secondary min-h-10 px-4 py-2"
                             >
                                 다음
                                 <ChevronRight className="h-4 w-4" />

@@ -693,15 +693,15 @@ export const Chat = () => {
     }, [roomSearchQuery, rooms]);
 
     return (
-        <div className="relative flex h-[calc(100svh-96px)] min-h-[560px] overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:h-[calc(100vh-120px)]">
+        <div className="surface-panel relative flex h-[calc(100svh-96px)] min-h-[560px] overflow-hidden lg:h-[calc(100vh-120px)]">
             {/* 사이드바 */}
             <div className={`${isSidebarOpen ? "translate-x-0 lg:w-80" : "-translate-x-full lg:w-0"} absolute inset-y-0 left-0 z-30 flex w-full flex-col border-r border-line bg-control transition-all duration-300 lg:relative lg:translate-x-0`}>
                 <div className="flex items-center justify-between gap-3 border-b border-line bg-surface p-3 sm:p-4">
                     <h2 className="flex items-center gap-2 font-bold text-ink"><MessageSquare className="h-5 w-5 text-primary-600" />채팅방</h2>
                     <div className="flex gap-1">
-                        <button type="button" aria-label="채팅방 목록 새로고침" onClick={fetchRooms} className="rounded-lg p-1.5 text-ink-subtle transition-colors hover:bg-control-hover"><RefreshCw className={`h-4 w-4 ${loadingRooms ? 'animate-spin' : ''}`} /></button>
-                        <button type="button" aria-label="AI 채팅방 열기" onClick={openAiRoom} className="rounded-lg bg-cyan-500/10 p-1.5 text-cyan-700 transition-colors hover:bg-cyan-500/20"><Bot className="h-5 w-5" /></button>
-                        <button type="button" aria-label="새 채팅방 만들기" onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="rounded-lg bg-primary-500/10 p-1.5 text-primary-600 transition-colors hover:bg-primary-500/20"><Plus className="h-5 w-5" /></button>
+                        <button type="button" aria-label="채팅방 목록 새로고침" onClick={fetchRooms} className="icon-button h-9 w-9"><RefreshCw className={`h-4 w-4 ${loadingRooms ? 'animate-spin' : ''}`} /></button>
+                        <button type="button" aria-label="AI 채팅방 열기" onClick={openAiRoom} className="icon-button h-9 w-9 text-cyan-700 hover:border-cyan-200 hover:bg-cyan-500/10"><Bot className="h-5 w-5" /></button>
+                        <button type="button" aria-label="새 채팅방 만들기" onClick={() => { resetMemberSelection(); setShowCreateModal(true); }} className="icon-button h-9 w-9 text-primary-600 hover:border-primary-200 hover:bg-primary-500/10"><Plus className="h-5 w-5" /></button>
                     </div>
                 </div>
                 <div className="p-3">
@@ -713,7 +713,7 @@ export const Chat = () => {
                                 value={roomSearchQuery}
                             onChange={(event) => setRoomSearchQuery(event.target.value)}
                             placeholder="방 이름 또는 최근 메시지 검색"
-                            className="w-full rounded-xl border border-line bg-surface py-2 pl-9 pr-4 text-sm text-ink placeholder:text-ink-subtle"
+                            className="input-base py-2 pl-9 pr-4"
                         />
                     </div>
                 </div>
@@ -971,13 +971,13 @@ export const Chat = () => {
                         if (event.target === event.currentTarget) closeRoomActions();
                     }}
                 >
-                    <div className="max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-surface shadow-2xl">
+                    <div className="modal-panel max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto">
                         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
                             <div className="min-w-0">
                                 <div className="truncate text-sm font-black text-ink">{roomActionTarget?.title || "채팅방"}</div>
                                 <div className="mt-0.5 text-xs font-semibold text-ink-subtle">채팅방 설정</div>
                             </div>
-                            <button type="button" aria-label="채팅방 메뉴 닫기" onClick={closeRoomActions} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ink-subtle hover:bg-control-hover hover:text-ink-muted">
+                            <button type="button" aria-label="채팅방 메뉴 닫기" onClick={closeRoomActions} className="icon-button h-9 w-9 shrink-0">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
@@ -993,9 +993,9 @@ export const Chat = () => {
                             <button
                                 type="button"
                                 onClick={leaveSelectedRoom}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold text-rose-600 hover:bg-rose-50"
                             >
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-600"><LogOut className="h-5 w-5" /></span>
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600"><LogOut className="h-5 w-5" /></span>
                                 채팅방 나가기
                             </button>
                         </div>
@@ -1011,10 +1011,10 @@ export const Chat = () => {
                         if (event.target === event.currentTarget) closeRoomActions();
                     }}
                 >
-                    <div className="max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="chat-room-rename-title">
+                    <div className="modal-panel max-h-[calc(100svh-7rem)] w-full max-w-md overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="chat-room-rename-title">
                         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
                             <h3 id="chat-room-rename-title" className="text-base font-black text-ink">채팅방 이름 바꾸기</h3>
-                            <button type="button" aria-label="이름 변경 닫기" onClick={closeRoomActions} className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-subtle hover:bg-control-hover hover:text-ink-muted">
+                            <button type="button" aria-label="이름 변경 닫기" onClick={closeRoomActions} className="icon-button h-9 w-9">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
@@ -1037,8 +1037,8 @@ export const Chat = () => {
                             />
                         </div>
                         <div className="flex gap-2 bg-control p-4">
-                            <button type="button" onClick={closeRoomActions} className="flex-1 rounded-xl border border-line bg-surface px-4 py-3 text-sm font-bold text-ink-muted hover:bg-control-hover">취소</button>
-                            <button type="button" onClick={renameRoom} disabled={!renameRoomTitle.trim()} className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold shadow-sm ${renameRoomTitle.trim() ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-control-hover text-ink-subtle"}`}>저장</button>
+                            <button type="button" onClick={closeRoomActions} className="btn-secondary flex-1 py-3">취소</button>
+                            <button type="button" onClick={renameRoom} disabled={!renameRoomTitle.trim()} className="btn-primary flex-1 py-3">저장</button>
                         </div>
                     </div>
                 </div>
@@ -1055,7 +1055,7 @@ export const Chat = () => {
                 >
                     <div
                         ref={modalPanelRef}
-                        className="w-full max-w-md overflow-hidden rounded-3xl bg-surface shadow-2xl"
+                        className="modal-panel w-full max-w-md overflow-hidden"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={modalTitleId}
@@ -1064,9 +1064,9 @@ export const Chat = () => {
                         <p id={modalDescriptionId} className="sr-only">
                             {showCreateModal ? "새 채팅방 제목을 입력해 방을 만들 수 있습니다." : "초대할 멤버를 검색하고 선택할 수 있습니다."}
                         </p>
-                        <div className="p-6 border-b flex items-center justify-between bg-primary-600 text-white">
+                        <div className="flex items-center justify-between border-b border-line bg-primary-600 p-6 text-white">
                             <div className="flex items-center gap-3"><div className="p-2 rounded-xl bg-white/20">{showCreateModal ? <MessageSquare className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}</div><h3 id={modalTitleId} className="text-xl font-bold">{showCreateModal ? "새 채팅방 만들기" : "멤버 초대하기"}</h3></div>
-                            <button ref={modalCloseButtonRef} type="button" aria-label="채팅 모달 닫기" onClick={closeMemberModal} className="p-1 hover:bg-white/20 rounded-lg transition-colors"><X className="h-6 w-6" /></button>
+                            <button ref={modalCloseButtonRef} type="button" aria-label="채팅 모달 닫기" onClick={closeMemberModal} className="flex h-9 w-9 items-center justify-center rounded-xl text-white/80 transition-colors hover:bg-white/20 hover:text-white"><X className="h-6 w-6" /></button>
                         </div>
                         <div className="p-6 space-y-5">
                             {showCreateModal ? (
@@ -1107,8 +1107,8 @@ export const Chat = () => {
                             )}
                         </div>
                         <div className="flex gap-3 bg-control p-6">
-                            <button type="button" onClick={closeMemberModal} className="flex-1 rounded-2xl border border-line bg-surface px-4 py-3 font-bold text-ink-muted transition-colors hover:bg-control-hover">취소</button>
-                            <button type="button" onClick={showCreateModal ? createRoom : inviteMembers} disabled={showCreateModal ? !newRoomTitle.trim() : selectedMembers.length === 0} className={`flex-1 rounded-2xl px-4 py-3 font-bold shadow-lg transition-all ${ (showCreateModal ? newRoomTitle.trim() : selectedMembers.length > 0) ? "bg-primary-600 text-white hover:bg-primary-700" : "cursor-not-allowed bg-control-hover text-ink-subtle" }`}>{showCreateModal ? "채팅방 생성" : "멤버 초대"}</button>
+                            <button type="button" onClick={closeMemberModal} className="btn-secondary flex-1 py-3">취소</button>
+                            <button type="button" onClick={showCreateModal ? createRoom : inviteMembers} disabled={showCreateModal ? !newRoomTitle.trim() : selectedMembers.length === 0} className="btn-primary flex-1 py-3">{showCreateModal ? "채팅방 생성" : "멤버 초대"}</button>
                         </div>
                     </div>
                 </div>

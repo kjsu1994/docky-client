@@ -65,15 +65,15 @@ export const Ranks = () => {
 
     return (
         <div className="space-y-6">
-            <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+            <div className="surface-card p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
                             <Trophy className="h-6 w-6" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">랭킹</h1>
-                            <p className="text-sm font-medium text-slate-500">커뮤니티 인기 게시글과 활발한 멤버를 확인하세요.</p>
+                            <h1 className="text-2xl font-black text-ink sm:text-3xl">랭킹</h1>
+                            <p className="text-sm font-medium text-ink-muted">커뮤니티 인기 게시글과 활발한 멤버를 확인하세요.</p>
                         </div>
                     </div>
                     <div className="rounded-xl bg-control px-3 py-2 text-sm font-bold text-ink-muted">
@@ -82,7 +82,7 @@ export const Ranks = () => {
                 </div>
             </div>
 
-            <div className="card p-2">
+            <div className="surface-card p-2">
                 <div className="grid grid-cols-2 gap-2">
                     {tabs.map((tab) => (
                         <TabButton
@@ -98,7 +98,7 @@ export const Ranks = () => {
             </div>
 
             {activeTab === "boards" ? (
-                <div className="card p-3">
+                <div className="surface-card p-3">
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {BOARD_RANK_TYPES.map((type) => (
                             <BoardTypeButton
@@ -117,7 +117,7 @@ export const Ranks = () => {
             {!loading && error ? <ErrorMessage message={error} onRetry={fetchRanks} /> : null}
 
             {!loading && !error ? (
-                <div className="card overflow-hidden">
+                <div className="surface-card overflow-hidden">
                     {activeTab === "boards" ? <BoardRankList ranks={ranks.boards} /> : null}
                     {activeTab === "level" ? <LevelRankList ranks={ranks.level} /> : null}
                 </div>

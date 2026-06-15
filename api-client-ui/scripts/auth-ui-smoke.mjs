@@ -532,9 +532,9 @@ async function assertStoredRefreshRedirectsFromLogin(cdp, sessionId, label, metr
 
 async function inspectAuth(cdp, sessionId) {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
-        width: 390,
-        height: 844,
-        deviceScaleFactor: 2,
+        width: 360,
+        height: 780,
+        deviceScaleFactor: 3,
         mobile: true,
     }, sessionId);
 
@@ -581,10 +581,16 @@ async function inspectAuth(cdp, sessionId) {
     await waitFor(cdp, sessionId, `localStorage.getItem("accessToken") === "smoke-reissued-access-token"`, "reissued access token persisted in local storage");
     await assertNoBlockedText(cdp, sessionId, "refresh-token-only recovery");
 
-    await assertStoredRefreshRedirectsFromLogin(cdp, sessionId, "mobile stored refresh login route", {
-        width: 390,
-        height: 844,
-        deviceScaleFactor: 2,
+    await assertStoredRefreshRedirectsFromLogin(cdp, sessionId, "galaxy s26 stored refresh login route", {
+        width: 360,
+        height: 780,
+        deviceScaleFactor: 3,
+        mobile: true,
+    });
+    await assertStoredRefreshRedirectsFromLogin(cdp, sessionId, "short galaxy s26 stored refresh login route", {
+        width: 360,
+        height: 740,
+        deviceScaleFactor: 3,
         mobile: true,
     });
     await assertStoredRefreshRedirectsFromLogin(cdp, sessionId, "tablet stored refresh login route", {

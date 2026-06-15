@@ -20,7 +20,9 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "news-ui-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
-    { name: "mobile", width: 390, height: 844, mobile: true },
+    { name: "tablet", width: 768, height: 1024, mobile: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3 },
 ];
 const requiredTexts = ["환경 뉴스", "빠른 검색어", "기후위기", "검색 결과", "읽기", "원문 보기"];
 const blockedTexts = ["CLAUDE", "CODEX", "엔트로픽", "Loading", "Error"];
@@ -157,7 +159,7 @@ async function inspectNews(ws, viewport) {
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     });
     await send(ws, "Page.navigate", { url: `${baseUrl}/app/news` });

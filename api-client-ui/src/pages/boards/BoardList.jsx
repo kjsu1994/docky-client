@@ -275,7 +275,7 @@ const BoardCard = ({ board, user, onDelete, onOpen, onEdit }) => {
     const [imgError, setImgError] = useState(false);
 
     return (
-        <div onClick={onOpen} className="card group flex min-h-[120px] cursor-pointer items-stretch overflow-hidden transition-all hover:shadow-lg">
+        <div onClick={onOpen} className="surface-card group flex min-h-[120px] cursor-pointer items-stretch overflow-hidden transition-all hover:shadow-panel">
             {thumbnailUrl && !imgError && (
                 <div className="relative w-32 flex-shrink-0 border-r border-line bg-control sm:w-40">
                     <img

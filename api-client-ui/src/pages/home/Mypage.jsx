@@ -577,14 +577,14 @@ const SecurityTab = ({
     const hasOtherSessions = sessions.some((session) => !Boolean(session.current));
 
     return (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <section className="surface-card p-5 sm:p-6">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                    <h2 className="flex items-center gap-2 text-lg font-black text-slate-900">
+                    <h2 className="flex items-center gap-2 text-lg font-black text-ink">
                         <ShieldCheck className="h-5 w-5 text-sky-600" />
                         로그인 기기 관리
                     </h2>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                    <p className="mt-1 text-sm font-semibold leading-6 text-ink-muted">
                         현재 로그인된 기기를 확인하고 사용하지 않는 세션을 종료할 수 있습니다.
                     </p>
                 </div>
@@ -593,7 +593,7 @@ const SecurityTab = ({
                         type="button"
                         onClick={onRefresh}
                         disabled={loading || Boolean(busyKey)}
-                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                        className="btn-secondary min-h-10 px-3 py-2"
                     >
                         <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                         새로고침
@@ -602,7 +602,7 @@ const SecurityTab = ({
                         type="button"
                         onClick={onLogoutOtherSessions}
                         disabled={loading || Boolean(busyKey) || !hasOtherSessions}
-                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white hover:bg-slate-800 disabled:opacity-60"
+                        className="btn-primary min-h-10 px-3 py-2"
                     >
                         <LogOut className="h-4 w-4" />
                         다른 기기 로그아웃
@@ -623,12 +623,12 @@ const SecurityTab = ({
                         return (
                             <div
                                 key={sessionId}
-                                className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                className="flex flex-col gap-3 rounded-xl border border-line bg-control/70 p-4 sm:flex-row sm:items-center sm:justify-between"
                             >
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <MonitorSmartphone className="h-4 w-4 shrink-0 text-slate-500" />
-                                        <span className="break-words text-sm font-black text-slate-900">
+                                        <MonitorSmartphone className="h-4 w-4 shrink-0 text-ink-muted" />
+                                        <span className="break-words text-sm font-black text-ink">
                                             {session.device_label || session.deviceLabel || "Unknown device"}
                                         </span>
                                         {current ? (
@@ -637,7 +637,7 @@ const SecurityTab = ({
                                             </span>
                                         ) : null}
                                     </div>
-                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-ink-muted">
                                         <span>마지막 사용 {toDisplayDate(session.last_used_at || session.lastUsedAt) || "-"}</span>
                                         <span>만료 {toDisplayDate(session.expires_at || session.expiresAt) || "-"}</span>
                                         <span>{session.remember ? "자동 로그인" : "일반 로그인"}</span>
@@ -648,7 +648,7 @@ const SecurityTab = ({
                                         type="button"
                                         onClick={() => onRevokeSession(sessionId)}
                                         disabled={Boolean(busyKey)}
-                                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-surface px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-50 disabled:opacity-60"
                                     >
                                         {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                                         로그아웃
@@ -698,7 +698,7 @@ const PrivacyTab = ({
 
     if (!summary) {
         return (
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="surface-card p-6">
                 <EmptyState message="개인정보 설정을 불러오지 못했습니다." subMessage="잠시 후 다시 시도해 주세요." />
                 <div className="flex justify-center">
                     <button type="button" onClick={onRefresh} className="btn-secondary">
@@ -711,14 +711,14 @@ const PrivacyTab = ({
 
     return (
         <div className="space-y-6">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <section className="surface-card p-5 sm:p-6">
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                        <h2 className="flex items-center gap-2 text-lg font-black text-slate-900">
+                        <h2 className="flex items-center gap-2 text-lg font-black text-ink">
                             <FileText className="h-5 w-5 text-sky-600" />
                             내 데이터와 동의 설정
                         </h2>
-                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                        <p className="mt-1 text-sm font-semibold leading-6 text-ink-muted">
                             저장된 계정 정보와 작성 콘텐츠 범위를 확인하고, 선택 동의를 변경할 수 있습니다.
                         </p>
                     </div>
@@ -727,7 +727,7 @@ const PrivacyTab = ({
                             type="button"
                             onClick={onRefresh}
                             disabled={loading || Boolean(busyKey) || exporting}
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                            className="btn-secondary min-h-10 px-3 py-2"
                         >
                             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                             새로고침
@@ -736,7 +736,7 @@ const PrivacyTab = ({
                             type="button"
                             onClick={onExport}
                             disabled={exporting || Boolean(busyKey)}
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white hover:bg-slate-800 disabled:opacity-60"
+                            className="btn-primary min-h-10 px-3 py-2"
                         >
                             {exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                             내 데이터 받기
@@ -749,18 +749,18 @@ const PrivacyTab = ({
                         const busy = busyKey === consent.consentType;
                         const disabled = consent.required || Boolean(busyKey);
                         return (
-                            <div key={consent.consentType} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div key={consent.consentType} className="rounded-xl border border-line bg-control/70 p-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="break-words text-sm font-black text-slate-900">{consent.label}</span>
+                                            <span className="break-words text-sm font-black text-ink">{consent.label}</span>
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-black ${
-                                                consent.required ? "bg-slate-200 text-slate-700" : "bg-sky-100 text-sky-700"
+                                                consent.required ? "bg-control-hover text-ink-muted" : "bg-sky-100 text-sky-700"
                                             }`}>
                                                 {consent.required ? "필수" : "선택"}
                                             </span>
                                         </div>
-                                        <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                                        <p className="mt-2 text-xs font-semibold leading-5 text-ink-muted">
                                             {consent.required
                                                 ? "서비스 이용을 위해 유지되는 필수 동의입니다."
                                                 : "원하면 언제든지 켜거나 끌 수 있습니다."}
@@ -774,17 +774,17 @@ const PrivacyTab = ({
                                         onClick={() => onUpdateConsent(consent.consentType, !consent.granted)}
                                         disabled={disabled}
                                         className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${
-                                            consent.granted ? "bg-emerald-500" : "bg-slate-300"
+                                            consent.granted ? "bg-emerald-500" : "bg-control-hover"
                                         } disabled:cursor-not-allowed disabled:opacity-70`}
                                     >
                                         <span
-                                            className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+                                            className={`inline-block h-5 w-5 rounded-full bg-surface shadow transition ${
                                                 consent.granted ? "translate-x-6" : "translate-x-1"
                                             }`}
                                         />
                                     </button>
                                 </div>
-                                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500">
+                                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-ink-muted">
                                     {busy ? (
                                         <span className="inline-flex items-center gap-1 text-sky-700">
                                             <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -792,7 +792,7 @@ const PrivacyTab = ({
                                         </span>
                                     ) : (
                                         <span className="inline-flex items-center gap-1">
-                                            <CheckCircle2 className={`h-3.5 w-3.5 ${consent.granted ? "text-emerald-600" : "text-slate-400"}`} />
+                                            <CheckCircle2 className={`h-3.5 w-3.5 ${consent.granted ? "text-emerald-600" : "text-ink-subtle"}`} />
                                             {consent.granted ? "동의" : "미동의"}
                                         </span>
                                     )}
@@ -804,11 +804,11 @@ const PrivacyTab = ({
                     })}
                 </div>
 
-                <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm font-black text-slate-900">내보내기 포함 항목</div>
+                <div className="mt-5 rounded-xl border border-line bg-control/70 p-4">
+                    <div className="text-sm font-black text-ink">내보내기 포함 항목</div>
                     <div className="mt-3 flex flex-wrap gap-2">
                         {exportIncludes.map((item) => (
-                            <span key={item} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700">
+                            <span key={item} className="rounded-full bg-surface px-3 py-1.5 text-xs font-black text-ink-muted">
                                 {exportIncludeLabels[item] || item}
                             </span>
                         ))}
@@ -816,28 +816,28 @@ const PrivacyTab = ({
                 </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
+            <section className="surface-card p-5 sm:p-6">
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-ink">
                     <ShieldCheck className="h-5 w-5 text-emerald-600" />
                     보관 및 삭제 기준
                 </h2>
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     {retentionPolicy.map((item) => (
-                        <div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                            <div className="text-sm font-black text-slate-900">{item.title}</div>
+                        <div key={item.title} className="rounded-xl border border-line bg-control/70 p-4">
+                            <div className="text-sm font-black text-ink">{item.title}</div>
                             <div className="mt-2 text-xs font-black text-emerald-700">{item.period}</div>
-                            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{item.description}</p>
+                            <p className="mt-2 text-sm font-semibold leading-6 text-ink-muted">{item.description}</p>
                         </div>
                     ))}
                 </div>
             </section>
 
-            <section className="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm sm:p-6">
-                <h2 className="mb-3 flex items-center gap-2 text-lg font-black text-slate-900">
+            <section className="surface-card border-rose-200/70 p-5 sm:p-6">
+                <h2 className="mb-3 flex items-center gap-2 text-lg font-black text-ink">
                     <Trash2 className="h-5 w-5 text-rose-600" />
                     계정 삭제 요청
                 </h2>
-                <p className="mb-4 text-sm font-semibold leading-6 text-slate-500">
+                <p className="mb-4 text-sm font-semibold leading-6 text-ink-muted">
                     탈퇴하면 계정은 비활성화되며, 법령과 서비스 운영상 필요한 보관 기간이 끝난 정보는 삭제 대상이 됩니다.
                 </p>
                 <button
@@ -856,8 +856,8 @@ const PrivacyTab = ({
 
 const ProfileTab = ({ member, level, onDeleteAccount, deleteBusy }) => (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
+        <section className="surface-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-ink">
                 <User className="h-5 w-5 text-sky-600" />
                 기본 정보
             </h2>
@@ -868,30 +868,30 @@ const ProfileTab = ({ member, level, onDeleteAccount, deleteBusy }) => (
             <InfoRow label="회원 상태" value={member.statusLabel} />
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
+        <section className="surface-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-ink">
                 <Award className="h-5 w-5 text-amber-600" />
                 레벨 정보
             </h2>
             <div className="mb-4 flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-600">현재 레벨</span>
-                <span className="text-2xl font-black text-slate-900">레벨 {level.level || 1}</span>
+                <span className="text-sm font-bold text-ink-muted">현재 레벨</span>
+                <span className="text-2xl font-black text-ink">레벨 {level.level || 1}</span>
             </div>
             <InfoRow label="현재 티어" value={level.tierName || level.frameLabel || level.rewardTier || "-"} />
             <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="font-bold text-slate-600">다음 레벨까지</span>
+                <span className="font-bold text-ink-muted">다음 레벨까지</span>
                 <span className="font-black text-sky-700">{formatNumber(level.currentExp)} / {formatNumber(level.nextLevelExp)}</span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-3 overflow-hidden rounded-full bg-control">
                 <div className="h-full rounded-full bg-sky-500" style={{ width: `${level.progressPercent || 0}%` }} />
             </div>
-            <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-500">
+            <p className="mt-3 rounded-xl bg-control/70 p-3 text-xs font-semibold text-ink-muted">
                 게시글, 댓글, 좋아요, 게임 참여로 경험치를 얻고 레벨을 올릴 수 있습니다.
             </p>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
+        <section className="surface-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-ink">
                 <BarChart3 className="h-5 w-5 text-emerald-600" />
                 활동 요약
             </h2>
@@ -900,12 +900,12 @@ const ProfileTab = ({ member, level, onDeleteAccount, deleteBusy }) => (
             <InfoRow label="작성 댓글" value={`${formatNumber(member.commentCount)}개`} />
         </section>
 
-        <section className="rounded-2xl border border-rose-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
+        <section className="surface-card border-rose-200/70 p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-ink">
                 <ShieldCheck className="h-5 w-5 text-rose-600" />
                 계정 관리
             </h2>
-            <p className="mb-4 text-sm font-medium leading-6 text-slate-500">
+            <p className="mb-4 text-sm font-medium leading-6 text-ink-muted">
                 탈퇴하면 계정 상태가 비활성화되며, 다시 이용하려면 같은 이메일로 재가입 절차를 진행해야 합니다.
             </p>
             <button
@@ -926,7 +926,7 @@ const PostsTab = ({ boards, loading, navigate }) => {
     }
     if (!boards.length) {
         return (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="surface-card p-6">
                 <EmptyState message="작성한 게시글이 없습니다." subMessage="첫 번째 게시글을 작성해 보세요." />
                 <div className="flex justify-center">
                     <button type="button" onClick={() => navigate("/app/boards/FREE_BOARD")} className="btn-primary">
@@ -943,12 +943,12 @@ const PostsTab = ({ boards, loading, navigate }) => {
                 <button
                     key={board.id}
                     type="button"
-                    className="block w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-sky-200 hover:shadow-md"
+                    className="surface-card block w-full p-5 text-left transition hover:border-sky-200 hover:shadow-panel"
                     onClick={() => navigate(`/app/boards/${board.kind}/${board.id}`)}
                 >
-                    <h3 className="line-clamp-1 text-lg font-black text-slate-900">{board.title}</h3>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{board.preview || "본문 미리보기가 없습니다."}</p>
-                    <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-semibold text-slate-500">
+                    <h3 className="line-clamp-1 text-lg font-black text-ink">{board.title}</h3>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-muted">{board.preview || "본문 미리보기가 없습니다."}</p>
+                    <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-semibold text-ink-muted">
                         <span className="inline-flex items-center gap-1"><Heart className="h-4 w-4 text-rose-500" />좋아요 {formatNumber(board.likeCount)}</span>
                         <span className="inline-flex items-center gap-1"><TrendingUp className="h-4 w-4 text-sky-500" />조회 {formatNumber(board.viewCount)}</span>
                         <span className="ml-auto inline-flex items-center gap-1"><Calendar className="h-4 w-4" />{toDisplayDate(board.createdAt) || "-"}</span>
@@ -961,8 +961,8 @@ const PostsTab = ({ boards, loading, navigate }) => {
 
 const StatsTab = ({ member, level, history, historyLoading }) => (
     <div className="space-y-6">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
+        <section className="surface-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-ink">
                 <BarChart3 className="h-5 w-5 text-sky-600" />
                 활동 통계
             </h2>
@@ -974,20 +974,20 @@ const StatsTab = ({ member, level, history, historyLoading }) => (
             </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-black text-slate-900">레벨 진행도</h2>
+        <section className="surface-card p-6">
+            <h2 className="mb-4 text-lg font-black text-ink">레벨 진행도</h2>
             <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="font-black text-slate-900">레벨 {level.level || 1} → 레벨 {(level.level || 1) + 1}</span>
-                <span className="font-bold text-slate-600">{formatNumber(level.currentExp)} / {formatNumber(level.nextLevelExp)}</span>
+                <span className="font-black text-ink">레벨 {level.level || 1} → 레벨 {(level.level || 1) + 1}</span>
+                <span className="font-bold text-ink-muted">{formatNumber(level.currentExp)} / {formatNumber(level.nextLevelExp)}</span>
             </div>
-            <div className="h-4 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-4 overflow-hidden rounded-full bg-control">
                 <div className="h-full rounded-full bg-emerald-500" style={{ width: `${level.progressPercent || 0}%` }} />
             </div>
-            <p className="mt-3 text-sm font-semibold text-slate-500">다음 레벨까지 {formatNumber(level.remainingExp)} 경험치가 필요합니다.</p>
+            <p className="mt-3 text-sm font-semibold text-ink-muted">다음 레벨까지 {formatNumber(level.remainingExp)} 경험치가 필요합니다.</p>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-black text-slate-900">경험치 이력</h2>
+        <section className="surface-card p-6">
+            <h2 className="mb-4 text-lg font-black text-ink">경험치 이력</h2>
             {historyLoading ? (
                 <LoadingSpinner text="경험치 이력을 불러오는 중입니다..." />
             ) : !history.length ? (
@@ -995,14 +995,14 @@ const StatsTab = ({ member, level, history, historyLoading }) => (
             ) : (
                 <div className="space-y-2">
                     {history.map((item) => (
-                        <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div key={item.id} className="rounded-xl border border-line bg-control/70 p-4">
                             <div className="flex items-center justify-between gap-3">
-                                <div className="text-sm font-black text-slate-900">{item.label}</div>
+                                <div className="text-sm font-black text-ink">{item.label}</div>
                                 <div className={`text-sm font-black ${Number(item.grantedExp) < 0 ? "text-rose-600" : "text-emerald-600"}`}>
                                     {formatSignedExp(item.grantedExp)} 경험치
                                 </div>
                             </div>
-                            <div className="mt-1 text-xs font-semibold text-slate-500">
+                            <div className="mt-1 text-xs font-semibold text-ink-muted">
                                 기준 {formatNumber(item.baseExp)} · 차감 {formatNumber(item.penaltyExp)} · {toDisplayDate(item.createdAt) || "-"}
                             </div>
                         </div>

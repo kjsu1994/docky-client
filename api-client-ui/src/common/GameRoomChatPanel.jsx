@@ -198,7 +198,7 @@ export const GameRoomChatPanel = ({
 
   return (
     <aside
-      className={`rounded-[1.8rem] border border-line bg-surface p-4 shadow-lg ${className}`}
+      className={`surface-panel p-4 ${className}`}
       data-smoke="game-room-chat-panel"
       data-chat-game={gameCode}
     >
@@ -212,15 +212,15 @@ export const GameRoomChatPanel = ({
         </span>
       </div>
 
-      <div ref={scrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-2xl bg-control p-3 text-xs sm:h-[320px] xl:h-[360px]">
+      <div ref={scrollRef} className="mb-3 h-[min(34vh,260px)] space-y-2 overflow-auto overscroll-contain rounded-panel bg-control/80 p-3 text-xs sm:h-[320px] xl:h-[360px]">
         {loading && (
-          <div className="rounded-xl border border-line bg-surface px-3 py-2 font-bold text-ink-muted">
+          <div className="rounded-card border border-line bg-surface px-3 py-2 font-bold text-ink-muted">
             채팅을 불러오는 중입니다.
           </div>
         )}
         {!loading && !messages.length && (
           <div
-            className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-surface px-4 py-6 text-center"
+            className="flex min-h-40 flex-col items-center justify-center rounded-panel border border-dashed border-line bg-surface px-4 py-6 text-center"
             data-smoke="game-chat-empty-state"
             data-chat-game={gameCode}
           >
@@ -230,7 +230,7 @@ export const GameRoomChatPanel = ({
           </div>
         )}
         {messages.map((message) => (
-          <div key={message.messageId || message.id || message.key} className="rounded-xl border border-line bg-surface px-3 py-2">
+          <div key={message.messageId || message.id || message.key} className="rounded-card border border-line bg-surface px-3 py-2">
             <div className="flex items-center gap-2 font-black text-ink">
               <UserAvatar
                 name={message.senderName || "SYSTEM"}
@@ -249,7 +249,7 @@ export const GameRoomChatPanel = ({
 
       <div className="flex gap-2">
         <input
-          className="min-w-0 flex-1 rounded-xl border border-line bg-control px-3 py-2 text-sm text-ink placeholder:text-ink-subtle"
+          className="input-base min-w-0 flex-1 px-3 py-2"
           placeholder="메시지를 입력하세요"
           value={input}
           maxLength={GAME_ROOM_CHAT_MESSAGE_MAX_LENGTH}
@@ -263,7 +263,7 @@ export const GameRoomChatPanel = ({
         />
         <button
           type="button"
-          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-ink px-3 text-xs font-black text-ink-inverse disabled:opacity-40"
+          className="inline-flex min-h-10 items-center justify-center rounded-control bg-ink px-3 text-xs font-black text-ink-inverse transition hover:bg-primary-600 disabled:opacity-40"
           disabled={!input.trim() || !canUseChat}
           onClick={sendMessage}
           aria-label="게임 채팅 전송"

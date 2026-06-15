@@ -245,13 +245,14 @@ export const Login = () => {
 
     if (oauthProcessing) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-                <div className="card p-8 w-full max-w-md text-center space-y-4">
+            <div className="min-h-screen bg-transparent flex items-center justify-center p-6 relative overflow-hidden">
+                <div className="bg-vibe" />
+                <div className="surface-panel motion-panel-in p-8 w-full max-w-md text-center space-y-4 relative z-10">
                     <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600/10 text-primary-600 mx-auto">
                         <Leaf className="h-7 w-7 animate-pulse" />
                     </div>
-                    <h1 className="text-xl font-black text-slate-900">소셜 로그인 처리중</h1>
-                    <p className="text-sm text-slate-500">잠시만 기다려주세요. 자동으로 이동합니다.</p>
+                    <h1 className="text-xl font-black text-ink">소셜 로그인 처리중</h1>
+                    <p className="text-sm text-ink-muted">잠시만 기다려주세요. 자동으로 이동합니다.</p>
                     <div className="flex items-center justify-center gap-2 text-primary-600 font-bold text-sm">
                         <div className="loading-spinner !w-4 !h-4 !border-2 border-primary-200 border-t-primary-600" />
                         인증 확인중...
@@ -301,20 +302,21 @@ export const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-transparent flex items-center justify-center p-6 relative overflow-hidden">
+            <div className="bg-vibe" />
             <div className="w-full max-w-md relative z-10">
                 <div className="text-center mb-10">
                     <BrandMark className="mx-auto mb-6 h-24 max-w-[18rem] transition-transform duration-500 hover:scale-105" />
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">
+                    <h1 className="text-4xl font-black text-ink tracking-tight mb-3">
                         로그인
                     </h1>
-                    <p className="text-slate-400 font-bold uppercase text-[11px] tracking-[0.3em]">
+                    <p className="text-ink-subtle font-bold uppercase text-[11px] tracking-[0.3em]">
                         Docky community
                     </p>
                 </div>
 
                 {/* 로그인 폼 */}
-                <div className="card p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50">
+                <div className="surface-panel motion-panel-in p-8 sm:p-10">
                     {oauthErrorMessage && (
                         <div
                             role="alert"
@@ -325,16 +327,16 @@ export const Login = () => {
                     )}
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                            <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">
                                 이메일
                             </label>
                             <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="input-base pl-12 h-14 bg-white font-bold"
+                                    className="input-base pl-12 h-14 font-bold"
                                     placeholder="이메일 주소"
                                     autoComplete="email"
                                     spellCheck={false}
@@ -344,16 +346,16 @@ export const Login = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                            <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">
                                 비밀번호
                             </label>
                             <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="input-base pl-12 h-14 bg-white font-bold"
+                                    className="input-base pl-12 h-14 font-bold"
                                     placeholder="••••••••"
                                     autoComplete="current-password"
                                     required
@@ -361,7 +363,7 @@ export const Login = () => {
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-sm font-bold text-slate-500">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-sm font-bold text-ink-muted">
                             <label className="inline-flex cursor-pointer items-center gap-2">
                                 <input
                                     type="checkbox"
@@ -424,22 +426,22 @@ export const Login = () => {
                         </div>
                     </form>
 
-                    <div className="mt-10 pt-8 border-t border-slate-50 text-center">
+                        <div className="mt-10 pt-8 border-t border-line text-center">
                         <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <Link
                                 to="/account-recovery/find-id"
-                                className="inline-flex h-12 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-600 hover:bg-slate-200"
+                                className="inline-flex h-12 items-center justify-center rounded-control bg-control px-4 text-sm font-black text-ink-muted hover:bg-control-hover"
                             >
                                 아이디 찾기
                             </Link>
                             <Link
                                 to="/account-recovery/password-reset"
-                                className="inline-flex h-12 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-600 hover:bg-slate-200"
+                                className="inline-flex h-12 items-center justify-center rounded-control bg-control px-4 text-sm font-black text-ink-muted hover:bg-control-hover"
                             >
                                 비밀번호 찾기
                             </Link>
                         </div>
-                        <p className="text-sm font-medium text-slate-400">
+                        <p className="text-sm font-medium text-ink-subtle">
                             처음이신가요?{" "}
                             <Link
                                 to="/register"
@@ -454,7 +456,7 @@ export const Login = () => {
 
             {lockInfo && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
                     role="presentation"
                     onMouseDown={(event) => {
                         if (event.target === event.currentTarget) closeLockDialog();
@@ -462,18 +464,18 @@ export const Login = () => {
                 >
                     <div
                         ref={lockDialogRef}
-                        className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+                        className="modal-panel w-full max-w-md p-6"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={lockDialogTitleId}
                         aria-describedby={lockDialogDescriptionId}
                     >
-                        <h2 id={lockDialogTitleId} className="text-xl font-black text-slate-900">계정 이용 제한</h2>
-                        <p id={lockDialogDescriptionId} className="mt-2 text-sm text-slate-600">
+                        <h2 id={lockDialogTitleId} className="text-xl font-black text-ink">계정 이용 제한</h2>
+                        <p id={lockDialogDescriptionId} className="mt-2 text-sm text-ink-muted">
                             현재 이 계정은 제재 상태입니다. 아래 내용을 확인하고 필요하면 해제를 요청하세요.
                         </p>
 
-                        <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                        <div className="mt-4 space-y-2 rounded-panel bg-control p-4 text-sm text-ink-muted">
                             <div><b>이메일:</b> {lockInfo.email}</div>
                             <div><b>사유:</b> {lockInfo.reason}</div>
                             <div><b>시작:</b> {formatDateTime(lockInfo.startsAt)}</div>

@@ -21,7 +21,8 @@ const blockedTexts = ["Error", "undefined", "NaN", "null점", "WAITING", "PLAYIN
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false, interactive: true },
     { name: "tablet", width: 820, height: 1180, mobile: true, interactive: true },
-    { name: "mobile", width: 390, height: 844, mobile: true, interactive: true },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3, interactive: true },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3, interactive: false },
 ];
 
 function assertNoThanksRealtimeSource() {
@@ -753,7 +754,7 @@ async function inspectNoThanksEmptyLobby(cdp, sessionId, viewport) {
         await cdp.send("Emulation.setDeviceMetricsOverride", {
             width: viewport.width,
             height: viewport.height,
-            deviceScaleFactor: viewport.mobile ? 2 : 1,
+            deviceScaleFactor: viewport.deviceScaleFactor ?? (viewport.mobile ? 2 : 1),
             mobile: viewport.mobile,
         }, sessionId);
         await evaluate(cdp, sessionId, `localStorage.removeItem("no_thanks_last_room_id"); true`);
@@ -845,7 +846,7 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor ?? (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     }, sessionId);
 
@@ -877,6 +878,7 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
     await cdp.send("Page.navigate", { url: `${baseUrl}/app/games/no-thanks` }, sessionId);
     await waitForText(cdp, sessionId, "검증 관리자");
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="no-thanks-action-availability-panel"]'))`, "no thanks action availability rendered");
+    await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-gsap="no-thanks-card-stage"]'))`, "no thanks GSAP card-stage anchor rendered");
     await waitFor(cdp, sessionId, `document.querySelectorAll('[data-smoke="no-thanks-player-state-card"]').length >= 1`, "no thanks player state cards rendered");
     await waitFor(cdp, sessionId, `Boolean(document.querySelector('[data-smoke="game-chat-empty-state"][data-chat-game="no-thanks"]')) || document.body.innerText.includes("방 채팅")`, "no thanks selected room chat rendered");
     await assertNoRemovedNoThanksPanels(cdp, sessionId, `no thanks gameplay ${viewport.name}`);
@@ -1117,7 +1119,7 @@ async function inspectNoThanks(cdp, sessionId, viewport) {
             || !["true", "false"].includes(actionAvailabilitySnapshot.canPass)
             || !["true", "false"].includes(actionAvailabilitySnapshot.myTurn)
             || !actionAvailabilitySnapshot.text.includes("카드 가져가기")
-            || !actionAvailabilitySnapshot.text.includes("칩 1개 내고 넘기기")
+            || !actionAvailabilitySnapshot.text.includes("칩 내고 넘기기")
         ) {
             throw new Error(`no-thanks-ui-smoke: action availability artwork missing ${JSON.stringify(actionAvailabilitySnapshot)}`);
         }

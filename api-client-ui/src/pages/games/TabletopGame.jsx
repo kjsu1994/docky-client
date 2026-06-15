@@ -49,7 +49,7 @@ const TelestrationsBoard = lazy(() => import("./TelestrationsBoard.jsx").then((m
 const MafiaBoard = lazy(() => import("./MafiaBoard.jsx").then((module) => ({ default: module.MafiaBoard })));
 
 const TabletopBoardFallback = () => (
-  <div className="rounded-[1.5rem] border border-slate-200 bg-white p-6 text-center text-sm font-black text-slate-500 shadow-lg" role="status" aria-live="polite">
+  <div className="surface-panel p-6 text-center text-sm font-black text-ink-muted" role="status" aria-live="polite">
     Loading board...
   </div>
 );
@@ -169,7 +169,7 @@ const MobileGameJumpNav = ({ game, gameState }) => {
   if (!links.length) return null;
 
   return (
-    <nav className="tabletop-mobile-jump-nav sticky z-30 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur xl:hidden" aria-label="게임 화면 빠른 이동">
+    <nav className="tabletop-mobile-jump-nav surface-panel sticky z-30 p-1.5 xl:hidden" aria-label="게임 화면 빠른 이동">
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${links.length}, minmax(0, 1fr))` }}>
         {links.map((link) => (
           <a
@@ -7184,7 +7184,7 @@ export const TabletopGame = ({ game }) => {
   if (!config) return null;
 
   return (
-    <div className={`tabletop-game tabletop-${game} animate-fade-in space-y-6`}>
+    <div className={`game-shell tabletop-game tabletop-${game} animate-fade-in space-y-6`}>
       <section className={`overflow-hidden rounded-2xl bg-gradient-to-br ${config.accent} p-[1px] shadow-2xl sm:rounded-[2rem]`}>
         <div className="bg-white p-5 sm:p-8">
           <div className="grid gap-5">
@@ -7211,7 +7211,7 @@ export const TabletopGame = ({ game }) => {
       {!selectedRoom && (
         <section className="space-y-4" aria-busy={initialLoading ? "true" : "false"}>
           <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-          <form onSubmit={createRoom} className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg sm:p-5" aria-label={`${config.title} 방 만들기`}>
+          <form onSubmit={createRoom} className="surface-panel p-4 sm:p-5" aria-label={`${config.title} 방 만들기`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-lg font-black text-slate-900">방 만들기</div>
               {initialLoading && <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-black text-sky-700">불러오는 중</span>}
@@ -7277,7 +7277,7 @@ export const TabletopGame = ({ game }) => {
             </div>
           </form>
 
-          <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg sm:p-5">
+          <section className="surface-panel p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-lg font-black text-slate-900">대기 중인 방</div>
               <button type="button" className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-700 disabled:opacity-50" onClick={refreshRooms} disabled={roomsRefreshing || initialLoading} aria-label={`${config.title} 대기방 목록 새로고침`}>
@@ -7395,7 +7395,7 @@ export const TabletopGame = ({ game }) => {
 
       {selectedRoom && (
         <section className="space-y-4">
-          <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg sm:p-5">
+          <div className="surface-panel p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -7680,7 +7680,7 @@ const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo
   const winnerSeatNos = tabletopPlayerPanelWinners(gameState);
 
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg" data-smoke="tabletop-players-panel">
+    <div className="surface-panel p-4" data-smoke="tabletop-players-panel">
       <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
         <GameUxGlyph type="player" className="h-4 w-4 text-primary-600" />
         플레이어
@@ -7710,7 +7710,7 @@ const PlayersPanel = ({ game, gameState, players, selectedRoom, status, mySeatNo
             bot && !winner ? { key: "bot", label: "AI", className: "bg-violet-100 text-violet-700" } : null,
           ].filter(Boolean);
           return (
-            <div key={pid || seatNo} className={`rounded-xl border px-3 py-2 ${cardTone}`} data-smoke="tabletop-player-card">
+            <div key={pid || seatNo} className={`rounded-card border px-3 py-2 ${cardTone}`} data-smoke="tabletop-player-card">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <UserAvatar
@@ -7844,7 +7844,7 @@ const GuidePanel = ({ lines }) => {
 
   return (
     <div
-      className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg"
+      className="surface-panel p-4"
       data-smoke="tabletop-guide-panel"
       data-guide-sections={entries.length}
       data-guide-rules={guideBrief.ruleCount}

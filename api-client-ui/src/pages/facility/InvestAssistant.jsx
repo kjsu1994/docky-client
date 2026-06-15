@@ -330,7 +330,7 @@ const buildFallbackChart = ({ market, symbol, interval, priceSnapshot, currency,
 const Badge = ({ children, className = "" }) => <span className={`badge ${className}`}>{children}</span>;
 
 const Card = ({ title, subtitle, children }) => (
-    <section className="card bg-white p-4 sm:p-6">
+    <section className="surface-panel p-4 sm:p-6">
         <h2 className="text-xl font-black text-slate-900">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm font-medium text-slate-500">{subtitle}</p> : null}
         <div className="mt-4 sm:mt-5">{children}</div>
@@ -1771,11 +1771,11 @@ export const InvestAssistant = () => {
 
     return (
         <div className="-mx-4 space-y-6 px-1 animate-fade-in pb-10 sm:mx-0 sm:space-y-8 sm:px-0">
-            <section className="card bg-white p-4 sm:p-8">
+            <section className="surface-panel p-4 sm:p-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-black text-sky-700"><Bot className="h-3.5 w-3.5" />투자 작업공간</div>
                 <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-5xl">투자 도우미.</h1>
                 <p className="mt-3 max-w-3xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">종목 검색 후 현재가, 일봉/주봉/월봉 차트, 기본 분석, 뉴스, 판단 매트릭스까지 한 번에 확인할 수 있습니다.</p>
-                <div className="mt-4 rounded-[1.4rem] border border-amber-100 bg-amber-50/80 p-4 text-sm font-semibold leading-relaxed text-amber-900">
+                        <div className="mt-4 rounded-card border border-amber-100 bg-amber-50/80 p-4 text-sm font-semibold leading-relaxed text-amber-900 shadow-card">
                     단일 종목에 전재산을 투입하는 결정은 피하고, 이 화면의 점수는 분산, 투자 기간, 현금 필요 시점, 손실 감내 범위와 함께 확인해 주세요.
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1793,7 +1793,7 @@ export const InvestAssistant = () => {
                             const Icon = item.icon;
                             const active = market === item.value;
                             return (
-                                <button key={item.value} type="button" className={`rounded-[2rem] border p-4 text-left ${active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700"}`} onClick={() => { const preset = PRESETS[item.value][0]; setMarket(item.value); setSelectedSymbol(preset); setSymbolInput(preset); setChartInterval("DAY"); setChartData(null); }}>
+                                <button key={item.value} type="button" className={`surface-card p-4 text-left ${active ? "border-slate-900 bg-slate-900 text-white" : "text-slate-700"}`} onClick={() => { const preset = PRESETS[item.value][0]; setMarket(item.value); setSelectedSymbol(preset); setSymbolInput(preset); setChartInterval("DAY"); setChartData(null); }}>
                                     <Icon className="h-5 w-5" />
                                     <div className="mt-3 text-lg font-black">{item.label}</div>
                                     <div className={`mt-1 text-xs font-medium ${active ? "text-slate-300" : "text-slate-400"}`}>{item.helper}</div>
@@ -1802,7 +1802,7 @@ export const InvestAssistant = () => {
                         })}
                     </div>
 
-                    <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                    <div className="surface-card bg-control/70 p-4 sm:p-5">
                         <div className="text-sm font-black text-slate-900">{currentMarket.label} 시장</div>
                         <div className="mt-1 text-xs font-medium text-slate-500">{price?.source === "KIS" ? "KIS 실시간 시세 응답을 사용 중입니다." : "가용 provider 기준 응답을 사용 중입니다."}</div>
                         <div className="mt-4 space-y-4">
@@ -1818,7 +1818,7 @@ export const InvestAssistant = () => {
 
             {loading ? <LoadingSpinner size="lg" text="투자 분석 데이터를 불러오는 중입니다..." /> : null}
             {error ? <ErrorMessage message={error} onRetry={() => fetchAnalysis()} /> : null}
-            {!loading && !error && !v1 ? <section className="card bg-white p-5 sm:p-8 text-center"><Sparkles className="mx-auto h-10 w-10 text-primary-500" /><h2 className="mt-3 text-2xl font-black text-slate-900">종목을 검색하고 분석을 시작해 주세요.</h2></section> : null}
+            {!loading && !error && !v1 ? <section className="surface-panel p-5 text-center sm:p-8"><Sparkles className="mx-auto h-10 w-10 text-primary-500" /><h2 className="mt-3 text-2xl font-black text-slate-900">종목을 검색하고 분석을 시작해 주세요.</h2></section> : null}
 
             {v1 ? (
                 <>

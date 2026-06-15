@@ -25,11 +25,22 @@ import UserAvatar from "../../common/UserAvatar.jsx";
 import { NoThanksCardFace, NoThanksChipToken } from "../../common/NoThanksVisuals.jsx";
 import { clearPageGuideContext, setPageGuideContext } from "../../common/pageGuideContext.js";
 import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
+import { useGameGsapMotion } from "../../hooks/useGameGsapMotion.js";
 
 const ROOM_STORAGE_KEY = "no_thanks_last_room_id";
 const ROOM_TITLE_STORAGE_KEY = "no_thanks_last_room_title";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
 const NO_THANKS_SOUND_VOLUME_MULTIPLIER = 16;
+const NO_THANKS_GSAP_SELECTORS = [
+  '[data-gsap="no-thanks-card-stage"]',
+  '[data-smoke="no-thanks-current-card-art"]',
+  '[data-smoke="no-thanks-chip-token"]',
+  '[data-smoke="no-thanks-action-availability-node"]',
+  '[data-smoke="no-thanks-score-lens-node"]',
+  '[data-smoke="no-thanks-player-state-card"]',
+];
+const NO_THANKS_MOTION_FROM = { opacity: 0.8, y: 12, rotationY: -7, scale: 0.985 };
+const NO_THANKS_MOTION_TO = { opacity: 1, y: 0, rotationY: 0, scale: 1, duration: 0.32, stagger: 0.025, ease: "power2.out" };
 
 const roomIdOf = getNoThanksRoomId;
 const chatRoomIdOf = getNoThanksChatRoomId;
@@ -49,6 +60,16 @@ const clearResumeRoom = (roomId) => {
 const parseIntSafe = (value, fallback = 0) => {
   const parsed = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+const buildNoThanksPotChipStack = (count) => {
+  const visibleCount = Math.min(Math.max(0, Number(count) || 0), 30);
+  return Array.from({ length: visibleCount }, (_, index) => ({
+    id: `stack-${index}`,
+    index,
+    offsetX: (index % 6) * 44,
+    offsetY: Math.floor(index / 6) * 38,
+    rotate: index % 2 === 0 ? -5 : 5,
+  }));
 };
 const normalizeNumberDraft = (raw) => {
   const digits = String(raw ?? "").replace(/[^\d]/g, "");
@@ -1653,7 +1674,7 @@ const NoThanksDecisionPanel = ({ gameState, players, sortedPlayers, myPlayer, ro
   ];
 
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg" data-smoke="no-thanks-decision-panel">
+    <div className="surface-panel p-4" data-smoke="no-thanks-decision-panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <GameUxGlyph type="decision" className="mt-0.5 h-10 w-10 shrink-0 text-amber-500" />
@@ -2309,7 +2330,7 @@ const NoThanksActionAvailabilityPanel = ({
 
   return (
     <div
-      className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3"
+      className="rounded-2xl border border-slate-200 bg-slate-50 p-2"
       data-smoke="no-thanks-action-availability-panel"
       data-room-status={roomStatus || "UNKNOWN"}
       data-my-turn={isMyTurn ? "true" : "false"}
@@ -2318,43 +2339,41 @@ const NoThanksActionAvailabilityPanel = ({
       data-current-card={currentCard ?? ""}
       data-pot-chips={potChips ?? 0}
     >
-      <div className="space-y-2">
-        <button className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canTake} onClick={onTake} data-smoke="no-thanks-take-action">카드 가져가기</button>
-        <button className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canPass} onClick={onPass} data-smoke="no-thanks-pass-action">칩 1개 내고 넘기기</button>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+        <button className="min-h-10 w-full rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canTake} onClick={onTake} data-smoke="no-thanks-take-action">카드 가져가기</button>
+        <button className="min-h-10 w-full rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canPass} onClick={onPass} data-smoke="no-thanks-pass-action">칩 내고 넘기기</button>
       </div>
     </div>
   );
 };
 
-const NoThanksPlayerStateArt = ({ nickname, chips, cardCount, score, runLabel, isCurrent, isWinner }) => {
+const NoThanksPlayerStateArt = ({ chips, cardCount, score, isCurrent, isWinner }) => {
   const safeChips = Math.max(0, Number(chips) || 0);
   const safeCardCount = Math.max(0, Number(cardCount) || 0);
   const safeScore = Number.isFinite(Number(score)) ? Number(score) : 0;
   const nodes = [
-    { key: "chips", label: "칩 압력", value: `${safeChips}개`, x: 60, y: 68, fill: safeChips <= 2 ? "#fb7185" : "#f59e0b" },
-    { key: "cards", label: "카드 흐름", value: safeCardCount ? `${safeCardCount}장` : "카드 없음", x: 160, y: 68, fill: "#38bdf8" },
-    { key: "score", label: "점수 압력", value: `${safeScore}점`, x: 260, y: 68, fill: safeScore <= 20 ? "#22c55e" : "#f97316" },
-    { key: "turn", label: "차례", value: isCurrent ? "현재" : isWinner ? "우승" : "대기", x: 360, y: 68, fill: isCurrent ? "#0f172a" : "#94a3b8" },
+    { key: "chips", label: "칩 압력", value: safeChips, x: 36, fill: safeChips <= 2 ? "#fb7185" : "#f59e0b" },
+    { key: "cards", label: "카드 흐름", value: safeCardCount, x: 82, fill: "#38bdf8" },
+    { key: "score", label: "점수 압력", value: safeScore, x: 128, fill: safeScore <= 20 ? "#22c55e" : "#f97316" },
+    { key: "turn", label: "차례", value: isCurrent ? "ON" : isWinner ? "WIN" : "-", x: 174, fill: isCurrent ? "#0f172a" : "#94a3b8" },
   ];
 
   return (
     <svg
-      viewBox="0 0 420 142"
+      viewBox="0 0 210 54"
       role="img"
-      aria-label={`${nickname || "플레이어"} 노땡스 상태 요약`}
-      className="h-auto w-full"
+      aria-label="노땡스 플레이어 핵심 상태"
+      className="h-10 w-full min-w-[150px]"
       data-smoke="no-thanks-player-state-art"
     >
-      <rect x="8" y="8" width="404" height="126" rx="24" fill="#fff7ed" stroke="#fed7aa" strokeWidth="2" />
-      <path d="M40 104C92 56 136 112 190 78s93-36 150 18" fill="none" stroke="#fdba74" strokeWidth="9" strokeLinecap="round" opacity="0.32" />
-      <text x="26" y="34" fill="#9a3412" fontSize="12" fontWeight="900">{nickname || "플레이어"}</text>
-      <text x="394" y="34" textAnchor="end" fill="#64748b" fontSize="10" fontWeight="900">{runLabel || "카드 없음"}</text>
+      <rect x="6" y="7" width="198" height="40" rx="20" fill="#fff7ed" stroke="#fed7aa" strokeWidth="2" />
+      <path d="M24 35c27-22 46 6 72-8s50-14 83 4" fill="none" stroke="#fdba74" strokeWidth="5" strokeLinecap="round" opacity="0.32" />
       {nodes.map((node) => (
         <g key={node.key} data-smoke="no-thanks-player-state-node" data-state-key={node.key}>
-          <circle cx={node.x} cy={node.y} r="25" fill={node.fill} opacity="0.95" />
-          <circle cx={node.x} cy={node.y} r="13" fill="#ffffff" opacity="0.96" />
-          <text x={node.x} y={node.y + 4} textAnchor="middle" fill="#0f172a" fontSize="9" fontWeight="900">{node.value}</text>
-          <text x={node.x} y="114" textAnchor="middle" fill="#334155" fontSize="10" fontWeight="900">{node.label}</text>
+          <circle cx={node.x} cy="27" r="15" fill={node.fill} opacity="0.95" />
+          <circle cx={node.x} cy="27" r="8" fill="#ffffff" opacity="0.96" />
+          <text x={node.x} y="30" textAnchor="middle" fill="#0f172a" fontSize="7" fontWeight="900">{node.value}</text>
+          <title>{node.label}</title>
         </g>
       ))}
     </svg>
@@ -2370,69 +2389,54 @@ const NoThanksPlayerStateCard = ({ player, isCurrent, isWinner, isMe }) => {
   const runs = summarizeNoThanksRuns(cards);
   const memberId = playerIdOf(player);
   const nickname = player?.nickname || (memberId ? `플레이어 ${memberId}` : "플레이어");
-  const chipPressure = chips <= 0 ? "칩 없음" : chips <= 2 ? "높음" : chips <= 5 ? "주의" : "여유";
+  const chipPressure = chips <= 0 ? "없음" : chips <= 2 ? "위험" : chips <= 5 ? "주의" : "여유";
   const scorePressure = finalScore <= 20 ? "낮음" : finalScore <= 35 ? "중간" : "높음";
-  const metrics = [
-    {
-      label: "칩 압력",
-      value: `${chipPressure} · ${chips}개`,
-      detail: chips <= 0 ? "넘기기 불가, 받기 압박이 큽니다." : "남은 칩으로 패스 여지를 봅니다.",
-      icon: "coin",
-    },
-    {
-      label: "카드 흐름",
-      value: runs.label,
-      detail: cards.length ? `연속 묶음 ${runs.runCount}개 · 최장 ${runs.longestRun}장` : "아직 받은 카드가 없습니다.",
-      icon: "stage",
-    },
-    {
-      label: "점수 압력",
-      value: `${finalScore}점 · ${scorePressure}`,
-      detail: `카드 ${cardScore}점에서 칩 ${chips}개를 차감합니다.`,
-      icon: "score",
-    },
-    {
-      label: "차례 상태",
-      value: isCurrent ? "현재 차례" : isWinner ? "우승 기준" : isMe ? "내 상태" : "관찰",
-      detail: isCurrent ? "지금 받기/넘기기 선택 대상입니다." : "다음 공개 카드와 칩 이동을 확인합니다.",
-      icon: "turn",
-    },
-  ];
+  const cardPreview = cards.length
+    ? `${cards.slice(0, 5).join(", ")}${cards.length > 5 ? " +" : ""}`
+    : "카드 없음";
+  const turnLabel = isCurrent ? "현재 차례" : isWinner ? "우승" : isMe ? "나" : "대기";
+  const rowTone = isCurrent
+    ? "border-sky-200 bg-sky-50 ring-2 ring-sky-100"
+    : isWinner
+      ? "border-emerald-200 bg-emerald-50"
+      : isMe
+        ? "border-violet-200 bg-violet-50"
+        : "border-slate-200 bg-white";
+  const itemClass = "rounded-xl border border-white/80 bg-white/75 px-3 py-2";
 
   return (
     <section
-      className={`rounded-[1.4rem] border bg-white p-3 shadow-sm ${isCurrent ? "border-sky-200 ring-2 ring-sky-100" : isWinner ? "border-emerald-200" : "border-slate-200"}`}
+      className={`rounded-2xl border px-3 py-2 shadow-sm ${rowTone}`}
       data-smoke="no-thanks-player-state-card"
       data-player-current={isCurrent ? "true" : "false"}
       data-player-me={isMe ? "true" : "false"}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="grid gap-2 lg:grid-cols-[minmax(128px,1fr)_minmax(150px,190px)_repeat(4,minmax(92px,0.7fr))] lg:items-center">
         <div className="min-w-0">
           <div className="truncate text-sm font-black text-slate-950">{nickname}</div>
-          <div className="text-[11px] font-bold text-slate-500">{isMe ? "내 상태" : isCurrent ? "현재 차례" : isWinner ? "우승 기준" : "상태 요약"}</div>
+          <div className="mt-0.5 inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black text-slate-600">{turnLabel}</div>
         </div>
-        <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-black text-orange-700">점수 {finalScore}점</span>
-      </div>
-      <NoThanksPlayerStateArt
-        nickname={nickname}
-        chips={chips}
-        cardCount={cards.length}
-        score={finalScore}
-        runLabel={runs.label}
-        isCurrent={isCurrent}
-        isWinner={isWinner}
-      />
-      <div className="grid gap-2 sm:grid-cols-2">
-        {metrics.map((item) => (
-          <div key={item.label} className="rounded-xl bg-slate-50 px-3 py-2" data-smoke="no-thanks-player-state-item">
-            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500">
-              <GameUxGlyph type={item.icon} className="h-3.5 w-3.5" />
-              {item.label}
-            </div>
-            <div className="mt-0.5 truncate text-xs font-black text-slate-900">{item.value}</div>
-            <div className="mt-0.5 line-clamp-2 text-[11px] font-bold leading-relaxed text-slate-500">{item.detail}</div>
-          </div>
-        ))}
+        <NoThanksPlayerStateArt chips={chips} cardCount={cards.length} score={finalScore} isCurrent={isCurrent} isWinner={isWinner} />
+        <div className={itemClass} data-smoke="no-thanks-player-state-item">
+          <div className="text-[10px] font-black text-amber-700">칩 압력</div>
+          <div className="mt-0.5 text-sm font-black text-slate-950">{chips}개</div>
+          <div className="text-[10px] font-bold text-slate-500">{chipPressure}</div>
+        </div>
+        <div className={itemClass} data-smoke="no-thanks-player-state-item">
+          <div className="text-[10px] font-black text-sky-700">카드 흐름</div>
+          <div className="mt-0.5 truncate text-sm font-black text-slate-950">{cardPreview}</div>
+          <div className="truncate text-[10px] font-bold text-slate-500">{runs.label}</div>
+        </div>
+        <div className={itemClass} data-smoke="no-thanks-player-state-item">
+          <div className="text-[10px] font-black text-emerald-700">점수 압력</div>
+          <div className="mt-0.5 text-sm font-black text-slate-950">{finalScore}점</div>
+          <div className="text-[10px] font-bold text-slate-500">{scorePressure}</div>
+        </div>
+        <div className={itemClass} data-smoke="no-thanks-player-state-item">
+          <div className="text-[10px] font-black text-violet-700">카드 합</div>
+          <div className="mt-0.5 text-sm font-black text-slate-950">{cardScore}점</div>
+          <div className="text-[10px] font-bold text-slate-500">-{chips}칩</div>
+        </div>
       </div>
     </section>
   );
@@ -2754,6 +2758,7 @@ export const NoThanksGame = () => {
   const [secondsLeft, setSecondsLeft] = useState(null);
   const [actionFeedback, setActionFeedback] = useState(initialNoThanksActionFeedback);
   const [chipAnimations, setChipAnimations] = useState([]);
+  const [visualPotChips, setVisualPotChips] = useState(0);
   const [rematching, setRematching] = useState(false);
   const [createForm, setCreateForm] = useState({ title: "", startChipCount: "11", turnTimeSeconds: "15" });
   const [settingsForm, setSettingsForm] = useState({ startChipCount: "11", turnTimeSeconds: "15" });
@@ -2768,9 +2773,10 @@ export const NoThanksGame = () => {
   const lastGameServerSentAtRef = useRef(0);
   const mountedRef = useRef(false);
   const chatScrollRef = useRef(null);
+  const gameBoardRef = useRef(null);
   const audioContextRef = useRef(null);
   const isActionSoundPlayingRef = useRef(false);
-  const previousPotChipsRef = useRef(0);
+  const visualPotMetaRef = useRef({ initialized: false, currentCard: null, potChips: 0 });
   const chipAnimationIdRef = useRef(0);
   const lastReadMarkAtRef = useRef(0);
 
@@ -2945,13 +2951,8 @@ export const NoThanksGame = () => {
     if (aScore !== bScore) return aScore - bScore;
     return parseIntSafe(b?.chips, 0) - parseIntSafe(a?.chips, 0);
   });
-  const visiblePotChipCount = Math.min(potChips, 30);
-  const potChipStack = Array.from({ length: visiblePotChipCount }, (_, index) => ({
-    id: `stack-${index}`,
-    offsetX: (index % 6) * 36,
-    offsetY: Math.floor(index / 6) * 36,
-    rotate: 0,
-  }));
+  const potChipStack = buildNoThanksPotChipStack(visualPotChips);
+  const potChipAnimationById = useMemo(() => new Map(chipAnimations.map((chip) => [chip.id, chip])), [chipAnimations]);
   const selectedRoomId = roomIdOf(selectedRoom);
   const actionFeedbackTone = actionFeedback.status === "error"
     ? "error"
@@ -3003,6 +3004,24 @@ export const NoThanksGame = () => {
       },
     ];
   }, [actionFeedback, actionFeedbackTone, currentCard, deckRemaining, isMyTurn, players, potChips, roomStatus, turnMemberId]);
+
+  const noThanksMotionSignal = useMemo(() => [
+    roomStatusNormalized,
+    currentCard ?? "",
+    potChips,
+    deckRemaining,
+    turnMemberId || "",
+    winnerMemberId || "",
+    sortedPlayers.map((player) => `${playerIdOf(player)}:${parseIntSafe(player?.chips, 0)}:${Array.isArray(player?.cards) ? player.cards.join(".") : ""}`).join("|"),
+  ].join("::"), [currentCard, deckRemaining, potChips, roomStatusNormalized, sortedPlayers, turnMemberId, winnerMemberId]);
+
+  useGameGsapMotion({
+    scopeRef: gameBoardRef,
+    signal: noThanksMotionSignal,
+    selectors: NO_THANKS_GSAP_SELECTORS,
+    from: NO_THANKS_MOTION_FROM,
+    to: NO_THANKS_MOTION_TO,
+  });
 
   useGameSound({ myTurn: roomStatus === "PLAYING" && isMyTurn });
 
@@ -3312,30 +3331,43 @@ export const NoThanksGame = () => {
   }, [chatRoomId, selectedRoom]);
 
   useEffect(() => {
-    const previous = previousPotChipsRef.current;
+    const previousMeta = visualPotMetaRef.current;
+    const previous = Number(previousMeta.potChips || 0);
+    const currentKey = currentCard ?? null;
+    const cardChanged = previousMeta.initialized && String(previousMeta.currentCard ?? "") !== String(currentKey ?? "");
+
+    if (!previousMeta.initialized || cardChanged) {
+      setChipAnimations([]);
+      setVisualPotChips(potChips);
+      visualPotMetaRef.current = { initialized: true, currentCard: currentKey, potChips };
+      return undefined;
+    }
+
     if (potChips > previous) {
-      const additions = Math.min(potChips - previous, 3);
+      const additions = Math.min(potChips - previous, 4);
       const nextAnimations = Array.from({ length: additions }, (_, index) => {
         chipAnimationIdRef.current += 1;
         const targetIndex = Math.min(previous + index, 29);
         return {
-          id: chipAnimationIdRef.current,
+          id: `stack-${targetIndex}`,
+          sequence: chipAnimationIdRef.current,
           delay: index * 90,
-          rotate: 0,
-          targetX: (targetIndex % 6) * 36,
-          targetY: Math.floor(targetIndex / 6) * 36,
+          rotate: targetIndex % 2 === 0 ? -5 : 5,
+          targetX: (targetIndex % 6) * 44,
+          targetY: Math.floor(targetIndex / 6) * 38,
         };
       });
+      setVisualPotChips(potChips);
       setChipAnimations(nextAnimations);
       const timer = window.setTimeout(() => setChipAnimations([]), 720);
-      previousPotChipsRef.current = potChips;
+      visualPotMetaRef.current = { initialized: true, currentCard: currentKey, potChips };
       return () => window.clearTimeout(timer);
     }
-    if (potChips === 0 && previous !== 0) {
-      setChipAnimations([]);
-    }
-    previousPotChipsRef.current = potChips;
-  }, [potChips]);
+
+    setVisualPotChips(potChips);
+    setChipAnimations([]);
+    visualPotMetaRef.current = { initialized: true, currentCard: currentKey, potChips };
+  }, [currentCard, potChips]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -3565,7 +3597,7 @@ export const NoThanksGame = () => {
   };
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="game-shell animate-fade-in space-y-6">
       <style>{`
         @keyframes no-thanks-chip-drop {
           0% { transform: translate(68px, -70px) scale(0.7) rotate(0deg); opacity: 0; }
@@ -3597,7 +3629,7 @@ export const NoThanksGame = () => {
 
       {!selectedRoom && (
         <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <form onSubmit={createRoom} className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
+          <form onSubmit={createRoom} className="surface-panel p-5">
             <div className="flex items-center gap-2">
               <div className="text-lg font-black text-slate-900">방 만들기</div>
             </div>
@@ -3620,7 +3652,7 @@ export const NoThanksGame = () => {
             </div>
           </form>
 
-          <section className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
+          <section className="surface-panel p-5">
             <div className="flex items-center justify-between">
               <div className="text-lg font-black text-slate-900">대기 중인 방</div>
               <button className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" onClick={() => fetchRooms().catch(() => {})}>새로고침</button>
@@ -3649,7 +3681,7 @@ export const NoThanksGame = () => {
                 return (
                   <div
                     key={roomId}
-                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                    className="surface-card p-4"
                     data-smoke="no-thanks-lobby-room-card"
                     data-room-status={status}
                     data-joinable={joinable ? "true" : "false"}
@@ -3712,7 +3744,7 @@ export const NoThanksGame = () => {
 
       {selectedRoom && (
         <section className="space-y-4">
-          <div className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
+          <div className="surface-panel p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -3809,9 +3841,9 @@ export const NoThanksGame = () => {
               />
             </div>
           ) : (
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+          <div ref={gameBoardRef} className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <div className="space-y-4">
-              <div className={`rounded-[1.8rem] border p-5 shadow-xl ${isMyTurn ? "border-sky-200 bg-sky-50" : "border-slate-200 bg-white"}`}>
+              <div className={`rounded-panel border p-5 shadow-panel ${isMyTurn ? "border-sky-200 bg-sky-50" : "border-slate-200 bg-white"}`}>
                 <div className="flex flex-wrap items-center gap-2 text-xs font-black text-slate-700">
                   <span className="rounded-full bg-slate-100 px-2.5 py-1">카드 {currentCard ?? "-"}</span>
                   <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700">칩 더미 {potChips}</span>
@@ -3819,8 +3851,8 @@ export const NoThanksGame = () => {
                   {isMyTurn && <span className="rounded-full bg-sky-100 px-2.5 py-1 text-sky-700">내 차례</span>}
                   {secondsLeft !== null && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${secondsLeft <= 5 ? "bg-rose-100 text-rose-600" : "bg-slate-100 text-slate-700"}`}><TimerReset className="h-3.5 w-3.5" />{secondsLeft}초</span>}
                 </div>
-                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(360px,520px)_minmax(300px,360px)] lg:justify-center">
-                  <div className="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-700 p-4 text-white sm:p-5">
+                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(560px,760px)_minmax(220px,260px)] lg:justify-center">
+                  <div data-gsap="no-thanks-card-stage" className="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-700 p-5 text-white sm:p-6">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-300">
@@ -3833,36 +3865,34 @@ export const NoThanksGame = () => {
                         팟 {potChips}
                       </div>
                     </div>
-                    <div className="mt-5 grid gap-4 sm:grid-cols-[150px_228px] sm:items-center sm:justify-center">
-                      <NoThanksCardFace value={currentCard} className="mx-auto h-[198px] w-[150px] max-w-full" />
-                      <div className="relative mx-auto h-[196px] w-[228px] max-w-full">
+                    <div className="mt-5 grid gap-5 sm:grid-cols-[minmax(180px,230px)_minmax(280px,320px)] sm:items-center sm:justify-center">
+                      <NoThanksCardFace value={currentCard} className="mx-auto h-[260px] w-[195px] max-w-full sm:h-[300px] sm:w-[225px]" />
+                      <div className="relative mx-auto h-[230px] w-[300px] max-w-full">
                         {!potChipStack.length && (
-                          <NoThanksChipToken className="absolute left-[84px] top-[72px] h-[54px] w-[54px] opacity-45" label="빈 팟 칩 자리" />
+                          <NoThanksChipToken className="absolute left-[112px] top-[86px] h-[64px] w-[64px] opacity-45" label="빈 팟 칩 자리" />
                         )}
-                        {potChipStack.map((chip) => (
-                          <NoThanksChipToken
-                            key={chip.id}
-                            className="absolute left-0 top-0 h-[48px] w-[48px] drop-shadow-[0_8px_18px_rgba(251,191,36,0.32)]"
-                            style={{
-                              transform: `translate(${chip.offsetX}px, ${chip.offsetY}px) rotate(${chip.rotate}deg)`,
-                              zIndex: chip.offsetY + 1,
-                            }}
-                            label="팟에 쌓인 칩"
-                          />
-                        ))}
-                        {chipAnimations.map((chip) => (
-                          <NoThanksChipToken
-                            key={chip.id}
-                            className="absolute left-0 top-0 h-[48px] w-[48px] drop-shadow-[0_8px_18px_rgba(251,191,36,0.32)]"
-                            style={{
-                              "--chip-x": `${chip.targetX}px`,
-                              "--chip-y": `${chip.targetY}px`,
-                              "--chip-rotate": `${chip.rotate}deg`,
-                              animation: `no-thanks-chip-drop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) ${chip.delay}ms forwards`,
-                            }}
-                            label="팟으로 이동하는 칩"
-                          />
-                        ))}
+                        {potChipStack.map((chip) => {
+                          const entrance = potChipAnimationById.get(chip.id);
+                          return (
+                            <NoThanksChipToken
+                              key={entrance ? `${chip.id}-${entrance.sequence}` : chip.id}
+                              className="absolute left-0 top-0 h-[56px] w-[56px] drop-shadow-[0_8px_18px_rgba(251,191,36,0.32)]"
+                              style={{
+                                transform: `translate(${chip.offsetX}px, ${chip.offsetY}px) rotate(${chip.rotate}deg)`,
+                                zIndex: chip.offsetY + 1,
+                                ...(entrance
+                                  ? {
+                                      "--chip-x": `${entrance.targetX}px`,
+                                      "--chip-y": `${entrance.targetY}px`,
+                                      "--chip-rotate": `${entrance.rotate}deg`,
+                                      animation: `no-thanks-chip-drop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) ${entrance.delay}ms forwards`,
+                                    }
+                                  : {}),
+                              }}
+                              label="팟에 쌓인 칩"
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                     {!currentCard && roomStatus !== "FINISHED" && (

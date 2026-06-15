@@ -20,7 +20,9 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "chat-ui-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
-    { name: "mobile", width: 390, height: 844, mobile: true },
+    { name: "tablet", width: 768, height: 1024, mobile: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3 },
 ];
 const listTexts = ["채팅방", "운영 회의", "최근 메시지입니다.", "대화방을 선택해주세요."];
 const roomTexts = ["운영 회의", "실시간", "배포 일정 확인했습니다.", "release-note.pdf", "PDF", "차단된 첨부", "첨부파일을 표시할 수 없습니다."];
@@ -612,7 +614,7 @@ async function inspectChat(ws, viewport) {
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     });
 

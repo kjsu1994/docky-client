@@ -126,7 +126,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
                 ref={buttonRef}
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
+                className="icon-button relative"
                 title="알림"
                 aria-label="알림"
                 aria-haspopup="dialog"
@@ -143,7 +143,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
             {open ? (
                 <section
                     ref={panelRef}
-                    className="absolute right-0 top-12 z-[70] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
+                    className="surface-panel motion-panel-in absolute right-0 top-12 z-[70] w-[min(23rem,calc(100vw-2rem))] overflow-hidden"
                     role="dialog"
                     aria-label="알림 센터"
                 >
@@ -157,7 +157,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
                                 type="button"
                                 onClick={fetchNotifications}
                                 disabled={loading || Boolean(busyKey)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-control text-ink-muted hover:bg-control-hover disabled:opacity-60"
+                                className="icon-button h-9 w-9 disabled:opacity-60"
                                 title="새로고침"
                                 aria-label="새로고침"
                             >
@@ -167,7 +167,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
                                 type="button"
                                 onClick={markAllRead}
                                 disabled={unreadCount <= 0 || loading || Boolean(busyKey)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-ink-inverse hover:bg-primary-700 disabled:opacity-60"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-control bg-ink text-ink-inverse transition hover:bg-primary-700 disabled:opacity-60"
                                 title="모두 읽음"
                                 aria-label="모두 읽음"
                             >
@@ -186,7 +186,7 @@ export const NotificationCenter = ({ initialOpen = false }) => {
                                 {items.map((item) => (
                                     <article
                                         key={item.id || `${item.type}-${item.createdAt}`}
-                                        className={`rounded-xl border p-3 ${
+                                        className={`rounded-card border p-3 ${
                                             item.read ? "border-line bg-control" : "border-sky-200 bg-sky-50/60"
                                         }`}
                                     >

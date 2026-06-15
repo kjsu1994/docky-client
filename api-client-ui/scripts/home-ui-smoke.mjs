@@ -20,7 +20,9 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "home-ui-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
-    { name: "mobile", width: 390, height: 844, mobile: true },
+    { name: "tablet", width: 768, height: 1024, mobile: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3 },
 ];
 const requiredTexts = [
     "오늘 방문자",
@@ -236,27 +238,14 @@ function assertStaticCustomCursorRuntimeBoundary() {
     const appSource = readFileSync("src/App.jsx", "utf8");
     const protectedRoutesSource = readFileSync("src/components/ProtectedRoutes.jsx", "utf8");
     const layoutSource = readFileSync("src/components/ProtectedAppLayout.jsx", "utf8");
-    const entrySource = readFileSync("src/components/CustomCursorEntry.jsx", "utf8");
-    const requiredSnippets = [
-        "const ProtectedRoutes = lazy(() =>",
-        "import(\"./components/ProtectedRoutes.jsx\")",
-        "const ProtectedAppLayout = lazy(() =>",
-        "import(\"./ProtectedAppLayout.jsx\")",
-        "import { CustomCursorEntry } from \"./CustomCursorEntry.jsx\"",
-        "<CustomCursorEntry />",
-        "const CustomCursor = lazy(() => import(\"./CustomCursor.jsx\")",
-        "window.addEventListener(\"pointermove\", activate, { passive: true, once: true })",
-        "window.matchMedia(\"(prefers-reduced-motion: reduce)\")",
-    ];
-    const sources = [appSource, protectedRoutesSource, layoutSource, entrySource];
-    const missing = requiredSnippets.filter((snippet) => !sources.some((source) => source.includes(snippet)));
     if (
-        missing.length ||
-        appSource.includes("ProtectedAppLayout") ||
         appSource.includes("CustomCursorEntry") ||
-        appSource.includes("import { CustomCursor } from \"./components/CustomCursor.jsx\"")
+        protectedRoutesSource.includes("CustomCursorEntry") ||
+        layoutSource.includes("CustomCursorEntry") ||
+        layoutSource.includes("<CustomCursorEntry />") ||
+        layoutSource.includes("CustomCursor.jsx")
     ) {
-        throw new Error(`home-ui-smoke: custom cursor runtime boundary missing ${missing.join(", ")}`);
+        throw new Error("home-ui-smoke: custom cursor must stay removed from the protected app shell.");
     }
 }
 
@@ -918,9 +907,10 @@ async function inspectHome(ws, viewport) {
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     });
+    const compactViewport = viewport.width <= 1023;
     bannerEventRequests = 0;
     bannerClickRequests = 0;
     bannerImpressionRequests = 0;
@@ -944,13 +934,13 @@ async function inspectHome(ws, viewport) {
     }
     await delay(250);
     const bottomNavExists = await evaluate(ws, `Boolean(document.querySelector('[aria-label="하단 주요 내비게이션"]'))`);
-    if (viewport.mobile && !bottomNavExists) {
-        throw new Error(`home ${viewport.name}: bottom navigation missing on mobile viewport`);
+    if (compactViewport && !bottomNavExists) {
+        throw new Error(`home ${viewport.name}: bottom navigation missing on compact viewport`);
     }
-    if (!viewport.mobile && bottomNavExists) {
+    if (!compactViewport && bottomNavExists) {
         throw new Error(`home ${viewport.name}: bottom navigation rendered on desktop viewport`);
     }
-    if (!viewport.mobile && bottomNavChunkRequests > 0) {
+    if (!compactViewport && bottomNavChunkRequests > 0) {
         throw new Error(`home ${viewport.name}: bottom navigation chunk loaded on desktop viewport`);
     }
     if (customCursorChunkRequests > 0) {
@@ -976,18 +966,18 @@ async function inspectHome(ws, viewport) {
             viewportHeight: window.innerHeight,
         };
     })()`);
-    if (viewport.mobile) {
+    if (compactViewport) {
         if (utilityButtonState.chat) {
-            throw new Error(`home ${viewport.name}: floating chat launcher must not render on mobile ${JSON.stringify(utilityButtonState)}`);
+            throw new Error(`home ${viewport.name}: floating chat launcher must not render on compact viewport ${JSON.stringify(utilityButtonState)}`);
         }
         if (!utilityButtonState.guide) {
-            throw new Error(`home ${viewport.name}: mobile page guide button missing ${JSON.stringify(utilityButtonState)}`);
+            throw new Error(`home ${viewport.name}: compact page guide button missing ${JSON.stringify(utilityButtonState)}`);
         }
         const { guide, viewportHeight } = utilityButtonState;
-        if (guide.width > 48 || guide.height > 48) {
+        if (viewport.mobile && (guide.width > 48 || guide.height > 48)) {
             throw new Error(`home ${viewport.name}: page guide button is too large ${JSON.stringify(utilityButtonState)}`);
         }
-        if (guide.top < viewportHeight / 2 || guide.bottom < 72) {
+        if (viewport.mobile && (guide.top < viewportHeight / 2 || guide.bottom < 72)) {
             throw new Error(`home ${viewport.name}: page guide button overlaps primary content or bottom navigation ${JSON.stringify(utilityButtonState)}`);
         }
         await evaluate(ws, `(() => {
@@ -1169,7 +1159,7 @@ async function inspectHome(ws, viewport) {
         throw new Error(`home ${viewport.name}: banner pause button missing`);
     }
     await waitForText(ws, "배너 재생");
-    if (!viewport.mobile) {
+    if (!compactViewport) {
         if (await clickElementByLabel(ws, "채팅창 열기") !== "clicked") {
             throw new Error(`home ${viewport.name}: floating chat launcher missing`);
         }
@@ -1706,8 +1696,16 @@ async function main() {
                 { urlPattern: "https://pagead2.googlesyndication.com/*", requestStage: "Request" }] });
         await send(ws, "Page.addScriptToEvaluateOnNewDocument", {
             source: `
-                const smokeDocumentLoads = Number(sessionStorage.getItem("__homeSmokeDocumentLoads") || "0");
-                sessionStorage.setItem("__homeSmokeDocumentLoads", String(smokeDocumentLoads + 1));
+                let homeSmokeTopLevelDocument = true;
+                try {
+                    homeSmokeTopLevelDocument = window.top === window;
+                } catch {
+                    homeSmokeTopLevelDocument = false;
+                }
+                if (homeSmokeTopLevelDocument) {
+                    const smokeDocumentLoads = Number(sessionStorage.getItem("__homeSmokeDocumentLoads") || "0");
+                    sessionStorage.setItem("__homeSmokeDocumentLoads", String(smokeDocumentLoads + 1));
+                }
                 localStorage.setItem("accessToken", "smoke-access-token");
                 localStorage.setItem("refreshToken", "smoke-refresh-token");
                 localStorage.setItem("userRoles", JSON.stringify(["ROLE_USER"]));

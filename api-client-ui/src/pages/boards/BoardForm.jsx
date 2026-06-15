@@ -318,7 +318,7 @@ export const BoardForm = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="card space-y-6 p-8">
+                <div className="surface-card space-y-6 p-8">
                     <div>
                         <label className="mb-2 block text-sm font-semibold text-ink-muted">제목</label>
                         <input

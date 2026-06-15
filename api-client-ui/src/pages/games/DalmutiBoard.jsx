@@ -50,6 +50,11 @@ const dalmutiRankLabels = {
 };
 
 const dalmutiRankLabel = (rank) => dalmutiRankLabels[Number(rank)] || `${rank}계급`;
+const dalmutiRankNumberLabel = (rank, fallback = "카드") => {
+  const safeRank = Number(rank);
+  if (!Number.isFinite(safeRank) || safeRank <= 0) return fallback;
+  return `No.${safeRank} ${dalmutiRankLabel(safeRank)}`;
+};
 const dalmutiCardPalettes = {
   high: {
     paper: "#fff7ed",
@@ -106,7 +111,8 @@ const DalmutiCardArt = ({ rank, jester, name, selected }) => {
         : dalmutiCardPalettes.low;
   const displayRank = jester ? "J" : String(rank || "?");
   const displayName = jester ? "광대" : String(name || dalmutiRankLabel(rank)).slice(0, 7);
-  const caption = jester ? "와일드" : rank <= 3 ? "상위 계급" : rank <= 7 ? "중간 계급" : "하위 계급";
+  const rankNumberLabel = jester ? "No.13" : `No.${rank || "?"}`;
+  const caption = jester ? "No.13 · 와일드" : `${rankNumberLabel} · 숫자가 작을수록 강함`;
   const markCount = jester ? 0 : Math.max(1, Math.min(dalmutiMarkPositions.length, rank || 1));
 
   return (
@@ -124,7 +130,7 @@ const DalmutiCardArt = ({ rank, jester, name, selected }) => {
       <rect x="18" y="18" width="38" height="42" rx="10" fill={jester ? "#1e1b4b" : "#ffffff"} opacity={jester ? 0.72 : 0.82} />
       <text x="37" y="46" textAnchor="middle" fontSize="25" fontWeight="900" fill={palette.ink}>{displayRank}</text>
       <rect x="104" y="18" width="38" height="24" rx="12" fill={jester ? palette.badge : "#ffffff"} opacity={jester ? 0.95 : 0.85} />
-      <text x="123" y="34" textAnchor="middle" fontSize="11" fontWeight="900" fill={jester ? "#581c87" : palette.badge}>{jester ? "광대" : `${rank}장`}</text>
+      <text x="123" y="34" textAnchor="middle" fontSize="10" fontWeight="900" fill={jester ? "#581c87" : palette.badge}>{rankNumberLabel}</text>
       {jester ? (
         <g>
           <path d="M43 133c8-36 19-58 35-66 13 12 21 25 25 40 9-23 20-38 34-45 8 33 3 60-15 82-23 16-49 15-79-11Z" fill="#fbbf24" stroke="#1e1b4b" strokeWidth="6" strokeLinejoin="round" />
@@ -150,7 +156,7 @@ const DalmutiCardArt = ({ rank, jester, name, selected }) => {
       )}
       <rect x="20" y="176" width="120" height="28" rx="14" fill={jester ? "#1e1b4b" : "#ffffff"} opacity={jester ? 0.68 : 0.82} />
       <text x="80" y="195" textAnchor="middle" fontSize="14" fontWeight="900" fill={palette.ink}>{displayName}</text>
-      <text x="80" y="213" textAnchor="middle" fontSize="9" fontWeight="800" fill={jester ? "#fde68a" : palette.badge}>{caption}</text>
+      <text x="80" y="213" textAnchor="middle" fontSize="8.5" fontWeight="800" fill={jester ? "#fde68a" : palette.badge}>{caption}</text>
       {selected && (
         <g>
           <rect x="34" y="65" width="92" height="24" rx="12" fill="#0f172a" opacity="0.9" />
@@ -166,7 +172,7 @@ const DalmutiCard = ({ card, selected, onClick, disabled }) => {
   const jester = Boolean(card?.jester);
   const cardName = card?.name || "카드";
   const cardLabel = [
-    cardName,
+    jester ? "No.13 광대" : dalmutiRankNumberLabel(rank, cardName),
     jester ? "광대 와일드 카드" : `${rank}계급 카드`,
     selected ? "선택됨" : "선택 안 됨",
     disabled ? "현재 선택 불가" : "선택 가능",
@@ -189,6 +195,56 @@ const DalmutiCard = ({ card, selected, onClick, disabled }) => {
   );
 };
 
+const DalmutiTrickStack = ({ rank = 0, rankName = "카드", count = 0, owner = "", compact = false }) => {
+  const safeRank = Number(rank) || 0;
+  const safeCount = Math.max(0, Number(count) || 0);
+  const visibleCards = Math.max(1, Math.min(4, safeCount || 1));
+  const label = safeRank ? dalmutiRankNumberLabel(safeRank, rankName) : rankName;
+  return (
+    <div
+      className={`grid gap-3 ${compact ? "grid-cols-[112px_minmax(0,1fr)]" : "grid-cols-[132px_minmax(0,1fr)]"} items-center`}
+      data-smoke="dalmuti-current-trick-stack"
+      data-rank={safeRank || ""}
+      data-count={safeCount}
+    >
+      <div className={`relative ${compact ? "h-[86px] w-[112px]" : "h-[100px] w-[132px]"}`} aria-hidden="true">
+        {Array.from({ length: visibleCards }).map((_, index) => (
+          <div
+            key={index}
+            className="absolute rounded-xl border border-violet-200 bg-white shadow-sm"
+            style={{
+              left: `${index * 14}px`,
+              top: `${index * 7}px`,
+              width: compact ? 72 : 84,
+              height: compact ? 82 : 96,
+              transform: `rotate(${(index - 1) * 3}deg)`,
+              zIndex: index + 1,
+            }}
+            data-smoke="dalmuti-current-trick-card"
+          >
+            <div className="flex h-full flex-col items-center justify-center rounded-xl bg-gradient-to-br from-violet-50 via-white to-cyan-50 px-2 text-center">
+              <div className="text-[11px] font-black text-violet-700">No.{safeRank || "-"}</div>
+              <div className="mt-1 line-clamp-2 text-[10px] font-black leading-tight text-slate-900">{rankName}</div>
+            </div>
+          </div>
+        ))}
+        {safeCount > visibleCards && (
+          <div className="absolute bottom-0 right-0 z-10 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-black text-white">
+            +{safeCount - visibleCards}
+          </div>
+        )}
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] font-black uppercase text-violet-500">Current Set</div>
+        <div className="mt-1 truncate text-sm font-black text-slate-950">{owner ? `${owner} · ` : ""}{label}</div>
+        <div className="mt-1 inline-flex rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-violet-700 shadow-sm">
+          {safeCount || 0}장 기준
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DalmutiPlayAdvisorArt = ({
   selectedRank = 0,
   selectedCount = 0,
@@ -198,10 +254,10 @@ const DalmutiPlayAdvisorArt = ({
   phase = "PLAYING",
 }) => {
   const selectedLabel = selectedCount
-    ? selectedRank ? dalmutiRankLabel(selectedRank) : "광대"
+    ? selectedRank ? dalmutiRankNumberLabel(selectedRank) : "No.13 광대"
     : "미선택";
   const requiredLabel = requiredCount
-    ? `${dalmutiRankLabel(requiredRank)} ${requiredCount}장`
+    ? `${dalmutiRankNumberLabel(requiredRank)} ${requiredCount}장`
     : "새 기준";
   const resultFill = legal ? "#dcfce7" : selectedCount ? "#ffe4e6" : "#f8fafc";
   const resultStroke = legal ? "#16a34a" : selectedCount ? "#e11d48" : "#94a3b8";
@@ -1074,7 +1130,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
           key,
           rank,
           jester,
-          label: jester ? "광대" : dalmutiRankLabel(rank),
+          label: jester ? "No.13 광대" : dalmutiRankNumberLabel(rank),
           cards: [],
         });
       }
@@ -1150,7 +1206,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
   }, [selectedCards]);
   const selectedCardSummaryItems = useMemo(() => selectedCards.map((card) => ({
     id: card.id,
-    label: Boolean(card.jester) ? "광대" : dalmutiRankLabel(Number(card.rank || 0)),
+    label: Boolean(card.jester) ? "No.13 광대" : dalmutiRankNumberLabel(Number(card.rank || 0)),
     jester: Boolean(card.jester),
   })), [selectedCards]);
   const selectionHint = phase === "TAX_RETURN" && pendingTax
@@ -1257,7 +1313,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
     ? `${playerName(trickLeaderSeatNo)}님을 제외한 플레이어가 모두 패스하면 기준이 정리됩니다.`
     : "기준을 낸 플레이어가 이미 나갔으므로 남은 플레이어가 모두 패스하면 다음 선이 정해집니다.";
   const currentTrickLabel = currentTrick
-    ? `${get(currentTrick, "rank_name", "rankName", "카드")} ${currentTrickCount}장`
+    ? `${dalmutiRankNumberLabel(currentTrickRank, get(currentTrick, "rank_name", "rankName", "카드"))} ${currentTrickCount}장`
     : "새 기준";
   const dalmutiRankPressureRows = orderedDalmutiPlayers.map((player, index) => {
     const seatNo = Number(get(player, "seat_no", "seatNo", 0));
@@ -1307,7 +1363,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
     { label: "단계", value: dalmutiPhaseLabels[phase] || phase },
     { label: "차례", value: phase === "FINISHED" ? "종료" : activeSeatNo === mySeatNo ? "내 차례" : playerName(activeSeatNo) },
     { label: "선택", value: `${selectedCardIds.length}장` },
-    { label: "기준", value: currentTrick ? `${get(currentTrick, "rank_name", "rankName", "카드")} ${currentTrickCount}장` : "새 기준" },
+    { label: "기준", value: currentTrick ? `${dalmutiRankNumberLabel(currentTrickRank, get(currentTrick, "rank_name", "rankName", "카드"))} ${currentTrickCount}장` : "새 기준" },
   ];
   const dalmutiFlowItems = [
     {
@@ -1326,7 +1382,7 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
     },
     {
       label: "제출 기준",
-      value: currentTrick ? `${get(currentTrick, "rank_name", "rankName", "카드")} ${currentTrickCount}장` : "새 기준",
+      value: currentTrick ? `${dalmutiRankNumberLabel(currentTrickRank, get(currentTrick, "rank_name", "rankName", "카드"))} ${currentTrickCount}장` : "새 기준",
       detail: currentTrick ? trickClearHint : "같은 계급 여러 장으로 새 기준을 열 수 있습니다.",
       icon: "decision",
       tone: currentTrick ? "waiting" : "neutral",
@@ -1422,10 +1478,12 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
           </div>
           {currentTrick ? (
             <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3">
-              <div className="text-xs font-black text-violet-500">현재 기준</div>
-              <div className="mt-1 text-sm font-black text-violet-900">
-                {playerName(get(currentTrick, "seat_no", "seatNo", 0))} · {get(currentTrick, "rank_name", "rankName", "카드")} {currentTrick.count}장
-              </div>
+              <DalmutiTrickStack
+                rank={currentTrickRank}
+                rankName={get(currentTrick, "rank_name", "rankName", "카드")}
+                count={currentTrickCount}
+                owner={playerName(get(currentTrick, "seat_no", "seatNo", 0))}
+              />
               <div className="mt-2 grid gap-2 text-[11px] font-bold leading-relaxed text-violet-700 sm:grid-cols-2">
                 <div className="rounded-xl bg-white/80 px-3 py-2">
                   패스 {passCount}/{requiredPassCount} · {passSeatText}
@@ -1761,11 +1819,22 @@ const DalmutiBoard = ({ gameState, players: roomPlayers, mySeatNo, onAction }) =
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
           <div className="mb-3 text-sm font-black text-slate-900">최근 제출</div>
           <div className="space-y-2">
-            {playPile.slice(-5).reverse().map((play, index) => (
-              <div key={`${get(play, "seat_no", "seatNo", 0)}-${index}`} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
-                {playerName(get(play, "seat_no", "seatNo", 0))} · {get(play, "rank_name", "rankName", "")} {play.count}장
-              </div>
-            ))}
+            {playPile.slice(-5).reverse().map((play, index) => {
+              const playRank = Number(get(play, "rank", "rank", 0));
+              const playRankName = get(play, "rank_name", "rankName", "카드");
+              const playCount = Number(get(play, "count", "count", 0));
+              return (
+                <div key={`${get(play, "seat_no", "seatNo", 0)}-${index}`} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
+                  <DalmutiTrickStack
+                    rank={playRank}
+                    rankName={playRankName}
+                    count={playCount}
+                    owner={playerName(get(play, "seat_no", "seatNo", 0))}
+                    compact
+                  />
+                </div>
+              );
+            })}
             {!playPile.length && (
               <DalmutiPlayPileEmptyState
                 phase={phase}

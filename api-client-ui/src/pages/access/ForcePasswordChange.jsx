@@ -43,18 +43,19 @@ export const ForcePasswordChange = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-transparent flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+            <div className="bg-vibe" />
             <div className="w-full max-w-md relative z-10 py-8">
                 <div className="text-center mb-8">
                     <BrandMark className="mx-auto mb-5 h-20 sm:h-24 max-w-[17rem]" />
                     <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600/10 text-primary-600">
                         <KeyRound className="h-6 w-6" />
                     </div>
-                    <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-3">비밀번호 변경</h1>
-                    <p className="text-slate-500 text-sm font-bold">새 비밀번호로 변경해야 서비스를 이용할 수 있습니다.</p>
+                    <h1 className="text-3xl sm:text-4xl font-black text-ink tracking-tight mb-3">비밀번호 변경</h1>
+                    <p className="text-ink-muted text-sm font-bold">새 비밀번호로 변경해야 서비스를 이용할 수 있습니다.</p>
                 </div>
 
-                <div className="card p-6 sm:p-10 animate-fade-in bg-white/80 backdrop-blur-xl border-white/50 shadow-2xl shadow-slate-200">
+                <div className="surface-panel motion-panel-in p-6 sm:p-10">
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <PasswordInput
                             label="임시 비밀번호"
@@ -104,15 +105,15 @@ export const ForcePasswordChange = () => {
 
 const PasswordInput = ({ label, name, value, onChange, autoComplete }) => (
     <div className="space-y-2">
-        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
+        <label className="text-[11px] font-black text-ink-subtle uppercase tracking-widest ml-1">{label}</label>
         <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary-500 transition-colors" />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-subtle group-focus-within:text-primary-500 transition-colors" />
             <input
                 type="password"
                 name={name}
                 value={value}
                 onChange={onChange}
-                className="input-base pl-12 h-14 bg-white font-bold"
+                className="input-base pl-12 h-14 font-bold"
                 autoComplete={autoComplete}
             />
         </div>

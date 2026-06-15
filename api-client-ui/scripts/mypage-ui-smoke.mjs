@@ -20,7 +20,9 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "mypage-ui-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
-    { name: "mobile", width: 390, height: 844, mobile: true },
+    { name: "tablet", width: 768, height: 1024, mobile: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3 },
 ];
 const profileTexts = ["검증 사용자", "누적 경험치", "보유 포인트", "프로필 수정", "계정 관리"];
 const postsTexts = ["작성 글", "테스트 게시글", "좋아요", "조회"];
@@ -309,7 +311,7 @@ async function inspectMypage(cdp, sessionId, viewport) {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     }, sessionId);
 

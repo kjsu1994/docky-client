@@ -13,6 +13,7 @@ import { buildTalkPayload, chatAdapter, compareMessagesByChronology, getMemberId
 import { buildStompConnectHeaders, createStompClient, notifyRealtimeError } from "../../adapters/realtimeAdapter.js";
 import { realtimeReplayAdapter } from "../../adapters/realtimeReplayAdapter.js";
 import { GameActionCueBar, GameChatEmptyState, GameFlowMeter, GameResultSpotlight, GameUxGlyph } from "./GameUxAssets.jsx";
+import { useGameGsapMotion } from "../../hooks/useGameGsapMotion.js";
 import {
     buildLasVegasActionPayload,
     getLasVegasChatRoomId,
@@ -27,6 +28,15 @@ const ROOM_STORAGE_KEY = "las_vegas_last_room_id";
 const ROOM_TITLE_STORAGE_KEY = "las_vegas_last_room_title";
 const CHAT_ROOM_READ_EVENT = "chat-room-read";
 const LAS_VEGAS_SOUND_VOLUME_MULTIPLIER = 16;
+const LAS_VEGAS_GSAP_SELECTORS = [
+    '[data-gsap="las-vegas-recent-action"]',
+    '[data-smoke="las-vegas-action-availability-die"]',
+    '[data-smoke="las-vegas-action-route-die"]',
+    '[data-gsap="las-vegas-casino"]',
+    '[data-gsap="las-vegas-dice-stack"]',
+];
+const LAS_VEGAS_MOTION_FROM = { y: -3, scale: 0.985 };
+const LAS_VEGAS_MOTION_TO = { y: 0, scale: 1, duration: 0.16, stagger: 0.012, ease: "power3.out" };
 
 const initialLasVegasActionFeedback = () => ({
     status: "idle",
@@ -1573,7 +1583,7 @@ const LasVegasPlayerRosterPanel = ({
     };
 
     return (
-        <section className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg" data-smoke="las-vegas-player-roster" data-room-status={normalizedStatus}>
+        <section className="surface-panel p-4" data-smoke="las-vegas-player-roster" data-room-status={normalizedStatus}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm font-black text-slate-900">
                     <Crown className="h-4 w-4 text-amber-500" />
@@ -1700,7 +1710,7 @@ const LasVegasDecisionPanel = ({ state, players, myMemberId, currentRollCountByF
     ];
 
     return (
-        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg" data-smoke="las-vegas-decision-panel">
+        <div className="surface-panel p-4" data-smoke="las-vegas-decision-panel">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
                     <GameUxGlyph type="decision" className="mt-0.5 h-10 w-10 shrink-0 text-amber-500" />
@@ -2299,7 +2309,7 @@ const CasinoPanel = ({ casino, statePlayers, isHot, isLastPlaced }) => {
     }, [statePlayers]);
 
     return (
-        <article data-smoke="las-vegas-casino-panel" className={`rounded-2xl border p-2.5 shadow-xl backdrop-blur-md transition-all duration-500 sm:rounded-[1.6rem] sm:p-4 ${
+        <article data-smoke="las-vegas-casino-panel" data-gsap="las-vegas-casino" data-casino-no={casinoNo} className={`rounded-2xl border p-2.5 shadow-xl backdrop-blur-md transition-all duration-500 sm:rounded-[1.6rem] sm:p-4 ${
             isHot || isLastPlaced
                 ? "border-amber-300 bg-gradient-to-br from-amber-500/35 via-orange-500/30 to-slate-900/85 shadow-amber-400/30 scale-[1.01] ring-2 ring-amber-300/70"
                 : "border-white/20 bg-gradient-to-br from-slate-900/80 to-slate-800/85 shadow-slate-900/30"
@@ -2333,7 +2343,7 @@ const CasinoPanel = ({ casino, statePlayers, isHot, isLastPlaced }) => {
                     const player = playerMap.get(Number(memberId));
                     const name = player?.nickname || `P${toPlainInt(memberId, 0)}`;
                     return (
-                    <div key={`${casinoNo}-dice-${memberId}`} className="flex items-center justify-between rounded-xl bg-white/10 px-2.5 py-1.5 text-xs font-bold text-slate-100">
+                    <div key={`${casinoNo}-dice-${memberId}`} data-gsap="las-vegas-dice-stack" className="flex items-center justify-between rounded-xl bg-white/10 px-2.5 py-1.5 text-xs font-bold text-slate-100">
                         <span className="flex min-w-0 items-center gap-1.5">
                             <UserAvatar
                                 name={name}
@@ -2973,6 +2983,7 @@ export const LasVegasGame = () => {
     const lastGameServerSentAtRef = useRef(0);
     const mountedRef = useRef(false);
     const chatScrollRef = useRef(null);
+    const gameBoardRef = useRef(null);
     const prevCasinoSignatureRef = useRef("");
     const lastReadMarkAtRef = useRef(0);
     const audioContextRef = useRef(null);
@@ -3240,6 +3251,32 @@ export const LasVegasGame = () => {
         state?.roundNo,
     ]);
 
+    const lasVegasMotionSignal = useMemo(() => {
+        const casinoSignature = casinoRows.map((casino) => {
+            const casinoNo = toPlainInt(casino.casinoNo || casino.casino_no, 0);
+            const diceByPlayer = casino.diceByPlayer || casino.dice_by_player || {};
+            const diceTotal = Object.values(diceByPlayer).reduce((sum, value) => sum + toPlainInt(value, 0), 0);
+            const moneyTotal = toPlainInt(casino.totalMoney || casino.total_money, 0);
+            return `${casinoNo}:${diceTotal}:${moneyTotal}`;
+        }).join("|");
+        return [
+            normalizedRoomStatus,
+            currentRoll.join(","),
+            casinoSignature,
+            lastPlacedCasinoNo,
+            lastPlacedDiceCount,
+            winnerMemberId || "",
+        ].join("::");
+    }, [casinoRows, currentRoll, lastPlacedCasinoNo, lastPlacedDiceCount, normalizedRoomStatus, winnerMemberId]);
+
+    useGameGsapMotion({
+        scopeRef: gameBoardRef,
+        signal: lasVegasMotionSignal,
+        selectors: LAS_VEGAS_GSAP_SELECTORS,
+        from: LAS_VEGAS_MOTION_FROM,
+        to: LAS_VEGAS_MOTION_TO,
+    });
+
     const ensureSocket = async () => {
         if (stompRef.current) return stompRef.current;
         if (stompInitRef.current) return stompInitRef.current;
@@ -3333,6 +3370,23 @@ export const LasVegasGame = () => {
         const snapshot = await lasVegasGameAdapter.fetchRoomState(roomId);
         setState(snapshot);
         return snapshot;
+    };
+
+    const refreshRoomStateIfCurrent = async (roomId, { refreshRoom = false } = {}) => {
+        if (!mountedRef.current || Number(realtimeRoomRef.current?.roomId || 0) !== Number(roomId || 0)) return null;
+        const snapshot = await fetchState(roomId);
+        if (refreshRoom) {
+            refreshSelectedRoom(roomId).catch(() => {});
+        }
+        return snapshot;
+    };
+
+    const scheduleRoomStateRefresh = (roomId, delays = [350, 1400, 2600]) => {
+        delays.forEach((delay) => {
+            window.setTimeout(() => {
+                refreshRoomStateIfCurrent(roomId, { refreshRoom: true }).catch(() => {});
+            }, delay);
+        });
     };
 
     const fetchChatMessages = async (roomId) => {
@@ -3442,6 +3496,26 @@ export const LasVegasGame = () => {
         const timer = setInterval(tick, 500);
         return () => clearInterval(timer);
     }, [state?.turnDeadlineAt]);
+
+    useEffect(() => {
+        const roomId = normalizeRoomId(selectedRoom);
+        if (!roomId || !isPlaying) return undefined;
+        const pollDelay = myTurn ? 3500 : 1600;
+        const poll = () => {
+            refreshRoomStateIfCurrent(roomId).catch(() => {});
+        };
+        const interval = window.setInterval(poll, pollDelay);
+        let deadlineTimer = null;
+        const deadlineMs = Date.parse(state?.turnDeadlineAt || "");
+        if (Number.isFinite(deadlineMs)) {
+            const delay = Math.max(450, Math.min(2200, deadlineMs - Date.now() + 350));
+            deadlineTimer = window.setTimeout(poll, delay);
+        }
+        return () => {
+            window.clearInterval(interval);
+            if (deadlineTimer) window.clearTimeout(deadlineTimer);
+        };
+    }, [currentRoll.length, isPlaying, myTurn, selectedRoom, state?.turnDeadlineAt, state?.turnMemberId]);
 
     useEffect(() => {
         if (chatScrollRef.current) {
@@ -3723,6 +3797,7 @@ export const LasVegasGame = () => {
                 message: `${actionLabel} 전송 완료`,
                 detail: "서버가 실시간 상태를 다시 보내면 주사위와 카지노 보드에 반영됩니다.",
             });
+            scheduleRoomStateRefresh(roomId, actionType === "PLACE_DICE" ? [300, 1200, 2400, 3600] : [300, 1000]);
         } catch {
             notifyError("행동 전송에 실패했습니다.");
             setActionFeedback({
@@ -3876,7 +3951,7 @@ export const LasVegasGame = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="game-shell space-y-6">
             <style>{`
                 @keyframes chip-float {
                     0% { transform: translateY(0) rotate(0deg); opacity: 0; }
@@ -3945,7 +4020,7 @@ export const LasVegasGame = () => {
             )}
 
             {!selectedRoom && (
-                <section className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
+                <section className="surface-panel p-5">
                     <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-900">
                         <Users className="h-5 w-5" />
                         대기 중인 방
@@ -3974,7 +4049,7 @@ export const LasVegasGame = () => {
                             return (
                                 <div
                                     key={roomId}
-                                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                                    className="surface-card p-4"
                                     data-smoke="las-vegas-lobby-room-card"
                                     data-room-status={status}
                                     data-joinable={joinable ? "true" : "false"}
@@ -4031,7 +4106,7 @@ export const LasVegasGame = () => {
 
             {selectedRoom && (
                 <section className="space-y-4">
-                    <div className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-lg">
+                    <div className="surface-panel p-5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <div className="text-lg font-black text-slate-900">{selectedRoom.title}</div>
@@ -4133,7 +4208,7 @@ export const LasVegasGame = () => {
                     <div className={`grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] ${myTurn ? "rounded-[1.8rem] bg-sky-100/70 p-3 ring-2 ring-sky-300/70" : ""}`}>
                         <div className="space-y-4">
                             {showGameBoard ? (
-                                <div className={`rounded-[1.8rem] border p-4 shadow-2xl transition-all ${
+                                <div ref={gameBoardRef} className={`rounded-[1.8rem] border p-4 shadow-2xl transition-all ${
                                     myTurn
                                         ? "border-sky-200 bg-gradient-to-br from-sky-500 via-cyan-500 to-blue-600"
                                         : "border-white/20 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800"
@@ -4161,7 +4236,7 @@ export const LasVegasGame = () => {
                                     </div>
 
                                     {lastPlacedText && (
-                                        <div className="mb-3 rounded-2xl border border-amber-200/50 bg-amber-300/20 px-3 py-2 text-xs font-black leading-relaxed text-amber-50">
+                                        <div data-gsap="las-vegas-recent-action" className="mb-3 rounded-2xl border border-amber-200/50 bg-amber-300/20 px-3 py-2 text-xs font-black leading-relaxed text-amber-50">
                                             {lastPlacedText}
                                         </div>
                                     )}
@@ -4190,7 +4265,7 @@ export const LasVegasGame = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-lg">
+                                <div className="surface-panel p-4">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div>
                                             <div className="text-sm font-black text-slate-900">대기방</div>
@@ -4223,7 +4298,7 @@ export const LasVegasGame = () => {
                 </section>
             )}
 
-            <section className="rounded-[1.6rem] border border-slate-200 bg-white p-4 text-xs text-slate-500">
+            <section className="surface-panel p-4 text-xs text-ink-muted">
                 <div className="mb-1.5 flex items-center gap-1.5 font-black text-slate-700">
                     <Play className="h-3.5 w-3.5" />
                     게임규칙

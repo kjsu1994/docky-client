@@ -22,7 +22,7 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "home-runtime-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
-    { name: "mobile", width: 390, height: 844, mobile: true },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
 ];
 const localHosts = new Set(["localhost", "127.0.0.1"]);
 const replacementChar = String.fromCharCode(0xfffd);
@@ -213,7 +213,7 @@ async function inspectHomeRuntime(ws, viewport) {
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor ?? (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     });
     await send(ws, "Page.navigate", { url: `${baseUrl}/app` });

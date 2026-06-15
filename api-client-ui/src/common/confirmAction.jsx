@@ -42,9 +42,9 @@ const ConfirmToast = ({
 
     return (
         <div
-            className={`pointer-events-auto w-[min(92vw,380px)] rounded-2xl border bg-surface p-4 shadow-2xl ${
+            className={`modal-panel pointer-events-auto w-[min(92vw,380px)] p-4 ${
                 item.visible ? "animate-enter" : "animate-leave"
-            } ${tone === "danger" ? "border-rose-500/25" : "border-line"}`}
+            } ${tone === "danger" ? "border-rose-500/30" : ""}`}
             role="alertdialog"
             aria-modal="true"
             aria-labelledby={titleId}
@@ -56,7 +56,7 @@ const ConfirmToast = ({
                 <button
                     ref={cancelRef}
                     type="button"
-                    className="min-h-10 rounded-xl bg-control px-3 text-sm font-black text-ink-muted transition hover:bg-control-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus/20"
+                    className="btn-secondary min-h-10 px-3 py-2"
                     onClick={() => settle(false, item.id)}
                 >
                     {cancelText}
@@ -64,7 +64,7 @@ const ConfirmToast = ({
                 <button
                     ref={confirmRef}
                     type="button"
-                    className={`min-h-10 rounded-xl px-3 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 ${
+                    className={`min-h-10 rounded-control px-3 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 ${
                         tone === "danger"
                             ? "bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-200"
                             : "bg-ink text-ink-inverse hover:bg-primary-600 focus-visible:ring-focus/20"

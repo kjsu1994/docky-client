@@ -80,11 +80,11 @@ export const ReportDialog = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={handleBackdropMouseDown}>
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={handleBackdropMouseDown}>
             <form
                 ref={dialogRef}
                 onSubmit={handleSubmit}
-                className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+                className="modal-panel w-full max-w-md p-6"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
@@ -95,13 +95,13 @@ export const ReportDialog = ({
                         <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
                             <Flag className="h-5 w-5" />
                         </div>
-                        <h2 id={titleId} className="text-xl font-black text-slate-900">{targetLabel} 신고</h2>
-                        <p id={descriptionId} className="mt-1 text-sm font-medium text-slate-500">운영자가 검토할 내용을 입력해 주세요.</p>
+                        <h2 id={titleId} className="text-xl font-black text-ink">{targetLabel} 신고</h2>
+                        <p id={descriptionId} className="mt-1 text-sm font-medium text-ink-muted">운영자가 검토할 내용을 입력해 주세요.</p>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-xl bg-slate-100 p-2 text-slate-500 hover:bg-slate-200"
+                        className="icon-button"
                         aria-label="신고 닫기"
                         disabled={submitting}
                     >
@@ -109,7 +109,7 @@ export const ReportDialog = ({
                     </button>
                 </div>
 
-                <label htmlFor={reasonId} className="mb-2 block text-xs font-black text-slate-500">신고 사유</label>
+                <label htmlFor={reasonId} className="mb-2 block text-xs font-black text-ink-muted">신고 사유</label>
                 <input
                     id={reasonId}
                     ref={reasonRef}
@@ -121,11 +121,11 @@ export const ReportDialog = ({
                     disabled={submitting}
                     required
                 />
-                <div className="-mt-3 mb-4 text-right text-xs font-medium text-slate-400">
+                <div className="-mt-3 mb-4 text-right text-xs font-medium text-ink-subtle">
                     {formatNumber(reasonLength)} / {formatNumber(REPORT_REASON_MAX_LENGTH)}
                 </div>
 
-                <label htmlFor={detailId} className="mb-2 block text-xs font-black text-slate-500">상세 내용 (선택)</label>
+                <label htmlFor={detailId} className="mb-2 block text-xs font-black text-ink-muted">상세 내용 (선택)</label>
                 <textarea
                     id={detailId}
                     className="input-base min-h-[120px] w-full resize-none"
@@ -135,7 +135,7 @@ export const ReportDialog = ({
                     placeholder="운영자가 확인할 수 있는 구체적인 내용을 입력해 주세요"
                     disabled={submitting}
                 />
-                <div className="mt-1 text-right text-xs font-medium text-slate-400">
+                <div className="mt-1 text-right text-xs font-medium text-ink-subtle">
                     {formatNumber(detailLength)} / {formatNumber(REPORT_DETAIL_MAX_LENGTH)}
                 </div>
 

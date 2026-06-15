@@ -132,7 +132,7 @@ export const Statistics = () => {
             )}
 
             {visitorsCompare && (
-                <div className="card p-6">
+                <div className="surface-card p-6">
                     <div className="flex flex-wrap items-center gap-3 justify-between">
                         <h2 className="text-xl font-bold text-ink flex items-center gap-2">
                             <Activity className="h-5 w-5 text-primary-600" />
@@ -154,7 +154,7 @@ export const Statistics = () => {
                 </div>
             )}
 
-            <div className="card p-6 space-y-5">
+            <div className="surface-card space-y-5 p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <h2 className="text-xl font-bold text-ink flex items-center gap-2">
                         <Calendar className="h-5 w-5 text-primary-600" />
@@ -188,7 +188,7 @@ export const Statistics = () => {
                             const boards = Number(item.newBoards || 0);
                             const comments = Number(item.newComments || 0);
                             return (
-                                <div key={item.date} className="rounded-xl border border-line p-4">
+                                <div key={item.date} className="rounded-xl border border-line bg-control/60 p-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <span className="text-sm font-semibold text-ink">{toDateLabel(item.date)}</span>
                                         <span className="text-xs text-ink-subtle">방문자 {formatNumber(visitors)}</span>
@@ -242,7 +242,7 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
     };
 
     return (
-        <div className="card p-5">
+        <div className="surface-card p-5">
             <div className="flex items-center gap-4">
                 <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${colors[color]} text-white flex items-center justify-center`}>
                     <Icon className="h-5 w-5" />

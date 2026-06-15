@@ -45,7 +45,7 @@ export const Header = () => {
                             className={`hidden lg:inline-flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition-all ${
                                 menuOpen
                                     ? "border-primary-300 bg-primary-50 text-primary-600"
-                                    : "border-line bg-surface text-ink-muted hover:border-primary-200 hover:bg-control hover:text-primary-600"
+                                    : "border-line bg-surface/80 text-ink-muted hover:border-primary-200 hover:bg-control hover:text-primary-600"
                             }`}
                             title="전체 메뉴 펼치기"
                             aria-label="전체 메뉴 펼치기"
@@ -80,7 +80,7 @@ export const Header = () => {
                     <div className="flex items-center gap-2">
                         <NavLink
                             to="/app/mypage?tab=settings"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
+                            className="icon-button"
                             title="설정"
                             aria-label="설정으로 이동"
                         >
@@ -89,7 +89,7 @@ export const Header = () => {
                         <NotificationCenterEntry />
                         <Link
                             to="/app/todos"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700 sm:hidden"
+                            className="icon-button sm:hidden"
                             title="할 일"
                             aria-label="할 일로 이동"
                             data-smoke="header-todos-link"
@@ -99,7 +99,7 @@ export const Header = () => {
                         <div className="hidden items-center gap-2 sm:flex">
                             <Link
                                 to="/app/todos"
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface text-ink-subtle shadow-sm transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
+                                className="icon-button"
                                 title="할 일"
                                 aria-label="할 일로 이동"
                                 data-smoke="header-todos-link"

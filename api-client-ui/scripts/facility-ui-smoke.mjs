@@ -19,7 +19,9 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "facility-ui-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
-    { name: "mobile", width: 390, height: 844, mobile: true },
+    { name: "tablet", width: 768, height: 1024, mobile: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3 },
 ];
 const tabChecks = [
     { tab: "주차장", heading: "주차장 요금비교", result: "시청 공영주차장" },
@@ -483,7 +485,7 @@ async function inspectFacility(cdp, sessionId, viewport) {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     }, sessionId);
     const navigation = await cdp.send("Page.navigate", { url: `${baseUrl}/app/facility` }, sessionId);

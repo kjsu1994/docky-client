@@ -1,12 +1,18 @@
-import { useMemo } from "react";
+﻿import { useMemo, useRef } from "react";
 import { Crown, Dices, Shield } from "lucide-react";
 import { getTabletopSeatNo } from "../../adapters/tabletopGameAdapter.js";
+import { useGameGsapMotion } from "../../hooks/useGameGsapMotion.js";
 
 const get = (obj, snake, camel, fallback = undefined) => obj?.[camel] ?? obj?.[snake] ?? fallback;
 const listOf = (value) => (Array.isArray(value) ? value : []);
 const seatNoOf = (player) => Number(getTabletopSeatNo(player) || 0);
+const MAHE_GSAP_SELECTORS = [
+  '[data-gsap="mahe-dice-face"]',
+];
+const MAHE_MOTION_FROM = { y: -3, scale: 0.96 };
+const MAHE_MOTION_TO = { y: 0, scale: 1, duration: 0.16, stagger: 0.012, ease: "power3.out" };
 
-const TabletopHistoryEmptyArt = ({ tone = "slate", gameLabel = "기록", nextLabel = "첫 행동" }) => {
+const TabletopHistoryEmptyArt = ({ tone = "slate", gameLabel = "湲곕줉", nextLabel = "泥??됰룞" }) => {
   const palette = {
     slate: { bg: "#0f172a", node: "#38bdf8", accent: "#f59e0b", line: "#e2e8f0", soft: "#dbeafe" },
     blokus: { bg: "#111827", node: "#06b6d4", accent: "#a855f7", line: "#e0f2fe", soft: "#cffafe" },
@@ -21,15 +27,15 @@ const TabletopHistoryEmptyArt = ({ tone = "slate", gameLabel = "기록", nextLab
     soft: "#dbeafe",
   };
   const nodes = [
-    { key: "start", x: 48, y: 66, label: "시작", fill: palette.node },
+    { key: "start", x: 48, y: 66, label: "?쒖옉", fill: palette.node },
     { key: "action", x: 128, y: 38, label: nextLabel, fill: palette.accent },
-    { key: "log", x: 208, y: 70, label: "기록", fill: "#64748b" },
+    { key: "log", x: 208, y: 70, label: "湲곕줉", fill: "#64748b" },
   ];
   return (
     <svg
       viewBox="0 0 260 116"
       role="img"
-      aria-label={`${gameLabel} 첫 기록 대기 안내`}
+      aria-label={`${gameLabel} 泥?湲곕줉 ?湲??덈궡`}
       className="h-auto w-full"
       data-smoke="tabletop-history-empty-art"
     >
@@ -42,7 +48,7 @@ const TabletopHistoryEmptyArt = ({ tone = "slate", gameLabel = "기록", nextLab
           <text x={node.x} y={node.y + 4} textAnchor="middle" fontSize="8" fontWeight="900" fill="#ffffff">{node.label}</text>
         </g>
       ))}
-      <text x="22" y="26" fontSize="9" fontWeight="900" fill="#bfdbfe">최근 행동</text>
+      <text x="22" y="26" fontSize="9" fontWeight="900" fill="#bfdbfe">理쒓렐 ?됰룞</text>
       <text x="238" y="26" textAnchor="end" fontSize="9" fontWeight="900" fill="#e2e8f0">{gameLabel}</text>
     </svg>
   );
@@ -51,7 +57,7 @@ const TabletopHistoryEmptyArt = ({ tone = "slate", gameLabel = "기록", nextLab
 const TabletopHistoryEmptyState = ({
   game = "tabletop",
   title = "아직 기록이 없습니다",
-  detail = "첫 행동이 끝나면 이 영역에 최근 기록이 쌓입니다.",
+  detail = "첫 행동이 끝나면 이 영역에 최근 기록이 표시됩니다.",
   nextAction = "첫 행동",
 }) => {
   const gameLabel = game === "mahe" ? "마헤" : title;
@@ -90,9 +96,9 @@ const TabletopHistoryEmptyState = ({
 const maheEventLabels = {
   ROLL_DIE: "주사위",
   STOP_ROLLING: "멈춤",
-  CHOOSE_DICE_COUNT: "주사위 개수 지시",
+  CHOOSE_DICE_COUNT: "주사위 개수 지정",
   MOVE: "이동",
-  SCORE: "알 획득",
+  SCORE: "점수 획득",
   BUST: "실패",
 };
 
@@ -229,81 +235,81 @@ const buildMaheActionRouteItems = ({
   const isFinished = phase === "FINISHED";
   const isChoosing = phase === "CHOOSE_DICE_COUNT";
   const actionValue = isFinished
-    ? "결과 확인"
+    ? "寃곌낵 ?뺤씤"
     : canChoose
-      ? "주사위 개수 선택"
+      ? "二쇱궗??媛쒖닔 ?좏깮"
       : canRoll
         ? diceCount > 0
-          ? "굴릴지 멈출지 선택"
-          : "첫 주사위 굴림"
+          ? "援대┫吏 硫덉텧吏 ?좏깮"
+          : "泥?二쇱궗??援대┝"
         : "차례 대기";
   const actionDetail = isFinished
-    ? "알 카드 정산과 최종 점수를 확인합니다."
+    ? "??移대뱶 ?뺤궛怨?理쒖쥌 ?먯닔瑜??뺤씤?⑸땲??"
     : isChoosing
-      ? "업힌 거북이의 맨 위 플레이어가 이번 굴림 개수를 정합니다."
+      ? "?낇엺 嫄곕턿?댁쓽 留????뚮젅?댁뼱媛 ?대쾲 援대┝ 媛쒖닔瑜??뺥빀?덈떎."
       : canRoll
-        ? "현재 합계, 남은 굴림 수, 보상 가능성을 함께 보고 판단합니다."
-        : "현재 차례 플레이어의 선택이 끝나면 루트가 갱신됩니다.";
+        ? "?꾩옱 ?⑷퀎, ?⑥? 援대┝ ?? 蹂댁긽 媛?μ꽦???④퍡 蹂닿퀬 ?먮떒?⑸땲??"
+        : "?꾩옱 李⑤? ?뚮젅?댁뼱???좏깮???앸굹硫?猷⑦듃媛 媛깆떊?⑸땲??";
   const stopValue = stopSteps > 0
-    ? `${stopSteps}칸 이동`
+    ? `${stopSteps}移??대룞`
     : diceCount > 0
-      ? "이동 없음"
+      ? "?대룞 ?놁쓬"
       : "첫 굴림 전";
   const stopDetail = stopSteps > 0
     ? stopScores
       ? `${currentEgg ?? "-"}점 알 획득 후보입니다. ${scoreRecipientText}`
       : `멈추면 ${projectedDestination || "출발점"}번 칸 흐름으로 이동합니다.`
     : diceCount > 0
-      ? "합계가 초과되어 서버 정산을 기다립니다."
-      : "첫 굴림 뒤 멈춤 루트가 열립니다.";
+      ? "?⑷퀎媛 珥덇낵?섏뼱 ?쒕쾭 ?뺤궛??湲곕떎由쎈땲??"
+      : "泥?援대┝ ??硫덉땄 猷⑦듃媛 ?대┰?덈떎.";
   const riskValue = diceCount <= 0
-    ? "초과 없음"
+    ? "珥덇낵 ?놁쓬"
     : diceRollsLeft <= 0
-      ? "자동 이동"
-      : `${nextBustRolls.length}/6 초과`;
+      ? "?먮룞 ?대룞"
+      : `${nextBustRolls.length}/6 珥덇낵`;
   const riskDetail = diceCount <= 0
-    ? "첫 주사위는 실패 위험 없이 차례를 시작합니다."
+    ? "泥?二쇱궗?꾨뒗 ?ㅽ뙣 ?꾪뿕 ?놁씠 李⑤?瑜??쒖옉?⑸땲??"
     : diceRollsLeft <= 0
-      ? "세 번째 주사위까지 안전하면 현재 합계로 이동합니다."
+      ? "??踰덉㎏ 二쇱궗?꾧퉴吏 ?덉쟾?섎㈃ ?꾩옱 ?⑷퀎濡??대룞?⑸땲??"
       : nextBustRolls.length
-        ? `초과 눈 ${nextBustRolls.join(", ")} · 안전 여유 ${Math.max(0, safeRemaining)}`
-        : "다음 굴림도 모두 안전한 상태입니다.";
+        ? `珥덇낵 ??${nextBustRolls.join(", ")} 쨌 ?덉쟾 ?ъ쑀 ${Math.max(0, safeRemaining)}`
+        : "?ㅼ쓬 援대┝??紐⑤몢 ?덉쟾???곹깭?낅땲??";
   const outcomeValue = stopScores
     ? "보상 가능"
     : projectedSteps > 0
-      ? `${projectedSteps}칸 후보`
+      ? `${projectedSteps}移??꾨낫`
       : isFinished
-        ? "정산 완료"
-        : "위험 확인";
+        ? "?뺤궛 ?꾨즺"
+        : "?꾪뿕 ?뺤씤";
   const outcomeDetail = finalEggText
     || (stopScores ? scoreRecipientText : bustReturnText)
-    || "결승선을 넘는 거북이 스택의 맨 위 플레이어가 알을 받습니다.";
+    || "寃곗듅?좎쓣 ?섎뒗 嫄곕턿???ㅽ깮??留????뚮젅?댁뼱媛 ?뚯쓣 諛쏆뒿?덈떎.";
 
   return [
     {
       key: "action",
-      label: "이번 선택",
+      label: "?대쾲 ?좏깮",
       value: actionValue,
       detail: actionDetail,
       tone: canRoll || canChoose ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-slate-50 text-slate-700",
     },
     {
       key: "stop",
-      label: "멈춤 루트",
+      label: "硫덉땄 猷⑦듃",
       value: stopValue,
       detail: stopDetail,
       tone: stopScores ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-white text-slate-700",
     },
     {
       key: "risk",
-      label: "굴림 위험",
+      label: "援대┝ ?꾪뿕",
       value: riskValue,
       detail: riskDetail,
       tone: riskLevel === "danger" || riskLevel === "bust" ? "border-rose-100 bg-rose-50 text-rose-800" : "border-cyan-100 bg-cyan-50 text-cyan-800",
     },
     {
       key: "outcome",
-      label: "보상 판단",
+      label: "蹂댁긽 ?먮떒",
       value: outcomeValue,
       detail: outcomeDetail,
       tone: stopScores ? "border-amber-100 bg-amber-50 text-amber-800" : "border-violet-100 bg-violet-50 text-violet-800",
@@ -325,24 +331,24 @@ const MaheActionRouteArt = ({
 }) => {
   const tone = maheActionRouteTone[riskLevel] || maheActionRouteTone.ready;
   const stateLabel = phase === "FINISHED"
-    ? "결과"
+    ? "寃곌낵"
     : canChoose
-      ? "개수"
+      ? "媛쒖닔"
       : canRoll
         ? diceCount > 0
-          ? "선택"
-          : "시작"
+          ? "?좏깮"
+          : "?쒖옉"
         : "대기";
   const riskText = diceCount <= 0
-    ? "안전"
+    ? "?덉쟾"
     : diceRollsLeft <= 0
-      ? "이동"
+      ? "?대룞"
       : `${nextBustRolls.length}/6`;
   const nodes = [
-    { key: "turn", label: "차례", value: stateLabel, x: 54, y: 72, fill: canRoll || canChoose ? "#ecfdf5" : "#f8fafc", stroke: canRoll || canChoose ? "#059669" : "#94a3b8", text: canRoll || canChoose ? "#047857" : "#475569" },
-    { key: "dice", label: "합계", value: String(diceSum || 0), x: 142, y: 72, fill: tone.fill, stroke: tone.stroke, text: tone.text },
-    { key: "risk", label: "위험", value: riskText, x: 230, y: 72, fill: diceCount > 0 && nextBustRolls.length >= 4 ? "#fff1f2" : "#ecfeff", stroke: diceCount > 0 && nextBustRolls.length >= 4 ? "#e11d48" : "#0891b2", text: diceCount > 0 && nextBustRolls.length >= 4 ? "#be123c" : "#0e7490" },
-    { key: "stop", label: "멈춤", value: stopSteps > 0 ? `${stopSteps}` : "-", x: 318, y: 72, fill: stopScores ? "#fffbeb" : "#ffffff", stroke: stopScores ? "#f59e0b" : "#cbd5e1", text: stopScores ? "#b45309" : "#475569" },
+    { key: "turn", label: "李⑤?", value: stateLabel, x: 54, y: 72, fill: canRoll || canChoose ? "#ecfdf5" : "#f8fafc", stroke: canRoll || canChoose ? "#059669" : "#94a3b8", text: canRoll || canChoose ? "#047857" : "#475569" },
+    { key: "dice", label: "?⑷퀎", value: String(diceSum || 0), x: 142, y: 72, fill: tone.fill, stroke: tone.stroke, text: tone.text },
+    { key: "risk", label: "?꾪뿕", value: riskText, x: 230, y: 72, fill: diceCount > 0 && nextBustRolls.length >= 4 ? "#fff1f2" : "#ecfeff", stroke: diceCount > 0 && nextBustRolls.length >= 4 ? "#e11d48" : "#0891b2", text: diceCount > 0 && nextBustRolls.length >= 4 ? "#be123c" : "#0e7490" },
+    { key: "stop", label: "硫덉땄", value: stopSteps > 0 ? `${stopSteps}` : "-", x: 318, y: 72, fill: stopScores ? "#fffbeb" : "#ffffff", stroke: stopScores ? "#f59e0b" : "#cbd5e1", text: stopScores ? "#b45309" : "#475569" },
   ];
 
   return (
@@ -366,7 +372,7 @@ const MaheActionRouteArt = ({
       ))}
       <rect x="38" y="112" width="284" height="18" rx="9" fill="#ffffff" stroke="#e2e8f0" />
       <text x="180" y="125" textAnchor="middle" fontSize="10" fontWeight="900" fill="#475569">
-        굴림 · 멈춤 · 보상 판단
+        援대┝ 쨌 硫덉땄 쨌 蹂댁긽 ?먮떒
       </text>
       {stopScores && (
         <g>
@@ -432,11 +438,11 @@ const MaheActionRoutePanel = ({
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <div className="text-[11px] font-black text-teal-700">마헤 선택 루트</div>
-              <h3 className="text-base font-black text-slate-900">굴림, 멈춤, 보상 판단</h3>
+              <div className="text-[11px] font-black text-teal-700">留덊뿤 ?좏깮 猷⑦듃</div>
+              <h3 className="text-base font-black text-slate-900">援대┝, 硫덉땄, 蹂댁긽 ?먮떒</h3>
             </div>
             <div className="rounded-full border border-teal-100 bg-white px-3 py-1 text-[11px] font-black text-teal-700">
-              합계 {diceSum || 0} · 주사위 {diceCount}/3
+              ?⑷퀎 {diceSum || 0} 쨌 二쇱궗??{diceCount}/3
             </div>
           </div>
           <div data-smoke="mahe-action-route-art" className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-600">
@@ -462,6 +468,7 @@ const MaheActionRoutePanel = ({
 };
 
 const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction }) => {
+  const maheBoardRef = useRef(null);
   const trackSize = Number(get(gameState, "track_size", "trackSize", 21));
   const variantName = get(gameState, "variant_name", "variantName", "본게임");
   const phase = gameState?.phase || "ROLLING";
@@ -502,12 +509,12 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
           ? "caution"
           : "safe";
   const riskLabel = diceSum > 7
-    ? "합계 초과"
+    ? "?⑷퀎 珥덇낵"
     : dice.length === 0
-      ? "첫 주사위는 안전"
+      ? "泥?二쇱궗?꾨뒗 ?덉쟾"
       : diceRollsLeft === 0
-        ? "세 번째 주사위 자동 이동"
-        : `다음 주사위 위험 ${nextBustRolls.length}/6`;
+        ? "??踰덉㎏ 二쇱궗???먮룞 ?대룞"
+        : `?ㅼ쓬 二쇱궗???꾪뿕 ${nextBustRolls.length}/6`;
   const startSeatNos = turtles
     .filter((turtle) => Number(turtle.position) === 0)
     .map((turtle) => Number(get(turtle, "seat_no", "seatNo", 0)))
@@ -526,7 +533,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
   const canRoll = phase === "ROLLING" && activeSeatNo === mySeatNo;
   const canChoose = phase === "CHOOSE_DICE_COUNT" && decisionSeatNo === mySeatNo;
   const winners = scores.filter((score) => Boolean(get(score, "winner", "winner", false)));
-  const playerName = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || `${seatNo}번`;
+  const playerName = (seatNo) => roomPlayers.find((player) => seatNoOf(player) === Number(seatNo))?.nickname || String(seatNo) + "번";
   const scoreBySeatNo = new Map(scores.map((score) => [Number(get(score, "seat_no", "seatNo", 0)), score]));
   const maheRewardPressureRows = (turtles.length ? turtles : scores.map((score) => ({
     seatNo: get(score, "seat_no", "seatNo", 0),
@@ -564,23 +571,23 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
     ? activeMovingSeatNos.map((seatNo) => playerName(seatNo)).join(", ")
     : "-";
   const carriedChoiceText = activeIsCarried
-    ? `${playerName(activeStackTopSeatNo)}님이 맨 위에 있어 ${playerName(activeSeatNo)}님의 주사위 개수를 정합니다.`
-    : `${playerName(activeSeatNo)}님이 직접 주사위를 굴립니다.`;
+    ? playerName(activeStackTopSeatNo) + "님이 맨 위에 있어 " + playerName(activeSeatNo) + "님의 주사위 개수를 정합니다."
+    : playerName(activeSeatNo) + "님이 직접 주사위를 굴립니다.";
   const winnerText = winners.map((score) => playerName(get(score, "seat_no", "seatNo", 0))).join(", ");
   const winningScore = winners.length ? Number(get(winners[0], "score", "score", 0)) : 0;
   const turnMessage = phase === "FINISHED"
     ? "모든 알 카드가 정산되었습니다."
     : phase === "CHOOSE_DICE_COUNT"
       ? carriedChoiceText
-      : `${playerName(activeSeatNo)}님이 주사위를 굴립니다.`;
+      : playerName(activeSeatNo) + "님이 주사위를 굴립니다.";
   const bustReturnText = activeMovingSeatNos.length > 1
-    ? `합계가 8 이상이면 ${activeMovingText} 모두 출발점으로 돌아갑니다.`
+    ? "합계가 8 이상이면 " + activeMovingText + " 모두 출발점으로 돌아갑니다."
     : "합계가 8 이상이면 현재 거북이가 출발점으로 돌아갑니다.";
   const scoreRecipientText = projectedScorerSeatNo
-    ? `결승선을 넘으면 맨 위 ${playerName(projectedScorerSeatNo)}님이 알을 받습니다.`
+    ? "결승선을 넘으면 맨 위 " + playerName(projectedScorerSeatNo) + "님이 알을 받습니다."
     : "결승선을 넘으면 맨 위 거북이가 알을 받습니다.";
   const finalEggText = finalEggRound
-    ? "이 7점 알을 누군가 획득하면 게임이 끝납니다."
+    ? "마지막 7점 알을 누군가 획득하면 게임이 끝납니다."
     : eggDeck.length === 0
       ? "현재 알이 사라지면 마지막 7점 알이 공개됩니다."
       : "";
@@ -589,27 +596,27 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
       : "주사위 굴리기";
   const maheTurnGuidance = (() => {
     if (phase === "FINISHED") {
-      return winnerText ? `${winnerText} 승리, 총 ${winningScore}점입니다.` : "모든 알 카드가 정산되었습니다.";
+      return winnerText ? winnerText + " 승리, 총 " + winningScore + "점입니다." : "모든 알 카드가 정산되었습니다.";
     }
     if (phase === "CHOOSE_DICE_COUNT") {
-      return canChoose ? "업힌 거북이의 맨 위 플레이어로서 주사위 개수를 선택하세요." : `${playerName(decisionSeatNo)}님의 주사위 개수 선택을 기다리는 중입니다.`;
+      return canChoose ? "업힌 거북이의 맨 위 플레이어로서 주사위 개수를 선택하세요." : playerName(decisionSeatNo) + "님의 주사위 개수 선택을 기다리는 중입니다.";
     }
     if (!canRoll) {
-      return `${playerName(activeSeatNo)}님의 주사위 선택을 기다리는 중입니다.`;
+      return playerName(activeSeatNo) + "님의 주사위 선택을 기다리는 중입니다.";
     }
     if (!dice.length) {
       return "주사위 1개부터 굴립니다. 이후 더 굴릴지 멈출지 선택하세요.";
     }
     if (diceSum > 7) {
-      return `${bustReturnText} 서버가 이동 실패를 정리합니다.`;
+      return bustReturnText + " 서버가 이동 실패를 정리합니다.";
     }
-    return `지금 멈추면 ${stopSteps}칸 이동합니다. 더 굴리면 ${riskLabel.toLowerCase()}입니다.`;
+    return "지금 멈추면 " + stopSteps + "칸 이동합니다. 더 굴리면 " + riskLabel.toLowerCase() + "입니다.";
   })();
   const maheQuickFacts = [
     { label: "단계", value: mahePhaseLabel },
     { label: "차례", value: phase === "FINISHED" ? "종료" : canRoll || canChoose ? "내 차례" : playerName(activeSeatNo || decisionSeatNo) },
     { label: "합계", value: String(diceSum || 0) },
-    { label: "알", value: `${currentEgg ?? "-"}점` },
+    { label: "알", value: String(currentEgg ?? "-") + "점" },
   ];
   const maheRewardLeader = maheRewardPressureRows.slice().sort((left, right) => (
     Number(right.score || 0) - Number(left.score || 0)
@@ -629,21 +636,21 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
       key: "risk",
       label: "위험",
       value: riskLabel,
-      detail: diceSum > 7 ? bustReturnText : `멈추면 ${stopSteps || 0}칸 · 실패 눈 ${nextBustRolls.length}/6`,
+      detail: diceSum > 7 ? bustReturnText : "멈추면 " + (stopSteps || 0) + "칸 · 실패 눈 " + nextBustRolls.length + "/6",
       tone: riskLevel === "bust" || riskLevel === "danger" ? "border-rose-100 bg-rose-50 text-rose-800" : riskLevel === "caution" ? "border-amber-100 bg-amber-50 text-amber-800" : "border-cyan-100 bg-cyan-50 text-cyan-800",
     },
     {
       key: "egg",
       label: "알",
-      value: `${currentEgg ?? "-"}점`,
-      detail: `${eggDeck.length}장 남음${stopScores || projectedScores ? ` · ${scoreRecipientText}` : ""}${finalEggText ? ` · ${finalEggText}` : ""}`,
+      value: String(currentEgg ?? "-") + "점",
+      detail: eggDeck.length + "장 남음" + (stopScores || projectedScores ? " · " + scoreRecipientText : "") + (finalEggText ? " · " + finalEggText : ""),
       tone: stopScores || projectedScores || finalEggRound ? "border-amber-100 bg-amber-50 text-amber-800" : "border-slate-100 bg-white text-slate-700",
     },
     {
       key: "leader",
       label: "선두",
-      value: maheRewardLeader ? `${maheRewardLeader.name} ${maheRewardLeader.score}점` : "대기",
-      detail: maheClosestToGoal ? `결승선에 가까운 말: ${maheClosestToGoal.name} · ${maheClosestToGoal.position}/${trackSize}` : "점수판이 도착하면 선두와 결승선 거리가 표시됩니다.",
+      value: maheRewardLeader ? maheRewardLeader.name + " " + maheRewardLeader.score + "점" : "대기",
+      detail: maheClosestToGoal ? "결승선에 가까운 말: " + maheClosestToGoal.name + " · " + maheClosestToGoal.position + "/" + trackSize : "점수판이 도착하면 선두와 결승선 거리가 표시됩니다.",
       tone: "border-emerald-100 bg-emerald-50 text-emerald-800",
     },
   ];
@@ -651,15 +658,15 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
   const startProjected = Boolean(projectedSteps) && projectedDestination === 0;
   const startSpaceLabel = startSeatNos.length
     ? [
-        `출발점 · 아래에서 위 순서 ${startSeatNos.map((seatNo) => playerName(seatNo)).join(" → ")}`,
+        "출발점 · 아래에서 위 순서 " + startSeatNos.map((seatNo) => playerName(seatNo)).join(" → "),
         startActive ? "현재 차례 거북이 위치" : "",
-        startProjected ? `${projectedSteps}칸 이동 시 도착 예정` : "",
+        startProjected ? projectedSteps + "칸 이동 시 도착 예정" : "",
         startProjected && projectedScores ? "알 획득 가능" : "",
       ].filter(Boolean).join(" · ")
     : [
         "출발점 · 비어 있음",
         startActive ? "현재 차례 거북이 위치" : "",
-        startProjected ? `${projectedSteps}칸 이동 시 도착 예정` : "",
+        startProjected ? projectedSteps + "칸 이동 시 도착 예정" : "",
       ].filter(Boolean).join(" · ");
   const diceChoiceSummaries = useMemo(
     () => [1, 2, 3].map((count) => summarizeMaheDiceChoice(count, activePosition, trackSize)),
@@ -688,6 +695,26 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
     });
   }, [activePosition, dice.length, diceRollsLeft, diceSum, phase, trackSize]);
 
+  const maheMotionSignal = useMemo(() => [
+    phase,
+    activeSeatNo,
+    decisionSeatNo,
+    dice.join(","),
+    diceSum,
+    projectedDestination,
+    projectedSteps,
+    turtles.map((turtle) => String(get(turtle, "seat_no", "seatNo", 0)) + ":" + String(turtle.position || 0)).join("|"),
+    scores.map((score) => String(get(score, "seat_no", "seatNo", 0)) + ":" + String(score.score || 0)).join("|"),
+  ].join("::"), [activeSeatNo, decisionSeatNo, dice, diceSum, phase, projectedDestination, projectedSteps, scores, turtles]);
+
+  useGameGsapMotion({
+    scopeRef: maheBoardRef,
+    signal: maheMotionSignal,
+    selectors: MAHE_GSAP_SELECTORS,
+    from: MAHE_MOTION_FROM,
+    to: MAHE_MOTION_TO,
+  });
+
   const roll = async () => onAction({ action_type: "ROLL_DIE" });
   const stop = async () => onAction({ action_type: "STOP_ROLLING" });
   const choose = async (diceCount) => onAction({ action_type: "CHOOSE_DICE_COUNT", dice_count: diceCount });
@@ -699,18 +726,18 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
         ? "bg-amber-500 hover:bg-amber-600"
         : "bg-emerald-600 hover:bg-emerald-700";
     const choiceLabel = [
-      `${count}개 선택`,
-      `안전 ${summary.safePercent}%`,
-      `실패 ${summary.bustPercent}%`,
-      `성공 ${summary.minSafeSteps}-${summary.maxSafeSteps}칸`,
-      summary.scorePercent > 0 ? `득점 가능 ${summary.scorePercent}%` : `성공 평균 ${summary.expectedSafeSteps}칸`,
+      count + "개 선택",
+      "안전 " + summary.safePercent + "%",
+      "실패 " + summary.bustPercent + "%",
+      "성공 " + summary.minSafeSteps + "-" + summary.maxSafeSteps + "칸",
+      summary.scorePercent > 0 ? "득점 가능 " + summary.scorePercent + "%" : "성공 평균 " + summary.expectedSafeSteps + "칸",
       canChoose ? "선택 가능" : "선택 대기",
     ].join(" · ");
     return (
       <button
         key={count}
         type="button"
-        className={`min-h-[74px] rounded-xl px-3 py-2.5 text-left text-white shadow-sm transition disabled:opacity-40 ${tone}`}
+        className={"min-h-[74px] rounded-xl px-3 py-2.5 text-left text-white shadow-sm transition disabled:opacity-40 " + tone}
         disabled={!canChoose}
         onClick={() => choose(count).catch(() => notifyError("주사위 개수 선택 실패"))}
         aria-label={choiceLabel}
@@ -724,7 +751,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
           실패 {summary.bustPercent}% · 성공 {summary.minSafeSteps}-{summary.maxSafeSteps}칸
         </div>
         <div className="text-[10px] font-bold leading-relaxed text-white/85">
-          {summary.scorePercent > 0 ? `득점 가능 ${summary.scorePercent}%` : `성공 평균 ${summary.expectedSafeSteps}칸`}
+          {summary.scorePercent > 0 ? "득점 가능 " + summary.scorePercent + "%" : "성공 평균 " + summary.expectedSafeSteps + "칸"}
         </div>
       </button>
     );
@@ -743,21 +770,20 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
         <div className="grid grid-cols-3 gap-1.5">
           {nextRollOutcomes.map((outcome) => {
             const outcomeLabel = [
-              `다음 눈 ${outcome.face}`,
-              `합계 ${outcome.sum}`,
-              outcome.bust ? "실패" : `${outcome.steps}칸 이동`,
+              "다음 눈 " + outcome.face,
+              "합계 " + outcome.sum,
+              outcome.bust ? "실패" : outcome.steps + "칸 이동",
               outcome.scores ? "알 획득 가능" : "",
             ].filter(Boolean).join(" · ");
+            const outcomeTone = outcome.bust
+              ? "border-rose-100 bg-rose-50 text-rose-700"
+              : outcome.scores
+                ? "border-amber-100 bg-amber-50 text-amber-700"
+                : "border-emerald-100 bg-emerald-50 text-emerald-700";
             return (
               <div
                 key={outcome.face}
-                className={`rounded-lg border px-2 py-1.5 text-[10px] font-black leading-tight ${
-                  outcome.bust
-                    ? "border-rose-100 bg-rose-50 text-rose-700"
-                    : outcome.scores
-                      ? "border-amber-100 bg-amber-50 text-amber-700"
-                      : "border-emerald-100 bg-emerald-50 text-emerald-700"
-                }`}
+                className={"rounded-lg border px-2 py-1.5 text-[10px] font-black leading-tight " + outcomeTone}
                 role="img"
                 aria-label={outcomeLabel}
                 title={outcomeLabel}
@@ -767,7 +793,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
                   <span>합 {outcome.sum}</span>
                 </div>
                 <div className="mt-0.5 text-[9px] font-bold">
-                  {outcome.bust ? "실패" : `${outcome.steps}칸`}
+                  {outcome.bust ? "실패" : outcome.steps + "칸"}
                   {outcome.scores ? " · 알 가능" : ""}
                 </div>
               </div>
@@ -780,7 +806,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
 
   return (
     <>
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div ref={maheBoardRef} className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div id="mahe-board-panel" className="scroll-mt-24 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-lg sm:p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm font-black text-slate-900">
@@ -788,7 +814,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
             마헤 트랙
           </div>
           <div className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
-            {phase === "FINISHED" ? "게임 종료" : `${playerName(activeSeatNo)} 차례`}
+            {phase === "FINISHED" ? "게임 종료" : playerName(activeSeatNo) + " 차례"}
           </div>
           <div className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
             {variantName}
@@ -820,7 +846,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
             <div className="mt-1 text-[10px] font-bold text-slate-400">남은 카드 {eggDeck.length}</div>
           </div>
           <div
-            className={`absolute left-1/2 top-[62%] max-w-[72%] -translate-x-1/2 rounded-full border bg-white/90 px-2 py-1.5 shadow sm:top-[60%] sm:px-3 sm:py-2 ${startProjected ? "tabletop-projected-space border-amber-300 ring-2 ring-amber-200" : startActive ? "tabletop-active-space border-emerald-300 ring-2 ring-emerald-200" : "border-slate-200"}`}
+            className={"absolute left-1/2 top-[62%] max-w-[72%] -translate-x-1/2 rounded-full border bg-white/90 px-2 py-1.5 shadow sm:top-[60%] sm:px-3 sm:py-2 " + (startProjected ? "tabletop-projected-space border-amber-300 ring-2 ring-amber-200" : startActive ? "tabletop-active-space border-emerald-300 ring-2 ring-emerald-200" : "border-slate-200")}
             role="img"
             aria-label={startSpaceLabel}
             title={startSpaceLabel}
@@ -836,17 +862,17 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
             const activePositionCell = position === activePosition;
             const projectedPositionCell = position === projectedDestination && projectedSteps;
             const spaceLabel = [
-              `${position}번 칸`,
-              seatNos.length ? `아래에서 위 순서 ${seatNos.map((seatNo) => playerName(seatNo)).join(" → ")}` : "비어 있음",
+              position + "번 칸",
+              seatNos.length ? "아래에서 위 순서 " + seatNos.map((seatNo) => playerName(seatNo)).join(" → ") : "비어 있음",
               activePositionCell ? "현재 차례 거북이 위치" : "",
-              projectedPositionCell ? `${projectedSteps}칸 이동 시 도착 예정` : "",
+              projectedPositionCell ? projectedSteps + "칸 이동 시 도착 예정" : "",
               projectedPositionCell && projectedScores ? "알 획득 가능" : "",
             ].filter(Boolean).join(" · ");
             return (
               <div
                 key={position}
-                className={`absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border bg-white/90 text-[10px] font-black shadow sm:h-10 sm:w-10 lg:h-12 lg:w-12 ${projectedPositionCell ? "tabletop-projected-space border-amber-300 text-amber-700 ring-2 ring-amber-200" : activePositionCell ? "tabletop-active-space border-emerald-300 text-emerald-700 ring-2 ring-emerald-200" : "border-white text-slate-400"}`}
-                style={{ left: `${x}%`, top: `${y}%` }}
+                className={"absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border bg-white/90 text-[10px] font-black shadow sm:h-10 sm:w-10 lg:h-12 lg:w-12 " + (projectedPositionCell ? "tabletop-projected-space border-amber-300 text-amber-700 ring-2 ring-amber-200" : activePositionCell ? "tabletop-active-space border-emerald-300 text-emerald-700 ring-2 ring-emerald-200" : "border-white text-slate-400")}
+                style={{ left: x + "%", top: y + "%" }}
                 role="img"
                 aria-label={spaceLabel}
                 title={spaceLabel}
@@ -860,35 +886,35 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
         <div id="mahe-action-strip" className="tabletop-mobile-action-strip sticky z-20 mt-3 scroll-mt-24 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur xl:hidden">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs font-black text-slate-900" role="status" aria-live="polite" aria-atomic="true">{turnMessage}</div>
-            <div className={`rounded-full px-2 py-1 text-[11px] font-black ${diceSum > 7 ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
+            <div className={"rounded-full px-2 py-1 text-[11px] font-black " + (diceSum > 7 ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-600")}>
               합계 {diceSum || 0}
             </div>
           </div>
           {activeStackSeatNos.length > 1 && (
             <div className="mt-2 rounded-xl border border-teal-100 bg-teal-50 px-3 py-2 text-[11px] font-bold leading-relaxed text-teal-700">
               아래→위 {activeStackOrderText} · 이번 이동 {activeMovingText}
-              {activeIsCarried ? ` · 선택권 ${playerName(activeStackTopSeatNo)}` : ""}
-              {projectedScores || stopScores ? ` · ${scoreRecipientText}` : ""}
+              {activeIsCarried ? " · 선택권 " + playerName(activeStackTopSeatNo) : ""}
+              {projectedScores || stopScores ? " · " + scoreRecipientText : ""}
             </div>
           )}
           <div className="mt-2 flex items-center justify-between gap-2">
             <div className="flex gap-1.5">
               {[0, 1, 2].map((index) => (
-                <div key={index} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-base font-black text-slate-800">
+                <div key={index} data-gsap="mahe-dice-face" className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-base font-black text-slate-800">
                   {dice[index] || "-"}
                 </div>
               ))}
             </div>
-            <div className={`min-w-0 flex-1 rounded-xl border px-2 py-1.5 text-[11px] font-bold leading-relaxed ${maheRiskToneClasses[riskLevel]}`}>
+            <div className={"min-w-0 flex-1 rounded-xl border px-2 py-1.5 text-[11px] font-bold leading-relaxed " + maheRiskToneClasses[riskLevel]}>
               {riskLabel}
-              {stopSteps > 0 ? ` · 멈추면 ${stopSteps}칸` : ""}
+              {stopSteps > 0 ? " · 멈추면 " + stopSteps + "칸" : ""}
             </div>
           </div>
           {renderNextRollPreview()}
           <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-bold leading-relaxed text-slate-500">
             {bustReturnText}
-            {(projectedScores || stopScores) ? ` ${scoreRecipientText}` : ""}
-            {finalEggText ? ` ${finalEggText}` : ""}
+            {(projectedScores || stopScores) ? " " + scoreRecipientText : ""}
+            {finalEggText ? " " + finalEggText : ""}
           </div>
           {phase === "CHOOSE_DICE_COUNT" ? (
             <div className="mt-2 grid grid-cols-3 gap-2">
@@ -934,15 +960,15 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
           )}
           <div className="mt-3 flex gap-2">
             {[0, 1, 2].map((index) => (
-              <div key={index} className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xl font-black text-slate-800">
+              <div key={index} data-gsap="mahe-dice-face" className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xl font-black text-slate-800">
                 {dice[index] || "-"}
               </div>
             ))}
           </div>
-          <div className={`mt-3 rounded-xl px-3 py-2 text-sm font-black ${diceSum > 7 ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-600"}`}>
+          <div className={"mt-3 rounded-xl px-3 py-2 text-sm font-black " + (diceSum > 7 ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-600")}>
             합계 {diceSum}
           </div>
-          <div className={`mt-2 rounded-xl border px-3 py-2 text-xs font-bold leading-relaxed ${maheRiskToneClasses[riskLevel]}`}>
+          <div className={"mt-2 rounded-xl border px-3 py-2 text-xs font-bold leading-relaxed " + maheRiskToneClasses[riskLevel]}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-black">{riskLabel}</span>
               <span>안전 한도 {safeRemaining}</span>
@@ -954,7 +980,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
             )}
             {stopSteps > 0 && (
               <div className="mt-1">
-                지금 멈추면 {stopSteps}칸 이동{stopScores ? ` · ${playerName(projectedScorerSeatNo)}님 ${currentEgg ?? 0}점 알 획득 가능` : ""}
+                지금 멈추면 {stopSteps}칸 이동{stopScores ? " · " + playerName(projectedScorerSeatNo) + "님 " + (currentEgg ?? 0) + "점 알 획득 가능" : ""}
               </div>
             )}
             <div className="mt-1">{bustReturnText}</div>
@@ -963,7 +989,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
           {projectedSteps > 0 && (
             <div className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">
               예상 이동 {projectedSteps}칸 · 도착 {projectedDestination || "출발점"}
-              {projectedScores ? ` · ${playerName(projectedScorerSeatNo)}님 ${currentEgg ?? 0}점 획득 가능` : ""}
+              {projectedScores ? " · " + playerName(projectedScorerSeatNo) + "님 " + (currentEgg ?? 0) + "점 획득 가능" : ""}
             </div>
           )}
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-bold">
@@ -1023,7 +1049,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
             {scores.map((score) => {
               const seatNo = Number(get(score, "seat_no", "seatNo", 0));
               return (
-                <div key={seatNo || score.label} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <div key={seatNo || score.label} data-gsap="mahe-score-row" className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
                   <div className="flex items-center gap-2">
                     <TurtleStack seatNos={[seatNo]} />
                     <div>
@@ -1049,8 +1075,8 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
             {moveHistory.slice(-5).reverse().map((move) => (
               <div key={get(move, "turn_number", "turnNumber", 0)} className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
                 {get(move, "turn_number", "turnNumber", 0)} · {maheEventLabels[get(move, "action_type", "actionType", "")] || get(move, "action_type", "actionType", "")} · {playerName(get(move, "active_seat_no", "activeSeatNo", 0))}
-                {Number(get(move, "steps", "steps", 0)) > 0 ? ` · ${get(move, "steps", "steps", 0)}칸` : ""}
-                {Number(get(move, "value", "value", 0)) > 0 ? ` · ${get(move, "value", "value", 0)}점` : ""}
+                {Number(get(move, "steps", "steps", 0)) > 0 ? " · " + get(move, "steps", "steps", 0) + "칸" : ""}
+                {Number(get(move, "value", "value", 0)) > 0 ? " · " + get(move, "value", "value", 0) + "점" : ""}
               </div>
             ))}
             {!moveHistory.length && (
@@ -1072,7 +1098,7 @@ const MaheBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onAction })
       </div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {maheBottomSummaryItems.map((item) => (
-          <div key={item.key} className={`rounded-xl border px-3 py-2 ${item.tone}`} data-smoke="mahe-bottom-summary-item" data-summary-key={item.key}>
+          <div key={item.key} className={"rounded-xl border px-3 py-2 " + item.tone} data-smoke="mahe-bottom-summary-item" data-summary-key={item.key}>
             <div className="text-[10px] font-black opacity-70">{item.label}</div>
             <div className="mt-0.5 truncate text-sm font-black">{item.value}</div>
             <div className="mt-0.5 line-clamp-1 text-[10px] font-bold opacity-70">{item.detail}</div>

@@ -1,8 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
     ArrowRight,
+    BarChart3,
     Sparkles,
     MessageSquare,
     Eye,
@@ -15,6 +16,8 @@ import {
     Play,
     Clock3,
     Search,
+    Radio,
+    UsersRound,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { formatNumber, formatRelativeTime, stripHtmlTags } from "../../utils/helpers.js";
@@ -100,6 +103,13 @@ const HOME_QUICK_COMMANDS = [
     { title: "최신 게시글", hint: "최근 커뮤니티 글", to: "/app/boards/FREE_BOARD", prefetch: "boards" },
 ];
 
+const HOME_BRAND_POINTS = [
+    "커뮤니티",
+    "게임",
+    "생활 탐색",
+    "데이터 분석",
+];
+
 const readHomeStorage = (key) => {
     if (typeof window === "undefined") return "";
     try {
@@ -139,6 +149,7 @@ const readHomeResumeEntries = () => {
 
 export const Home = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const initialDashboardRef = useRef(homeAdapter.peekCachedDashboard({ user }));
     const [stats, setStats] = useState(() => initialDashboardRef.current?.stats || { summary: null, compare: null, unavailable: false });
     const [recentBoards, setRecentBoards] = useState(() => initialDashboardRef.current?.recentBoards || []);
@@ -190,10 +201,10 @@ export const Home = () => {
 
     const quickMenuItems = useMemo(() => {
         const items = [
-            { to: "/app/boards/FREE_BOARD", icon: MessageSquare, title: "사용자게시판", color: "blue", prefetch: "boards" },
-            { to: "/app/facility", icon: Car, title: "주변 찾기", color: "sky", prefetch: "facility" },
-            { to: "/app/games", icon: Dices, title: "게임 허브", color: "amber", prefetch: "games" },
-            { to: "/app/invest", icon: Bot, title: "투자 분석", color: "blue", prefetch: "invest" },
+            { to: "/app/boards/FREE_BOARD", icon: MessageSquare, title: "사용자게시판", description: "새 글, 공지, 댓글 흐름을 한눈에 따라갑니다.", color: "red", prefetch: "boards" },
+            { to: "/app/facility", icon: Car, title: "주변 찾기", description: "주차장, 병원, 도서관 등 오늘 필요한 장소를 찾습니다.", color: "sky", prefetch: "facility" },
+            { to: "/app/games", icon: Dices, title: "게임 허브", description: "보드게임과 비디오게임 진행 상태를 이어갑니다.", color: "amber", prefetch: "games" },
+            { to: "/app/invest", icon: Bot, title: "투자 분석", description: "지역과 시설 데이터를 바탕으로 판단을 돕습니다.", color: "blue", prefetch: "invest" },
         ];
         if (!resumeEntries.length) return items;
         return [items[2], items[0], items[1], items[3]];
@@ -495,7 +506,7 @@ export const Home = () => {
     return (
         <div className="space-y-8 animate-fade-in pb-10 sm:space-y-9 lg:space-y-10">
             <section
-                className="max-w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm"
+                className="surface-panel max-w-full px-4 py-3"
                 aria-label="홈 통계 요약"
                 aria-busy={statsPending}
             >
@@ -520,7 +531,7 @@ export const Home = () => {
                     </div>
                 </div>
                 {statsPending ? (
-                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500" role="status" aria-live="polite">
+                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-control px-3 py-2 text-xs font-bold text-ink-muted" role="status" aria-live="polite">
                         <span>통계를 불러오는 중입니다.</span>
                     </div>
                 ) : statsUnavailable ? (
@@ -528,7 +539,7 @@ export const Home = () => {
                         <span>통계 연결이 지연되고 있습니다.</span>
                         <button
                             type="button"
-                            className="rounded-full bg-white px-3 py-1 font-black text-amber-700 shadow-sm hover:text-amber-800 disabled:opacity-60"
+                            className="rounded-full bg-surface px-3 py-1 font-black text-amber-700 shadow-sm hover:text-amber-800 disabled:opacity-60"
                             onClick={refreshDashboard}
                             disabled={refreshing}
                             aria-label="통계 다시 불러오기"
@@ -539,11 +550,22 @@ export const Home = () => {
                 ) : null}
             </section>
 
+            <HomeBrandHero
+                userName={user?.name || user?.email?.split("@")[0]}
+                totalMembers={statValue(stats.summary?.totalMembers)}
+                todayVisitors={statValue(stats.summary?.todayVisitors)}
+                activeMembers={statValue(stats.summary?.activeMembers)}
+                totalBoards={statValue(stats.summary?.totalBoards)}
+                boardCount={recentBoards.length}
+                resumeCount={resumeEntries.length}
+                onBoardsPrefetch={prefetchBoardListRoute}
+            />
+
             <HomeResumeStrip entries={resumeEntries} />
 
             <section
                 ref={bannerSectionRef}
-                className="relative overflow-hidden rounded-[1.5rem] bg-white shadow-xl shadow-slate-200/60 sm:rounded-[2rem]"
+                className="surface-panel relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem]"
                 aria-label="홈 배너"
                 aria-roledescription="carousel"
                 aria-busy={bannersPending}
@@ -576,7 +598,7 @@ export const Home = () => {
             >
                 {heroBannersUnavailable ? (
                     <div className="absolute left-4 right-4 top-4 z-20 flex justify-end pointer-events-none sm:left-auto sm:right-6">
-                        <div className="pointer-events-auto max-w-full rounded-2xl border border-amber-100 bg-white/95 px-4 py-3 text-xs font-bold text-amber-800 shadow-xl backdrop-blur" role="status" aria-live="polite">
+                        <div className="pointer-events-auto max-w-full rounded-2xl border border-amber-100 bg-surface/95 px-4 py-3 text-xs font-bold text-amber-800 shadow-xl backdrop-blur" role="status" aria-live="polite">
                             <div className="flex flex-wrap items-center justify-end gap-2">
                                 <span>운영 배너 연결이 지연되고 있습니다.</span>
                                 <button
@@ -638,7 +660,7 @@ export const Home = () => {
 
                                     return (
                                         <div
-                                            className={`relative min-h-[160px] p-4 sm:min-h-[220px] sm:p-7 lg:min-h-[240px] ${adsense ? "bg-white text-slate-900" : "text-white"} ${!adsense && !hasImageBackground ? "bg-gradient-to-br from-primary-600 to-primary-400" : ""}`}
+                                            className={`relative min-h-[160px] p-4 sm:min-h-[220px] sm:p-7 lg:min-h-[240px] ${adsense ? "bg-surface text-ink" : "text-white"} ${!adsense && !hasImageBackground ? "bg-gradient-to-br from-primary-600 to-primary-400" : ""}`}
                                             style={contentBannerStyle}
                                         >
                                             <div className={`relative z-10 ${hasImageBackground ? "max-w-3xl [text-shadow:0_2px_12px_rgba(15,23,42,0.72)]" : ""}`}>
@@ -650,13 +672,13 @@ export const Home = () => {
 
                                                 {adsense ? (
                                                     <div className="mt-3">
-                                                        <h1 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">{banner.title || "광고"}</h1>
+                                                        <h1 className="text-lg font-black tracking-tight text-ink sm:text-2xl">{banner.title || "광고"}</h1>
                                                         {banner.description ? (
-                                                            <p className="mt-2 line-clamp-2 max-w-3xl text-sm font-medium text-slate-600">{banner.description}</p>
+                                                            <p className="mt-2 line-clamp-2 max-w-3xl text-sm font-medium text-ink-muted">{banner.description}</p>
                                                         ) : null}
-                                                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                                                        <div className="mt-4 rounded-2xl border border-line bg-control p-3">
                                                             {adsConsent === null ? (
-                                                                <div className="flex min-h-[130px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-4 text-center text-xs font-bold text-slate-500" role="status" aria-live="polite">
+                                                                <div className="flex min-h-[130px] items-center justify-center rounded-xl border border-dashed border-line bg-surface px-4 text-center text-xs font-bold text-ink-muted" role="status" aria-live="polite">
                                                                     광고 개인화 설정을 선택하면 이 영역이 활성화됩니다.
                                                                 </div>
                                                             ) : (
@@ -683,7 +705,7 @@ export const Home = () => {
                                                                     href={banner.linkUrl}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    className={`inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black ${hasImageBackground ? "text-slate-950 hover:bg-white/90" : "text-primary-700 hover:bg-primary-50"}`}
+                                                                    className={`inline-flex items-center gap-2 rounded-2xl bg-surface px-4 py-2 text-sm font-black ${hasImageBackground ? "text-ink hover:bg-control" : "text-primary-700 hover:bg-primary-50"}`}
                                                                     onClick={() => sendBannerEvent(banner, "CLICK")}
                                                                     tabIndex={isActiveBannerSlide(idx) ? undefined : -1}
                                                                 >
@@ -694,8 +716,12 @@ export const Home = () => {
                                                             {banner.linkUrl && banner.linkTarget === "INTERNAL" ? (
                                                                 <Link
                                                                     to={banner.linkUrl}
-                                                                    className={`inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black ${hasImageBackground ? "text-slate-950 hover:bg-white/90" : "text-primary-700 hover:bg-primary-50"}`}
-                                                                    onClick={() => sendBannerEvent(banner, "CLICK")}
+                                                                    className={`inline-flex items-center gap-2 rounded-2xl bg-surface px-4 py-2 text-sm font-black ${hasImageBackground ? "text-ink hover:bg-control" : "text-primary-700 hover:bg-primary-50"}`}
+                                                                    onClick={(event) => {
+                                                                        event.preventDefault();
+                                                                        sendBannerEvent(banner, "CLICK");
+                                                                        navigate(banner.linkUrl);
+                                                                    }}
                                                                     tabIndex={isActiveBannerSlide(idx) ? undefined : -1}
                                                                 >
                                                                     {banner.ctaText || "자세히 보기"}
@@ -715,10 +741,10 @@ export const Home = () => {
                 )}
 
                 {bannerCount > 1 && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white/95 px-3 py-2 backdrop-blur sm:px-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-surface/95 px-3 py-2 backdrop-blur sm:px-5">
                         <button
                             type="button"
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-black text-ink-muted shadow-sm transition hover:bg-control"
                             onClick={() => setIsBannerPaused((prev) => !prev)}
                             aria-pressed={isBannerPaused}
                             aria-label={isBannerPaused ? "배너 자동 전환 재생" : "배너 자동 전환 일시정지"}
@@ -729,7 +755,7 @@ export const Home = () => {
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 sm:h-9 sm:w-9"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-ink-muted shadow-sm transition hover:bg-control sm:h-9 sm:w-9"
                                 onClick={() => {
                                     setIsBannerPaused(true);
                                     handlePrev();
@@ -741,7 +767,7 @@ export const Home = () => {
                             </button>
                             <button
                                 type="button"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 sm:h-9 sm:w-9"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-ink-muted shadow-sm transition hover:bg-control sm:h-9 sm:w-9"
                                 onClick={() => {
                                     setIsBannerPaused(true);
                                     handleNext();
@@ -757,7 +783,7 @@ export const Home = () => {
                                 <button
                                     key={banner.id}
                                     type="button"
-                                    className={`h-2.5 rounded-full transition-all ${idx === bannerIndex ? "w-8 bg-primary-500" : "w-2.5 bg-slate-300"}`}
+                                    className={`h-2.5 rounded-full transition-all ${idx === bannerIndex ? "w-8 bg-primary-500" : "w-2.5 bg-control-hover"}`}
                                     onClick={() => {
                                         setIsBannerPaused(true);
                                         setIsTransitioning(true);
@@ -775,8 +801,8 @@ export const Home = () => {
             <section className="space-y-4" aria-labelledby="home-quick-menu-heading">
                 <div className="flex items-end justify-between px-2">
                     <div className="space-y-1">
-                        <h2 id="home-quick-menu-heading" className="flex items-center gap-2 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">주요 서비스</h2>
-                        <p className="text-sm font-medium text-slate-400">주요 기능을 바로 실행하세요.</p>
+                        <h2 id="home-quick-menu-heading" className="flex items-center gap-2 text-xl font-black tracking-tight text-ink sm:text-2xl">주요 서비스</h2>
+                        <p className="text-sm font-medium text-ink-subtle">주요 기능을 바로 실행하세요.</p>
                     </div>
                 </div>
                 <HomeQuickSearch
@@ -794,8 +820,8 @@ export const Home = () => {
             <section className="space-y-4" aria-labelledby="home-boards-heading" aria-busy={boardsPending}>
                 <div className="flex items-end justify-between px-2">
                     <div className="space-y-1">
-                        <h2 id="home-boards-heading" className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">최신 게시글</h2>
-                        <p className="text-sm font-medium text-slate-400">커뮤니티의 새 글을 빠르게 확인하세요.</p>
+                        <h2 id="home-boards-heading" className="text-xl font-black tracking-tight text-ink sm:text-2xl">최신 게시글</h2>
+                        <p className="text-sm font-medium text-ink-subtle">커뮤니티의 새 글을 빠르게 확인하세요.</p>
                     </div>
                     <Link
                         to="/app/boards/FREE_BOARD"
@@ -811,7 +837,7 @@ export const Home = () => {
                 {boardsPending ? (
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3" data-home-boards-loading="true" role="status" aria-live="polite" aria-label="최신 게시글을 불러오는 중입니다.">
                         {[0, 1, 2].map((item) => (
-                            <div key={item} className="card bg-surface p-4 sm:p-5">
+                            <div key={item} className="surface-card p-4 sm:p-5">
                                 <div className="mb-3 h-4 w-28 rounded-lg bg-control" />
                                 <div className="mb-3 h-5 w-3/4 rounded-xl bg-control" />
                                 <div className="space-y-2">
@@ -833,7 +859,7 @@ export const Home = () => {
                             </div>
                             <button
                                 type="button"
-                                className="rounded-full bg-white px-4 py-2 text-xs font-black text-amber-700 shadow-sm hover:text-amber-800 disabled:opacity-60"
+                                className="rounded-full bg-surface px-4 py-2 text-xs font-black text-amber-700 shadow-sm hover:text-amber-800 disabled:opacity-60"
                                 onClick={refreshDashboard}
                                 disabled={refreshing}
                                 aria-label="최신 게시글 다시 불러오기"
@@ -850,7 +876,7 @@ export const Home = () => {
                                 <Link
                                     key={board.id}
                                     to={`/app/boards/${board.kind}/${board.id}`}
-                                className="card group bg-surface p-4 sm:p-5"
+                                className="surface-card group p-4 sm:p-5"
                                     onPointerEnter={prefetchBoardDetailRoute}
                                     onFocus={prefetchBoardDetailRoute}
                                     onTouchStart={prefetchBoardDetailRoute}
@@ -886,7 +912,7 @@ export const Home = () => {
                         })}
                     </div>
                 ) : (
-                    <div className="rounded-[2rem] border border-dashed border-line bg-surface">
+                    <div className="surface-panel border-dashed">
                         <EmptyState message="아직 최신 게시글이 없습니다." subMessage="첫 게시글을 작성해 커뮤니티를 시작해보세요." />
                     </div>
                 )}
@@ -912,22 +938,191 @@ export const Home = () => {
     );
 };
 
+const HomeBrandHero = ({
+    userName,
+    totalMembers,
+    todayVisitors,
+    activeMembers,
+    totalBoards,
+    boardCount,
+    resumeCount,
+    onBoardsPrefetch,
+}) => {
+    const displayName = String(userName || "").trim();
+    const headlineName = displayName.length > 14 ? `${displayName.slice(0, 14)}...` : displayName;
+    const headlineOwner = headlineName ? `${headlineName}님의` : "오늘의";
+    const statCards = [
+        { label: "오늘 방문자", value: todayVisitors, icon: Radio },
+        { label: "활성 사용자", value: activeMembers, icon: UsersRound },
+        { label: "전체 게시글", value: totalBoards, icon: BarChart3 },
+    ];
+
+    return (
+        <section className="relative isolate overflow-hidden rounded-[1.5rem] border border-slate-950 bg-slate-950 text-white shadow-panel sm:rounded-[2rem]" aria-labelledby="home-brand-hero-heading">
+            <div className="home-hero-ribbon pointer-events-none absolute inset-y-0 right-0 w-2/5 bg-red-600/95" />
+            <div className="pointer-events-none absolute bottom-8 left-[-8%] h-10 w-[116%] -rotate-2 bg-white/10" />
+            <div className="pointer-events-none absolute right-0 top-0 h-full w-full bg-[linear-gradient(120deg,rgba(255,255,255,0.08),transparent_42%,rgba(239,68,68,0.16))]" />
+
+            <div className="relative grid gap-8 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-10">
+                <div className="flex min-w-0 flex-col justify-between gap-7">
+                    <div>
+                        <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-black text-white/90 backdrop-blur">
+                            <Sparkles className="h-3.5 w-3.5 shrink-0 text-red-200" />
+                            <span className="truncate">Docky daily command center</span>
+                        </div>
+                        <h1 id="home-brand-hero-heading" className="mt-5 text-4xl font-black leading-none text-white sm:text-6xl lg:text-7xl">
+                            <span className="block">재미가 모이는 항구</span>
+                            <span className="block text-red-200">Docky</span>
+                        </h1>
+                        <p className="mt-5 max-w-2xl text-sm font-semibold leading-7 text-white/80 sm:text-base">
+                            Docky는 다양한 컨텐츠를 한 화면에서 이어주는 생활형 서비스 허브입니다.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                        <Link
+                            to="/app/boards/FREE_BOARD"
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-black/20 transition hover:bg-red-50"
+                            onPointerEnter={onBoardsPrefetch}
+                            onFocus={onBoardsPrefetch}
+                            onTouchStart={onBoardsPrefetch}
+                        >
+                            새 글 보러가기
+                            <ArrowRight className="h-4 w-4" />
+                        </Link>
+                        <Link
+                            to="/app/games"
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20"
+                            onPointerEnter={() => prefetchHomeRoute("games")}
+                            onFocus={() => prefetchHomeRoute("games")}
+                            onTouchStart={() => prefetchHomeRoute("games")}
+                        >
+                            {resumeCount ? `이어하기 ${resumeCount}` : "게임 허브"}
+                            <ArrowRight className="h-4 w-4" />
+                        </Link>
+                    </div>
+
+                    <dl className="grid gap-2 sm:grid-cols-3">
+                        {statCards.map((item) => {
+                            const Icon = item.icon;
+                            return (
+                                <div key={item.label} className="min-w-0 rounded-xl border border-white/10 bg-white/10 p-3 backdrop-blur">
+                                    <dt className="flex items-center gap-2 text-[11px] font-black text-white/60">
+                                        <Icon className="h-3.5 w-3.5 shrink-0 text-red-200" />
+                                        <span className="truncate">{item.label}</span>
+                                    </dt>
+                                    <dd className="mt-2 text-2xl font-black text-white">{item.value}</dd>
+                                </div>
+                            );
+                        })}
+                    </dl>
+                </div>
+
+                <div className="min-w-0">
+                    <DockySignalArtwork boardCount={boardCount} totalMembers={totalMembers} />
+                </div>
+            </div>
+
+            <div className="relative grid border-t border-white/10 bg-white/[0.06] sm:grid-cols-4">
+                {HOME_BRAND_POINTS.map((point) => (
+                    <div key={point} className="border-white/10 px-4 py-3 text-sm font-black text-white/80 sm:border-r last:sm:border-r-0">
+                        {point}
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+};
+
+const DockySignalArtwork = ({ boardCount, totalMembers }) => {
+    return (
+        <div className="relative min-h-[260px] overflow-hidden rounded-[1.25rem] border border-white/20 bg-white/[0.08] p-4 shadow-2xl shadow-black/20 sm:min-h-[340px] sm:p-5">
+            <div className="absolute inset-x-5 top-5 flex items-center justify-between text-[11px] font-black text-white/60">
+                <span>Live Docky Map</span>
+                <span>{boardCount ? `새 글 ${boardCount}` : "대기 중"}</span>
+            </div>
+            <svg className="absolute inset-0 h-full w-full" viewBox="0 0 520 360" role="img" aria-label="Docky 서비스 흐름을 표현한 시각 자산">
+                <defs>
+                    <linearGradient id="dockySignalRed" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#fca5a5" />
+                        <stop offset="45%" stopColor="#ef4444" />
+                        <stop offset="100%" stopColor="#38bdf8" />
+                    </linearGradient>
+                    <linearGradient id="dockyCardFill" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
+                        <stop offset="100%" stopColor="rgba(255,255,255,0.72)" />
+                    </linearGradient>
+                </defs>
+
+                <path className="home-signal-line" d="M58 246 C138 130 214 310 304 178 S438 104 468 220" fill="none" stroke="url(#dockySignalRed)" strokeWidth="8" strokeLinecap="round" />
+                <path className="home-signal-line home-signal-line-delay" d="M70 118 C158 72 210 168 286 118 S400 56 456 118" fill="none" stroke="rgba(255,255,255,0.36)" strokeWidth="4" strokeLinecap="round" />
+
+                <g className="home-signal-card home-signal-card-a">
+                    <rect x="44" y="156" width="128" height="92" rx="18" fill="url(#dockyCardFill)" />
+                    <circle cx="78" cy="190" r="18" fill="#fee2e2" />
+                    <path d="M71 190h14M78 183v14" stroke="#dc2626" strokeWidth="5" strokeLinecap="round" />
+                    <rect x="104" y="178" width="44" height="10" rx="5" fill="#0f172a" opacity="0.88" />
+                    <rect x="70" y="218" width="78" height="8" rx="4" fill="#94a3b8" opacity="0.5" />
+                </g>
+
+                <g className="home-signal-card home-signal-card-b">
+                    <rect x="194" y="208" width="142" height="98" rx="20" fill="rgba(15,23,42,0.86)" stroke="rgba(255,255,255,0.18)" />
+                    <circle cx="232" cy="246" r="20" fill="#f59e0b" />
+                    <circle cx="232" cy="246" r="6" fill="#fff7ed" />
+                    <rect x="264" y="232" width="42" height="10" rx="5" fill="#ffffff" opacity="0.92" />
+                    <rect x="230" y="276" width="72" height="8" rx="4" fill="#ffffff" opacity="0.42" />
+                </g>
+
+                <g className="home-signal-card home-signal-card-c">
+                    <rect x="324" y="92" width="138" height="98" rx="20" fill="rgba(255,255,255,0.94)" />
+                    <circle cx="362" cy="130" r="20" fill="#dbeafe" />
+                    <path d="M354 133l8-12 10 18 8-13" fill="none" stroke="#2563eb" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                    <rect x="394" y="116" width="42" height="10" rx="5" fill="#0f172a" opacity="0.88" />
+                    <rect x="360" y="160" width="76" height="8" rx="4" fill="#94a3b8" opacity="0.5" />
+                </g>
+
+                <g className="home-signal-node home-signal-node-a">
+                    <circle cx="58" cy="246" r="10" fill="#fff" />
+                    <circle cx="58" cy="246" r="18" fill="none" stroke="#fff" strokeOpacity="0.35" />
+                </g>
+                <g className="home-signal-node home-signal-node-b">
+                    <circle cx="304" cy="178" r="10" fill="#fff" />
+                    <circle cx="304" cy="178" r="18" fill="none" stroke="#fff" strokeOpacity="0.35" />
+                </g>
+                <g className="home-signal-node home-signal-node-c">
+                    <circle cx="468" cy="220" r="10" fill="#fff" />
+                    <circle cx="468" cy="220" r="18" fill="none" stroke="#fff" strokeOpacity="0.35" />
+                </g>
+            </svg>
+            <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-white backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <p className="text-xs font-black text-white/60">Docky network</p>
+                        <p className="mt-1 text-lg font-black">{totalMembers}명이 연결된 허브</p>
+                    </div>
+                    <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-black text-white shadow-lg shadow-red-950/30">LIVE</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const HomeResumeStrip = ({ entries }) => {
     if (!entries.length) return null;
 
     return (
-        <section className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3 shadow-sm sm:p-4" aria-label="최근 이어하기" data-smoke="home-resume-strip">
+        <section className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-3 shadow-card sm:p-4" aria-label="최근 이어하기" data-smoke="home-resume-strip">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-amber-600 shadow-sm">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-amber-600 shadow-sm">
                         <Clock3 className="h-4 w-4" />
                     </span>
                     <div>
-                        <h2 className="text-sm font-black text-slate-900">최근 이어하기</h2>
-                        <p className="text-xs font-bold text-slate-500">진행 중인 방과 저장된 게임만 표시합니다.</p>
+                        <h2 className="text-sm font-black text-ink">최근 이어하기</h2>
+                        <p className="text-xs font-bold text-ink-muted">진행 중인 방과 저장된 게임만 표시합니다.</p>
                     </div>
                 </div>
-                <Link to="/app/games" className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-amber-700 shadow-sm hover:text-amber-800">
+                <Link to="/app/games" className="rounded-full bg-surface px-3 py-1.5 text-xs font-black text-amber-700 shadow-sm hover:text-amber-800">
                     전체 게임
                 </Link>
             </div>
@@ -936,11 +1131,11 @@ const HomeResumeStrip = ({ entries }) => {
                     <Link
                         key={entry.key}
                         to={entry.to}
-                        className="group flex min-w-0 items-center justify-between gap-3 rounded-xl border border-white bg-white/90 px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md"
+                        className="group flex min-w-0 items-center justify-between gap-3 rounded-xl border border-amber-100 bg-surface/90 px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md"
                     >
                         <span className="min-w-0">
-                            <span className="block truncate text-sm font-black text-slate-900">{entry.title}</span>
-                            <span className="block truncate text-xs font-bold text-slate-500">{entry.detail}</span>
+                            <span className="block truncate text-sm font-black text-ink">{entry.title}</span>
+                            <span className="block truncate text-xs font-bold text-ink-muted">{entry.detail}</span>
                         </span>
                         <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-black text-amber-700 group-hover:bg-amber-200">
                             이어하기
@@ -956,17 +1151,17 @@ const HomeQuickSearch = ({ query, results, onQueryChange }) => {
     const hasQuery = query.trim().length > 0;
 
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-smoke="home-quick-search">
+        <div className="surface-card p-3" data-smoke="home-quick-search">
             <label className="sr-only" htmlFor="home-quick-search">빠른 이동 검색</label>
             <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                <Search className="h-4 w-4 shrink-0 text-ink-subtle" />
                 <input
                     id="home-quick-search"
                     type="search"
                     value={query}
                     onChange={(event) => onQueryChange(event.target.value)}
                     placeholder="게임, 게시판, 주변 찾기 검색"
-                    className="min-w-0 flex-1 bg-transparent text-sm font-bold text-slate-800 outline-none placeholder:text-slate-400"
+                    className="min-w-0 flex-1 bg-transparent text-sm font-bold text-ink outline-none placeholder:text-ink-subtle"
                     autoComplete="off"
                 />
             </div>
@@ -980,7 +1175,7 @@ const HomeQuickSearch = ({ query, results, onQueryChange }) => {
                             <Link
                                 key={`${item.to}-${item.title}`}
                                 to={item.to}
-                                className="rounded-xl bg-slate-50 px-3 py-2 text-left transition hover:bg-primary-50"
+                                className="rounded-xl bg-control px-3 py-2 text-left transition hover:bg-primary-50"
                                 onPointerEnter={handlePrefetch}
                                 onFocus={handlePrefetch}
                                 onFocusCapture={handlePrefetch}
@@ -988,12 +1183,12 @@ const HomeQuickSearch = ({ query, results, onQueryChange }) => {
                                 aria-label={`${item.title} 바로 이동`}
                                 role="listitem"
                             >
-                                <span className="block text-sm font-black text-slate-900">{item.title}</span>
-                                <span className="block text-xs font-bold text-slate-500">{item.hint}</span>
+                                <span className="block text-sm font-black text-ink">{item.title}</span>
+                                <span className="block text-xs font-bold text-ink-muted">{item.hint}</span>
                             </Link>
                         );
                     }) : (
-                        <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500" role="status">
+                        <div className="rounded-xl bg-control px-3 py-2 text-xs font-bold text-ink-muted" role="status">
                             일치하는 바로가기가 없습니다.
                         </div>
                     )}
@@ -1044,11 +1239,11 @@ const PrivacyPolicyFooter = () => {
     ];
 
     return (
-        <footer className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-[11px] text-slate-500 shadow-sm sm:px-4" aria-labelledby="home-footer-info-heading">
+        <footer className="rounded-xl border border-line bg-surface px-3 py-3 text-[11px] text-ink-muted shadow-card sm:px-4" aria-labelledby="home-footer-info-heading">
             <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <h2 id="home-footer-info-heading" className="text-xs font-black text-slate-800 sm:text-sm">사업자 정보 및 개인정보처리방침</h2>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-black text-slate-600">시행일 2026.06.03</span>
+                    <h2 id="home-footer-info-heading" className="text-xs font-black text-ink sm:text-sm">사업자 정보 및 개인정보처리방침</h2>
+                    <span className="rounded-full bg-control px-2 py-0.5 font-black text-ink-muted">시행일 2026.06.03</span>
                 </div>
                 <p className="font-medium leading-snug">
                     전자상거래 등에서의 소비자보호에 관한 법률 및 개인정보 보호법에 따라 Docky 운영자 정보와 개인정보 처리 기준을 고지합니다.
@@ -1056,8 +1251,8 @@ const PrivacyPolicyFooter = () => {
                 <dl className="flex flex-wrap gap-x-3 gap-y-1 leading-snug">
                     {businessInfo.map(([label, value]) => (
                         <div key={label} className="inline-flex min-w-0 items-baseline gap-1">
-                            <dt className="shrink-0 font-black text-slate-700">{label}</dt>
-                            <dd className="min-w-0 break-words font-bold text-slate-500">{value}</dd>
+                            <dt className="shrink-0 font-black text-ink-muted">{label}</dt>
+                            <dd className="min-w-0 break-words font-bold text-ink-subtle">{value}</dd>
                         </div>
                     ))}
                 </dl>
@@ -1066,20 +1261,20 @@ const PrivacyPolicyFooter = () => {
                 </p>
             </div>
 
-            <details className="mt-2 rounded-xl bg-slate-50 px-3 py-2">
-                <summary className="cursor-pointer text-xs font-black text-slate-700 sm:text-sm">개인정보처리방침 상세 내용 보기</summary>
+            <details className="mt-2 rounded-xl bg-control px-3 py-2">
+                <summary className="cursor-pointer text-xs font-black text-ink-muted sm:text-sm">개인정보처리방침 상세 내용 보기</summary>
                 <p className="mt-3 font-medium leading-snug">
                     Docky는 개인정보 보호법 등 관계 법령에 따라 이용자의 개인정보를 필요한 범위에서만 처리하며, 처리 목적이 달성된 정보는 지체 없이 파기합니다.
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {privacyItems.map((item) => (
-                        <section key={item.title} className="rounded-xl border border-slate-200 bg-white p-2.5">
-                            <h3 className="font-black text-slate-700">{item.title}</h3>
+                        <section key={item.title} className="rounded-xl border border-line bg-surface p-2.5">
+                            <h3 className="font-black text-ink-muted">{item.title}</h3>
                             <p className="mt-1 leading-snug">{item.body}</p>
                         </section>
                     ))}
                 </div>
-                <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2.5 leading-snug">
+                <div className="mt-2 rounded-xl border border-line bg-surface p-2.5 leading-snug">
                     개인정보 보호 관련 문의, 권리 행사, 불만 처리는 사이트 내 문의 기능 또는 관리자 연락 채널로 접수할 수 있습니다. 방침 변경 시 변경 내용과 시행일을 서비스 화면에 공지합니다.
                 </div>
             </details>
@@ -1090,8 +1285,8 @@ const PrivacyPolicyFooter = () => {
 const HeaderStat = ({ label, value, trend }) => {
     return (
         <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400">{label}</span>
-            <span className="text-sm font-black text-slate-900" data-home-stat-value="true">{value}</span>
+            <span className="text-xs font-bold text-ink-subtle">{label}</span>
+            <span className="text-sm font-black text-ink" data-home-stat-value="true">{value}</span>
             {trend ? (
                 <span className={`inline-flex items-center gap-1 text-[11px] font-black ${trend.isGrowth ? "text-primary-600" : "text-rose-600"}`}>
                     {trend.isGrowth ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -1102,17 +1297,35 @@ const HeaderStat = ({ label, value, trend }) => {
     );
 };
 
-const QuickMenuLink = ({ to, icon: Icon, title, color, prefetch }) => {
+const QuickMenuLink = ({ to, icon: Icon, title, description, color, prefetch }) => {
     const linkRef = useRef(null);
     const colors = {
-        blue: "text-blue-500 bg-white shadow-blue-100",
-        rose: "text-rose-500 bg-white shadow-rose-100",
-        sky: "text-sky-500 bg-white shadow-sky-100",
-        amber: "text-amber-500 bg-white shadow-amber-100",
-        emerald: "text-emerald-500 bg-white shadow-emerald-100",
-        indigo: "text-indigo-500 bg-white shadow-indigo-100",
-        slate: "text-slate-500 bg-white shadow-slate-100",
+        blue: {
+            shell: "border-line bg-surface/95 hover:border-blue-300 hover:bg-surface-raised/95",
+            icon: "bg-blue-600 text-white shadow-blue-500/20",
+            label: "text-blue-600",
+            rail: "bg-blue-500",
+        },
+        red: {
+            shell: "border-line bg-surface/95 hover:border-red-300 hover:bg-surface-raised/95",
+            icon: "bg-red-600 text-white shadow-red-500/20",
+            label: "text-red-600",
+            rail: "bg-red-500",
+        },
+        sky: {
+            shell: "border-line bg-surface/95 hover:border-sky-300 hover:bg-surface-raised/95",
+            icon: "bg-sky-600 text-white shadow-sky-500/20",
+            label: "text-sky-600",
+            rail: "bg-sky-500",
+        },
+        amber: {
+            shell: "border-line bg-surface/95 hover:border-amber-300 hover:bg-surface-raised/95",
+            icon: "bg-amber-500 text-slate-950 shadow-amber-500/20",
+            label: "text-amber-600",
+            rail: "bg-amber-500",
+        },
     };
+    const tone = colors[color] || colors.blue;
 
     const handlePrefetch = () => {
         if (prefetch) prefetchHomeRoute(prefetch);
@@ -1129,17 +1342,29 @@ const QuickMenuLink = ({ to, icon: Icon, title, color, prefetch }) => {
         <Link
             ref={linkRef}
             to={to}
-            className="group flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 sm:min-h-[132px]"
+            className={`group relative flex min-h-[158px] overflow-hidden rounded-[1.25rem] border p-4 shadow-card backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-panel active:scale-[0.99] sm:min-h-[184px] ${tone.shell}`}
             onPointerEnter={handlePrefetch}
             onFocus={handlePrefetch}
             onFocusCapture={handlePrefetch}
             onTouchStart={handlePrefetch}
             aria-label={`${title} 바로가기`}
         >
-            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-md transition-all duration-300 group-hover:scale-105 sm:h-16 sm:w-16 lg:h-20 lg:w-20 ${colors[color]}`}>
-                <Icon className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" />
+            <div className={`absolute inset-x-0 top-0 h-1.5 ${tone.rail}`} />
+            <div className="pointer-events-none absolute -right-12 top-7 h-16 w-36 -rotate-12 bg-ink/5" />
+            <div className="relative flex h-full min-w-0 flex-1 flex-col justify-between">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg transition-all duration-300 group-hover:scale-105 ${tone.icon}`}>
+                    <Icon className="h-6 w-6" />
+                </div>
+                <div className="mt-5 min-w-0">
+                    <span className={`block text-xs font-black ${tone.label}`}>Docky service</span>
+                    <span className="mt-1 block text-xl font-black leading-tight text-ink">{title}</span>
+                    <span className="mt-2 block text-sm font-semibold leading-6 text-ink-muted">{description}</span>
+                </div>
+                <div className="mt-4 inline-flex items-center gap-2 text-sm font-black text-ink transition group-hover:text-red-600">
+                    바로가기
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </div>
             </div>
-            <span className="text-center text-sm font-bold leading-tight text-slate-600 transition-colors group-hover:text-primary-600 sm:text-base">{title}</span>
         </Link>
     );
 };

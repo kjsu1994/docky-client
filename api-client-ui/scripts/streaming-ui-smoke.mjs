@@ -20,7 +20,9 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "streaming-ui-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
-    { name: "mobile", width: 390, height: 844, mobile: true },
+    { name: "tablet", width: 768, height: 1024, mobile: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3 },
 ];
 const listTexts = ["영상 스트리밍 허브", "재생 목록", "테스트 강의", "외부 썸네일 차단", "상세 보기", "재생 가능"];
 const playerTexts = ["현재 재생", "재생 정보", "목록으로 돌아가기", "플레이리스트"];
@@ -205,7 +207,7 @@ async function inspectStreaming(ws, viewport, requestLog) {
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     });
     await send(ws, "Page.navigate", { url: `${baseUrl}/app/streaming` });

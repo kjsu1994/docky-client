@@ -602,6 +602,24 @@ const gameSectionsByTab = {
 
 const gamesByPreview = new Map([...boardGames, ...videoGames].map((game) => [game.preview, game]));
 
+const useCompactGameHubCards = () => {
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const queries = [
+      window.matchMedia("(max-width: 639px)"),
+      window.matchMedia("(pointer: coarse)"),
+    ];
+    const update = () => setCompact(queries.some((query) => query.matches));
+    update();
+    queries.forEach((query) => query.addEventListener?.("change", update));
+    return () => queries.forEach((query) => query.removeEventListener?.("change", update));
+  }, []);
+
+  return compact;
+};
+
 const GameHubJourneyPanel = ({ activeTab }) => {
   const isVideo = activeTab === "video";
   const gameCount = isVideo ? videoGames.length : boardGames.length;
@@ -2285,7 +2303,7 @@ const GameCardBriefPanel = ({ game, experience }) => {
 
   return (
     <div
-      className="mt-3 grid grid-cols-2 gap-1.5"
+      className="mt-3 hidden grid-cols-2 gap-1.5 sm:grid"
       data-smoke="game-card-brief-panel"
       data-brief-type={isVideo ? "video" : "board"}
       data-game-title={game.title}
@@ -2305,25 +2323,358 @@ const GameCardBriefPanel = ({ game, experience }) => {
   );
 };
 
-const GameCard = ({ game, onOpenManual }) => {
+const gameCardMotionKinds = {
+  poker: "poker-pot",
+  dice: "casino-dice",
+  cards: "no-thanks",
+  catan: "catan-trade",
+  blokus: "blokus-grid",
+  mahe: "mahe-turtle",
+  dalmuti: "dalmuti-crown",
+  "six-nimmt": "six-row",
+  telestrations: "sketch-pass",
+  mafia: "mafia-night",
+  citadels: "citadels-build",
+  arena: "arena-target",
+  fortress: "fortress-siege",
+  defense: "tower-defense",
+  kart: "kart-lap",
+  bomb: "bomb-fuse",
+  snake: "snake-trail",
+  coin: "coin-stack",
+  rpg: "rpg-tree",
+};
+
+const GameCardMotionPreview = ({ game, selected = false, variant = "panel", dataSmoke = "game-card-hover-art" }) => {
+  const kind = gameCardMotionKinds[game.preview] || "signal";
+  const isHero = variant === "hero";
+
+  return (
+    <div
+      className={`game-card-motion overflow-hidden bg-slate-950 text-white shadow-inner transition-opacity duration-300 ${
+        isHero
+          ? `pointer-events-none absolute inset-0 h-full w-full rounded-lg border-0 ${selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`
+          : "relative h-24 rounded-xl border border-line"
+      }`}
+      data-smoke={dataSmoke}
+      data-motion-kind={kind}
+      data-active={selected ? "true" : "false"}
+      aria-hidden="true"
+    >
+      <div className={`absolute inset-0 bg-gradient-to-br ${game.tone} opacity-35`} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.28),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.1),rgba(15,23,42,0.78))]" />
+
+      {kind === "casino-dice" && (
+        <div className="absolute inset-0 flex items-center justify-center gap-2">
+          {[5, 3, 6].map((value, index) => (
+            <div key={index} className="game-card-motion-die grid h-9 w-9 grid-cols-3 grid-rows-3 gap-1 rounded-xl bg-white p-2 shadow-lg sm:h-10 sm:w-10" style={{ "--motion-index": index }}>
+              {Array.from({ length: 9 }).map((_, dot) => (
+                <span key={dot} className={`rounded-full ${[0, 2, 4, 6, 8].slice(0, value).includes(dot) ? "bg-slate-900" : "bg-transparent"}`} />
+              ))}
+            </div>
+          ))}
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="game-card-motion-chip absolute bottom-3 h-6 w-6 rounded-full border-4 border-amber-100 bg-amber-400 shadow-lg" style={{ left: `${58 + index * 18}%`, "--motion-index": index }} />
+          ))}
+        </div>
+      )}
+
+      {kind === "poker-pot" && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="game-card-motion-card absolute h-16 w-11 rounded-lg border border-white/70 bg-white shadow-xl" style={{ "--motion-index": index }}>
+              <div className="m-1 text-[10px] font-black text-rose-600">{index === 1 ? "A" : "K"}</div>
+              <div className="mx-auto mt-2 h-5 w-5 rotate-45 rounded-sm bg-rose-500" />
+            </div>
+          ))}
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="game-card-motion-chip absolute bottom-4 h-7 w-7 rounded-full border-4 border-emerald-100 bg-emerald-400 shadow-lg" style={{ left: `${30 + index * 12}%`, "--motion-index": index }} />
+          ))}
+        </div>
+      )}
+
+      {kind === "no-thanks" && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="game-card-motion-card absolute h-16 w-12 rounded-xl border border-white/80 bg-rose-500 p-2 text-center text-white shadow-xl" style={{ "--motion-index": 1 }}>
+            <div className="text-[10px] font-black">NO</div>
+            <div className="mt-1 text-2xl font-black">24</div>
+          </div>
+          <div className="game-card-motion-chip absolute bottom-4 right-12 h-8 w-8 rounded-full border-4 border-cyan-100 bg-cyan-400 shadow-lg" />
+          <div className="game-card-motion-chip absolute left-12 top-5 h-6 w-6 rounded-full border-4 border-amber-100 bg-amber-400 shadow-lg" style={{ "--motion-index": 1 }} />
+        </div>
+      )}
+
+      {kind === "catan-trade" && (
+        <div className="absolute inset-0">
+          <svg viewBox="0 0 260 96" className="h-full w-full">
+            <path className="game-card-motion-path" d="M42 58 C78 22 118 28 138 54 S196 74 222 34" fill="none" stroke="rgba(255,255,255,.72)" strokeWidth="5" strokeLinecap="round" />
+            {[
+              [42, 58, "#f59e0b"], [86, 32, "#22c55e"], [134, 54, "#38bdf8"], [180, 68, "#eab308"], [222, 34, "#ef4444"],
+            ].map(([x, y, fill], index) => (
+              <polygon key={x} className="game-card-motion-node" points={`${x},${y - 12} ${x + 11},${y - 6} ${x + 11},${y + 6} ${x},${y + 12} ${x - 11},${y + 6} ${x - 11},${y - 6}`} fill={fill} style={{ "--motion-index": index }} />
+            ))}
+          </svg>
+        </div>
+      )}
+
+      {kind === "blokus-grid" && (
+        <div className="absolute inset-0 grid grid-cols-6 gap-1 p-4">
+          {Array.from({ length: 18 }).map((_, index) => (
+            <span key={index} className={`game-card-motion-tile rounded-md ring-1 ring-white/20 ${["bg-sky-400", "bg-fuchsia-400", "bg-amber-300", "bg-emerald-400"][index % 4]}`} style={{ "--motion-index": index, gridColumn: index === 6 ? "span 2" : undefined }} />
+          ))}
+        </div>
+      )}
+
+      {kind === "mahe-turtle" && (
+        <div className="absolute inset-0">
+          <div className="absolute left-4 right-4 top-1/2 h-2 -translate-y-1/2 rounded-full bg-white/25" />
+          <div className="absolute left-5 right-5 top-1/2 flex -translate-y-1/2 justify-between">
+            {[0, 1, 2, 3, 4].map((index) => <span key={index} className="h-3 w-3 rounded-full bg-white/70" />)}
+          </div>
+          <div className="game-card-motion-turtle absolute left-5 top-1/2 h-8 w-12 -translate-y-1/2 rounded-[999px] bg-emerald-300 shadow-lg">
+            <span className="absolute -right-2 top-2 h-4 w-4 rounded-full bg-emerald-300" />
+            <span className="absolute left-4 top-2 h-4 w-4 rounded-full bg-emerald-700/70" />
+          </div>
+          <div className="absolute right-6 top-5 rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black text-amber-900">egg</div>
+        </div>
+      )}
+
+      {kind === "dalmuti-crown" && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="game-card-motion-card absolute h-16 w-12 rounded-lg border border-white/70 bg-violet-500 p-2 text-center text-white shadow-xl" style={{ "--motion-index": 1 }}>
+            <div className="mx-auto h-8 w-8 bg-amber-300 [clip-path:polygon(8%_86%,20%_34%,40%_68%,50%_18%,62%_68%,80%_34%,92%_86%)]" />
+            <div className="text-[10px] font-black">KING</div>
+          </div>
+          <div className="game-card-motion-chip absolute bottom-4 left-8 h-7 w-7 rounded-full border-4 border-rose-100 bg-rose-400 shadow-lg" />
+        </div>
+      )}
+
+      {kind === "six-row" && (
+        <div className="absolute inset-0 flex items-center justify-center gap-1">
+          {[12, 37, 66, 104].map((value, index) => (
+            <div key={value} className="game-card-motion-card h-14 w-10 rounded-lg border border-white/70 bg-white p-1 text-center text-slate-900 shadow-lg" style={{ "--motion-index": index }}>
+              <div className="text-sm font-black">{value}</div>
+              <div className="mt-1 h-2 rounded bg-rose-400" />
+            </div>
+          ))}
+          <div className="game-card-motion-chip absolute right-5 top-4 h-6 w-6 rounded-full bg-rose-500 shadow-lg" />
+        </div>
+      )}
+
+      {kind === "sketch-pass" && (
+        <div className="absolute inset-0 flex items-center justify-center gap-2">
+          <div className="game-card-motion-sketch h-16 w-24 rounded-xl bg-white p-3 shadow-lg">
+            <div className="h-2 w-14 rounded bg-slate-300" />
+            <div className="mt-3 h-7 rounded-lg border-2 border-dashed border-sky-400" />
+          </div>
+          <div className="game-card-motion-pencil h-14 w-3 rotate-12 rounded-full bg-amber-300 shadow-lg" />
+        </div>
+      )}
+
+      {kind === "mafia-night" && (
+        <div className="absolute inset-0 flex items-end justify-center gap-2 p-5">
+          <div className="absolute left-8 top-4 h-12 w-12 rounded-full bg-slate-100/25 shadow-[0_0_28px_rgba(255,255,255,.32)]" />
+          {[34, 62, 46, 70, 38].map((height, index) => (
+            <span key={index} className="game-card-motion-bar w-7 rounded-t-lg bg-white/75" style={{ height, "--motion-index": index }} />
+          ))}
+        </div>
+      )}
+
+      {kind === "citadels-build" && (
+        <div className="absolute inset-0 flex items-end justify-center gap-2 p-4">
+          {[48, 68, 54, 78].map((height, index) => (
+            <span key={index} className="game-card-motion-bar w-8 rounded-t-lg border border-white/40 bg-amber-300/80" style={{ height, "--motion-index": index }} />
+          ))}
+          <div className="game-card-motion-chip absolute right-8 top-5 h-7 w-7 rounded-full bg-violet-400 shadow-lg" />
+        </div>
+      )}
+
+      {kind === "arena-target" && (
+        <div className="absolute inset-0">
+          <svg viewBox="0 0 260 96" className="h-full w-full">
+            <circle className="game-card-motion-node" cx="130" cy="48" r="30" fill="none" stroke="#f87171" strokeWidth="5" style={{ "--motion-index": 0 }} />
+            <circle className="game-card-motion-node" cx="130" cy="48" r="15" fill="none" stroke="#fde68a" strokeWidth="4" style={{ "--motion-index": 1 }} />
+            <path className="game-card-motion-path" d="M42 48H218M130 10v76" stroke="rgba(255,255,255,.58)" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+        </div>
+      )}
+
+      {kind === "fortress-siege" && (
+        <div className="absolute inset-0">
+          <div className="absolute bottom-5 left-7 h-6 w-10 rounded-t-xl bg-slate-200" />
+          <div className="absolute bottom-5 right-7 h-7 w-12 rounded-t-xl bg-rose-300" />
+          <div className="game-card-motion-projectile absolute bottom-10 left-14 h-4 w-4 rounded-full bg-amber-300 shadow-lg" />
+          <svg viewBox="0 0 260 96" className="absolute inset-0 h-full w-full">
+            <path d="M62 58 C112 0 162 0 212 60" fill="none" stroke="rgba(255,255,255,.38)" strokeWidth="3" strokeDasharray="6 7" />
+          </svg>
+        </div>
+      )}
+
+      {kind === "tower-defense" && (
+        <div className="absolute inset-0">
+          <svg viewBox="0 0 260 96" className="h-full w-full">
+            <path className="game-card-motion-path" d="M24 72 C58 26 88 72 120 44 S186 26 232 66" fill="none" stroke="rgba(255,255,255,.72)" strokeWidth="5" strokeLinecap="round" />
+            {[62, 122, 184].map((x, index) => (
+              <rect key={x} className="game-card-motion-node" x={x - 9} y={index === 1 ? 28 : 48} width="18" height="28" rx="5" fill="#38bdf8" style={{ "--motion-index": index }} />
+            ))}
+            <circle className="game-card-motion-projectile" cx="36" cy="66" r="5" fill="#facc15" />
+          </svg>
+        </div>
+      )}
+
+      {kind === "kart-lap" && (
+        <div className="absolute inset-0">
+          <div className="absolute inset-5 rounded-full border-4 border-white/35" />
+          <div className="game-card-motion-turtle absolute left-8 top-1/2 h-7 w-12 -translate-y-1/2 rounded-xl bg-red-400 shadow-lg">
+            <span className="absolute -right-2 top-2 h-3 w-3 rounded-full bg-amber-300" />
+            <span className="absolute bottom-0 left-2 h-2 w-2 rounded-full bg-slate-950" />
+            <span className="absolute bottom-0 right-2 h-2 w-2 rounded-full bg-slate-950" />
+          </div>
+        </div>
+      )}
+
+      {kind === "bomb-fuse" && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="h-16 w-16 rounded-full bg-slate-900 shadow-xl ring-4 ring-white/20" />
+          <div className="game-card-motion-projectile absolute left-1/2 top-4 h-4 w-4 rounded-full bg-amber-300 shadow-[0_0_18px_rgba(251,191,36,.85)]" />
+          <svg viewBox="0 0 260 96" className="absolute inset-0 h-full w-full">
+            <path d="M132 30 C154 12 184 18 196 32" fill="none" stroke="#fef3c7" strokeWidth="4" strokeLinecap="round" strokeDasharray="5 7" />
+          </svg>
+        </div>
+      )}
+
+      {kind === "snake-trail" && (
+        <div className="absolute inset-0 grid grid-cols-7 gap-1 p-5">
+          {Array.from({ length: 21 }).map((_, index) => (
+            <span key={index} className={`game-card-motion-tile rounded-full ${index > 4 && index < 14 ? "bg-emerald-300" : "bg-white/15"}`} style={{ "--motion-index": index }} />
+          ))}
+        </div>
+      )}
+
+      {kind === "coin-stack" && (
+        <div className="absolute inset-0 flex items-center justify-center gap-1">
+          {[0, 1, 2, 3, 4].map((index) => (
+            <div key={index} className="game-card-motion-chip h-10 w-10 rounded-full border-4 border-amber-100 bg-amber-400 shadow-lg" style={{ "--motion-index": index, marginTop: `${Math.abs(index - 2) * 9}px` }} />
+          ))}
+        </div>
+      )}
+
+      {kind === "rpg-tree" && (
+        <div className="absolute inset-0">
+          <svg viewBox="0 0 260 96" className="h-full w-full">
+            <path className="game-card-motion-path" d="M44 70 L98 44 L132 70 L168 34 L218 58" fill="none" stroke="rgba(255,255,255,.72)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+            {[[44, 70], [98, 44], [132, 70], [168, 34], [218, 58]].map(([x, y], index) => (
+              <circle key={x} className="game-card-motion-node" cx={x} cy={y} r="10" fill={index === 3 ? "#facc15" : "#38bdf8"} style={{ "--motion-index": index }} />
+            ))}
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const GameCardSelectionPanel = ({ game, experience, selected = false }) => {
+  const isVideo = Boolean(videoGameArtProfiles[game.preview]);
+  const items = [
+    { key: "fit", icon: "stage", label: "추천 상황", value: `${game.players} · ${experience.genre}` },
+    { key: "first", icon: isVideo ? "input" : "decision", label: "첫 10초", value: experience.focus },
+    { key: "manual", icon: "signal", label: "플레이 감각", value: experience.feel },
+  ];
+
+  return (
+    <div
+      className={`game-card-selection mt-3 overflow-hidden rounded-xl border bg-surface/95 transition-all duration-300 group-hover:max-h-[340px] group-hover:border-line group-hover:p-2 group-hover:opacity-100 group-focus-within:max-h-[340px] group-focus-within:border-line group-focus-within:p-2 group-focus-within:opacity-100 ${
+        selected ? "max-h-[340px] border-line p-2 opacity-100 shadow-inner" : "max-h-0 border-transparent p-0 opacity-0"
+      }`}
+      data-smoke="game-card-selection-panel"
+      data-selection-type={isVideo ? "video" : "board"}
+      data-game-title={game.title}
+      data-active={selected ? "true" : "false"}
+      aria-hidden={selected ? "false" : "true"}
+    >
+      <div className="hidden gap-1.5 sm:grid sm:grid-cols-3">
+        {items.map((item) => (
+          <div
+            key={item.key}
+            className="min-h-[66px] rounded-lg border border-line bg-control px-2.5 py-2"
+            data-smoke="game-card-selection-item"
+            data-selection-key={item.key}
+          >
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-ink-subtle">
+              <GameUxGlyph type={item.icon} className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{item.label}</span>
+            </div>
+            <div className="mt-1 line-clamp-2 text-[11px] font-black leading-snug text-ink">{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const GameCard = ({ game, onOpenManual, selected = false, onActivate = () => {}, onDeactivate = () => {} }) => {
   const titleId = `game-card-${game.preview}-title`;
   const descId = `game-card-${game.preview}-desc`;
   const highlightText = (game.highlights || []).join(", ");
+  const touchTapArmedRef = useRef(false);
+  const compactCards = useCompactGameHubCards();
   const experience = gameExperienceProfiles[game.preview] || {
     genre: game.mode,
     focus: "현재 상태와 가능한 행동 확인",
     pace: game.players,
     feel: "방 흐름을 유지하는 플레이",
   };
+  const activate = () => {
+    preloadGameRoute(game.to);
+    onActivate(game.preview);
+  };
+  const deactivate = (options) => {
+    touchTapArmedRef.current = false;
+    onDeactivate(game.preview, options);
+  };
+  const shouldUseTapPreview = () => (
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(hover: none)")?.matches || navigator.maxTouchPoints > 0)
+  );
+  const handleEntryClick = (event) => {
+    const touchClick = event.nativeEvent?.pointerType === "touch" || event.nativeEvent?.sourceCapabilities?.firesTouchEvents;
+    if (!shouldUseTapPreview() && !touchClick) return;
+    if (touchTapArmedRef.current) {
+      touchTapArmedRef.current = false;
+      return;
+    }
+    event.preventDefault();
+    touchTapArmedRef.current = true;
+    activate();
+  };
+  const handleEntryTouchEnd = (event) => {
+    if (touchTapArmedRef.current) return;
+    event.preventDefault();
+    touchTapArmedRef.current = true;
+    activate();
+  };
 
   return (
     <article
-      className={`group relative min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br ${game.tone} p-[1px] shadow-lg transition-transform duration-300 hover:-translate-y-0.5`}
-      onPointerEnter={() => preloadGameRoute(game.to)}
+      className={`group relative min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br ${game.tone} p-[1px] shadow-lg transition-all duration-300 will-change-transform hover:z-10 hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-2xl hover:ring-2 hover:ring-primary-300/70 focus-within:z-10 focus-within:scale-[1.01] focus-within:shadow-2xl focus-within:ring-2 focus-within:ring-primary-300/70 sm:hover:scale-[1.02] sm:focus-within:scale-[1.02] ${
+        selected ? "z-10 scale-[1.01] shadow-2xl ring-2 ring-primary-300/70 sm:scale-[1.02]" : ""
+      }`}
+      onPointerEnter={(event) => {
+        preloadGameRoute(game.to);
+        if (event.pointerType !== "touch") activate();
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType !== "touch") deactivate();
+      }}
+      onMouseEnter={activate}
+      onMouseLeave={() => deactivate()}
       data-smoke="game-card"
       data-game-title={game.title}
       data-min-players={game.minPlayers}
       data-max-players={game.maxPlayers}
+      data-game-selected={selected ? "true" : "false"}
+      data-motion-preview={game.preview}
+      data-touch-preview-mode="tap"
     >
       <Link
         to={game.to}
@@ -2331,17 +2682,25 @@ const GameCard = ({ game, onOpenManual }) => {
         aria-describedby={descId}
         aria-label={`${game.title} 입장하기 · ${game.players} · ${game.mode}${highlightText ? ` · ${highlightText}` : ""}`}
         className="block h-full min-w-0 rounded-[calc(1rem-1px)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200/70"
-        onFocus={() => preloadGameRoute(game.to)}
+        onFocus={activate}
+        onBlur={() => deactivate()}
+        onClick={handleEntryClick}
+        onTouchEnd={handleEntryTouchEnd}
+        onTouchCancel={() => {
+          touchTapArmedRef.current = false;
+        }}
+        data-smoke="game-card-entry-link"
       >
-        <div className="flex h-full min-w-0 flex-col rounded-[calc(1rem-1px)] bg-surface/95 p-2.5 backdrop-blur sm:p-5">
-          <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${game.tone} p-2 sm:rounded-2xl sm:p-3`} aria-hidden="true">
+        <div className={`flex h-full min-w-0 flex-col rounded-[calc(1rem-1px)] bg-surface/95 p-2.5 backdrop-blur transition-colors duration-300 sm:p-5 ${selected ? "bg-surface" : ""}`}>
+          <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${game.tone} p-2 transition-all duration-300 sm:rounded-2xl sm:p-3 ${selected ? "min-h-28 sm:min-h-40" : ""}`} aria-hidden="true">
             <div className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-2 py-1 text-[10px] font-black text-slate-800 shadow-sm">
               {game.featured ? "대표 경험" : experience.genre}
             </div>
-            <div className="flex h-24 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-white/20 p-1 sm:h-auto sm:min-h-36 sm:rounded-xl sm:p-3">
-              <div className="scale-75 sm:scale-100">
+            <div className={`relative flex h-24 min-w-0 items-center justify-center overflow-hidden rounded-lg bg-white/20 p-1 transition-all duration-300 sm:h-auto sm:min-h-36 sm:rounded-xl sm:p-3 ${selected ? "h-28 sm:min-h-40" : ""}`}>
+              <div className={`transition-all duration-300 ${selected ? "scale-90 opacity-0 sm:scale-105" : "scale-75 opacity-100 sm:scale-100 group-hover:opacity-0 group-focus-within:opacity-0"}`}>
                 <GamePreview type={game.preview} />
               </div>
+              <GameCardMotionPreview game={game} selected={selected} variant="hero" dataSmoke="game-card-hover-art" />
             </div>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1 pr-9 sm:mt-4 sm:gap-2 sm:pr-12">
@@ -2356,7 +2715,8 @@ const GameCard = ({ game, onOpenManual }) => {
           </div>
           <h2 id={titleId} className="mt-2 text-sm font-black leading-tight text-ink sm:mt-4 sm:text-2xl">{game.title}</h2>
           <p id={descId} className="sr-only">{game.description}</p>
-          <GameCardBriefPanel game={game} experience={experience} />
+          {!compactCards && <GameCardBriefPanel game={game} experience={experience} />}
+          {!compactCards && <GameCardSelectionPanel game={game} experience={experience} selected={selected} />}
           <div className="flex-1" />
           <div className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-black text-ink-inverse transition-all group-hover:bg-primary-600 sm:mt-6 sm:min-h-11 sm:w-auto sm:gap-2 sm:rounded-xl sm:px-4 sm:text-sm">
             입장하기
@@ -3311,7 +3671,11 @@ export const GamesHub = () => {
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerLoading, setBannerLoading] = useState(true);
   const [bannerUnavailable, setBannerUnavailable] = useState(false);
+  const [activeGamePreviews, setActiveGamePreviews] = useState([]);
   const bannerImpressionRef = useRef(new Set());
+  const touchPreviewTimerRef = useRef(null);
+  const compactAutoPreviewFrameRef = useRef(0);
+  const compactCards = useCompactGameHubCards();
   const closeManual = useCallback(() => setManualGame(null), []);
   const bannerCount = hubBanners.length;
   const normalizedBannerIndex = bannerCount ? ((bannerIndex % bannerCount) + bannerCount) % bannerCount : 0;
@@ -3328,6 +3692,30 @@ export const GamesHub = () => {
     games: section.games.filter(selectedFilter.predicate),
   }));
   const visibleGames = filteredSections.flatMap((section) => section.games);
+
+  const activateGamePreview = useCallback((preview) => {
+    if (touchPreviewTimerRef.current) {
+      window.clearTimeout(touchPreviewTimerRef.current);
+      touchPreviewTimerRef.current = null;
+    }
+    setActiveGamePreviews(preview ? [preview] : []);
+  }, []);
+
+  const deactivateGamePreview = useCallback((preview, options = {}) => {
+    const clearPreview = () => {
+      setActiveGamePreviews((current) => (current.includes(preview) ? [] : current));
+      touchPreviewTimerRef.current = null;
+    };
+    if (touchPreviewTimerRef.current) {
+      window.clearTimeout(touchPreviewTimerRef.current);
+      touchPreviewTimerRef.current = null;
+    }
+    if (options.delay) {
+      touchPreviewTimerRef.current = window.setTimeout(clearPreview, options.delay);
+      return;
+    }
+    clearPreview();
+  }, []);
 
   const sendGameHubBannerEvent = useCallback(async (banner, eventType) => {
     try {
@@ -3409,10 +3797,111 @@ export const GamesHub = () => {
 
   useEffect(() => {
     setActiveFilter("all");
+    setActiveGamePreviews([]);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (!activeGamePreviews.length) return;
+    const visiblePreviewSet = new Set(visibleGames.map((game) => game.preview));
+    const nextPreviews = activeGamePreviews.filter((preview) => visiblePreviewSet.has(preview));
+    if (nextPreviews.length === activeGamePreviews.length) return;
+    setActiveGamePreviews(nextPreviews);
+  }, [activeGamePreviews, visibleGames]);
+
+  useEffect(() => {
+    if (!compactCards || typeof window === "undefined" || typeof document === "undefined") return undefined;
+
+    const selectVisibleCards = () => {
+      compactAutoPreviewFrameRef.current = 0;
+      const cards = Array.from(document.querySelectorAll('[data-smoke="game-card"][data-motion-preview]'));
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      if (!cards.length || !viewportHeight) return;
+
+      const focusY = viewportHeight * 0.52;
+      const minVisible = Math.min(180, viewportHeight * 0.28);
+      const visibleCards = [];
+
+      for (const card of cards) {
+        const rect = card.getBoundingClientRect();
+        const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+        if (visibleHeight <= 0 || visibleHeight < Math.min(rect.height * 0.28, minVisible)) continue;
+
+        const centerY = rect.top + rect.height / 2;
+        const score = Math.abs(centerY - focusY) - visibleHeight * 0.08;
+        const preview = card.getAttribute("data-motion-preview") || "";
+        if (preview) {
+          visibleCards.push({
+            preview,
+            score,
+            centerY,
+            top: rect.top,
+            left: rect.left,
+            height: rect.height,
+          });
+        }
+      }
+
+      if (visibleCards.length) {
+        const rowTolerance = Math.max(28, Math.min(84, Math.min(...visibleCards.map((card) => card.height)) * 0.42));
+        const rows = visibleCards
+          .sort((left, right) => left.centerY - right.centerY || left.left - right.left)
+          .reduce((groups, card) => {
+            const row = groups.find((entry) => Math.abs(entry.centerY - card.centerY) <= rowTolerance);
+            if (row) {
+              row.cards.push(card);
+              row.centerY = row.cards.reduce((sum, item) => sum + item.centerY, 0) / row.cards.length;
+              row.score = Math.min(row.score, card.score);
+              return groups;
+            }
+            groups.push({ centerY: card.centerY, score: card.score, cards: [card] });
+            return groups;
+          }, []);
+        const nextPreviews = rows
+          .sort((left, right) => left.score - right.score || left.centerY - right.centerY)
+          .slice(0, 2)
+          .flatMap((row) => row.cards.sort((left, right) => left.left - right.left).map((card) => card.preview))
+          .slice(0, 4);
+        setActiveGamePreviews((current) => (
+          current.length === nextPreviews.length && current.every((preview, index) => preview === nextPreviews[index])
+            ? current
+            : nextPreviews
+        ));
+      }
+    };
+
+    const scheduleCenteredPreview = () => {
+      if (compactAutoPreviewFrameRef.current) return;
+      compactAutoPreviewFrameRef.current = window.requestAnimationFrame(selectVisibleCards);
+    };
+
+    scheduleCenteredPreview();
+    window.addEventListener("scroll", scheduleCenteredPreview, { passive: true });
+    window.addEventListener("resize", scheduleCenteredPreview);
+    window.addEventListener("orientationchange", scheduleCenteredPreview);
+
+    return () => {
+      window.removeEventListener("scroll", scheduleCenteredPreview);
+      window.removeEventListener("resize", scheduleCenteredPreview);
+      window.removeEventListener("orientationchange", scheduleCenteredPreview);
+      if (compactAutoPreviewFrameRef.current) {
+        window.cancelAnimationFrame(compactAutoPreviewFrameRef.current);
+        compactAutoPreviewFrameRef.current = 0;
+      }
+    };
+  }, [activeFilter, activeTab, compactCards, visibleGames.length]);
+
+  useEffect(() => () => {
+    if (touchPreviewTimerRef.current) {
+      window.clearTimeout(touchPreviewTimerRef.current);
+    }
+    if (compactAutoPreviewFrameRef.current) {
+      window.cancelAnimationFrame(compactAutoPreviewFrameRef.current);
+      compactAutoPreviewFrameRef.current = 0;
+    }
+  }, []);
+
   return (
-    <div className="animate-fade-in space-y-4">
+    <div className="animate-fade-in space-y-4" data-compact-auto-preview={compactCards ? "visible-cards" : "hover"}>
       <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-slate-200/20 sm:p-6">
         <div className="space-y-5">
           <div className="inline-flex items-center gap-2 rounded-full bg-control px-4 py-1 text-[11px] font-black text-ink-muted">
@@ -3471,9 +3960,16 @@ export const GamesHub = () => {
             <div className="text-[11px] font-black text-ink-subtle">{section.games.length}개</div>
           </div>
           {section.games.length ? (
-            <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
               {section.games.map((game) => (
-                <GameCard key={game.to} game={game} onOpenManual={setManualGame} />
+                <GameCard
+                  key={game.to}
+                  game={game}
+                  onOpenManual={setManualGame}
+                  selected={activeGamePreviews.includes(game.preview)}
+                  onActivate={activateGamePreview}
+                  onDeactivate={deactivateGamePreview}
+                />
               ))}
             </div>
           ) : (

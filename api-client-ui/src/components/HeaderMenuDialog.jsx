@@ -22,7 +22,7 @@ import {
 import { trapFocus } from "../utils/focusTrap.js";
 
 const MenuSection = ({ title, items, onSelect }) => (
-    <section className="rounded-3xl border border-line bg-control/80 p-4">
+    <section className="surface-card p-4">
         <h3 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-ink-subtle">{title}</h3>
         <div className="mt-3 space-y-1.5">
             {items.map((item) => (
@@ -30,7 +30,7 @@ const MenuSection = ({ title, items, onSelect }) => (
                     key={item.to}
                     to={item.to}
                     onClick={onSelect}
-                    className="flex items-center justify-between rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-bold text-ink-muted transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
+                    className="flex items-center justify-between rounded-control border border-line bg-surface/80 px-3 py-2.5 text-sm font-bold text-ink-muted transition-all hover:border-primary-200 hover:bg-control hover:text-primary-700"
                 >
                     <span className="flex items-center gap-2.5">
                         <item.icon className="h-4 w-4" />
@@ -141,7 +141,7 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
             <div
                 id={panelId}
                 ref={panelRef}
-                className="hidden lg:block fixed inset-x-6 top-24 z-50 mx-auto w-full max-w-5xl max-h-[78vh] overflow-y-auto rounded-[2rem] border border-line bg-surface-overlay/95 p-6 shadow-2xl backdrop-blur"
+                className="modal-panel motion-panel-in hidden lg:block fixed inset-x-6 top-24 z-50 mx-auto w-full max-w-5xl max-h-[78vh] overflow-y-auto p-6"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
@@ -156,7 +156,7 @@ export const HeaderMenuDialog = ({ panelId, titleId, descriptionId, isAdmin, onC
                         ref={closeButtonRef}
                         type="button"
                         onClick={onClose}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-ink-muted transition-colors hover:border-primary-200 hover:text-primary-700"
+                        className="icon-button"
                         aria-label="모달 닫기"
                     >
                         <X className="h-4 w-4" />

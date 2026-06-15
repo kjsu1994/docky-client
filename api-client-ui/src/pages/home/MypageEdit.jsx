@@ -229,18 +229,18 @@ export const MypageEdit = () => {
     return (
         <div className="mx-auto max-w-3xl space-y-6">
             <div className="flex items-center justify-between gap-3">
-                <h1 className="text-2xl font-black text-slate-900">프로필 수정</h1>
+                <h1 className="text-2xl font-black text-ink">프로필 수정</h1>
                 <button
                     type="button"
                     onClick={() => navigate("/app/mypage")}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-200"
+                    className="btn-secondary min-h-11 px-4 py-3"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     마이페이지로
                 </button>
             </div>
 
-            <section className="space-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <section className="surface-card space-y-8 p-6 sm:p-8">
                 <div className="flex flex-wrap items-center gap-5">
                     <UserAvatar
                         name={member?.name}
@@ -249,11 +249,11 @@ export const MypageEdit = () => {
                         rewardTier={level.rewardTier}
                         frameCode={level.frameCode}
                         size="2xl"
-                        className="rounded-2xl border border-slate-200"
+                        className="rounded-2xl border border-line"
                         showLevelBadge
                     />
 
-                    <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-200">
+                    <label className="btn-secondary min-h-11 cursor-pointer px-4 py-3">
                         <Camera className="h-4 w-4" />
                         {uploading ? "업로드 중..." : "프로필 이미지 변경"}
                         <input type="file" accept={PROFILE_IMAGE_ACCEPT} className="hidden" onChange={handleProfileUpload} disabled={uploading} />
@@ -262,7 +262,7 @@ export const MypageEdit = () => {
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <Field label="이메일">
-                        <input value={member?.email || ""} disabled className="input-base bg-slate-100" />
+                        <input value={member?.email || ""} disabled className="input-base bg-control" />
                     </Field>
 
                     <Field label="이름">
@@ -276,7 +276,7 @@ export const MypageEdit = () => {
                     <Field label="주소">
                         <div className="flex flex-col gap-2 sm:flex-row">
                             <div className="relative min-w-0 flex-1">
-                                <MapPin className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-300" />
+                                <MapPin className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
                                 <input
                                     type="text"
                                     name="address"
@@ -290,13 +290,13 @@ export const MypageEdit = () => {
                             <button
                                 type="button"
                                 onClick={() => setAddressModalOpen(true)}
-                                className="min-h-11 shrink-0 rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white hover:bg-slate-800"
+                                className="btn-primary min-h-11 shrink-0 px-4 py-2"
                             >
                                 주소 검색
                             </button>
                         </div>
                         <div className="relative mt-2">
-                            <MapPin className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-300" />
+                            <MapPin className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
                             <input
                                 type="text"
                                 name="addressDetail"
@@ -326,7 +326,7 @@ export const MypageEdit = () => {
                                     className={`min-h-11 shrink-0 rounded-xl border px-4 py-2 text-sm font-black transition ${
                                         passwordVerified
                                             ? "border-emerald-200 bg-emerald-100 text-emerald-700"
-                                            : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                                            : "border-line bg-control text-ink-muted hover:bg-control-hover disabled:opacity-60"
                                     }`}
                                 >
                                     {verifyingPassword ? "확인 중..." : passwordVerified ? "확인 완료" : "확인"}
@@ -364,20 +364,20 @@ export const MypageEdit = () => {
 
             {addressModalOpen ? (
                 <div className="fixed inset-0 z-[90] bg-slate-900/45 p-4">
-                    <div className="mx-auto mt-20 w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl">
+                    <div className="modal-panel mx-auto mt-20 w-full max-w-xl p-5">
                         <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-black text-slate-900">주소 검색</h3>
+                            <h3 className="text-lg font-black text-ink">주소 검색</h3>
                             <button
                                 type="button"
                                 onClick={() => setAddressModalOpen(false)}
-                                className="rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+                                className="icon-button"
                                 aria-label="주소 검색 닫기"
                             >
                                 <X className="h-4 w-4" />
                             </button>
                         </div>
                         <AddressSearchBox onResolved={handleAddressResolved} placeholder="예: 서울시청, 서울역, 강남역" />
-                        <div className="mt-3 text-xs font-semibold text-slate-500">
+                        <div className="mt-3 text-xs font-semibold text-ink-muted">
                             검색 결과를 선택하면 주소 입력칸에 자동으로 반영됩니다.
                         </div>
                     </div>
@@ -389,7 +389,7 @@ export const MypageEdit = () => {
 
 const Field = ({ label, children }) => (
     <div>
-        <label className="mb-2 block text-sm font-black text-slate-700">{label}</label>
+        <label className="mb-2 block text-sm font-black text-ink-muted">{label}</label>
         {children}
     </div>
 );

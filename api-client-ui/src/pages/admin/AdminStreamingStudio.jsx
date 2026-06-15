@@ -315,7 +315,7 @@ export const AdminStreamingStudio = () => {
 
     if (!isAdmin) {
         return (
-            <section className="rounded-[2rem] border border-rose-100 bg-rose-50/50 p-10 text-center text-rose-800 space-y-4">
+            <section className="surface-panel space-y-4 p-6 text-center text-rose-800 sm:p-10">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
                     <AlertTriangle className="h-8 w-8 text-rose-500" />
                 </div>
@@ -329,8 +329,8 @@ export const AdminStreamingStudio = () => {
     const CurrentPhaseIcon = currentPhaseMeta?.icon || LoaderCircle;
 
     return (
-        <section className="space-y-8 animate-fade-in pb-10">
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/50">
+        <section className="space-y-6 animate-fade-in pb-10 sm:space-y-8">
+            <div className="surface-panel flex flex-col gap-4 p-5 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <p className="text-[11px] font-black text-primary-500">관리자 스트리밍</p>
                     <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">스트리밍 스튜디오</h1>
@@ -343,7 +343,7 @@ export const AdminStreamingStudio = () => {
                         fetchInboxFiles();
                     }}
                     disabled={loading || inboxLoading}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 transition-colors hover:bg-slate-200"
+                    className="btn-secondary w-full px-4 py-3 sm:w-auto"
                 >
                     <RefreshCw className={`h-4 w-4 ${loading || inboxLoading ? "animate-spin" : ""}`} />
                     전체 새로고침
@@ -351,7 +351,7 @@ export const AdminStreamingStudio = () => {
             </div>
 
             {currentPhaseMeta ? (
-                <div className={`rounded-[2rem] border p-5 shadow-sm ${currentPhaseMeta.tone}`}>
+                <div className={`rounded-card border p-5 shadow-card ${currentPhaseMeta.tone}`}>
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <div className="mt-0.5 rounded-2xl bg-white/70 p-2">
@@ -376,7 +376,7 @@ export const AdminStreamingStudio = () => {
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
                 <div className="space-y-6">
-                    <form onSubmit={handleUpload} className="space-y-5 rounded-[2rem] border border-slate-100 bg-white p-6 shadow-lg shadow-slate-200/40">
+                    <form onSubmit={handleUpload} className="surface-panel space-y-5 p-5 sm:p-6">
                         <div>
                             <h2 className="text-lg font-black text-slate-900">영상 업로드</h2>
                             <p className="mt-2 text-sm font-medium text-slate-400">지원 형식: MP4, MOV, MKV, WEBM. 권장 형식은 MP4이며 최대 3GB까지 허용됩니다.</p>
@@ -391,7 +391,7 @@ export const AdminStreamingStudio = () => {
                                 maxLength={200}
                             />
                             <textarea className="input-base min-h-[120px]" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="영상 설명 (선택, inbox 가져오기에도 공통 적용)" maxLength={1000} />
-                            <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/60 p-4">
+                            <div className="rounded-card border border-dashed border-line bg-control/70 p-4">
                                 <input
                                     id="streaming-file-input"
                                     type="file"
@@ -419,13 +419,13 @@ export const AdminStreamingStudio = () => {
                             </div>
                         </div>
 
-                        <button type="submit" disabled={uploading || importingInbox} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary-600 px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-primary-200 transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-300">
+                        <button type="submit" disabled={uploading || importingInbox} className="btn-primary w-full px-4 py-3.5">
                             <Upload className="h-4 w-4" />
                             {uploading ? "업로드 요청 처리 중..." : `영상 ${selectedFiles.length > 1 ? "일괄 업로드 시작" : "업로드 시작"}`}
                         </button>
                     </form>
 
-                    <div className="space-y-5 rounded-[2rem] border border-slate-100 bg-white p-6 shadow-lg shadow-slate-200/40">
+                    <div className="surface-panel space-y-5 p-5 sm:p-6">
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <h2 className="text-lg font-black text-slate-900">inbox 반입</h2>
@@ -435,7 +435,7 @@ export const AdminStreamingStudio = () => {
                                 type="button"
                                 onClick={() => fetchInboxFiles()}
                                 disabled={inboxLoading}
-                                className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 transition-colors hover:bg-slate-200"
+                                className="btn-secondary shrink-0 px-4 py-3"
                             >
                                 <FolderSearch className={`h-4 w-4 ${inboxLoading ? "animate-spin" : ""}`} />
                                 스캔
@@ -447,7 +447,7 @@ export const AdminStreamingStudio = () => {
                         </div>
 
                         {!inboxFiles.length ? (
-                            <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/40 p-6 text-center text-sm font-medium text-slate-500">
+                            <div className="rounded-card border border-dashed border-line bg-control/60 p-6 text-center text-sm font-medium text-ink-muted">
                                 스캔된 inbox 파일이 없습니다.
                             </div>
                         ) : (
@@ -483,13 +483,13 @@ export const AdminStreamingStudio = () => {
                             </div>
                         )}
 
-                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
+                        <div className="flex flex-col gap-3 rounded-card bg-control/70 px-4 py-3 text-xs font-semibold text-ink-muted sm:flex-row sm:items-center sm:justify-between">
                             <div>가져오기 가능 파일 {readyInboxFiles.length}개 / 선택 {selectedInboxFiles.length}개 / 1회 최대 {MAX_STREAMING_BATCH_FILES}개</div>
                             <button
                                 type="button"
                                 onClick={handleImportInbox}
                                 disabled={importingInbox || !selectedInboxFiles.length}
-                                className="inline-flex items-center gap-2 rounded-2xl bg-primary-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                className="btn-primary min-h-10 px-4 py-2.5 text-xs"
                             >
                                 <CheckSquare className="h-4 w-4" />
                                 {importingInbox ? "가져오는 중..." : "선택 파일 가져오기"}
@@ -498,7 +498,7 @@ export const AdminStreamingStudio = () => {
                     </div>
                 </div>
 
-                <div className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-lg shadow-slate-200/40">
+                <div className="surface-panel p-5 sm:p-6">
                     <div className="mb-5 flex items-center justify-between gap-4">
                         <div>
                             <h2 className="text-lg font-black text-slate-900">업로드/변환 현황</h2>
@@ -510,11 +510,11 @@ export const AdminStreamingStudio = () => {
                     </div>
 
                     {loading ? (
-                        <div className="rounded-3xl border border-slate-100 bg-slate-50/60 p-6 text-center text-sm font-semibold text-slate-400">목록을 불러오는 중입니다...</div>
+                        <div className="rounded-card border border-line bg-control/70 p-6 text-center text-sm font-semibold text-ink-muted">목록을 불러오는 중입니다...</div>
                     ) : error ? (
                         <div className="rounded-3xl border border-rose-100 bg-rose-50/70 p-6 text-sm font-semibold text-rose-700">{error}</div>
                     ) : !videos.length ? (
-                        <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[2rem] border border-dashed border-slate-200 bg-slate-50/40 text-center">
+                        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-card border border-dashed border-line bg-control/60 p-5 text-center sm:min-h-[420px]">
                             <Clapperboard className="h-10 w-10 text-slate-300" />
                             <p className="mt-4 text-base font-black text-slate-700">업로드된 영상이 없습니다.</p>
                             <p className="mt-2 text-sm font-medium text-slate-400">왼쪽 폼에서 첫 영상을 등록하거나 inbox에서 가져오면 상태가 여기에 표시됩니다.</p>
@@ -562,7 +562,7 @@ export const AdminStreamingStudio = () => {
                                         type="button"
                                         onClick={() => fetchVideos({ silent: true, page: videoPage + 1, append: true })}
                                         disabled={loadingMoreVideos}
-                                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-60"
+                                        className="btn-secondary min-h-11 px-5 py-3"
                                     >
                                         <RefreshCw className={`h-4 w-4 ${loadingMoreVideos ? "animate-spin" : ""}`} />
                                         {loadingMoreVideos ? "불러오는 중..." : "더 보기"}

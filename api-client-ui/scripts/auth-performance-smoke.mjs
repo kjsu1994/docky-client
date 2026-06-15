@@ -201,9 +201,9 @@ async function main() {
         });
 
         await send(ws, "Emulation.setDeviceMetricsOverride", {
-            width: 390,
-            height: 844,
-            deviceScaleFactor: 2,
+            width: 360,
+            height: 780,
+            deviceScaleFactor: 3,
             mobile: true,
         });
         await send(ws, "Page.navigate", { url: `${baseUrl}/login` });

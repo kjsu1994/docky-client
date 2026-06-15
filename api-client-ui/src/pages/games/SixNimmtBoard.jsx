@@ -327,7 +327,7 @@ const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note 
     disabled ? "현재 선택 불가" : clickable ? "선택 가능" : "",
   ].filter(Boolean).join(" · ");
   const className = [
-    compact ? "rounded-md p-1 sm:rounded-xl sm:p-1.5" : "rounded-xl p-2 sm:rounded-2xl sm:p-3",
+    compact ? "rounded-md p-1 sm:rounded-xl sm:p-1.5 xl:p-1" : "rounded-xl p-2 sm:rounded-2xl sm:p-3",
     "border bg-white text-left shadow-sm transition",
     selected ? "border-slate-900 ring-4 ring-slate-900/10" : "border-slate-200",
     disabled ? "opacity-50" : "",
@@ -336,7 +336,7 @@ const SixNimmtCard = ({ card, selected = false, disabled = false, onClick, note 
   const content = (
     <>
       <SixNimmtCardArt card={card} selected={selected} />
-      {note && <div className={`${compact ? "mt-0.5 max-h-[22px] overflow-hidden text-[8px] leading-tight sm:mt-1 sm:max-h-none sm:text-[10px] sm:leading-snug" : "mt-2 min-h-[30px] text-[11px]"} font-bold text-slate-500`}>{note}</div>}
+      {note && <div className={`${compact ? "mt-0.5 max-h-[22px] overflow-hidden text-[8px] leading-tight sm:mt-1 sm:max-h-none sm:text-[10px] sm:leading-snug xl:max-h-[18px] xl:overflow-hidden xl:text-[8px] xl:leading-tight" : "mt-2 min-h-[30px] text-[11px]"} font-bold text-slate-500`}>{note}</div>}
     </>
   );
   return clickable ? (
@@ -1020,9 +1020,6 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
       handCount: Number(get(player, "hand_count", "handCount", 0)),
     };
   });
-  const sixNimmtPlayerCount = sixNimmtTurnPlayers.length || roomPlayers.length || 0;
-  const sixNimmtSelectedCount = Math.max(selectedSeatNos.size, sixNimmtTurnPlayers.filter((player) => player.selected).length);
-  const sixNimmtWaitingCount = Math.max(0, sixNimmtPlayerCount - sixNimmtSelectedCount);
   const sixNimmtFlowItems = [
     {
       label: "라운드",
@@ -1055,26 +1052,26 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
   ];
 
   return (
-    <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-4">
-      <main className="space-y-2 xl:space-y-4">
-        <section id="six-nimmt-board-panel" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg sm:rounded-[1.5rem] sm:p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
+    <div className="space-y-3">
+      <main className="grid gap-3 xl:grid-cols-2 xl:items-start">
+        <section id="six-nimmt-board-panel" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg sm:rounded-[1.5rem] sm:p-3 xl:p-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-xs font-black text-slate-500 sm:text-sm">라운드 {roundNo} · 턴 {turnNo}</div>
-              <div className="mt-0.5 text-lg font-black text-slate-900 sm:mt-1 sm:text-2xl">{phaseLabel}</div>
-              <div className="mt-2 hidden max-w-2xl text-[11px] font-bold leading-relaxed text-slate-500 sm:block sm:text-xs">
+              <div className="mt-0.5 text-lg font-black text-slate-900 sm:text-xl">{phaseLabel}</div>
+              <div className="mt-1 hidden max-w-2xl text-[11px] font-bold leading-snug text-slate-500 sm:block xl:hidden 2xl:block">
                 모두 카드를 한 장씩 고르면 낮은 숫자부터 처리됩니다. 내 카드보다 작은 끝 카드 중 가장 큰 행에 붙고, 여섯 번째가 되면 그 행의 벌점을 가져갑니다.
               </div>
             </div>
-            <div className="rounded-lg bg-slate-50 px-2 py-1.5 text-right sm:rounded-2xl sm:px-4 sm:py-3">
+            <div className="rounded-lg bg-slate-50 px-2 py-1.5 text-right sm:rounded-2xl sm:px-3 sm:py-2">
               <div className="text-[9px] font-black text-slate-400 sm:text-[11px]">선택 완료</div>
               <div className="text-base font-black text-slate-900 sm:text-lg">{selectedSeatNos.size}/{statePlayers.length}</div>
             </div>
           </div>
 
-          <div className="mt-3 grid gap-2 text-xs font-black text-slate-700 sm:grid-cols-4">
+          <div className="mt-2 grid gap-1.5 text-xs font-black text-slate-700 sm:grid-cols-4 xl:gap-1">
             {sixNimmtFlowItems.map((item) => (
-              <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5 xl:px-2 xl:py-1">
                 <div className="text-[10px] text-slate-400">{item.label}</div>
                 <div className="mt-0.5 truncate text-sm text-slate-900">{item.value}</div>
               </div>
@@ -1087,7 +1084,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             </div>
           )}
 
-          <div className="mt-2 grid gap-1.5 sm:mt-4 sm:gap-3">
+          <div className="mt-2 grid gap-2 sm:mt-3 sm:gap-3 xl:mt-2">
             {boardRows.map((row, index) => {
               const cards = sixNimmtRowCards(row);
               const penalty = sixNimmtRowPenalty(row);
@@ -1095,8 +1092,8 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
               const automaticRowCandidate = waitingSelection && selectedRow;
               const recommended = needsRowChoice && recommendedRowIndex === index;
               return (
-                <div key={index} className={`rounded-lg border p-1.5 transition sm:rounded-2xl sm:p-3 ${selectedRow ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
-                  <div className="mb-1 flex flex-wrap items-center justify-between gap-1 sm:mb-2 sm:gap-2">
+                <div key={index} className={`rounded-lg border p-2 transition sm:rounded-2xl sm:p-3 xl:rounded-xl xl:p-2 ${selectedRow ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-1 sm:mb-2 sm:gap-2 xl:mb-1">
                     <div className="text-xs font-black text-slate-900 sm:text-sm">{index + 1}행</div>
                     <div className="flex flex-wrap items-center gap-1 text-[9px] font-black sm:gap-1.5 sm:text-[11px]">
                       <span className="rounded-full bg-white px-1.5 py-0.5 text-slate-600 sm:px-2 sm:py-1">{cards.length}/5장</span>
@@ -1106,10 +1103,10 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
                     </div>
                   </div>
                   <div className="block w-full rounded-lg text-left">
-                    <div className="grid grid-cols-5 gap-1 sm:gap-2">
+                    <div className="grid grid-cols-[repeat(5,minmax(0,58px))] justify-start gap-1.5 sm:grid-cols-[repeat(5,minmax(0,76px))] sm:gap-2 xl:grid-cols-[repeat(5,minmax(0,72px))] xl:gap-2 2xl:grid-cols-[repeat(5,minmax(0,82px))]">
                     {cards.map((card) => <SixNimmtCard key={sixNimmtCardId(card)} card={card} compact />)}
                     {Array.from({ length: Math.max(0, 5 - cards.length) }).map((_, emptyIndex) => (
-                      <div key={`empty-${emptyIndex}`} className="min-h-[46px] rounded-md border border-dashed border-slate-200 bg-white/70 sm:min-h-[76px] sm:rounded-xl" />
+                      <div key={`empty-${emptyIndex}`} className="min-h-[82px] rounded-md border border-dashed border-slate-200 bg-white/70 sm:min-h-[108px] sm:rounded-xl xl:min-h-[100px] 2xl:min-h-[114px]" />
                     ))}
                     </div>
                   </div>
@@ -1124,11 +1121,11 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           </div>
         </section>
 
-        <section id="six-nimmt-hand-panel" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg sm:rounded-[1.5rem] sm:p-4">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3">
+        <section id="six-nimmt-hand-panel" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:rounded-[1.5rem] sm:p-4 xl:p-3" data-smoke="six-nimmt-hand-panel">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3 xl:mb-2">
             <div>
               <div className="text-sm font-black text-slate-900 sm:text-lg">내 손패</div>
-              <div className="mt-0.5 text-[11px] font-bold text-slate-500 sm:mt-1 sm:text-xs">{mySelected ? "이번 턴 카드를 제출했습니다." : "카드를 고르면 예상 배치와 벌점을 먼저 볼 수 있습니다."}</div>
+              <div className="mt-0.5 text-[11px] font-bold text-slate-500 sm:mt-1 sm:text-xs xl:hidden 2xl:block">{mySelected ? "이번 턴 카드를 제출했습니다." : "카드를 고르면 예상 배치와 벌점을 먼저 볼 수 있습니다."}</div>
             </div>
             {selectedPreview && (
               <div className={`rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black sm:px-3 sm:text-xs ${selectedPreview.tone}`}>
@@ -1136,7 +1133,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
               </div>
             )}
           </div>
-          <div className="grid grid-cols-5 gap-1 sm:gap-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-[repeat(5,minmax(0,72px))] xl:gap-2 2xl:grid-cols-[repeat(5,minmax(0,78px))]" data-smoke="six-nimmt-hand-grid">
             {myHand.map((card) => {
               const preview = previewForCard(card);
               const possibleRowLabel = preview.rowIndex >= 0
@@ -1153,14 +1150,13 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
                     setSelectedRowIndex(null);
                   }}
                   note={`${possibleRowLabel} · ${preview.label}${preview.penalty ? ` · ${preview.penalty}벌점` : ""}`}
-                  compact
                 />
               );
             })}
           </div>
-          <div id="six-nimmt-action-strip" className="tabletop-mobile-action-strip sticky bottom-3 z-20 mt-2 scroll-mt-24 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur sm:mt-4 sm:p-3 xl:static xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none">
+          <div id="six-nimmt-action-strip" className="tabletop-mobile-action-strip sticky bottom-3 z-20 mt-2 scroll-mt-24 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur sm:mt-4 sm:p-3 xl:static xl:mt-2 xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none">
             {waitingSelection ? (
-              <button type="button" disabled={!selectedCardId} onClick={selectCard} className="min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40">
+              <button type="button" disabled={!selectedCardId} onClick={selectCard} className="min-h-12 w-full rounded-xl bg-slate-900 px-4 text-sm font-black text-white disabled:opacity-40 xl:min-h-10 xl:text-xs">
                 선택한 카드 제출
               </button>
             ) : needsRowChoice ? (
@@ -1171,56 +1167,11 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           </div>
         </section>
 
-        <section data-smoke="six-nimmt-compact-summary" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:rounded-[1.5rem] sm:p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-sm font-black text-slate-900">핵심 요약</div>
-              <div className="mt-0.5 text-xs font-bold text-slate-500">보드와 손패를 본 뒤 필요한 판단만 압축해서 확인합니다.</div>
-            </div>
-            <div className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">
-              {sixNimmtSelectedCount}/{sixNimmtPlayerCount || "-"}명 선택
-            </div>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              {
-                key: "phase",
-                label: "현재 단계",
-                value: phaseLabel,
-                detail: mySelected ? "내 카드는 제출 완료" : waitingSelection ? "손패에서 한 장 선택" : needsRowChoice ? "가져갈 행 선택" : "진행 대기",
-              },
-              {
-                key: "lock",
-                label: "선택 잠금",
-                value: `${sixNimmtSelectedCount}/${sixNimmtPlayerCount || "-"}명`,
-                detail: sixNimmtWaitingCount > 0 ? `${sixNimmtWaitingCount}명 대기` : "공개 준비 완료",
-              },
-              {
-                key: "risk",
-                label: "주의 행",
-                value: mostDangerousRow.index >= 0 ? `${mostDangerousRow.index + 1}행 · ${mostDangerousRow.penalty}벌점` : "-",
-                detail: mostDangerousRow.index >= 0 ? `${mostDangerousRow.cardCount}/5장` : "행 정보 대기",
-              },
-              {
-                key: "preview",
-                label: "내 예측",
-                value: mySelected ? "제출 완료" : selectedPreview ? selectedPreview.label : needsRowChoice ? "행 선택 필요" : "카드 선택",
-                detail: selectedPreview?.penalty ? `${selectedPreview.penalty}벌점 위험` : selectedPreview ? "자동 배치 후보" : "선택 전",
-              },
-            ].map((item) => (
-              <div key={item.key} data-smoke="six-nimmt-compact-summary-item" className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                <div className="text-[10px] font-black text-slate-400">{item.label}</div>
-                <div className="mt-0.5 truncate text-sm font-black text-slate-900">{item.value}</div>
-                <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </section>
       </main>
 
-      <aside className="space-y-4">
-        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
-          <div className="mb-3 text-sm font-black text-slate-900">벌점 현황</div>
+      <section className="grid gap-3 lg:grid-cols-2">
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg xl:p-2.5">
+          <div className="mb-3 text-sm font-black text-slate-900 xl:mb-2">벌점 현황</div>
           <div className="grid gap-2">
             {statePlayers.map((player) => {
               const seatNo = Number(get(player, "seat_no", "seatNo", 0));
@@ -1228,7 +1179,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
               const roundPenalty = Number(get(player, "round_penalty", "roundPenalty", 0));
               const winner = Boolean(get(player, "winner", "winner", false));
               return (
-                <div key={seatNo} className={`rounded-2xl border px-3 py-2 ${seatNo === Number(mySeatNo) ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
+                <div key={seatNo} className={`rounded-2xl border px-3 py-2 xl:px-2.5 xl:py-1.5 ${seatNo === Number(mySeatNo) ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-black text-slate-900">{playerNameBySeat(seatNo)}</div>
                     {winner && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">승리</span>}
@@ -1240,9 +1191,9 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
           </div>
         </section>
 
-        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg">
-          <div className="mb-3 text-sm font-black text-slate-900">최근 기록</div>
-          <div className="max-h-[420px] space-y-2 overflow-auto pr-1">
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-lg xl:p-2.5">
+          <div className="mb-3 text-sm font-black text-slate-900 xl:mb-2">최근 기록</div>
+          <div className="max-h-[420px] space-y-2 overflow-auto pr-1 xl:max-h-[300px] xl:space-y-1.5">
             {[...events].slice(-12).reverse().map((event) => {
               const eventType = get(event, "event_type", "eventType", "");
               const normalizedEventType = String(eventType || "").toUpperCase();
@@ -1267,7 +1218,7 @@ const SixNimmtBoard = ({ gameState, players: roomPlayers = [], mySeatNo, onActio
             )}
           </div>
         </section>
-      </aside>
+      </section>
     </div>
   );
 };

@@ -250,7 +250,7 @@ export const BoardDetail = () => {
                 )}
             </div>
 
-            <div className="card overflow-hidden">
+            <div className="surface-card overflow-hidden">
                 <div className="border-b border-line bg-control/60 p-6">
                     <div className="flex items-center gap-2 mb-3">
                         <span className="badge-primary">

@@ -177,7 +177,7 @@ export const StreamingHub = () => {
 
     return (
         <section className="space-y-6 pb-10">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="surface-panel p-5 sm:p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <p className="text-[11px] font-black text-primary-600">스트리밍</p>
@@ -188,7 +188,7 @@ export const StreamingHub = () => {
                         type="button"
                         onClick={() => fetchVideos()}
                         disabled={loading}
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-60"
+                        className="btn-secondary w-full sm:w-auto"
                     >
                         <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                         새로고침
@@ -197,7 +197,7 @@ export const StreamingHub = () => {
             </div>
 
             {playbackUnsupported ? (
-                <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5 text-sm font-semibold text-amber-800">
+                <div className="rounded-card border border-amber-100 bg-amber-50/85 p-5 text-sm font-semibold text-amber-800 shadow-card">
                     <div className="flex items-start gap-3">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                         <div>이 브라우저에서 전용 재생 엔진을 사용할 수 없어 내장 플레이어로 재생을 시도합니다.</div>
@@ -206,7 +206,7 @@ export const StreamingHub = () => {
             ) : null}
 
             {!selectedVideoId ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="surface-panel p-4 sm:p-5">
                     <div className="mb-5 flex items-center justify-between gap-4">
                         <div>
                             <h2 className="text-lg font-black text-slate-900">재생 목록</h2>
@@ -229,10 +229,10 @@ export const StreamingHub = () => {
                                         key={video.videoId}
                                         type="button"
                                         onClick={() => setSelectedVideoId(video.videoId)}
-                                        className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-lg"
+                                        className="surface-card spotlight-card overflow-hidden text-left transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-panel"
                                     >
-                                        <div className="aspect-video w-full bg-slate-100 p-3">
-                                            {renderThumbnail(video, "h-full w-full rounded-xl bg-slate-100 object-contain")}
+                                        <div className="aspect-video w-full bg-control p-3">
+                                            {renderThumbnail(video, "h-full w-full rounded-control bg-control object-contain")}
                                         </div>
                                         <div className="space-y-3 p-5">
                                             <div className="flex items-start justify-between gap-3">
@@ -256,7 +256,7 @@ export const StreamingHub = () => {
                                         type="button"
                                         onClick={() => fetchVideos({ page: videoPage + 1, append: true })}
                                         disabled={loadingMore}
-                                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-60"
+                                        className="btn-secondary"
                                     >
                                         <RefreshCw className={`h-4 w-4 ${loadingMore ? "animate-spin" : ""}`} />
                                         {loadingMore ? "불러오는 중..." : "더 보기"}
@@ -267,12 +267,12 @@ export const StreamingHub = () => {
                     )}
                 </div>
             ) : (
-                <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="surface-panel space-y-6 p-4 sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <button
                             type="button"
                             onClick={() => setSelectedVideoId(null)}
-                            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 transition-colors hover:bg-slate-200"
+                            className="btn-secondary"
                         >
                             <ArrowLeft className="h-4 w-4" />
                             목록으로 돌아가기
@@ -288,9 +288,9 @@ export const StreamingHub = () => {
                             <h2 className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">{selectedVideo?.title || playInfo?.title || "선택한 영상"}</h2>
                         </div>
 
-                        <div className="overflow-hidden rounded-2xl bg-slate-950 shadow-xl shadow-slate-900/20">
+                        <div className="overflow-hidden rounded-card bg-slate-950 shadow-panel">
                             {playLoading ? (
-                                <div className="flex aspect-video min-h-[260px] items-center justify-center text-sm font-bold text-white/70">플레이어를 준비하는 중입니다...</div>
+                                <div className="flex aspect-video min-h-[220px] items-center justify-center px-4 text-center text-sm font-bold text-white/70 sm:min-h-[260px]">플레이어를 준비하는 중입니다...</div>
                             ) : playInfo ? (
                                 <video
                                     key={playInfo.playlistUrl}
@@ -303,7 +303,7 @@ export const StreamingHub = () => {
                                     브라우저가 영상 재생을 지원하지 않습니다.
                                 </video>
                             ) : (
-                                <div className="flex aspect-video min-h-[260px] items-center justify-center text-sm font-bold text-white/70">재생 정보를 불러오지 못했습니다.</div>
+                                <div className="flex aspect-video min-h-[220px] items-center justify-center px-4 text-center text-sm font-bold text-white/70 sm:min-h-[260px]">재생 정보를 불러오지 못했습니다.</div>
                             )}
                         </div>
 
@@ -311,7 +311,7 @@ export const StreamingHub = () => {
                             <ErrorMessage message={playError} onRetry={() => fetchPlayInfo(selectedVideoId)} />
                         ) : null}
 
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm text-slate-600">
+                        <div className="surface-card bg-control/60 p-5 text-sm text-slate-600">
                             <div className="flex items-center gap-2 font-black text-slate-900">
                                 <PlayCircle className="h-4 w-4 text-primary-600" />
                                 재생 정보

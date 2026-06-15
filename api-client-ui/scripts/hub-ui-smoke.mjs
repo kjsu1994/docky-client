@@ -20,7 +20,9 @@ const debug = process.env.SMOKE_DEBUG === "1";
 const userDataDir = mkdtempSync(path.join(tmpdir(), "hub-ui-smoke-"));
 const viewports = [
     { name: "desktop", width: 1366, height: 900, mobile: false },
-    { name: "mobile", width: 390, height: 844, mobile: true },
+    { name: "tablet", width: 768, height: 1024, mobile: false },
+    { name: "galaxy-s26", width: 360, height: 780, mobile: true, deviceScaleFactor: 3 },
+    { name: "short-galaxy-s26", width: 360, height: 740, mobile: true, deviceScaleFactor: 3 },
 ];
 
 const allMenuTexts = [
@@ -101,10 +103,34 @@ function assertStaticGamesHubManualAccessibility() {
         "closeButtonRef.current?.focus()",
         "previousFocus.focus()",
         "onClose={closeManual}",
+        "GameCardSelectionPanel",
+        "GameCardMotionPreview",
+        'dataSmoke="game-card-hover-art"',
+        'variant="hero"',
+        "data-game-selected={selected ? \"true\" : \"false\"}",
+        'data-touch-preview-mode="tap"',
+        'data-compact-auto-preview={compactCards ? "visible-cards" : "hover"}',
+        "activeGamePreviews",
+        "setActiveGamePreviews",
+        "visibleCards",
+        "rowTolerance",
+        ".flatMap((row) => row.cards",
+        ".slice(0, 4)",
+        "(hover: none)",
+        "handleEntryClick",
     ];
     const missing = requiredSnippets.filter((snippet) => !source.includes(snippet));
     if (missing.length) {
         throw new Error(`games hub manual accessibility guard missing: ${missing.join(", ")}`);
+    }
+    if (source.includes('data-smoke="game-card-selection-art"')) {
+        throw new Error("games hub must not render duplicate lower motion art in card selection panels");
+    }
+    if (source.includes("hover:col-span-2") || source.includes("xl:hover:col-span-2")) {
+        throw new Error("games hub cards must not reflow the grid on hover");
+    }
+    if (!source.includes("grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4")) {
+        throw new Error("games hub card grid must keep two mobile columns and four desktop columns");
     }
 }
 
@@ -843,7 +869,7 @@ async function setViewport(ws, viewport) {
     await send(ws, "Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: viewport.mobile ? 2 : 1,
+        deviceScaleFactor: viewport.deviceScaleFactor || (viewport.mobile ? 2 : 1),
         mobile: viewport.mobile,
     });
 }
@@ -1116,6 +1142,96 @@ async function inspectGamesHub(ws, viewport) {
     if (JSON.stringify(cardOrder) !== JSON.stringify(expectedOrder)) {
         throw new Error(`games-hub ${viewport.name}: player-count order mismatch ${JSON.stringify(cardOrder)}`);
     }
+    const boardHoverTarget = await evaluate(ws, `(() => {
+        const link = document.querySelector('[data-smoke="game-card"] a[href="/app/games/las-vegas"]');
+        const card = link?.closest('[data-smoke="game-card"]');
+        card?.scrollIntoView({ block: "center", inline: "center" });
+        if (!card) {
+            return {
+                ready: false,
+                url: location.href,
+                cardCount: document.querySelectorAll('[data-smoke="game-card"]').length,
+                hrefs: Array.from(document.querySelectorAll('a[href]')).map((node) => node.getAttribute("href")).slice(0, 20),
+            };
+        }
+        const rect = card.getBoundingClientRect();
+        return {
+            ready: true,
+            x: Math.round(rect.left + rect.width / 2),
+            y: Math.round(rect.top + rect.height / 2),
+            rect: {
+                left: Math.round(rect.left),
+                top: Math.round(rect.top),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height),
+            },
+            pointTitle: document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)?.closest('[data-smoke="game-card"]')?.getAttribute("data-game-title") || "",
+            url: location.href,
+        };
+    })()`);
+    if (!boardHoverTarget.ready) {
+        throw new Error(`games-hub ${viewport.name}: board card hover target missing ${JSON.stringify(boardHoverTarget)}`);
+    }
+    if (viewport.mobile) {
+        await send(ws, "Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: [{ x: boardHoverTarget.x, y: boardHoverTarget.y, radiusX: 4, radiusY: 4, force: 1 }],
+        });
+        await delay(60);
+        await send(ws, "Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    } else {
+        await send(ws, "Input.dispatchMouseEvent", {
+            type: "mouseMoved",
+            x: boardHoverTarget.x,
+            y: boardHoverTarget.y,
+            button: "none",
+        });
+    }
+    await delay(250);
+    const boardHoverExpansion = await evaluate(ws, `(() => {
+        const link = document.querySelector('[data-smoke="game-card"] a[href="/app/games/las-vegas"]');
+        const card = link?.closest('[data-smoke="game-card"]');
+        const panel = card?.querySelector('[data-smoke="game-card-selection-panel"]');
+        const heroArt = card?.querySelector('[data-smoke="game-card-hover-art"]');
+        return {
+            selected: card?.getAttribute("data-game-selected") || "",
+            panelMounted: Boolean(panel),
+            panelActive: panel?.getAttribute("data-active") || "",
+            panelHeight: Math.round(panel?.getBoundingClientRect().height || 0),
+            heroMotionKind: heroArt?.getAttribute("data-motion-kind") || "",
+            heroOpacity: Number(getComputedStyle(heroArt || document.body).opacity || 0),
+            duplicateMotionArt: card?.querySelectorAll('[data-smoke="game-card-selection-art"]').length || 0,
+            briefPanels: card?.querySelectorAll('[data-smoke="game-card-brief-panel"]').length || 0,
+            items: card?.querySelectorAll('[data-smoke="game-card-selection-item"]').length || 0,
+            visibleItems: Array.from(card?.querySelectorAll('[data-smoke="game-card-selection-item"]') || []).filter((node) => {
+                const style = getComputedStyle(node);
+                return style.display !== "none" && style.visibility !== "hidden" && node.getClientRects().length > 0;
+            }).length,
+            activeCards: document.querySelectorAll('[data-smoke="game-card"][data-game-selected="true"]').length,
+            activeElement: document.activeElement?.getAttribute("href") || document.activeElement?.getAttribute("aria-label") || document.activeElement?.tagName || "",
+            url: location.href,
+            body: document.body?.innerText.slice(0, 240) || "",
+            hoveredTitle: document.querySelector('[data-smoke="game-card"]:hover')?.getAttribute("data-game-title") || "",
+            pointTitle: document.elementFromPoint(${boardHoverTarget.x}, ${boardHoverTarget.y})?.closest('[data-smoke="game-card"]')?.getAttribute("data-game-title") || "",
+            hrefs: Array.from(document.querySelectorAll('[data-smoke="game-card"] a[href]')).map((node) => node.getAttribute("href")),
+            titles: Array.from(document.querySelectorAll('[data-smoke="game-card"]')).map((node) => node.getAttribute("data-game-title")),
+        };
+    })()`);
+    if (
+        (viewport.mobile ? boardHoverExpansion.panelMounted : boardHoverExpansion.panelHeight < 60) ||
+        boardHoverExpansion.heroMotionKind !== "casino-dice" ||
+        boardHoverExpansion.heroOpacity < 0.9 ||
+        boardHoverExpansion.duplicateMotionArt !== 0 ||
+        (viewport.mobile ? boardHoverExpansion.briefPanels !== 0 : boardHoverExpansion.briefPanels < 1) ||
+        (viewport.mobile ? boardHoverExpansion.items !== 0 : boardHoverExpansion.items < 3) ||
+        (viewport.mobile ? boardHoverExpansion.visibleItems !== 0 : boardHoverExpansion.visibleItems < 3)
+    ) {
+        throw new Error(`games-hub ${viewport.name}: board card hover expansion missing ${JSON.stringify(boardHoverExpansion)}`);
+    }
+    if (!viewport.mobile) {
+        await send(ws, "Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 4, button: "none" });
+    }
+    await delay(100);
     if (false) {
     const boardCardFlow = await evaluate(ws, `(() => {
         const rails = Array.from(document.querySelectorAll('[data-smoke="game-card-flow-rail"]'));
@@ -1490,6 +1606,89 @@ async function inspectGamesHub(ws, viewport) {
     if (JSON.stringify(videoOrder) !== JSON.stringify(expectedVideoOrder)) {
         throw new Error(`games-hub ${viewport.name}: video player-count order mismatch ${JSON.stringify(videoOrder)}`);
     }
+    const videoHoverTarget = await evaluate(ws, `(() => {
+        const link = document.querySelector('[data-smoke="game-card"] a[href="/app/games/video/rpg"]');
+        const card = link?.closest('[data-smoke="game-card"]');
+        card?.scrollIntoView({ block: "center", inline: "center" });
+        if (!card) {
+            return {
+                ready: false,
+                url: location.href,
+                cardCount: document.querySelectorAll('[data-smoke="game-card"]').length,
+                hrefs: Array.from(document.querySelectorAll('a[href]')).map((node) => node.getAttribute("href")).slice(0, 20),
+            };
+        }
+        const rect = card.getBoundingClientRect();
+        return {
+            ready: true,
+            x: Math.round(rect.left + rect.width / 2),
+            y: Math.round(rect.top + rect.height / 2),
+            rect: {
+                left: Math.round(rect.left),
+                top: Math.round(rect.top),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height),
+            },
+            pointTitle: document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)?.closest('[data-smoke="game-card"]')?.getAttribute("data-game-title") || "",
+            url: location.href,
+        };
+    })()`);
+    if (!videoHoverTarget.ready) {
+        throw new Error(`games-hub ${viewport.name}: video card hover target missing ${JSON.stringify(videoHoverTarget)}`);
+    }
+    if (viewport.mobile) {
+        await send(ws, "Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: [{ x: videoHoverTarget.x, y: videoHoverTarget.y, radiusX: 4, radiusY: 4, force: 1 }],
+        });
+        await delay(60);
+        await send(ws, "Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    } else {
+        await send(ws, "Input.dispatchMouseEvent", {
+            type: "mouseMoved",
+            x: videoHoverTarget.x,
+            y: videoHoverTarget.y,
+            button: "none",
+        });
+    }
+    await delay(250);
+    const videoHoverExpansion = await evaluate(ws, `(() => {
+        const link = document.querySelector('[data-smoke="game-card"] a[href="/app/games/video/rpg"]');
+        const card = link?.closest('[data-smoke="game-card"]');
+        const panel = card?.querySelector('[data-smoke="game-card-selection-panel"]');
+        const heroArt = card?.querySelector('[data-smoke="game-card-hover-art"]');
+        return {
+            selected: card?.getAttribute("data-game-selected") || "",
+            panelMounted: Boolean(panel),
+            panelActive: panel?.getAttribute("data-active") || "",
+            panelHeight: Math.round(panel?.getBoundingClientRect().height || 0),
+            heroMotionKind: heroArt?.getAttribute("data-motion-kind") || "",
+            heroOpacity: Number(getComputedStyle(heroArt || document.body).opacity || 0),
+            duplicateMotionArt: card?.querySelectorAll('[data-smoke="game-card-selection-art"]').length || 0,
+            briefPanels: card?.querySelectorAll('[data-smoke="game-card-brief-panel"]').length || 0,
+            items: card?.querySelectorAll('[data-smoke="game-card-selection-item"]').length || 0,
+            visibleItems: Array.from(card?.querySelectorAll('[data-smoke="game-card-selection-item"]') || []).filter((node) => {
+                const style = getComputedStyle(node);
+                return style.display !== "none" && style.visibility !== "hidden" && node.getClientRects().length > 0;
+            }).length,
+            activeCards: document.querySelectorAll('[data-smoke="game-card"][data-game-selected="true"]').length,
+        };
+    })()`);
+    if (
+        (viewport.mobile ? videoHoverExpansion.panelMounted : videoHoverExpansion.panelHeight < 60) ||
+        videoHoverExpansion.heroMotionKind !== "rpg-tree" ||
+        videoHoverExpansion.heroOpacity < 0.9 ||
+        videoHoverExpansion.duplicateMotionArt !== 0 ||
+        (viewport.mobile ? videoHoverExpansion.briefPanels !== 0 : videoHoverExpansion.briefPanels < 1) ||
+        (viewport.mobile ? videoHoverExpansion.items !== 0 : videoHoverExpansion.items < 3) ||
+        (viewport.mobile ? videoHoverExpansion.visibleItems !== 0 : videoHoverExpansion.visibleItems < 3)
+    ) {
+        throw new Error(`games-hub ${viewport.name}: video card hover expansion missing ${JSON.stringify(videoHoverExpansion)}`);
+    }
+    if (!viewport.mobile) {
+        await send(ws, "Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 4, button: "none" });
+    }
+    await delay(100);
     if (false) {
     const videoCardFlow = await evaluate(ws, `(() => {
         const rails = Array.from(document.querySelectorAll('[data-smoke="game-card-flow-rail"]'));
