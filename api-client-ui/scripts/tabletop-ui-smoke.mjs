@@ -2486,6 +2486,26 @@ function assertRequest(game, kind, predicate, description) {
   }
 }
 
+function summarizeRequests(game, kind) {
+  return mockState.requests
+    .filter((candidate) => candidate.game === game && candidate.kind === kind)
+    .map((candidate) => ({
+      pathname: candidate.pathname,
+      title: candidate.body?.title || "",
+      variant: candidate.body?.variant_code || candidate.body?.variantCode || "",
+    }));
+}
+
+async function waitForRequest(game, kind, predicate, description, timeoutMs = 5000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const request = mockState.requests.find((candidate) => candidate.game === game && candidate.kind === kind && (!predicate || predicate(candidate)));
+    if (request) return request;
+    await delay(100);
+  }
+  throw new Error(`${game} room flow: missing ${description}; observed ${JSON.stringify(summarizeRequests(game, kind))}`);
+}
+
 function expectedSoloAiBotCount(game) {
   const selectedVariant = variantsByGame[game]?.[0] || {};
   const minPlayers = Number(selectedVariant.minPlayers || selectedVariant.min_players || 1);
@@ -3056,7 +3076,7 @@ async function runVariantCreateSmoke(ws, { game, variantCode }) {
   await setInputByAriaLabel(ws, "방 제목", title);
   await clickCreateRoomSubmit(ws);
   await waitForText(ws, "방 코드");
-  assertRequest(
+  await waitForRequest(
     game,
     "create",
     (request) => request.body?.title === title && (request.body?.variant_code || request.body?.variantCode) === variantCode,
