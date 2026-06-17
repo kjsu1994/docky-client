@@ -69,6 +69,24 @@ const csvParams = (csvPath) => ({
     },
 });
 
+const csvFileFormData = (file, extraFiles = {}) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    Object.entries(extraFiles).forEach(([key, value]) => {
+        if (value) {
+            formData.append(key, value);
+        }
+    });
+    return formData;
+};
+
+const importCsvFile = async (endpoint, file, extraFiles = {}) => {
+    const response = await api.post(endpoint, csvFileFormData(file, extraFiles), {
+        timeout: 0,
+    });
+    return response;
+};
+
 export const facilityAdapter = {
     async fetchParkingLots({ latitude, longitude, radiusKm, limit, paidOnly = false, keyword = "", sort = "distance" }) {
         const response = await api.get("/parking/lots", {
@@ -84,6 +102,11 @@ export const facilityAdapter = {
 
     async importParkingLots(csvPath) {
         const response = await api.post("/admin/parking/import", null, csvParams(csvPath));
+        return normalizeImportResult(response);
+    },
+
+    async importParkingLotsFile(file) {
+        const response = await importCsvFile("/admin/parking/import-file", file);
         return normalizeImportResult(response);
     },
 
@@ -104,6 +127,11 @@ export const facilityAdapter = {
         return normalizeImportResult(response);
     },
 
+    async importRestroomLotsFile(file) {
+        const response = await importCsvFile("/admin/restroom/import-file", file);
+        return normalizeImportResult(response);
+    },
+
     async fetchLibraryLots({ latitude, longitude, radiusKm, limit }) {
         const response = await api.get("/libraries/lots", {
             params: lotSearchParams({ latitude, longitude, radiusKm, limit }),
@@ -116,6 +144,11 @@ export const facilityAdapter = {
         return normalizeImportResult(response);
     },
 
+    async importLibraryLotsFile(file) {
+        const response = await importCsvFile("/admin/library/import-file", file);
+        return normalizeImportResult(response);
+    },
+
     async fetchBunkerLots({ latitude, longitude, radiusKm, limit }) {
         const response = await api.get("/bunkers/lots", {
             params: lotSearchParams({ latitude, longitude, radiusKm, limit }),
@@ -125,6 +158,11 @@ export const facilityAdapter = {
 
     async importBunkerLots(csvPath) {
         const response = await api.post("/admin/bunker/import", null, csvParams(csvPath));
+        return normalizeImportResult(response);
+    },
+
+    async importBunkerLotsFile(file) {
+        const response = await importCsvFile("/admin/bunker/import-file", file);
         return normalizeImportResult(response);
     },
 
@@ -142,6 +180,11 @@ export const facilityAdapter = {
 
     async importMedicalLots(csvPath) {
         const response = await api.post("/admin/medical/import", null, csvParams(csvPath));
+        return normalizeMedicalImportStatus(response);
+    },
+
+    async importMedicalLotsFile({ file, locationFile } = {}) {
+        const response = await importCsvFile("/admin/medical/import-file", file, { locationFile });
         return normalizeMedicalImportStatus(response);
     },
 

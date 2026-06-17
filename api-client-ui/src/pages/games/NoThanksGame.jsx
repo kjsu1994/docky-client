@@ -34,7 +34,6 @@ const NO_THANKS_SOUND_VOLUME_MULTIPLIER = 16;
 const NO_THANKS_GSAP_SELECTORS = [
   '[data-gsap="no-thanks-card-stage"]',
   '[data-smoke="no-thanks-current-card-art"]',
-  '[data-smoke="no-thanks-chip-token"]',
   '[data-smoke="no-thanks-action-availability-node"]',
   '[data-smoke="no-thanks-score-lens-node"]',
   '[data-smoke="no-thanks-player-state-card"]',

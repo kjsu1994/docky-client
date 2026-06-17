@@ -429,7 +429,7 @@ export const AdminStreamingStudio = () => {
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <h2 className="text-lg font-black text-slate-900">inbox 반입</h2>
-                                <p className="mt-2 text-sm font-medium text-slate-400">`C:\compose\minio-data\streaming\inbox` 에 넣은 영상을 스캔하고 선택해서 가져옵니다.</p>
+                                <p className="mt-2 text-sm font-medium text-slate-400">`/data/streaming/inbox` 경로에 넣은 영상을 스캔하고 선택해서 가져옵니다.</p>
                             </div>
                             <button
                                 type="button"

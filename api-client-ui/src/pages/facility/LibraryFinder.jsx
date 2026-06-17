@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Library, LocateFixed, RefreshCw, Search, DatabaseZap, X, ExternalLink } from "lucide-react";
+import { Library, LocateFixed, Search, X, ExternalLink } from "lucide-react";
 import { LoadingSpinner } from "../../components/LoadingSpinner.jsx";
+import { CsvImportPanel } from "./CsvImportPanel.jsx";
 import { AddressSearchBox } from "../../common/AddressSearchBox.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { isAdminUser } from "../../utils/authorization.js";
@@ -306,6 +307,21 @@ export const LibraryFinder = () => {
         }
     };
 
+    const handleImportFile = async (file) => {
+        setImporting(true);
+        try {
+            const data = await facilityAdapter.importLibraryLotsFile(file);
+            const count = data.importedCount;
+            if (data.csvPath) setCsvPath(data.csvPath);
+            notifySuccess(`CSV 재적재 완료 (${count}건)`);
+            await fetchLots();
+        } catch (err) {
+            notifyError(extractFacilityErrorMessage(err, "CSV 재적재에 실패했습니다."));
+        } finally {
+            setImporting(false);
+        }
+    };
+
     const summary = useMemo(() => {
         const seatTotal = items.reduce((acc, i) => acc + toNumber(i?.reading_seat_count ?? i?.readingSeatCount), 0);
         const bookTotal = items.reduce((acc, i) => acc + toNumber(i?.book_count ?? i?.bookCount), 0);
@@ -362,11 +378,13 @@ export const LibraryFinder = () => {
                     <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm text-sm font-bold text-slate-800">총 {items.length}건 / 좌석 합계 {summary.seatTotal.toLocaleString("ko-KR")} / 도서 합계 {summary.bookTotal.toLocaleString("ko-KR")}</div>
 
                     {adminMode && (
-                        <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
-                            <div className="mb-3 flex items-center gap-2 text-amber-800"><DatabaseZap className="h-4 w-4" /><span className="text-sm font-black">관리자 CSV 재적재</span></div>
-                            <input value={csvPath} onChange={(e) => setCsvPath(e.target.value)} className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" placeholder="CSV 경로" />
-                            <button onClick={handleImport} disabled={importing} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 py-2.5 text-xs font-black text-white disabled:opacity-60">{importing ? <LoadingSpinner size="sm" text="" /> : <RefreshCw className="h-3.5 w-3.5" />}CSV 다시 적재</button>
-                        </div>
+                        <CsvImportPanel
+                            csvPath={csvPath}
+                            onCsvPathChange={setCsvPath}
+                            onPathImport={handleImport}
+                            onFileImport={handleImportFile}
+                            importing={importing}
+                        />
                     )}
                 </div>
 
